@@ -30,11 +30,11 @@ describe('Grupo Cacharelo Landing Page Rendering', () => {
     expect(screen.getByRole('button', { name: /operaciones 24 hrs/i })).toBeInTheDocument();
   });
 
-  it('renders the contact form and safe line phone number', () => {
+  it('renders the contact form and contact options', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { name: /línea segura/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /únete a la familia/i })).toBeInTheDocument();
-    expect(screen.getByText('55 9244 9939')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /atención al cliente/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /contacto y franquicias/i })).toBeInTheDocument();
+    expect(screen.getByText('contacto@grupo-cacharelo.com')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /enviar mensaje/i })).toBeInTheDocument();
   });
 

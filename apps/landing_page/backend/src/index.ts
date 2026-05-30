@@ -26,7 +26,7 @@ export const submitInquiry: ff.HttpFunction = async (req, res) => {
   }
 
   try {
-    const { name, email, phone, subject, message, honeypot } = req.body || {};
+    const { name, email, phone, subject, message, honeypot, inquiryType } = req.body || {};
 
     // Spam honeypot validation: if filled, reject silently or return simulated success
     if (honeypot && honeypot.trim() !== '') {
@@ -68,6 +68,10 @@ export const submitInquiry: ff.HttpFunction = async (req, res) => {
       errors.push('Phone must be 20 characters or less');
     }
 
+    if (inquiryType && (typeof inquiryType !== 'string' || inquiryType.length > 50)) {
+      errors.push('Inquiry type must be a valid string of 50 characters or less');
+    }
+
     if (errors.length > 0) {
       res.status(400).json({
         success: false,
@@ -88,6 +92,7 @@ export const submitInquiry: ff.HttpFunction = async (req, res) => {
       phone: phone ? phone.trim() : null,
       subject: subject.trim(),
       message: message.trim(),
+      inquiryType: inquiryType ? inquiryType.trim() : 'general',
       status: 'pending',
       createdAt: FieldValue.serverTimestamp(),
     };

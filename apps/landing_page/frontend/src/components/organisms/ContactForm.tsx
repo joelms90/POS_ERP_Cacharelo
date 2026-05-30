@@ -7,6 +7,7 @@ export const ContactForm: React.FC = () => {
     name: '',
     email: '',
     phone: '',
+    inquiryType: 'quejas_sugerencias',
     subject: '',
     message: '',
     honeypot: '',
@@ -53,7 +54,9 @@ export const ContactForm: React.FC = () => {
     return Object.keys(errors).length === 0;
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     // Clear field error on change
@@ -98,6 +101,7 @@ export const ContactForm: React.FC = () => {
           name: '',
           email: '',
           phone: '',
+          inquiryType: 'quejas_sugerencias',
           subject: '',
           message: '',
           honeypot: '',
@@ -116,28 +120,37 @@ export const ContactForm: React.FC = () => {
   return (
     <section className="w-full py-24 px-margin-mobile md:px-margin-desktop bg-[#0B0B0C]" id="contacto">
       <div className="max-w-3xl mx-auto flex flex-col items-center">
-        {/* Safe Line / Contact Info */}
-        <div id="linea-segura" className="flex flex-col items-center text-center gap-8 mb-16">
+        {/* Customer Attention Info */}
+        <div id="linea-segura" className="flex flex-col items-center text-center gap-6 mb-16">
           <span className="material-symbols-outlined text-mafia-gold text-5xl" style={{ fontVariationSettings: "'FILL' 1" }}>
-            phone_in_talk
+            restaurant
           </span>
           <div>
             <Typography variant="h2" className="font-spec-hero text-mafia-gold text-2xl md:text-3xl mb-2">
-              Línea segura
+              Atención al Cliente
             </Typography>
-            <Typography variant="body-md" className="text-on-surface-variant">
-              Para reporte y soporte directo:
+            <Typography variant="body-md" className="text-on-surface-variant max-w-lg">
+              Tu opinión es lo más importante para nosotros. Escríbenos directamente o utiliza el formulario para quejas, sugerencias o solicitudes de franquicias.
             </Typography>
           </div>
-          <a
-            className="font-hero text-4xl md:text-5xl hover:text-primary transition-colors duration-300 tracking-wider text-white font-bold"
-            href="tel:5592449939"
-          >
-            55 9244 9939
-          </a>
-          <Typography variant="label-sm" className="text-on-surface-variant uppercase font-mono">
-            Ofic: +52 1 55 7421 5566
-          </Typography>
+          <div className="flex flex-col sm:flex-row gap-6 mt-2 w-full justify-center">
+            <a
+              href="https://wa.me/525592449939"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/30 px-8 py-3 rounded-[4px] font-sans font-semibold text-sm hover:bg-[#25D366]/20 transition-all duration-300 w-full sm:w-auto"
+            >
+              <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>chat</span>
+              WhatsApp Directo
+            </a>
+            <a
+              href="mailto:contacto@grupo-cacharelo.com"
+              className="flex items-center justify-center gap-2 bg-mafia-gold/10 text-mafia-gold border border-mafia-gold/30 px-8 py-3 rounded-[4px] font-sans font-semibold text-sm hover:bg-mafia-gold/20 transition-all duration-300 w-full sm:w-auto"
+            >
+              <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>mail</span>
+              contacto@grupo-cacharelo.com
+            </a>
+          </div>
         </div>
 
         <div className="w-full divider-cinematic mb-16"></div>
@@ -145,7 +158,7 @@ export const ContactForm: React.FC = () => {
         {/* Contact Form Container */}
         <div className="w-full bg-mafia-gradient border border-mafia-bronze rounded-lg p-8 md:p-12 relative">
           <Typography variant="h2" className="font-spec-hero text-mafia-gold text-xl md:text-2xl mb-8 text-center">
-            Únete a la familia
+            Contacto y Franquicias
           </Typography>
 
           {success && (
@@ -219,7 +232,7 @@ export const ContactForm: React.FC = () => {
               </div>
             </div>
 
-            {/* Row: Phone and Subject */}
+            {/* Row: Phone and Motivo de Contacto */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="flex flex-col gap-2">
                 <label className="font-sans font-bold text-xs uppercase tracking-wider text-on-surface-variant" htmlFor="phone">
@@ -240,22 +253,47 @@ export const ContactForm: React.FC = () => {
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="font-sans font-bold text-xs uppercase tracking-wider text-on-surface-variant" htmlFor="subject">
-                  Asunto *
+                <label className="font-sans font-bold text-xs uppercase tracking-wider text-on-surface-variant" htmlFor="inquiryType">
+                  Motivo de Contacto *
                 </label>
-                <input
-                  id="subject"
-                  type="text"
-                  name="subject"
-                  value={formData.subject}
-                  onChange={handleChange}
-                  placeholder="ej. Solicitud de Franquicia"
-                  className="bg-[#0B0B0C] border border-mafia-bronze text-white rounded-[4px] px-4 py-3 focus:outline-none focus:border-mafia-gold focus:ring-1 focus:ring-mafia-gold placeholder-neutral-700 transition-all font-sans text-sm"
-                />
-                {fieldErrors.subject && (
-                  <span className="text-xs text-red-400 font-medium">{fieldErrors.subject}</span>
-                )}
+                <div className="relative">
+                  <select
+                    id="inquiryType"
+                    name="inquiryType"
+                    value={formData.inquiryType}
+                    onChange={handleChange}
+                    className="w-full bg-[#0B0B0C] border border-mafia-bronze text-white rounded-[4px] px-4 py-3 pr-10 focus:outline-none focus:border-mafia-gold focus:ring-1 focus:ring-mafia-gold transition-all font-sans text-sm cursor-pointer appearance-none"
+                  >
+                    <option value="quejas_sugerencias">Quejas y Sugerencias</option>
+                    <option value="franquicias">Solicitud de Franquicia</option>
+                    <option value="proveedores">Proveedores / Alianzas</option>
+                    <option value="empleo">Bolsa de Trabajo</option>
+                    <option value="otro">Otro Asunto</option>
+                  </select>
+                  <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">
+                    keyboard_arrow_down
+                  </span>
+                </div>
               </div>
+            </div>
+
+            {/* Row: Subject */}
+            <div className="flex flex-col gap-2">
+              <label className="font-sans font-bold text-xs uppercase tracking-wider text-on-surface-variant" htmlFor="subject">
+                Asunto *
+              </label>
+              <input
+                id="subject"
+                type="text"
+                name="subject"
+                value={formData.subject}
+                onChange={handleChange}
+                placeholder="ej. Sugerencia sobre el servicio en sucursal"
+                className="bg-[#0B0B0C] border border-mafia-bronze text-white rounded-[4px] px-4 py-3 focus:outline-none focus:border-mafia-gold focus:ring-1 focus:ring-mafia-gold placeholder-neutral-700 transition-all font-sans text-sm"
+              />
+              {fieldErrors.subject && (
+                <span className="text-xs text-red-400 font-medium">{fieldErrors.subject}</span>
+              )}
             </div>
 
             {/* Row: Message */}

@@ -122,7 +122,7 @@ describe('submitInquiry Google Cloud Function', () => {
     expect(responseData.details).toContain('Message is required');
   });
 
-  it('should return 201 Created and save to Firestore on valid input', async () => {
+  it('should return 201 Created and save to Firestore on valid input with default inquiryType', async () => {
     mockRequest = {
       method: 'POST',
       body: {
@@ -148,8 +148,37 @@ describe('submitInquiry Google Cloud Function', () => {
         phone: '+525592449939',
         subject: 'Business Inquiry',
         message: 'Let us make a deal.',
+        inquiryType: 'general',
         status: 'pending',
         createdAt: 'mock-server-timestamp',
+      })
+    );
+  });
+
+  it('should return 201 Created and save specific inquiryType to Firestore', async () => {
+    mockRequest = {
+      method: 'POST',
+      body: {
+        name: 'Fredo Corleone',
+        email: 'fredo@corleone.com',
+        subject: 'Complaints',
+        message: 'I was passed over!',
+        inquiryType: 'quejas_sugerencias',
+      },
+    };
+
+    await submitInquiry(mockRequest, mockResponse);
+
+    expect(responseStatus).toBe(201);
+    expect(responseData.success).toBe(true);
+    expect(mockSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Fredo Corleone',
+        email: 'fredo@corleone.com',
+        subject: 'Complaints',
+        message: 'I was passed over!',
+        inquiryType: 'quejas_sugerencias',
+        status: 'pending',
       })
     );
   });
