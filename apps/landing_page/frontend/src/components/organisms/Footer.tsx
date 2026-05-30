@@ -43,7 +43,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenPrivacy, onOpenTerms }) =>
             href="#linea-segura"
             onClick={(e) => handleScroll(e, 'linea-segura')}
           >
-            Línea Segura
+            Atención al Cliente
           </a>
           <a
             className="text-on-surface-variant hover:text-primary transition-all duration-300"

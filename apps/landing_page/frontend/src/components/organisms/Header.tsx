@@ -55,7 +55,7 @@ export const Header: React.FC = () => {
               href="#linea-segura"
               onClick={(e) => handleScroll(e, 'linea-segura')}
             >
-              Línea Segura
+              Atención al Cliente
             </a>
           </li>
         </ul>
@@ -116,7 +116,7 @@ export const Header: React.FC = () => {
               href="#linea-segura"
               onClick={(e) => handleScroll(e, 'linea-segura')}
             >
-              Línea Segura
+              Atención al Cliente
             </a>
           </li>
           <li className="w-full px-8 mt-2">
