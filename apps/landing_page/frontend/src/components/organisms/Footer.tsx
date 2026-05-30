@@ -27,13 +27,13 @@ export const Footer: React.FC<FooterProps> = ({ onOpenPrivacy, onOpenTerms }) =>
         {/* Links */}
         <div className="flex flex-wrap justify-center gap-6 font-sans font-semibold text-xs uppercase">
           <button
-            className="text-on-surface-variant hover:text-primary transition-all duration-300 cursor-pointer focus:outline-none bg-transparent border-none p-0"
+            className="text-on-surface-variant hover:text-primary transition-all duration-300 cursor-pointer focus:outline-none bg-transparent border-none p-0 uppercase"
             onClick={onOpenPrivacy}
           >
             Privacidad
           </button>
           <button
-            className="text-on-surface-variant hover:text-primary transition-all duration-300 cursor-pointer focus:outline-none bg-transparent border-none p-0"
+            className="text-on-surface-variant hover:text-primary transition-all duration-300 cursor-pointer focus:outline-none bg-transparent border-none p-0 uppercase"
             onClick={onOpenTerms}
           >
             Términos
