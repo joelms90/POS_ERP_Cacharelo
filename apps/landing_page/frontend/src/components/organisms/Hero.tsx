@@ -26,7 +26,7 @@ export const Hero: React.FC = () => {
       {/* Content Anchor */}
       <div className="max-w-4xl mx-auto flex flex-col items-center gap-8 relative z-10">
         <Typography variant="h1">
-          El Sabor Oficial De Tu Viaje
+          El sabor oficial de tu viaje
         </Typography>
         <Typography
           variant="body-lg"

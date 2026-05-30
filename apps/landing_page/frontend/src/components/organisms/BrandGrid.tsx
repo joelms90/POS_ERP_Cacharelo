@@ -37,7 +37,7 @@ export const BrandGrid: React.FC = () => {
     <section className="w-full py-24 px-margin-mobile md:px-margin-desktop bg-[#0B0B0C]" id="marcas">
       <div className="max-w-container-max mx-auto flex flex-col items-center">
         <Typography variant="h2" className="mb-16 text-center font-spec-hero text-mafia-gold">
-          Nuestras Cuatro Marcas
+          Nuestras cuatro marcas
         </Typography>
         
         {/* Grid cols 1 on mobile, 2 on tablet, 4 on desktop */}

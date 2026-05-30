@@ -17,7 +17,7 @@ export const Typography: React.FC<TypographyProps> = ({
 
   const styles = {
     h1: 'font-hero font-spec-hero text-4xl md:text-[3.5rem] leading-tight text-mafia-gold font-bold drop-shadow-2xl tracking-widest',
-    h2: 'font-serif text-2xl md:text-3xl font-semibold uppercase tracking-wider text-on-surface',
+    h2: 'font-serif text-2xl md:text-3xl font-semibold tracking-wider text-on-surface',
     h3: 'font-spec-dish text-xl md:text-2xl text-white font-bold',
     'body-lg': 'font-sans text-lg md:text-xl font-normal leading-relaxed text-[#e2e2e2]',
     'body-md': 'font-sans text-sm md:text-base font-normal leading-relaxed text-[#e5e5e5]',

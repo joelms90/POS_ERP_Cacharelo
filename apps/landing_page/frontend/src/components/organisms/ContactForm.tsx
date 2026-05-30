@@ -123,7 +123,7 @@ export const ContactForm: React.FC = () => {
           </span>
           <div>
             <Typography variant="h2" className="font-spec-hero text-mafia-gold text-2xl md:text-3xl mb-2">
-              Línea Segura
+              Línea segura
             </Typography>
             <Typography variant="body-md" className="text-on-surface-variant">
               Para reporte y soporte directo:
@@ -145,7 +145,7 @@ export const ContactForm: React.FC = () => {
         {/* Contact Form Container */}
         <div className="w-full bg-mafia-gradient border border-mafia-bronze rounded-lg p-8 md:p-12 relative">
           <Typography variant="h2" className="font-spec-hero text-mafia-gold text-xl md:text-2xl mb-8 text-center">
-            Únete a la Familia
+            Únete a la familia
           </Typography>
 
           {success && (

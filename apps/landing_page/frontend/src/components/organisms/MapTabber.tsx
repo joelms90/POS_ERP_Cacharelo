@@ -35,9 +35,9 @@ export const MapTabber: React.FC = () => {
     <section className="w-full py-24 px-margin-mobile md:px-margin-desktop bg-[#0B0B0C]" id="territorios">
       <div className="max-w-container-max mx-auto">
         <Typography variant="h2" className="mb-12 text-center font-spec-hero text-mafia-gold">
-          Los Territorios y Operaciones{' '}
+          Los territorios y operaciones{' '}
           <span className="font-sans font-semibold tracking-normal text-mafia-gold lowercase text-xs" style={{ fontVariant: 'small-caps' }}>
-            24 Horas
+            24 horas
           </span>
         </Typography>
 
@@ -77,8 +77,8 @@ export const MapTabber: React.FC = () => {
 
           {/* Sidebar location list on right */}
           <div className="w-full lg:w-1/3 p-8 flex flex-col gap-6 bg-[#0E0E10] border-t lg:border-t-0 lg:border-l border-mafia-bronze overflow-y-auto max-h-[500px]">
-            <Typography variant="h3" className="border-b border-mafia-bronze pb-4 mb-2 uppercase font-spec-hero text-sm tracking-widest text-mafia-gold">
-              Puntos de Operación
+            <Typography variant="h3" className="border-b border-mafia-bronze pb-4 mb-2 font-spec-hero text-sm tracking-widest text-mafia-gold">
+              Puntos de operación
             </Typography>
 
             <div className="flex flex-col gap-4">
