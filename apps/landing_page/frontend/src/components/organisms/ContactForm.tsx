@@ -130,7 +130,7 @@ export const ContactForm: React.FC = () => {
               Atención al Cliente
             </Typography>
             <Typography variant="body-md" className="text-on-surface-variant max-w-lg">
-              Tu opinión es lo más importante para nosotros. Escríbenos directamente o utiliza el formulario para quejas, sugerencias o solicitudes de franquicias.
+              Tu opinión es lo más importante para nosotros. Escríbenos directamente o utiliza el formulario para quejas, sugerencias o consultas comerciales.
             </Typography>
           </div>
           <div className="flex flex-col sm:flex-row gap-6 mt-2 w-full justify-center">
@@ -158,7 +158,7 @@ export const ContactForm: React.FC = () => {
         {/* Contact Form Container */}
         <div className="w-full bg-mafia-gradient border border-mafia-bronze rounded-lg p-8 md:p-12 relative">
           <Typography variant="h2" className="font-spec-hero text-mafia-gold text-xl md:text-2xl mb-8 text-center">
-            Contacto y Franquicias
+            Contacto
           </Typography>
 
           {success && (
@@ -265,7 +265,7 @@ export const ContactForm: React.FC = () => {
                     className="w-full bg-[#0B0B0C] border border-mafia-bronze text-white rounded-[4px] px-4 py-3 pr-10 focus:outline-none focus:border-mafia-gold focus:ring-1 focus:ring-mafia-gold transition-all font-sans text-sm cursor-pointer appearance-none"
                   >
                     <option value="quejas_sugerencias">Quejas y Sugerencias</option>
-                    <option value="franquicias">Solicitud de Franquicia</option>
+                    {/* <option value="franquicias">Solicitud de Franquicia</option> */}
                     <option value="proveedores">Proveedores / Alianzas</option>
                     <option value="empleo">Bolsa de Trabajo</option>
                     <option value="otro">Otro Asunto</option>

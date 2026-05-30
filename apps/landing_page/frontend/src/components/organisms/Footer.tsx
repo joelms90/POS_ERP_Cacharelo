@@ -45,6 +45,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenPrivacy, onOpenTerms }) =>
           >
             Atención al Cliente
           </a>
+          {/*
           <a
             className="text-on-surface-variant hover:text-primary transition-all duration-300"
             href="#contacto"
@@ -52,6 +53,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenPrivacy, onOpenTerms }) =>
           >
             Franquicias
           </a>
+          */}
         </div>
 
         {/* Copyright */}
