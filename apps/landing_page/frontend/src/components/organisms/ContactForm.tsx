@@ -144,11 +144,11 @@ export const ContactForm: React.FC = () => {
               WhatsApp Directo
             </a>
             <a
-              href="mailto:contacto@grupo-cacharelo.com"
+              href="mailto:desarrollo@cacharelo.com"
               className="flex items-center justify-center gap-2 bg-mafia-gold/10 text-mafia-gold border border-mafia-gold/30 px-8 py-3 rounded-[4px] font-sans font-semibold text-sm hover:bg-mafia-gold/20 transition-all duration-300 w-full sm:w-auto"
             >
               <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>mail</span>
-              contacto@grupo-cacharelo.com
+              desarrollo@cacharelo.com
             </a>
           </div>
         </div>

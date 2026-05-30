@@ -52,7 +52,7 @@ describe('Grupo Cacharelo Landing Page Rendering', () => {
     render(<App />);
     expect(screen.getByRole('heading', { name: /atención al cliente/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /^contacto$/i })).toBeInTheDocument();
-    expect(screen.getByText('contacto@grupo-cacharelo.com')).toBeInTheDocument();
+    expect(screen.getByText('desarrollo@cacharelo.com')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /enviar mensaje/i })).toBeInTheDocument();
   });
 
