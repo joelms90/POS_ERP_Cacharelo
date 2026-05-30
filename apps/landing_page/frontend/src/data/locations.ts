@@ -38,7 +38,7 @@ export const locationsData: Location[] = [
     latitude: 19.4124,
     longitude: -99.1631,
     category: 'city',
-    is24Hours: true,
+    is24Hours: false,
   },
   {
     id: 'cacharelo-hq',
@@ -58,6 +58,6 @@ export const locationsData: Location[] = [
     latitude: 19.4795,
     longitude: -99.1415,
     category: 'transit',
-    is24Hours: true,
+    is24Hours: false,
   },
 ];

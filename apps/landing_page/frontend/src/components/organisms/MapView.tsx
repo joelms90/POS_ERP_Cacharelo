@@ -74,7 +74,7 @@ export const MapView: React.FC<MapViewProps> = ({
                 <h4 className="font-semibold text-sm text-white mb-1">{loc.name}</h4>
                 <p className="text-xs text-on-surface-variant mb-1">{loc.address}</p>
                 <p className="text-[10px] text-mafia-gold font-semibold uppercase">
-                  {loc.is24Hours ? 'Servicio 24 Horas' : 'Horario Comercial'}
+                  Horario Comercial
                 </p>
               </div>
             </Popup>

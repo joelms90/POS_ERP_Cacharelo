@@ -43,7 +43,6 @@ describe('Grupo Cacharelo Landing Page Rendering', () => {
     render(<App />);
     expect(screen.getByRole('button', { name: /en la ciudad/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /en tránsito/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /operaciones 24 hrs/i })).toBeInTheDocument();
   });
 
   it('renders the contact form and contact options', () => {

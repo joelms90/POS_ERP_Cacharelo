@@ -6,7 +6,7 @@ import { locationsData } from '../../data/locations';
 import type { Location } from '../../data/locations';
 
 export const MapTabber: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'city' | 'transit' | '24hours'>('city');
+  const [activeTab, setActiveTab] = useState<'city' | 'transit'>('city');
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
 
   const filteredLocations = useMemo(() => {
@@ -16,13 +16,10 @@ export const MapTabber: React.FC = () => {
     if (activeTab === 'transit') {
       return locationsData.filter((loc) => loc.category === 'transit');
     }
-    if (activeTab === '24hours') {
-      return locationsData.filter((loc) => loc.is24Hours);
-    }
     return locationsData;
   }, [activeTab]);
 
-  const handleTabChange = (tab: 'city' | 'transit' | '24hours') => {
+  const handleTabChange = (tab: 'city' | 'transit') => {
     setActiveTab(tab);
     setSelectedLocation(null);
   };
@@ -34,15 +31,12 @@ export const MapTabber: React.FC = () => {
   return (
     <section className="w-full py-24 px-margin-mobile md:px-margin-desktop bg-[#0B0B0C]" id="territorios">
       <div className="max-w-container-max mx-auto">
-        <Typography variant="h2" className="mb-12 text-center font-spec-hero text-mafia-gold">
-          Los territorios y operaciones{' '}
-          <span className="font-sans font-semibold tracking-normal text-mafia-gold lowercase text-xs" style={{ fontVariant: 'small-caps' }}>
-            24 horas
-          </span>
+        <Typography variant="h2" className="mb-12 text-center font-spec-hero text-[#3498db]">
+          LOS TERRITORIOS Y OPERACIONES
         </Typography>
 
         {/* Tabs Controller */}
-        <div className="flex flex-col md:flex-row justify-center gap-2 mb-8 max-w-3xl mx-auto bg-mafia-surface border border-mafia-bronze rounded-lg p-1">
+        <div className="flex flex-col md:flex-row justify-center gap-2 mb-8 max-w-2xl mx-auto bg-mafia-surface border border-mafia-bronze rounded-lg p-1">
           <TabItem
             active={activeTab === 'city'}
             onClick={() => handleTabChange('city')}
@@ -54,13 +48,6 @@ export const MapTabber: React.FC = () => {
             onClick={() => handleTabChange('transit')}
             icon="directions_bus"
             label="En Tránsito"
-          />
-          <TabItem
-            active={activeTab === '24hours'}
-            onClick={() => handleTabChange('24hours')}
-            icon="nightlight_round"
-            label="Operaciones"
-            badge="24 Hrs"
           />
         </div>
 
@@ -95,18 +82,14 @@ export const MapTabber: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span
-                        className={`w-2 h-2 rounded-full ${
-                          loc.is24Hours ? 'bg-[#3498db]' : 'bg-mafia-gold'
-                        }`}
-                      ></span>
+                      <span className="w-2 h-2 rounded-full bg-mafia-gold"></span>
                       <Typography
                         variant="body-lg"
                         className={`font-semibold transition-colors duration-300 text-sm md:text-base ${
                           isSelected ? 'text-mafia-gold' : 'text-on-surface'
                         }`}
                       >
-                        {loc.name} {loc.is24Hours && <span className="text-[10px] text-[#3498db] uppercase font-bold ml-1">(24hrs)</span>}
+                        {loc.name}
                       </Typography>
                     </div>
                     <Typography variant="body-md" className="text-xs text-on-surface-variant pl-4">

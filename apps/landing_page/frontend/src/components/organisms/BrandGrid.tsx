@@ -73,8 +73,8 @@ export const BrandGrid: React.FC = () => {
   return (
     <section className="w-full py-24 px-margin-mobile md:px-margin-desktop bg-[#0B0B0C]" id="marcas">
       <div className="max-w-container-max mx-auto flex flex-col items-center">
-        <Typography variant="h2" className="mb-16 text-center font-spec-hero text-mafia-gold">
-          Nuestras cuatro marcas
+        <Typography variant="h2" className="mb-16 text-center font-spec-hero text-[#3498db]">
+          NUESTRAS CUATRO MARCAS
         </Typography>
         
         {/* Brand Grid: stays stable at 4 columns on desktop, 2 on tablet */}
