@@ -58,15 +58,6 @@ export const Header: React.FC = () => {
               Línea Segura
             </a>
           </li>
-          <li>
-            <a
-              className="text-on-surface hover:text-primary transition-colors duration-300 font-sans font-semibold text-xs uppercase"
-              href="#contacto"
-              onClick={(e) => handleScroll(e, 'contacto')}
-            >
-              Contacto
-            </a>
-          </li>
         </ul>
 
         {/* Trailing Action */}
@@ -78,7 +69,7 @@ export const Header: React.FC = () => {
             }}
             className="bg-primary-container text-on-primary-container px-6 py-2 rounded-[4px] font-sans font-semibold text-xs uppercase hover:shadow-glow-gold hover:bg-[#ebd564] transition-all duration-300 active:scale-95 cursor-pointer"
           >
-            Únete a la Familia
+            Contacto
           </button>
         </div>
 
@@ -128,15 +119,6 @@ export const Header: React.FC = () => {
               Línea Segura
             </a>
           </li>
-          <li>
-            <a
-              className="text-on-surface hover:text-primary transition-colors duration-300 font-sans font-semibold text-xs uppercase tracking-widest"
-              href="#contacto"
-              onClick={(e) => handleScroll(e, 'contacto')}
-            >
-              Contacto
-            </a>
-          </li>
           <li className="w-full px-8 mt-2">
             <button
               onClick={() => {
@@ -146,7 +128,7 @@ export const Header: React.FC = () => {
               }}
               className="w-full bg-primary-container text-on-primary-container py-3 rounded-[4px] font-sans font-semibold text-xs uppercase tracking-widest hover:shadow-glow-gold transition-all duration-300 cursor-pointer"
             >
-              Únete a la Familia
+              Contacto
             </button>
           </li>
         </ul>
