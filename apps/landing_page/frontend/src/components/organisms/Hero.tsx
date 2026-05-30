@@ -30,7 +30,7 @@ export const Hero: React.FC = () => {
         </Typography>
         <Typography
           variant="body-lg"
-          className="italic opacity-90 max-w-2xl font-serif text-[#ebd564] drop-shadow-md"
+          className="italic opacity-90 max-w-2xl font-serif text-[#d4b038] drop-shadow-md"
         >
           "Una tradición familiar que se respeta."
         </Typography>

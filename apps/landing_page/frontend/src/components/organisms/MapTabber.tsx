@@ -28,7 +28,7 @@ export const MapTabber: React.FC = () => {
   return (
     <section className="w-full py-24 px-margin-mobile md:px-margin-desktop bg-[#0B0B0C]" id="territorios">
       <div className="max-w-container-max mx-auto">
-        <Typography variant="h2" className="mb-12 text-center font-spec-hero text-[#3498db]">
+        <Typography variant="h2" className="mb-12 text-center font-spec-hero text-[#d4b038]">
           LOS TERRITORIOS Y OPERACIONES
         </Typography>
 

@@ -1,6 +1,6 @@
 # Quickstart Guide: Grupo Cacharelo Landing Page
 
-This guide walks developers through local environment setup, running tests, and executing GCP deployments.
+This guide walks developers through local environment setup, Google Cloud configuration from scratch, running tests, and executing deployments.
 
 ## 1. Directory Structure
 
@@ -8,14 +8,58 @@ This feature is organized under a unified landing app path:
 ```text
 apps/landing_page/
 ├── frontend/          # Vite + React + TS + Tailwind (Atomic Design)
-└── backend/           # Node.js 22 HTTPS Google Cloud Function
+├── backend/           # Node.js 22 HTTPS Google Cloud Function
+└── infra/             # Terraform infrastructure as code (IaC)
 ```
 
 ---
 
-## 2. Local Development
+## 2. Google Cloud Setup (For Fresh Accounts)
 
-### 2.1 Backend Setup & Running
+If you are setting up your development environment from scratch with a new Google Cloud account, follow these steps to initialize your credentials and services.
+
+### 2.1 Install Google Cloud SDK (`gcloud` CLI)
+First, install the `gcloud` command-line tool on your local machine:
+* **macOS (via Homebrew - Recommended)**:
+  ```bash
+  brew install --cask google-cloud-sdk
+  ```
+* **macOS (Manual Archive)**: Download the macOS package from [cloud.google.com/sdk](https://cloud.google.com/sdk/docs/install), extract it, and run `./google-cloud-sdk/install.sh`.
+* **Restart your terminal** after installation to load the command paths.
+
+### 2.2 Authenticate your CLI
+Log in to your Google Cloud account through the CLI:
+```bash
+gcloud auth login
+```
+*This will open a browser window. Sign in using your Google Cloud credentials and approve authorization.*
+
+### 2.3 Create a GCP Project & Firestore Database
+If you do not have a project initialized yet:
+1. Create a project in the [Google Cloud Console](https://console.cloud.google.com/).
+2. Copy the generated **Project ID** (e.g. `grupo-cacharelo-dev`).
+3. Set your active project in the CLI:
+   ```bash
+   gcloud config set project YOUR_PROJECT_ID
+   ```
+4. **Provision Firestore Database**:
+   * Navigate to **Firestore** in the GCP Console.
+   * Click **Create Database**.
+   * Select **Native Mode** (required for client SDK compatibility).
+   * Choose a database region (e.g. `us-central1` or multi-region `nam5`) and finalize the creation.
+
+### 2.4 Enable Application Default Credentials (ADC)
+To allow your local backend emulation (running via Functions Framework) to connect to Firestore securely without using static service account key files:
+```bash
+gcloud auth application-default login
+```
+*This credentials file will be automatically discovered and used by the `@google-cloud/firestore` library during local execution.*
+
+---
+
+## 3. Local Development Setup
+
+### 3.1 Backend Setup & Running
 The backend utilizes the Google Cloud Functions Framework to emulate the serverless environment locally.
 
 1. Navigate to the backend directory:
@@ -24,58 +68,54 @@ The backend utilizes the Google Cloud Functions Framework to emulate the serverl
    ```
 2. Install dependencies:
    ```bash
-   npm install
+   pnpm install
    ```
 3. Start the function emulator:
    ```bash
-   npm run dev
+   pnpm dev
    ```
    The endpoint will be available locally at `http://localhost:8080/`.
 
-### 2.2 Frontend Setup & Running
+### 3.2 Frontend Setup & Running
 1. Navigate to the frontend directory:
    ```bash
    cd apps/landing_page/frontend
    ```
 2. Install dependencies:
    ```bash
-   npm install
+   pnpm install
    ```
 3. Start the development server:
    ```bash
-   npm run dev
+   pnpm run dev
    ```
    Open `http://localhost:5173/` in your browser.
 
 ---
 
-## 3. Running Tests
+## 4. Running Tests
 
-### 3.1 Frontend Tests
+### 4.1 Frontend Tests
 Runs Vitest for unit and component tests:
 ```bash
 cd apps/landing_page/frontend
-npm run test
+pnpm test
 ```
 
-### 3.2 Backend Tests
-Runs Jest/Vitest for HTTP handler validation:
+### 4.2 Backend Tests
+Runs Vitest unit tests (mocks Firestore calls, runs with zero GCP credentials):
 ```bash
 cd apps/landing_page/backend
-npm run test
+pnpm test
 ```
 
 ---
 
-## 4. Infrastructure Provisioning via Terraform (Preferred)
+## 5. Infrastructure Provisioning via Terraform
 
-Ensure the Google Cloud SDK (`gcloud` CLI) and Terraform are installed:
-```bash
-gcloud auth login
-gcloud auth application-default login  # Required for Terraform authentication
-```
+Ensure you have both the `gcloud` CLI and **Terraform** installed.
 
-### 4.1 Initialize and Apply Infrastructure
+### 5.1 Initialize and Apply Infrastructure
 1. Navigate to the infra directory:
    ```bash
    cd apps/landing_page/infra
@@ -89,16 +129,22 @@ gcloud auth application-default login  # Required for Terraform authentication
 3. Initialize and provision the resources:
    ```bash
    terraform init
+   ```
+4. Preview the changes:
+   ```bash
    terraform plan
+   ```
+5. Deploy the resources to GCP:
+   ```bash
    terraform apply
    ```
-4. Note the output values for `function_url` and `website_bucket_name`.
+6. Note the output values for `function_url` and `website_bucket_name`.
 
 ---
 
-## 5. Frontend Build and Static Deployment
+## 6. Frontend Build and Static Deployment
 
-### 5.1 Configure Environment Variables
+### 6.1 Configure Environment Variables
 Create a production environment file in the frontend folder:
 `apps/landing_page/frontend/.env.production`
 ```env
@@ -106,7 +152,7 @@ VITE_CONTACT_API_URL=https://[REGION]-[PROJECT_ID].cloudfunctions.net/submit-inq
 # (Or use the exact function_url output from Terraform)
 ```
 
-### 5.2 Build & Deploy to GCS
+### 6.2 Build & Deploy to GCS
 1. Navigate to the frontend directory:
    ```bash
    cd apps/landing_page/frontend
@@ -120,4 +166,3 @@ VITE_CONTACT_API_URL=https://[REGION]-[PROJECT_ID].cloudfunctions.net/submit-inq
    gcloud storage rsync -r dist/ gs://[YOUR_WEBSITE_BUCKET_NAME]
    ```
    *(Ensure you replace `[YOUR_WEBSITE_BUCKET_NAME]` with the value outputted by Terraform `website_bucket_name`)*
-

@@ -67,7 +67,7 @@ export const Header: React.FC = () => {
               const element = document.getElementById('contacto');
               if (element) element.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="bg-primary-container text-on-primary-container px-6 py-2 rounded-[4px] font-sans font-semibold text-xs uppercase hover:shadow-glow-gold hover:bg-[#ebd564] transition-all duration-300 active:scale-95 cursor-pointer"
+            className="bg-primary-container text-on-primary-container px-6 py-2 rounded-[4px] font-sans font-semibold text-xs uppercase hover:shadow-glow-gold hover:bg-[#d4b038] transition-all duration-300 active:scale-95 cursor-pointer"
           >
             Contacto
           </button>

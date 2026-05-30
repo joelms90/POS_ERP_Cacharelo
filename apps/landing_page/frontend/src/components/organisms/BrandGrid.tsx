@@ -73,7 +73,7 @@ export const BrandGrid: React.FC = () => {
   return (
     <section className="w-full py-24 px-margin-mobile md:px-margin-desktop bg-[#0B0B0C]" id="marcas">
       <div className="max-w-container-max mx-auto flex flex-col items-center">
-        <Typography variant="h2" className="text-[#ebd564]  mb-16 text-center font-spec-hero">
+        <Typography variant="h2" className="text-[#d4b038]  mb-16 text-center font-spec-hero">
           NUESTRAS CUATRO MARCAS
         </Typography>
         
@@ -154,7 +154,7 @@ export const BrandGrid: React.FC = () => {
                     <a
                       href={activeBrand.pdfMenuUrl}
                       download
-                      className="inline-flex items-center gap-2 bg-primary-container text-on-primary-container px-6 py-2.5 rounded-[4px] font-sans font-bold text-xs uppercase hover:bg-[#ebd564] hover:shadow-glow-gold transition-all duration-300 cursor-pointer"
+                      className="inline-flex items-center gap-2 bg-primary-container text-on-primary-container px-6 py-2.5 rounded-[4px] font-sans font-bold text-xs uppercase hover:bg-[#d4b038] hover:shadow-glow-gold transition-all duration-300 cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-lg">download</span>
                       Descargar Menú PDF
