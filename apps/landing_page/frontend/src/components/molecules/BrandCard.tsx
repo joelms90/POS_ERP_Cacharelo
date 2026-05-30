@@ -29,7 +29,7 @@ export const BrandCard: React.FC<BrandCardProps> = ({
       onClick={onClick}
       className={`interactive-card bg-mafia-gradient border border-mafia-bronze rounded-lg flex flex-col justify-center relative overflow-hidden transition-all duration-500 ease-in-out cursor-pointer ${
         isExpanded
-          ? 'lg:col-span-2 col-span-1 p-6 md:p-8 min-h-[380px] sm:col-span-2'
+          ? 'lg:col-span-4 col-span-1 p-6 md:p-8 min-h-[380px] sm:col-span-2 order-first'
           : 'col-span-1 p-8 text-center items-center min-h-[320px]'
       }`}
     >

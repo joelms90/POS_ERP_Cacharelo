@@ -61,12 +61,8 @@ export const BrandGrid: React.FC = () => {
           Nuestras cuatro marcas
         </Typography>
         
-        {/* Accordion CSS Grid: dynamically adjust grid columns on desktop */}
-        <div
-          className={`grid grid-cols-1 sm:grid-cols-2 gap-gutter w-full transition-all duration-500 ease-in-out ${
-            activeBrandId !== null ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
-          }`}
-        >
+        {/* Brand Grid: stays at 4 columns on desktop, active card spans full-width with order-first */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter w-full">
           {brands.map((brand) => (
             <BrandCard
               key={brand.id}
