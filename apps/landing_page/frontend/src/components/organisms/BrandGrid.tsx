@@ -2,34 +2,32 @@ import React from 'react';
 import { Typography } from '../atoms/Typography';
 import { BrandCard } from '../molecules/BrandCard';
 
+import pastesLogo from '../../assets/logos/pastes-logo.png';
+import hamburguesasLogo from '../../assets/logos/hamburguesas-logo.png';
+import grupoCachareloLogo from '../../assets/logos/grupo-cacharelo-logo.png';
+import coffeeLogo from '../../assets/logos/cacharelo-cofee-gold-logo.png';
+
 export const BrandGrid: React.FC = () => {
   const brands = [
     {
       name: 'Pastes y Empanadas',
       description: 'De Tradición',
-      iconName: 'local_pizza',
-      iconColorClass: 'text-primary',
+      logoUrl: pastesLogo,
     },
     {
       name: 'Las Hamburguesas',
       description: 'Del Imperio',
-      iconName: 'lunch_dining',
-      iconColorClass: 'text-[#e74c3c] drop-shadow-[0_0_10px_rgba(231,76,60,0.5)]',
+      logoUrl: hamburguesasLogo,
     },
     {
       name: 'El Sabor de Antaño',
       description: 'Xastipam',
-      iconName: 'person',
-      iconColorClass: 'text-[#f39c12]',
-      customOverlay: (
-        <div className="absolute top-0 w-16 h-4 border-t-4 border-[#f39c12] rounded-t-full"></div>
-      ),
+      logoUrl: grupoCachareloLogo,
     },
     {
       name: 'La Excelencia',
       description: 'Multimarca',
-      iconName: 'coffee_maker',
-      iconColorClass: 'text-primary',
+      logoUrl: coffeeLogo,
     },
   ];
 
@@ -47,9 +45,7 @@ export const BrandGrid: React.FC = () => {
               key={index}
               name={brand.name}
               description={brand.description}
-              iconName={brand.iconName}
-              iconColorClass={brand.iconColorClass}
-              customOverlay={brand.customOverlay}
+              logoUrl={brand.logoUrl}
             />
           ))}
         </div>
