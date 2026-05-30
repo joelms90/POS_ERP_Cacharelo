@@ -27,31 +27,31 @@ As a visitor, I want to experience the brand's cinematic "Empire Noir" atmospher
 
 ### User Story 2 - Interactive Territories & Operations (Priority: P2)
 
-As a visitor, I want to view operational locations and 24-hour schedules on a tabbed, interactive layout, so that I know where and when I can access Grupo Cacharelo's brands.
+As a visitor, I want to view operational locations, their days, and hours of operations on an interactive map layout, filtered by brands, so that I know where and when I can access Grupo Cacharelo's brands.
 
-**Why this priority**: Helps prospective customers and franchise partners identify physical availability, enhancing utility beyond static marketing.
+**Why this priority**: Helps prospective customers and partners identify physical availability, enhancing utility beyond static marketing.
 
-**Independent Test**: The user can click through the "En La Ciudad", "En Tránsito", and "Operaciones 24 Horas" tabs, seeing different locations and map representations load correctly.
+**Independent Test**: The user can click through the "Todos", "Pastes", "Hamburguesas", "El Sabor de Antaño", and "La Excelencia" tabs, seeing different locations and map representations load correctly.
 
 **Acceptance Scenarios**:
 
-1. **Given** a user is viewing the "Los Territorios" section, **When** they click different tabs, **Then** the map marker positions and the list of "Puntos de Operación" update dynamically to match the selected category.
-2. **Given** the map is displayed, **When** a user hovers over a map location pin, **Then** a detailed tooltip/card showing the location name and office details (e.g. "Sucursal Reforma") becomes visible.
+1. **Given** a user is viewing the "LOS TERRITORIOS Y OPERACIONES" section, **When** they click different brand tabs, **Then** the map marker positions and the list of "Puntos de operación" update dynamically to display only the branches offering the selected brand.
+2. **Given** the map is displayed, **When** a user clicks a map location pin, **Then** a detailed popup showing the location name, address, working days (e.g. "Lunes a Domingo"), working hours (e.g. "7:00 am - 18:00 pm"), and a "Cómo llegar" Google Maps button becomes visible.
 
 ---
 
-### User Story 3 - Safe Line & Contact Channels (Priority: P3)
+### User Story 3 - Suggestions, Complaints & Contact Channels (Priority: P3)
 
-As a visitor or franchise prospect, I want to access official communication channels, such as a direct phone line ("Línea Segura"), office numbers, and WhatsApp, so that I can establish contact immediately.
+As a visitor or customer, I want to submit inquiries, suggestions, or complaints via a secure contact form and access WhatsApp support, so that I can establish contact immediately.
 
-**Why this priority**: Connects interested users directly with corporate office support, security reporting, or franchise inquiries.
+**Why this priority**: Connects interested users and customers directly with corporate support and provides a structured channel for suggestions/complaints.
 
-**Independent Test**: A user clicks on the "Línea Segura" number or the floating WhatsApp button and is prompted to call or message the official channels.
+**Independent Test**: A user submits the suggestions form. Verify it handles inputs correctly, displays success states, and saves to Firestore.
 
 **Acceptance Scenarios**:
 
-1. **Given** a user wants to contact the business, **When** they tap the large "Línea Segura" number, **Then** their device initiates a phone call to `55 9244 9939`.
-2. **Given** a user is browsing on mobile or desktop, **When** they click the floating chat button, **Then** they are redirected to a chat channel (WhatsApp) pre-configured for Grupo Cacharelo support.
+1. **Given** a user wants to submit feedback, **When** they fill the contact form and hit submit, **Then** the message is securely posted to the backend GCF and stored in Firestore.
+2. **Given** a user is browsing on mobile or desktop, **When** they click the floating chat button, **Then** they are redirected to a WhatsApp chat channel pre-configured for Grupo Cacharelo support.
 
 ---
 
@@ -66,20 +66,21 @@ As a visitor or franchise prospect, I want to access official communication chan
 ### Functional Requirements
 
 - **FR-001**: The system MUST render the application using the "Empire Noir" design system (Obsidian backgrounds, Champagne Gold accents, Aged Bronze outlines, Bodoni Moda headers, Inter body text).
-- **FR-002**: The application MUST feature a responsive navigation header containing links to Brand, Territories, Línea Segura, and Contact, collapsing to a mobile menu toggle on small viewports.
+- **FR-002**: The application MUST feature a responsive navigation header containing links to Brand, Territories, and Contact, collapsing to a mobile menu toggle on small viewports.
 - **FR-003**: The application MUST display a hero section with high-contrast cinematic overlay and primary/secondary call-to-action buttons.
-- **FR-004**: The system MUST implement an interactive Tab switcher for the "Los Territorios" section with three tabs: "En La Ciudad", "En Tránsito", and "Operaciones 24 Horas".
-- **FR-005**: The system MUST render an interactive map component with custom styled pins that display detail tooltips on hover or click.
-- **FR-006**: The system MUST implement a dynamic locations list that highlights the active location when its corresponding map pin is clicked/hovered.
-- **FR-007**: The system MUST provide accessible direct communication links for telephone and WhatsApp channels.
+- **FR-004**: The system MUST implement an interactive Tab switcher for the "LOS TERRITORIOS Y OPERACIONES" section with tabs: "Todos", "Pastes", "Hamburguesas", "El Sabor de Antaño", and "La Excelencia".
+- **FR-005**: The system MUST render an interactive map component with custom styled pins that display detail popups on click.
+- **FR-006**: The system MUST implement a dynamic locations list that highlights the active location when its corresponding list item or map pin is clicked.
+- **FR-007**: The system MUST provide accessible direct communication links for WhatsApp channel.
 - **FR-008**: The deployment configuration MUST support hosting the landing page on Google Cloud Platform using Google Cloud Storage for static website hosting.
-- **FR-009**: The system MUST handle user inquiries via a fully functional contact form that posts submission data to a simple Google Cloud Function backend.
+- **FR-009**: The system MUST handle user inquiries, complaints, and suggestions via a fully functional contact form that posts submission data to a Google Cloud Function backend.
 - **FR-010**: The map component MUST render location data using Leaflet and OpenStreetMap, styled with CartoDB Dark Matter tiles to match the Empire Noir theme without requiring external API keys.
+- **FR-011**: The system MUST load location dataset records from a local JSON file (`src/data/locations.json`) to allow easy configuration of points of operation.
 
 ### Key Entities
 
 - **Brand**: Represents a subsidiary brand (e.g. Pastes y Empanadas, Las Hamburguesas) with attributes like name, tagline, icon, and detail description.
-- **Location**: Represents an operational branch or transit hub, including name, coordinates (latitude/longitude), address, phone number, category (City, Transit, 24 Hours), and operating hours.
+- **Location**: Represents an operational branch or transit hub, including name, coordinates (latitude/longitude), address, phone number, workingHours, workingDays, and brand associations.
 
 ## Success Criteria *(mandatory)*
 
@@ -95,3 +96,4 @@ As a visitor or franchise prospect, I want to access official communication chan
 - **A-001**: The asset images provided in the draft (e.g. espresso/empanada hero image, stylized city map) are approved for initial implementation.
 - **A-002**: Localization is initially in Spanish, as depicted in the draft copy.
 - **A-003**: The landing page does not require a customer login system or database backend for content management in version 1.
+

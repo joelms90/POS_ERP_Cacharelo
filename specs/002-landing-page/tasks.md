@@ -122,6 +122,19 @@
 
 ---
 
+## Phase 7: Post-MVP User & Styling Refinements
+
+- [x] T032 Remove obsolete 24-hours operations from dataset, map popups, point-of-operation badges, and tab switchers
+- [x] T033 Uppercase headers `LOS TERRITORIOS Y OPERACIONES` and `NUESTRAS CUATRO MARCAS` and set color to `#3498db`
+- [x] T034 Migrate points of operations configuration to an external `locations.json` file for easy administration
+- [x] T035 Change map tab filters from city/transit to brand-based filters ("Todos", "Pastes", "Hamburguesas", "El Sabor de Antaño", "La Excelencia")
+- [x] T036 Add `"workingHours"` and `"workingDays"` to locations dataset and render them dynamically in marker popups
+- [x] T037 Add Google Maps link button ("Cómo llegar") in popup tooltips for direction routing
+- [x] T038 Force uppercase text transform on all footer interactive buttons
+- [x] T039 Align Privacy and Terms modal text content to the new contact suggestions form, removing obsolete legal mentions of Línea Segura and Franquicias
+
+---
+
 ## Implementation Strategy
 
 ### MVP First (User Story 1 Only)

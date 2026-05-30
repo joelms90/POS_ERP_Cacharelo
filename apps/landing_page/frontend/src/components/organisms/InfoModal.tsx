@@ -80,8 +80,8 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, type }) =
                   Sus datos personales serán utilizados única y exclusivamente para los siguientes fines legítimos:
                 </Typography>
                 <ul className="list-disc list-inside text-sm text-[#e5e5e5] flex flex-col gap-2 pl-2">
-                  <li>Atender, evaluar y responder a solicitudes de Franquicias o alianzas comerciales.</li>
-                  <li>Canalizar de forma confidencial los reportes de soporte técnico o incidencias enviados a nuestra Línea Segura.</li>
+                  <li>Atender, evaluar y responder a solicitudes de contacto, quejas, sugerencias y alianzas comerciales.</li>
+                  <li>Canalizar de forma confidencial y directa las quejas, sugerencias y reportes enviados a través del formulario de contacto.</li>
                   <li>Establecer comunicación directa de seguimiento comercial o institucional con usted.</li>
                 </ul>
               </div>
@@ -126,10 +126,10 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, type }) =
 
               <div>
                 <Typography variant="label-sm" className="text-mafia-gold mb-1">
-                  3. USO DE LA LÍNEA SEGURA y CANALES DE CONTACTO
+                  3. CANALES DE CONTACTO Y BUZÓN DE SUGERENCIAS
                 </Typography>
                 <Typography variant="body-md" className="text-sm">
-                  La Línea Segura y el formulario de contacto están destinados a canalizar consultas y reportes legítimos de clientes, franquiciados o personal. Se prohíbe el uso de estos canales para enviar mensajes ofensivos, spam, información falsa o ataques cibernéticos. Grupo Cacharelo se reserva el derecho de proceder legalmente ante uso malintencionado.
+                  El formulario de contacto y buzón de quejas están destinados a canalizar consultas, sugerencias y reportes legítimos de clientes o personal. Se prohíbe el uso de estos canales para enviar mensajes ofensivos, spam, información falsa o ataques cibernéticos. Grupo Cacharelo se reserva el derecho de proceder legalmente ante uso malintencionado.
                 </Typography>
               </div>
 
