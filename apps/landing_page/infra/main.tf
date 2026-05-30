@@ -3,7 +3,7 @@ provider "google" {
   region  = var.region
 }
 
-# Enable required APIs dynamically to support fresh GCP accounts
+# 1. Enable required APIs dynamically
 resource "google_project_service" "services" {
   for_each = toset([
     "cloudfunctions.googleapis.com",
@@ -11,7 +11,8 @@ resource "google_project_service" "services" {
     "cloudbuild.googleapis.com",
     "artifactregistry.googleapis.com",
     "storage.googleapis.com",
-    "firestore.googleapis.com"
+    "firestore.googleapis.com",
+    "firebase.googleapis.com"
   ])
 
   service            = each.key
@@ -19,6 +20,7 @@ resource "google_project_service" "services" {
 }
 
 # Disable organization policy restricting public sharing for this project
+# This enables public website hosting on GCS and anonymous access to Cloud Run (for the contact form)
 resource "google_project_organization_policy" "disable_public_sharing_restriction" {
   project    = var.project_id
   constraint = "gcp.restrictPublicSharing"
@@ -30,43 +32,80 @@ resource "google_project_organization_policy" "disable_public_sharing_restrictio
   depends_on = [google_project_service.services]
 }
 
-# Fetch project metadata (needed for project number)
+# Fetch project metadata
 data "google_project" "project" {}
 
-# Grant required permissions to the Cloud Build service account
-resource "google_project_iam_member" "cloudbuild_logging" {
+# =====================================================================
+# CUENTAS DE SERVICIO PERSONALIZADAS
+# =====================================================================
+resource "google_service_account" "function_sa" {
+  account_id   = "gcf-submit-inquiry-sa"
+  display_name = "Custom Service Account for Submit Inquiry Runtime"
+  depends_on   = [google_project_service.services]
+}
+
+resource "google_service_account" "build_sa" {
+  account_id   = "gcf-custom-builder-sa"
+  display_name = "Custom Service Account for Cloud Build"
+  depends_on   = [google_project_service.services]
+}
+
+# Permisos Build SA
+resource "google_project_iam_member" "custom_build_logging" {
   project = var.project_id
   role    = "roles/logging.logWriter"
-  member  = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
-
-  depends_on = [google_project_service.services]
+  member  = "serviceAccount:${google_service_account.build_sa.email}"
 }
 
-resource "google_project_iam_member" "cloudbuild_storage" {
+resource "google_project_iam_member" "custom_build_storage" {
   project = var.project_id
-  role    = "roles/storage.objectViewer"
-  member  = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
-
-  depends_on = [google_project_service.services]
+  role    = "roles/storage.admin"
+  member  = "serviceAccount:${google_service_account.build_sa.email}"
 }
 
-resource "google_project_iam_member" "cloudbuild_artifactregistry" {
+resource "google_project_iam_member" "custom_build_artifactregistry" {
   project = var.project_id
   role    = "roles/artifactregistry.writer"
-  member  = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
-
-  depends_on = [google_project_service.services]
+  member  = "serviceAccount:${google_service_account.build_sa.email}"
 }
 
-resource "google_project_iam_member" "cloudbuild_service_account_user" {
+resource "google_service_account_iam_member" "custom_build_act_as" {
+  service_account_id = google_service_account.function_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.build_sa.email}"
+}
+
+# Permisos Function SA (Logging and Firestore/Datastore access)
+resource "google_project_iam_member" "function_logging" {
   project = var.project_id
-  role    = "roles/iam.serviceAccountUser"
-  member  = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
-
-  depends_on = [google_project_service.services]
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_service_account.function_sa.email}"
 }
 
-# 1. GCS Bucket for Static Frontend Web Hosting
+resource "google_project_iam_member" "function_firestore" {
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${google_service_account.function_sa.email}"
+}
+
+# Tiempo de espera para propagación de APIs e IAM
+resource "time_sleep" "wait_for_apis_and_iam" {
+  create_duration = "30s"
+  depends_on = [
+    google_project_service.services,
+    google_project_organization_policy.disable_public_sharing_restriction,
+    google_service_account.function_sa,
+    google_service_account.build_sa,
+    google_project_iam_member.custom_build_logging,
+    google_project_iam_member.custom_build_storage,
+    google_project_iam_member.custom_build_artifactregistry,
+    google_service_account_iam_member.custom_build_act_as,
+    google_project_iam_member.function_logging,
+    google_project_iam_member.function_firestore
+  ]
+}
+
+# 1. GCS Bucket para el Hosting del Frontend Estático
 resource "google_storage_bucket" "frontend_bucket" {
   name                        = var.bucket_name
   location                    = var.region
@@ -78,29 +117,25 @@ resource "google_storage_bucket" "frontend_bucket" {
     not_found_page   = "index.html"
   }
 
-  depends_on = [google_project_service.services]
+  depends_on = [time_sleep.wait_for_apis_and_iam]
 }
 
-# Make the frontend bucket public
+# Hacer público el bucket del frontend
 resource "google_storage_bucket_iam_member" "public_rule" {
   bucket = google_storage_bucket.frontend_bucket.name
   role   = "roles/storage.objectViewer"
   member = "allUsers"
 
-  depends_on = [
-    google_storage_bucket.frontend_bucket,
-    google_project_organization_policy.disable_public_sharing_restriction
-  ]
+  depends_on = [google_storage_bucket.frontend_bucket]
 }
 
-# 2. GCS Bucket for Function Source Code Archives
+# 2. Bucket exclusivo para el código de la función
 resource "google_storage_bucket" "function_bucket" {
   name                        = "${var.bucket_name}-functions"
   location                    = var.region
   uniform_bucket_level_access = true
   force_destroy               = true
-
-  depends_on = [google_project_service.services]
+  depends_on                  = [time_sleep.wait_for_apis_and_iam]
 }
 
 # Zip the backend source code dynamically
@@ -108,32 +143,28 @@ data "archive_file" "function_zip" {
   type        = "zip"
   source_dir  = "${path.module}/../backend"
   output_path = "${path.module}/dist/function.zip"
-  excludes    = [
-    "node_modules",
-    "dist",
-    "src/index.test.ts",
-    "vitest.config.ts"
-  ]
+  excludes    = ["node_modules", "dist", "src/index.test.ts", "vitest.config.ts"]
 }
 
 # Upload the zip archive to GCS
 resource "google_storage_bucket_object" "function_zip_object" {
-  name   = "function-${data.archive_file.function_zip.output_md5}.zip"
-  bucket = google_storage_bucket.function_bucket.name
-  source = data.archive_file.function_zip.output_path
-
+  name       = "function-${data.archive_file.function_zip.output_md5}.zip"
+  bucket     = google_storage_bucket.function_bucket.name
+  source     = data.archive_file.function_zip.output_path
   depends_on = [google_storage_bucket.function_bucket]
 }
 
-# 3. Google Cloud Function (2nd Gen)
+# 6. Google Cloud Function (2nd Gen)
 resource "google_cloudfunctions2_function" "submit_inquiry" {
   name        = var.function_name
   location    = var.region
   description = "HTTPS Contact Form Inquiry Function for Grupo Cacharelo"
 
   build_config {
-    runtime     = "nodejs22"
-    entry_point = "submitInquiry"
+    runtime         = "nodejs22"
+    entry_point     = "submitInquiry"
+    service_account = "projects/${var.project_id}/serviceAccounts/${google_service_account.build_sa.email}"
+
     source {
       storage_source {
         bucket = google_storage_bucket.function_bucket.name
@@ -143,19 +174,16 @@ resource "google_cloudfunctions2_function" "submit_inquiry" {
   }
 
   service_config {
-    max_instance_count = 3
-    available_memory   = "256Mi"
-    timeout_seconds    = 60
-    ingress_settings   = "ALLOW_ALL"
+    max_instance_count    = 3
+    available_memory      = "256Mi"
+    timeout_seconds       = 60
+    ingress_settings      = "ALLOW_ALL"
+    service_account_email = google_service_account.function_sa.email
   }
 
   depends_on = [
-    google_project_service.services,
-    google_storage_bucket_object.function_zip_object,
-    google_project_iam_member.cloudbuild_logging,
-    google_project_iam_member.cloudbuild_storage,
-    google_project_iam_member.cloudbuild_artifactregistry,
-    google_project_iam_member.cloudbuild_service_account_user
+    time_sleep.wait_for_apis_and_iam,
+    google_storage_bucket_object.function_zip_object
   ]
 }
 

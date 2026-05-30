@@ -8,7 +8,7 @@ output "website_bucket_name" {
   description = "The name of the GCS bucket hosting the frontend"
 }
 
-output "function_url" {
+output "function_uri" {
   value       = google_cloudfunctions2_function.submit_inquiry.service_config[0].uri
-  description = "The HTTPS URL of the submit-inquiry Cloud Function"
+  description = "La URL del endpoint de tu Cloud Function (Backend)"
 }

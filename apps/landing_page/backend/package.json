@@ -23,5 +23,11 @@
   "dependencies": {
     "@google-cloud/firestore": "^8.6.0",
     "@google-cloud/functions-framework": "^5.0.2"
+  },
+  "pnpm": {
+    "allowedBuilds": [
+      "esbuild",
+      "protobufjs"
+    ]
   }
 }
