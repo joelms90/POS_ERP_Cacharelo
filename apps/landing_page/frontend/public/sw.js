@@ -2,7 +2,7 @@ const CACHE_NAME = 'cacharelo-v1';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/favicon.svg',
+  '/favicon.ico',
 ];
 
 // Install event - caching shell assets
