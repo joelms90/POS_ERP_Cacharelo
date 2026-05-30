@@ -1,0 +1,199 @@
+openapi: 3.1.0
+info:
+  title: POS Offline Sync API
+  version: 0.1.0
+  description: Idempotent AWS Lambda API for synchronizing offline POS operations.
+servers:
+  - url: https://api.example.com
+paths:
+  /v1/devices/register:
+    post:
+      summary: Register a POS device before offline operation.
+      operationId: registerDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterDeviceRequest"
+      responses:
+        "201":
+          description: Device registered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterDeviceResponse"
+  /v1/sync/transactions:
+    post:
+      summary: Submit one locally committed transaction for cloud consolidation.
+      operationId: submitTransaction
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID v4 transaction id generated offline by the client.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionSyncRequest"
+      responses:
+        "202":
+          description: Transaction accepted or duplicate replay acknowledged.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncReceipt"
+        "409":
+          description: Same transaction UUID was received with conflicting payload.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictResponse"
+        "422":
+          description: Payload failed validation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/sync/receipts/{transactionId}:
+    get:
+      summary: Fetch cloud receipt for a transaction UUID.
+      operationId: getSyncReceipt
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Receipt exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncReceipt"
+        "404":
+          description: No receipt exists for this transaction.
+components:
+  schemas:
+    RegisterDeviceRequest:
+      type: object
+      required: [branchId]
+      properties:
+        branchId:
+          type: string
+    RegisterDeviceResponse:
+      type: object
+      required: [deviceId, branchId, registeredAt]
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        branchId:
+          type: string
+        registeredAt:
+          type: string
+          format: date-time
+    TransactionSyncRequest:
+      type: object
+      required:
+        - transactionId
+        - deviceId
+        - branchId
+        - transactionType
+        - localVersion
+        - createdAtLocal
+        - payloadHash
+        - payload
+        - authContext
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        branchId:
+          type: string
+        transactionType:
+          type: string
+          enum: [sale, refund, inventory_adjustment, shift_close]
+        localVersion:
+          type: integer
+          minimum: 1
+        createdAtLocal:
+          type: string
+          format: date-time
+        payloadHash:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        authContext:
+          type: object
+          required: [userId, offlineUnlock]
+          properties:
+            userId:
+              type: string
+            offlineUnlock:
+              type: boolean
+            roleIds:
+              type: array
+              items:
+                type: string
+    SyncReceipt:
+      type: object
+      required:
+        - receiptId
+        - transactionId
+        - status
+        - acceptedAt
+        - cloudVersion
+      properties:
+        receiptId:
+          type: string
+          format: uuid
+        transactionId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [accepted, duplicate]
+        acceptedAt:
+          type: string
+          format: date-time
+        cloudVersion:
+          type: integer
+          minimum: 1
+    ConflictResponse:
+      type: object
+      required:
+        - conflictId
+        - transactionId
+        - reason
+      properties:
+        conflictId:
+          type: string
+          format: uuid
+        transactionId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          enum: [payload_hash_mismatch, invalid_state, inventory_conflict]
+        message:
+          type: string
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string

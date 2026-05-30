@@ -18,29 +18,38 @@
   the iteration process.
 -->
 
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]
+**Language/Version**: [e.g., Flutter/Dart client, AWS Lambda runtime, SQL/Postgres migrations or NEEDS CLARIFICATION]
 
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]
+**Primary Dependencies**: [e.g., Flutter, Isar Database, AWS Lambda SDK, Postgres client or NEEDS CLARIFICATION]
 
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
+**Storage**: [local Isar entities, sync queue, Postgres tables/migrations, or N/A]
 
 **Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]
 
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
+**Target Platform**: [e.g., Flutter mobile/desktop POS, AWS Lambda, Postgres or NEEDS CLARIFICATION]
 
-**Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]
+**Project Type**: [e.g., mobile POS + cloud API, backend sync service, reporting tool or NEEDS CLARIFICATION]
 
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]
+**Performance Goals**: [domain-specific, e.g., complete sale locally in <2s, sync pending queue without UI blocking or NEEDS CLARIFICATION]
 
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]
+**Constraints**: [offline-first, local Isar write before success, idempotent cloud sync, no network dependency for critical POS flows or NEEDS CLARIFICATION]
 
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Scale/Scope**: [number of devices/registers, restaurants, daily orders, pending offline operations or NEEDS CLARIFICATION]
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- **Offline continuity**: Critical flows for sales, payments, orders, inventory and shift
+  closing can complete without internet; any exception is documented with approval.
+- **Local authority**: User-facing success is backed by an Isar write, not by a remote
+  response; synchronized entities include stable IDs, versions, timestamps and sync state.
+- **Sync contract**: The plan defines operation direction, idempotency keys, retry behavior,
+  conflict rules, deduplication and audit requirements.
+- **Cloud role**: AWS Lambda/Postgres changes coordinate and consolidate data without becoming
+  a point of failure for local operation; migrations handle clients with pending local data.
+- **Verification**: Tests cover offline execution, reconnection, retries, idempotency and
+  recovery for queues/conflicts when the feature touches operational data.
 
 ## Project Structure
 

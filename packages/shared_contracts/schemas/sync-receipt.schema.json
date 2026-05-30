@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pos-erp.local/schemas/sync-receipt.schema.json",
+  "type": "object",
+  "required": ["receiptId", "transactionId", "status", "acceptedAt", "cloudVersion"],
+  "properties": {
+    "receiptId": { "type": "string", "format": "uuid" },
+    "transactionId": { "type": "string", "format": "uuid" },
+    "status": { "type": "string", "enum": ["accepted", "duplicate"] },
+    "acceptedAt": { "type": "string", "format": "date-time" },
+    "cloudVersion": { "type": "integer", "minimum": 1 }
+  },
+  "additionalProperties": false
+}
+

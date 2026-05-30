@@ -205,7 +205,7 @@ export const ContactForm: React.FC = () => {
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  placeholder="ej. Don Corleone"
+                  placeholder="ej. Don Cacharelo"
                   className="bg-[#0B0B0C] border border-mafia-bronze text-white rounded-[4px] px-4 py-3 focus:outline-none focus:border-mafia-gold focus:ring-1 focus:ring-mafia-gold placeholder-neutral-700 transition-all font-sans text-sm"
                 />
                 {fieldErrors.name && (
@@ -223,7 +223,7 @@ export const ContactForm: React.FC = () => {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  placeholder="ej. vito@corleone.com"
+                  placeholder="ej. don@cacharelo.com"
                   className="bg-[#0B0B0C] border border-mafia-bronze text-white rounded-[4px] px-4 py-3 focus:outline-none focus:border-mafia-gold focus:ring-1 focus:ring-mafia-gold placeholder-neutral-700 transition-all font-sans text-sm"
                 />
                 {fieldErrors.email && (
@@ -288,7 +288,7 @@ export const ContactForm: React.FC = () => {
                 name="subject"
                 value={formData.subject}
                 onChange={handleChange}
-                placeholder="ej. Sugerencia sobre el servicio en sucursal"
+                placeholder="ej. Los quiero en un evento familiar"
                 className="bg-[#0B0B0C] border border-mafia-bronze text-white rounded-[4px] px-4 py-3 focus:outline-none focus:border-mafia-gold focus:ring-1 focus:ring-mafia-gold placeholder-neutral-700 transition-all font-sans text-sm"
               />
               {fieldErrors.subject && (

@@ -1,0 +1,69 @@
+openapi: 3.1.0
+info:
+  title: POS Offline Sync API
+  version: 0.1.0
+  description: Idempotent AWS Lambda API for synchronizing offline POS operations.
+servers:
+  - url: https://api.example.com
+paths:
+  /v1/devices/register:
+    post:
+      summary: Register a POS device before offline operation.
+      operationId: registerDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterDeviceRequest"
+      responses:
+        "201":
+          description: Device registered.
+  /v1/sync/transactions:
+    post:
+      summary: Submit one locally committed transaction for cloud consolidation.
+      operationId: submitTransaction
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "202":
+          description: Transaction accepted or duplicate replay acknowledged.
+        "409":
+          description: Same transaction UUID was received with conflicting payload.
+        "422":
+          description: Payload failed validation.
+  /v1/sync/receipts/{transactionId}:
+    get:
+      summary: Fetch cloud receipt for a transaction UUID.
+      operationId: getSyncReceipt
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Receipt exists.
+        "404":
+          description: No receipt exists for this transaction.
+components:
+  schemas:
+    RegisterDeviceRequest:
+      type: object
+      required: [branchId]
+      properties:
+        branchId:
+          type: string
+    TransactionSyncRequest:
+      type: object
+    SyncReceipt:
+      type: object
+    ConflictResponse:
+      type: object

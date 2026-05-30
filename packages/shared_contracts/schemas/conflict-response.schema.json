@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pos-erp.local/schemas/conflict-response.schema.json",
+  "type": "object",
+  "required": ["conflictId", "transactionId", "reason"],
+  "properties": {
+    "conflictId": { "type": "string", "format": "uuid" },
+    "transactionId": { "type": "string", "format": "uuid" },
+    "reason": {
+      "type": "string",
+      "enum": ["payload_hash_mismatch", "invalid_state", "inventory_conflict"]
+    },
+    "message": { "type": "string" }
+  },
+  "additionalProperties": false
+}
+

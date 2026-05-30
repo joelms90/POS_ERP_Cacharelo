@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Eventos &amp; Catering | Grupo Cacharelo</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&amp;family=Inter:wght@300..700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-secondary-container": "#c2b7a1",
+                        "surface-container": "#1e2020",
+                        "inverse-surface": "#e2e2e2",
+                        "tertiary-fixed": "#e5e2e3",
+                        "on-primary-container": "#554300",
+                        "tertiary-container": "#b5b2b3",
+                        "on-error": "#690005",
+                        "surface-container-lowest": "#0d0f0f",
+                        "on-secondary-fixed-variant": "#4d4635",
+                        "surface-variant": "#333535",
+                        "on-primary": "#3c2f00",
+                        "on-surface": "#e2e2e2",
+                        "tertiary": "#d0cecf",
+                        "outline": "#99907c",
+                        "background": "#121414",
+                        "secondary": "#d1c5af",
+                        "on-tertiary": "#313031",
+                        "inverse-on-surface": "#2f3131",
+                        "tertiary-fixed-dim": "#c8c6c7",
+                        "on-primary-fixed-variant": "#574500",
+                        "secondary-fixed": "#ede1ca",
+                        "on-secondary": "#363020",
+                        "surface-dim": "#121414",
+                        "surface-container-low": "#1a1c1c",
+                        "error": "#ffb4ab",
+                        "secondary-fixed-dim": "#d1c5af",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-fixed": "#241a00",
+                        "primary": "#f2ca50",
+                        "surface-bright": "#38393a",
+                        "secondary-container": "#504837",
+                        "primary-fixed": "#ffe088",
+                        "on-tertiary-fixed-variant": "#474647",
+                        "on-surface-variant": "#d0c5af",
+                        "on-background": "#e2e2e2",
+                        "on-tertiary-fixed": "#1c1b1c",
+                        "primary-container": "#d4af37",
+                        "on-secondary-fixed": "#211b0d",
+                        "surface-container-highest": "#333535",
+                        "outline-variant": "#4d4635",
+                        "surface": "#121414",
+                        "inverse-primary": "#735c00",
+                        "surface-tint": "#e9c349",
+                        "error-container": "#93000a",
+                        "surface-container-high": "#282a2b",
+                        "primary-fixed-dim": "#e9c349",
+                        "on-tertiary-container": "#454546",
+                        "mafia-bg": "#0B0B0C",
+                        "mafia-bronze": "#2A2415",
+                        "mafia-gold": "#D4AF37"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem",
+                        "mafia": "4px"
+                    },
+                    spacing: {
+                        "gutter": "24px",
+                        "container-max": "1200px",
+                        "unit": "8px",
+                        "margin-mobile": "20px",
+                        "margin-desktop": "64px"
+                    },
+                    fontFamily: {
+                        "headline-lg": ["Bodoni Moda", "serif"],
+                        "label-sm": ["Inter", "sans-serif"],
+                        "headline-lg-mobile": ["Bodoni Moda", "serif"],
+                        "body-md": ["Inter", "sans-serif"],
+                        "display-lg": ["Bodoni Moda", "serif"],
+                        "body-lg": ["Inter", "sans-serif"]
+                    },
+                    fontSize: {
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "1.0", "letterSpacing": "0.1em", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "1.1", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "1.7", "fontWeight": "400" }]
+                    },
+                    backgroundImage: {
+                        'surface-gradient': 'linear-gradient(180deg, #121214 0%, #0D0D0E 100%)',
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #0B0B0C; color: #e2e2e2; }
+        .input-mafia {
+            background-color: transparent;
+            border: none;
+            border-bottom: 1px solid #2A2415;
+            color: #e2e2e2;
+            padding: 8px 0;
+            transition: all 0.3s ease;
+        }
+        .input-mafia:focus {
+            outline: none;
+            border-bottom: 2px solid #D4AF37;
+            box-shadow: none;
+        }
+        .input-mafia::placeholder { color: #666666; }
+        .btn-primary-mafia {
+            background-color: #D4AF37;
+            color: #000;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        .btn-primary-mafia:hover {
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+        }
+    </style>
+</head>
+<body class="font-body-md text-body-md antialiased overflow-x-hidden selection:bg-primary selection:text-on-primary">
+<!-- TopNavBar -->
+<nav class="docked full-width top-0 sticky z-50 bg-background/90 backdrop-blur-md dark:bg-background/95 border-b border-outline-variant/30 hidden md:block">
+<div class="flex justify-between items-center w-full px-margin-desktop max-w-container-max mx-auto py-4">
+<div class="text-headline-lg font-headline-lg text-primary dark:text-primary-fixed uppercase tracking-widest">
+                Grupo Cacharelo
+            </div>
+<ul class="flex gap-8 items-center">
+<li><a class="text-on-surface dark:text-on-surface hover:text-primary transition-colors duration-300 font-label-sm text-label-sm uppercase hover:text-primary dark:hover:text-primary-fixed transition-all duration-300" href="#">Nuestras Marcas</a></li>
+<li><a class="text-on-surface dark:text-on-surface hover:text-primary transition-colors duration-300 font-label-sm text-label-sm uppercase hover:text-primary dark:hover:text-primary-fixed transition-all duration-300" href="#">Territorios</a></li>
+<li><a class="text-on-surface dark:text-on-surface hover:text-primary transition-colors duration-300 font-label-sm text-label-sm uppercase hover:text-primary dark:hover:text-primary-fixed transition-all duration-300" href="#">Línea Segura</a></li>
+<li><a class="text-on-surface dark:text-on-surface hover:text-primary transition-colors duration-300 font-label-sm text-label-sm uppercase hover:text-primary dark:hover:text-primary-fixed transition-all duration-300" href="#">Contacto</a></li>
+</ul>
+<button class="btn-primary-mafia px-6 py-2 font-label-sm text-label-sm uppercase tracking-wider">Únete a la Familia</button>
+</div>
+</nav>
+<!-- Mobile Nav (simplified representation of top nav for mobile) -->
+<nav class="md:hidden full-width top-0 sticky z-50 bg-background/90 backdrop-blur-md border-b border-outline-variant/30 flex justify-center py-4">
+<div class="text-headline-lg-mobile font-headline-lg-mobile text-primary uppercase tracking-widest">
+                Grupo Cacharelo
+         </div>
+</nav>
+<!-- Hero Section -->
+<section class="relative w-full h-[819px] flex items-center justify-center overflow-hidden">
+<div class="absolute inset-0 bg-black z-0">
+<img alt="Cinematic Event Setting" class="w-full h-full object-cover opacity-40 mix-blend-luminosity" data-alt="A highly cinematic, moody photograph of a luxurious banquet table setting in a grand, dimly lit room. The scene embodies a 'Mafia' aesthetic, sophisticated and authoritative. Deep obsidian blacks dominate the shadows, while sharp transitions of light highlight aged bronze and subtle gold accents on the elegant tableware and crystal glasses. The atmosphere is exclusive, steeped in tradition and legacy, with a high-contrast noir lighting style that directs focus to the pristine details of the catering setup." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_peEZGdTkOFkJa39_iIu5dgZQAJYwdg-O-oXUGmzoVmKpilCdihMNJxr5QzrZUMPAY_Sxd497Fdo3CQ8f1ouPw52TwMFTp6D10iR1Y2UvtiN7rMJRqkNl5puqeXyLayv-qKlC5JIHYCcJXugufMRtEhCLatYOhjkA2ttM_sex8aO9y1MNRwstSAKuRdtIabzfmC0XPcCTN0kLWMyh0L5gYIEoeg1onGqbcneP5uK75ia8OXqIPEeU4LPpt-yfqnP2mo1l_59OGURT"/>
+<div class="absolute inset-0 bg-gradient-to-t from-[#0B0B0C] via-transparent to-transparent"></div>
+</div>
+<div class="relative z-10 text-center max-w-4xl px-margin-mobile md:px-margin-desktop">
+<h1 class="font-display-lg text-display-lg text-primary uppercase mb-6 tracking-[0.1em] drop-shadow-2xl">
+                Eventos Imperiales
+            </h1>
+<p class="font-headline-lg text-headline-lg md:text-[36px] text-inverse-surface opacity-90 max-w-2xl mx-auto leading-tight">
+                Lleve la tradición de nuestra familia a sus momentos más importantes.
+            </p>
+</div>
+</section>
+<!-- Separator -->
+<div class="w-full flex justify-center py-16">
+<div class="w-24 h-[1px] bg-gradient-to-r from-transparent via-primary-container to-transparent opacity-50"></div>
+</div>
+<!-- Service Offerings -->
+<section class="py-16 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
+<div class="text-center mb-16">
+<h2 class="font-headline-lg text-headline-lg text-inverse-surface uppercase tracking-widest mb-4">Servicios Exclusivos</h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-xl mx-auto">Nuestra experiencia a su disposición, garantizando discreción y excelencia en cada detalle.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<!-- Card 1 -->
+<div class="group bg-surface-gradient border border-mafia-bronze rounded-mafia p-8 flex flex-col items-center text-center transition-all duration-300 hover:border-mafia-gold hover:shadow-[0_0_20px_rgba(212,175,55,0.05)] cursor-pointer">
+<div class="w-16 h-16 rounded-full border border-mafia-bronze flex items-center justify-center mb-6 text-primary group-hover:border-primary transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 32px;">business_center</span>
+</div>
+<h3 class="font-headline-lg text-headline-lg md:text-[24px] text-inverse-surface mb-3 uppercase">Empresas</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Soluciones de alto nivel para reuniones ejecutivas y galas corporativas. Imponga respeto.</p>
+</div>
+<!-- Card 2 -->
+<div class="group bg-surface-gradient border border-mafia-bronze rounded-mafia p-8 flex flex-col items-center text-center transition-all duration-300 hover:border-mafia-gold hover:shadow-[0_0_20px_rgba(212,175,55,0.05)] cursor-pointer">
+<div class="w-16 h-16 rounded-full border border-mafia-bronze flex items-center justify-center mb-6 text-primary group-hover:border-primary transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 32px;">vpn_key</span>
+</div>
+<h3 class="font-headline-lg text-headline-lg md:text-[24px] text-inverse-surface mb-3 uppercase">Eventos Privados</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Celebraciones íntimas diseñadas con absoluta reserva y un gusto impecable.</p>
+</div>
+<!-- Card 3 -->
+<div class="group bg-surface-gradient border border-mafia-bronze rounded-mafia p-8 flex flex-col items-center text-center transition-all duration-300 hover:border-mafia-gold hover:shadow-[0_0_20px_rgba(212,175,55,0.05)] cursor-pointer">
+<div class="w-16 h-16 rounded-full border border-mafia-bronze flex items-center justify-center mb-6 text-primary group-hover:border-primary transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 32px;">restaurant</span>
+</div>
+<h3 class="font-headline-lg text-headline-lg md:text-[24px] text-inverse-surface mb-3 uppercase">Banquetes</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Nuestra herencia culinaria llevada a la máxima expresión para gran escala.</p>
+</div>
+</div>
+</section>
+<!-- Separator -->
+<div class="w-full flex justify-center py-16">
+<div class="w-24 h-[1px] bg-gradient-to-r from-transparent via-primary-container to-transparent opacity-50"></div>
+</div>
+<!-- Contact Form ("Reserva de Honor") -->
+<section class="py-16 px-margin-mobile md:px-margin-desktop mb-24">
+<div class="max-w-3xl mx-auto bg-surface-gradient border border-mafia-bronze rounded-mafia p-8 md:p-12 relative overflow-hidden">
+<!-- Subtle decorative corner -->
+<div class="absolute top-0 left-0 w-16 h-16 border-t border-l border-mafia-gold/30 rounded-tl-mafia m-2"></div>
+<div class="text-center mb-12">
+<h2 class="font-display-lg text-display-lg md:text-[36px] text-primary uppercase mb-2">Reserva de Honor</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Confíenos los detalles. Nosotros nos encargamos del resto.</p>
+</div>
+<form class="space-y-8 flex flex-col">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<div class="flex flex-col">
+<label class="font-label-sm text-label-sm text-on-surface-variant uppercase mb-2">Nombre del Evento</label>
+<input class="input-mafia font-body-md" placeholder="Ej. Gala Anual" type="text"/>
+</div>
+<div class="flex flex-col">
+<label class="font-label-sm text-label-sm text-on-surface-variant uppercase mb-2">Tipo de Servicio</label>
+<select class="input-mafia font-body-md appearance-none bg-transparent">
+<option class="bg-[#0B0B0C] text-on-surface-variant" disabled="" selected="" value="">Seleccione...</option>
+<option class="bg-[#0B0B0C] text-inverse-surface" value="empresas">Empresas</option>
+<option class="bg-[#0B0B0C] text-inverse-surface" value="privado">Eventos Privados</option>
+<option class="bg-[#0B0B0C] text-inverse-surface" value="banquete">Banquetes</option>
+</select>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<div class="flex flex-col">
+<label class="font-label-sm text-label-sm text-on-surface-variant uppercase mb-2">Número de Invitados</label>
+<input class="input-mafia font-body-md" placeholder="Aprox." type="number"/>
+</div>
+<div class="flex flex-col">
+<label class="font-label-sm text-label-sm text-on-surface-variant uppercase mb-2">Fecha Estimada</label>
+<input class="input-mafia font-body-md text-on-surface-variant" style="color-scheme: dark;" type="date"/>
+</div>
+</div>
+<div class="flex flex-col">
+<label class="font-label-sm text-label-sm text-on-surface-variant uppercase mb-2">Email de Contacto</label>
+<input class="input-mafia font-body-md" placeholder="su.correo@dominio.com" type="email"/>
+</div>
+<div class="flex flex-col">
+<label class="font-label-sm text-label-sm text-on-surface-variant uppercase mb-2">Mensaje / Requerimientos Especiales</label>
+<textarea class="input-mafia font-body-md resize-none" placeholder="Especifique detalles de seguridad o dietéticos..." rows="3"></textarea>
+</div>
+<div class="pt-6 flex justify-center">
+<button class="btn-primary-mafia w-full md:w-auto px-12 py-4 font-label-sm text-label-sm font-bold uppercase tracking-widest" type="submit">
+                        Solicitar Presupuesto
+                    </button>
+</div>
+</form>
+</div>
+</section>
+<!-- Footer -->
+<footer class="full-width bg-surface-container-lowest dark:bg-surface-container-lowest border-t border-outline-variant/50">
+<div class="flex flex-col md:flex-row justify-between items-center w-full px-margin-desktop py-12 max-w-container-max mx-auto gap-gutter">
+<div class="text-headline-lg font-headline-lg text-primary dark:text-primary-fixed uppercase tracking-widest text-center md:text-left">
+                Grupo Cacharelo
+            </div>
+<ul class="flex flex-wrap justify-center gap-6 text-label-sm font-label-sm uppercase">
+<li><a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary transition-all duration-300" href="#">Privacidad</a></li>
+<li><a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary transition-all duration-300" href="#">Términos</a></li>
+<li><a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary transition-all duration-300" href="#">Línea Segura</a></li>
+<li><a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary transition-all duration-300" href="#">Franquicias</a></li>
+</ul>
+<div class="text-body-md font-body-md text-on-surface-variant dark:text-on-surface-variant text-center md:text-right">
+                © 2024 Grupo Cacharelo. Tradición y Respeto.
+            </div>
+</div>
+</footer>
+</body></html>

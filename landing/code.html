@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Grupo Cacharelo - Tradición y Respeto</title>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&amp;family=Playfair+Display:ital,wght@0,400..900;1,400..900&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind Theme Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed": "#e5e2e3",
+              "on-secondary-fixed-variant": "#4d4635",
+              "tertiary-fixed-dim": "#c8c6c7",
+              "surface-variant": "#333535",
+              "secondary-fixed-dim": "#d1c5af",
+              "inverse-primary": "#735c00",
+              "on-primary": "#3c2f00",
+              "on-primary-container": "#554300",
+              "outline-variant": "#4d4635",
+              "outline": "#99907c",
+              "on-surface": "#e2e2e2",
+              "surface-container": "#1e2020",
+              "background": "#121414",
+              "inverse-surface": "#e2e2e2",
+              "surface-container-low": "#1a1c1c",
+              "on-tertiary": "#313031",
+              "on-background": "#e2e2e2",
+              "secondary-container": "#504837",
+              "on-tertiary-fixed-variant": "#474647",
+              "on-error": "#690005",
+              "surface-tint": "#e9c349",
+              "on-primary-fixed-variant": "#574500",
+              "on-secondary": "#363020",
+              "on-secondary-container": "#c2b7a1",
+              "surface": "#121414",
+              "on-tertiary-container": "#454546",
+              "on-tertiary-fixed": "#1c1b1c",
+              "tertiary": "#d0cecf",
+              "surface-bright": "#38393a",
+              "error-container": "#93000a",
+              "surface-container-highest": "#333535",
+              "surface-dim": "#121414",
+              "surface-container-high": "#282a2b",
+              "on-surface-variant": "#d0c5af",
+              "secondary-fixed": "#ede1ca",
+              "secondary": "#d1c5af",
+              "primary": "#f2ca50",
+              "primary-container": "#d4af37",
+              "tertiary-container": "#b5b2b3",
+              "primary-fixed": "#ffe088",
+              "on-secondary-fixed": "#211b0d",
+              "on-error-container": "#ffdad6",
+              "primary-fixed-dim": "#e9c349",
+              "inverse-on-surface": "#2f3131",
+              "error": "#ffb4ab",
+              "on-primary-fixed": "#241a00",
+              "surface-container-lowest": "#0d0f0f",
+              
+              // Custom Mafia Theme Additions mapping closely to standard tokens
+              "mafia-base": "#0B0B0C",
+              "mafia-surface": "#121214",
+              "mafia-surface-end": "#0D0D0E",
+              "mafia-bronze": "#2A2415",
+              "mafia-gold": "#D4AF37",
+            },
+            borderRadius: {
+              "DEFAULT": "0.125rem",
+              "lg": "0.25rem",
+              "xl": "0.5rem",
+              "full": "0.75rem"
+            },
+            spacing: {
+              "margin-mobile": "20px",
+              "margin-desktop": "64px",
+              "gutter": "24px",
+              "unit": "8px",
+              "container-max": "1200px"
+            },
+            boxShadow: {
+              'glow-gold': '0 0 20px rgba(212, 175, 55, 0.15)',
+            }
+          }
+        }
+      }
+    </script>
+<style type="text/tailwindcss">
+        @layer components {
+            .font-spec-hero {
+                font-family: 'CorleoneOld', serif;
+                text-transform: uppercase;
+                letter-spacing: 0.15em;
+                color: #D4AF37;
+            }
+            .font-spec-dish {
+                font-family: 'Playfair Display', serif;
+                font-weight: 700;
+                letter-spacing: 0.025em;
+                color: #ffffff;
+            }
+            .font-spec-body {
+                font-family: 'Inter', sans-serif;
+                font-weight: 400;
+                line-height: 1.625;
+                color: #E5E5E5;
+            }
+        }
+
+        /* Base cinematic overrides */
+        body {
+            background-color: #0B0B0C;
+            color: #e2e2e2;
+        }
+        
+        .bg-mafia-gradient {
+            background: linear-gradient(180deg, #121214 0%, #0D0D0E 100%);
+        }
+        
+        /* Subtle divider glow */
+        .divider-cinematic {
+            height: 1px;
+            background: radial-gradient(circle, rgba(42,36,21,1) 0%, rgba(42,36,21,0) 100%);
+        }
+        
+        /* Interactive Card Gold Border Transition */
+        .interactive-card {
+            border: 1px solid #2A2415;
+            transition: all 0.3s ease;
+        }
+        .interactive-card:hover {
+            border-color: #D4AF37;
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(212, 175, 55, 0.1);
+        }
+    </style>
+</head>
+<body class="antialiased flex flex-col min-h-screen font-spec-body overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container">
+<!-- JSON: TopNavBar -->
+<nav class="bg-background/90 backdrop-blur-md dark:bg-background/95 docked full-width top-0 sticky z-50 border-b border-outline-variant/30 transition-all duration-300 w-full" id="global-nav">
+<div class="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto py-4">
+<!-- Brand -->
+<a class="text-xl md:text-2xl font-spec-hero flex items-center gap-2" href="#">
+                Grupo Cacharelo
+            </a>
+<!-- Desktop Links -->
+<ul class="hidden md:flex items-center gap-gutter">
+<li>
+<!-- Active state based on Intent Match (Home/Landing = Nuestras Marcas) -->
+<a class="text-primary dark:text-primary-fixed border-b-2 border-primary pb-1 font-spec-body font-semibold text-xs uppercase hover:text-primary dark:hover:text-primary-fixed transition-all duration-300" href="#">
+                        Nuestras Marcas
+                    </a>
+</li>
+<li>
+<a class="text-on-surface dark:text-on-surface hover:text-primary transition-colors duration-300 font-spec-body font-semibold text-xs uppercase" href="#territorios">
+                        Territorios
+                    </a>
+</li>
+<li>
+<a class="text-on-surface dark:text-on-surface hover:text-primary transition-colors duration-300 font-spec-body font-semibold text-xs uppercase" href="#linea-segura">
+                        Línea Segura
+                    </a>
+</li>
+<li>
+<a class="text-on-surface dark:text-on-surface hover:text-primary transition-colors duration-300 font-spec-body font-semibold text-xs uppercase" href="#contacto">
+                        Contacto
+                    </a>
+</li>
+</ul>
+<!-- Trailing Action -->
+<div class="hidden md:block">
+<button class="bg-primary-container text-on-primary-container px-6 py-2 rounded font-spec-body font-semibold text-xs uppercase hover:shadow-glow-gold transition-all duration-300 active:scale-95">
+                    Únete a la Familia
+                </button>
+</div>
+<!-- Mobile Menu Toggle -->
+<button class="md:hidden text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">menu</span>
+</button>
+</div>
+</nav>
+<!-- Canvas Start -->
+<main class="flex-grow">
+<!-- Hero Section -->
+<section class="relative w-full min-h-[819px] flex flex-col items-center justify-center pt-24 pb-16 px-margin-mobile md:px-margin-desktop text-center">
+<!-- Atmospheric Background Image -->
+<div class="absolute inset-0 w-full h-full z-[-1] opacity-40 mix-blend-luminosity">
+<img class="w-full h-full object-cover object-center" data-alt="A cinematic, low-key lighting photograph of a steaming cup of dark espresso next to a golden baked empanada resting on a dark, textured slate surface. The mood is sophisticated, noir, and premium, utilizing deep charcoal blacks punctuated by warm amber and gold highlights from the steam and pastry crust. Designed to fit a luxury mafia aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxxUyZP7pbHEdEYfjfaYRhBR0t7yFy-0gJsmR9AJid_vHIArOQy4jCZ-AF_uJZoH2C_ZKzkVRZxdO4BBevNZk_PWJ_9cfzMqrG4Xc9OFrG5qdRZQSIk2-wotBrI8MmcGQm93Q0wyq3OGuPfUFndlPDBAqLxTZH77l18IUqYfegugx49Pfnp-_n_vBgUlRDQp7afhihoKJL7FBd1T5WGOvheCgKwSUE7I37tWh05CfMli3e3XgMNzIzz3uUGkhM73Hdri65Y1aduAV0"/>
+<!-- Vignette overlay -->
+<div class="absolute inset-0 bg-radial-gradient from-transparent via-[#0B0B0C]/80 to-[#0B0B0C]"></div>
+</div>
+<!-- Content Anchor -->
+<div class="max-w-4xl mx-auto flex flex-col items-center gap-8 relative z-10">
+<h1 class="font-spec-hero text-4xl md:text-[3.5rem] leading-tight drop-shadow-2xl">
+                    El Sabor Oficial De Tu Viaje
+                </h1>
+<p class="font-spec-body text-xl md:text-2xl italic opacity-90 max-w-2xl">
+                    "Una tradición familiar que se respeta."
+                </p>
+<div class="flex flex-col sm:flex-row gap-4 mt-8">
+<button class="bg-primary-container text-on-primary-container px-8 py-3 rounded uppercase font-spec-body font-semibold text-xs tracking-widest hover:shadow-glow-gold transition-all duration-300">
+                        Nuestras Operaciones
+                    </button>
+<button class="border border-mafia-bronze bg-transparent text-on-surface px-8 py-3 rounded uppercase font-spec-body font-semibold text-xs tracking-widest hover:border-primary-container hover:text-primary transition-all duration-300">
+                        Conoce la Historia
+                    </button>
+</div>
+</div>
+<!-- Subtly separated bottom edge -->
+<div class="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-[#0B0B0C] to-transparent z-10"></div>
+</section>
+<!-- Divider -->
+<div class="w-full divider-cinematic max-w-container-max mx-auto"></div>
+<!-- Our Brands Grid -->
+<section class="w-full py-24 px-margin-mobile md:px-margin-desktop bg-[#0B0B0C]" id="marcas">
+<div class="max-w-container-max mx-auto flex flex-col items-center">
+<h2 class="font-spec-hero text-2xl md:text-3xl mb-16 text-center">
+                    Nuestras Cuatro Marcas
+                </h2>
+<!-- Grid cols 1 on mobile, 2 on tablet, 4 on desktop -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter w-full">
+<!-- Card 1 -->
+<div class="interactive-card bg-mafia-gradient rounded-lg p-8 flex flex-col items-center text-center gap-6 min-h-[320px] justify-center">
+<div class="w-24 h-24 rounded-full border border-mafia-bronze flex items-center justify-center p-4">
+<span class="material-symbols-outlined text-primary text-5xl" style="font-variation-settings: 'FILL' 1;">local_pizza</span>
+</div>
+<div>
+<h3 class="font-spec-dish text-xl mb-2">Pastes y Empanadas</h3>
+<p class="font-spec-body text-base">De Tradición</p>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="interactive-card bg-mafia-gradient rounded-lg p-8 flex flex-col items-center text-center gap-6 min-h-[320px] justify-center">
+<div class="w-24 h-24 flex items-center justify-center">
+<span class="material-symbols-outlined text-[#e74c3c] text-6xl drop-shadow-[0_0_10px_rgba(231,76,60,0.5)]" style="font-variation-settings: 'FILL' 1;">lunch_dining</span>
+</div>
+<div>
+<h3 class="font-spec-dish text-xl mb-2">Las Hamburguesas</h3>
+<p class="font-spec-body text-base">Del Imperio</p>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="interactive-card bg-mafia-gradient rounded-lg p-8 flex flex-col items-center text-center gap-6 min-h-[320px] justify-center">
+<div class="w-24 h-24 flex items-center justify-center relative">
+<span class="material-symbols-outlined text-[#f39c12] text-6xl" style="font-variation-settings: 'FILL' 1;">person</span>
+<!-- Faux charro hat detail using border hacks for cinematic styling without complex SVGs -->
+<div class="absolute top-0 w-16 h-4 border-t-4 border-[#f39c12] rounded-t-full"></div>
+</div>
+<div>
+<h3 class="font-spec-dish text-xl mb-2">El Sabor de Antaño</h3>
+<p class="font-spec-body text-base">Xastipam</p>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="interactive-card bg-mafia-gradient rounded-lg p-8 flex flex-col items-center text-center gap-6 min-h-[320px] justify-center">
+<div class="w-24 h-24 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-5xl" style="font-variation-settings: 'FILL' 0;">coffee_maker</span>
+</div>
+<div>
+<h3 class="font-spec-dish text-xl mb-2">La Excelencia</h3>
+<p class="font-spec-body text-base">Multimarca</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Territory Tabber -->
+<section class="w-full py-24 px-margin-mobile md:px-margin-desktop bg-[#0B0B0C]" id="territorios">
+<div class="max-w-container-max mx-auto">
+<h2 class="font-spec-hero text-2xl md:text-3xl mb-12 text-center">
+                    Los Territorios y Operaciones <span class="font-semibold font-spec-body tracking-normal text-[#D4AF37] lowercase" style="font-variant: small-caps;">24 Horas</span>
+</h2>
+<!-- Tabs Header -->
+<div class="flex flex-col md:flex-row justify-center gap-2 mb-8 max-w-3xl mx-auto bg-mafia-surface border border-mafia-bronze rounded-lg p-1">
+<button class="flex-1 py-3 px-4 bg-primary-container text-on-primary-container rounded flex items-center justify-center gap-2 font-spec-body font-semibold text-xs uppercase transition-all duration-300">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">location_on</span>
+                        En La Ciudad
+                    </button>
+<button class="flex-1 py-3 px-4 bg-transparent text-on-surface hover:text-primary rounded flex items-center justify-center gap-2 font-spec-body font-semibold text-xs uppercase transition-all duration-300">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 0;">directions_bus</span>
+                        En Tránsito
+                    </button>
+<button class="flex-1 py-3 px-4 bg-transparent text-on-surface hover:text-primary rounded flex items-center justify-center gap-2 font-spec-body font-semibold text-xs uppercase transition-all duration-300">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">nightlight_round</span>
+                        Operaciones <span class="font-semibold">24 Horas</span>
+</button>
+</div>
+<!-- Content Area (Asymmetric Layout) -->
+<div class="flex flex-col lg:flex-row gap-gutter bg-mafia-gradient border border-mafia-bronze rounded-lg overflow-hidden min-h-[500px]">
+<!-- Left: Interactive Map Stand-in -->
+<div class="w-full lg:w-2/3 bg-[#1A1C1E] relative min-h-[300px]">
+<img class="w-full h-full object-cover opacity-30 grayscale contrast-125" data-alt="A dark-mode stylised overhead map of a city grid. The map is rendered in deep charcoal greys and blacks. It serves as a sophisticated, minimalist background for plotting luxury brand territory markers, adhering strictly to a cinematic mafia aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB86ZmjA0H-PdtdJT76tKQnW6CFbkNRY5VUA2118z0rvAmBEYsfKLK33ABJCrPrARdIoiuQcJZ6K1XTFLgYJvTGnzfdnOaOTxnpi5pST8W8RXlPy_zf1d-e4UvmcoCwCt3Ht2MGpYeKoCcyhtmTthT5tCTu6GQB4yzHOsAhX00u6YB3L4msmswPW_6DM_fyrqRlh48rKLS90kvPQYyDr6a1hHaMKl9BnQJVPqudukP8LebUhabxXucmQpNSn_eH2vo3WVNWvpdrbLYf"/>
+<!-- Map Overlay Pins (Simulated) -->
+<div class="absolute top-1/4 left-1/3 flex flex-col items-center group cursor-pointer">
+<div class="bg-surface border border-mafia-bronze p-3 rounded shadow-xl mb-2 hidden group-hover:block transition-all z-20 w-48">
+<p class="font-spec-body font-semibold text-xs text-on-surface">Sucursal Reforma</p>
+<p class="text-[10px] font-spec-body text-on-surface-variant">Corporativo</p>
+</div>
+<span class="material-symbols-outlined text-primary text-3xl drop-shadow-glow-gold" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+<div class="absolute top-1/2 left-1/2 flex flex-col items-center group cursor-pointer">
+<div class="bg-surface border border-mafia-bronze p-3 rounded shadow-xl mb-2 hidden group-hover:block transition-all z-20 w-48">
+<p class="font-spec-body font-semibold text-xs text-on-surface">Sucursal Insurgentes</p>
+<p class="text-[10px] font-spec-body font-semibold text-on-surface-variant">24 Hrs</p>
+</div>
+<span class="material-symbols-outlined text-primary text-3xl drop-shadow-glow-gold" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+</div>
+<!-- Right: Locations List -->
+<div class="w-full lg:w-1/3 p-8 flex flex-col gap-6 overflow-y-auto">
+<h3 class="font-spec-hero text-xl border-b border-mafia-bronze pb-4 mb-2">
+                            Puntos de Operación
+                        </h3>
+<!-- List Item -->
+<div class="flex flex-col gap-1 hover:pl-2 transition-all duration-300 border-l-2 border-transparent hover:border-primary group cursor-pointer">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+<h4 class="font-spec-body text-base text-on-surface group-hover:text-primary transition-colors">Territorio Cacharelo (CDMX)</h4>
+</div>
+<p class="font-spec-body text-xs text-on-surface-variant pl-4">Oficina: +52 1 55 7421 5566</p>
+</div>
+<!-- List Item -->
+<div class="flex flex-col gap-1 hover:pl-2 transition-all duration-300 border-l-2 border-transparent hover:border-primary group cursor-pointer">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+<h4 class="font-spec-body text-base text-on-surface group-hover:text-primary transition-colors">Sucursal Reforma (9am-10pm)</h4>
+</div>
+<p class="font-spec-body text-xs text-on-surface-variant pl-4">Oficina: +52 1 55 7421 5566</p>
+</div>
+<!-- List Item -->
+<div class="flex flex-col gap-1 hover:pl-2 transition-all duration-300 border-l-2 border-transparent hover:border-primary group cursor-pointer">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#3498db]"></span>
+<h4 class="font-spec-body text-base text-on-surface group-hover:text-primary transition-colors">Sucursal Insurgentes <span class="font-semibold">(24hrs)</span></h4>
+</div>
+<p class="font-spec-body text-xs text-on-surface-variant pl-4">Oficina: +52 1 55 7421 5566</p>
+</div>
+<!-- List Item -->
+<div class="flex flex-col gap-1 hover:pl-2 transition-all duration-300 border-l-2 border-transparent hover:border-primary group cursor-pointer">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+<h4 class="font-spec-body text-base text-on-surface group-hover:text-primary transition-colors">Sucursal Polanco (8am-11pm)</h4>
+</div>
+<p class="font-spec-body text-xs text-on-surface-variant pl-4">Oficina: +52 1 55 7421 5566</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Divider -->
+<div class="w-full divider-cinematic max-w-container-max mx-auto"></div>
+<!-- Línea Segura / Minimal Contact -->
+<section class="w-full py-24 px-margin-mobile md:px-margin-desktop bg-[#0B0B0C]" id="linea-segura">
+<div class="max-w-3xl mx-auto flex flex-col items-center text-center gap-8">
+<span class="material-symbols-outlined text-primary text-5xl" style="font-variation-settings: 'FILL' 1;">phone_in_talk</span>
+<div>
+<h2 class="font-spec-hero text-2xl md:text-3xl mb-2">Línea Segura</h2>
+<p class="font-spec-body text-base text-on-surface-variant">Para reporte y soporte directo:</p>
+</div>
+<a class="font-spec-hero text-4xl md:text-5xl hover:text-primary transition-colors duration-300 tracking-wider" href="tel:5592449939" style="text-transform: none; color: #E5E5E5;">
+                    55 9244 9939
+                </a>
+<p class="font-spec-body font-semibold text-xs text-on-surface-variant uppercase">Ofic: +52 1 55 7421 5566</p>
+<!-- Floating WhatsApp visual anchor -->
+<button class="mt-4 w-16 h-16 rounded-full border border-primary-container bg-mafia-surface flex items-center justify-center hover:bg-primary-container hover:text-on-primary-container transition-all duration-300 shadow-glow-gold">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">chat</span>
+</button>
+</div>
+</section>
+</main>
+<!-- JSON: Footer -->
+<footer class="bg-surface-container-lowest dark:bg-surface-container-lowest full-width border-t border-outline-variant/50 transition-all duration-300">
+<div class="flex flex-col md:flex-row justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-12 max-w-container-max mx-auto gap-gutter">
+<!-- Brand -->
+<div class="font-spec-hero text-xl md:text-2xl mb-6 md:mb-0">
+                Grupo Cacharelo
+            </div>
+<!-- Links -->
+<div class="flex flex-wrap justify-center gap-6 font-spec-body font-semibold text-xs uppercase">
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary transition-all duration-300" href="#">
+                    Privacidad
+                </a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary transition-all duration-300" href="#">
+                    Términos
+                </a>
+<!-- Direct match to JSON active state intent, although often inactive in footer unless on the specific page. Following JSON active state logic: active if intent matches -->
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary transition-all duration-300" href="#">
+                    Línea Segura
+                </a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary transition-all duration-300" href="#">
+                    Franquicias
+                </a>
+</div>
+<!-- Copyright -->
+<div class="mt-8 md:mt-0 font-spec-body text-base text-on-surface-variant dark:text-on-surface-variant text-center md:text-right">
+                © 2024 Grupo Cacharelo. Tradición y Respeto.
+            </div>
+</div>
+</footer>
+<!-- Interactive script for smooth scrolling (JSON Interaction logic) -->
+<script>
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                if(targetId === '#') {
+                    window.scrollTo({
+                        top: 0,
+                        behavior: 'smooth'
+                    });
+                } else {
+                    document.querySelector(targetId).scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+    </script>
+</body></html>

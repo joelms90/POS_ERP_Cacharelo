@@ -77,6 +77,9 @@
 
 - What happens when [boundary condition]?
 - How does system handle [error scenario]?
+- What can the user still complete if internet drops during this flow?
+- What happens when the device reconnects with pending local operations?
+- How are duplicate submissions, partial sync failures, or conflicting edits handled?
 
 ## Requirements *(mandatory)*
 
@@ -92,11 +95,13 @@
 - **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]
 - **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
 - **FR-005**: System MUST [behavior, e.g., "log all security events"]
+- **FR-006**: System MUST define offline behavior for every critical POS action in scope
+- **FR-007**: System MUST define synchronization and conflict behavior for data shared with the cloud
 
 *Example of marking unclear requirements:*
 
-- **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
-- **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
+- **FR-008**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
+- **FR-009**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
 ### Key Entities *(include if feature involves data)*
 
@@ -116,6 +121,7 @@
 - **SC-002**: [Measurable metric, e.g., "System handles 1000 concurrent users without degradation"]
 - **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete primary task on first attempt"]
 - **SC-004**: [Business metric, e.g., "Reduce support tickets related to [X] by 50%"]
+- **SC-005**: [Offline metric, e.g., "Cashier can complete 20 consecutive sales with internet disabled and sync them after reconnection"]
 
 ## Assumptions
 
@@ -125,7 +131,7 @@
   chosen when the feature description did not specify certain details.
 -->
 
-- [Assumption about target users, e.g., "Users have stable internet connectivity"]
+- [Assumption about connectivity, e.g., "Users may lose internet during normal restaurant operation"]
 - [Assumption about scope boundaries, e.g., "Mobile support is out of scope for v1"]
 - [Assumption about data/environment, e.g., "Existing authentication system will be reused"]
 - [Dependency on existing system/service, e.g., "Requires access to the existing user profile API"]

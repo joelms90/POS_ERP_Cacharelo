@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pos-erp.local/schemas/transaction-sync-request.schema.json",
+  "type": "object",
+  "required": [
+    "transactionId",
+    "deviceId",
+    "branchId",
+    "transactionType",
+    "localVersion",
+    "createdAtLocal",
+    "payloadHash",
+    "payload"
+  ],
+  "properties": {
+    "transactionId": { "type": "string", "format": "uuid" },
+    "deviceId": { "type": "string", "format": "uuid" },
+    "branchId": { "type": "string", "minLength": 1 },
+    "transactionType": {
+      "type": "string",
+      "enum": ["sale", "refund", "inventory_adjustment", "shift_close"]
+    },
+    "localVersion": { "type": "integer", "minimum": 1 },
+    "createdAtLocal": { "type": "string", "format": "date-time" },
+    "payloadHash": { "type": "string", "minLength": 16 },
+    "payload": { "type": "object" }
+  },
+  "additionalProperties": false
+}
+

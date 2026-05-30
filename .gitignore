@@ -1,0 +1,29 @@
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/
+
+# Environment and logs
+.env
+.env.*
+*.log
+*.log.*
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+coverage/
+
+# Node/TypeScript
+node_modules/
+dist/
+
+# Local generated files
+*.isar
+*.isar.lock
+
