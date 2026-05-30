@@ -27,6 +27,7 @@
 - [x] T006 Create directory sub-folders for Atomic Design pattern (`src/components/atoms/`, `src/components/molecules/`, `src/components/organisms/`, `src/components/templates/`, `src/components/pages/`)
 - [x] T007 [P] Scaffolder functions-framework emulation server in `apps/landing_page/backend/src/index.ts` with TypeScript configuration and JSON request parsing
 - [x] T008 Setup deployment command helper scripts for static GCS sync and GCF deploy in `apps/landing_page/package.json`
+- [x] T008a Define Terraform files (`main.tf`, `variables.tf`, `outputs.tf`, `backend.tf`) in `apps/landing_page/infra/` to automate GCS hosting and GCF deployment
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 

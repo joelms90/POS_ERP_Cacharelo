@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc",
     "predev": "pnpm build",
+    "gcp-build": "tsc",
     "dev": "functions-framework --source=dist --target=submitInquiry",
     "start": "functions-framework --source=dist --target=submitInquiry",
     "test": "vitest run"

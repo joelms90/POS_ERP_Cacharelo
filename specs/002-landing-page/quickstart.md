@@ -67,42 +67,57 @@ npm run test
 
 ---
 
-## 4. Google Cloud Deployment
+## 4. Infrastructure Provisioning via Terraform (Preferred)
 
-### 4.1 Prerequisites
-Ensure the Google Cloud SDK (`gcloud` CLI) is installed and authenticated:
+Ensure the Google Cloud SDK (`gcloud` CLI) and Terraform are installed:
 ```bash
 gcloud auth login
-gcloud config set project [YOUR_PROJECT_ID]
+gcloud auth application-default login  # Required for Terraform authentication
 ```
 
-### 4.2 Deploying the Backend (Cloud Function)
-1. Deploy the HTTPS function:
+### 4.1 Initialize and Apply Infrastructure
+1. Navigate to the infra directory:
    ```bash
-   cd apps/landing_page/backend
-   gcloud functions deploy submit-inquiry \
-     --runtime=nodejs22 \
-     --trigger-http \
-     --allow-unauthenticated \
-     --entry-point=submitInquiry \
-     --region=us-central1
+   cd apps/landing_page/infra
    ```
-2. Copy the generated URL and update the frontend `.env.production` file:
-   ```env
-   VITE_CONTACT_API_URL=https://us-central1-[YOUR_PROJECT_ID].cloudfunctions.net/submit-inquiry
+2. Create a `terraform.tfvars` file and specify your parameters:
+   ```hcl
+   project_id  = "your-gcp-project-id"
+   region      = "us-central1"
+   bucket_name = "grupo-cacharelo-landing"
    ```
+3. Initialize and provision the resources:
+   ```bash
+   terraform init
+   terraform plan
+   terraform apply
+   ```
+4. Note the output values for `function_url` and `website_bucket_name`.
 
-### 4.3 Deploying the Frontend (Cloud Storage Static Web)
-1. Compile the React production build:
+---
+
+## 5. Frontend Build and Static Deployment
+
+### 5.1 Configure Environment Variables
+Create a production environment file in the frontend folder:
+`apps/landing_page/frontend/.env.production`
+```env
+VITE_CONTACT_API_URL=https://[REGION]-[PROJECT_ID].cloudfunctions.net/submit-inquiry
+# (Or use the exact function_url output from Terraform)
+```
+
+### 5.2 Build & Deploy to GCS
+1. Navigate to the frontend directory:
    ```bash
    cd apps/landing_page/frontend
-   npm run build
    ```
-2. Upload the `dist/` directory to the GCS bucket:
+2. Build the static distribution assets:
    ```bash
-   gcloud storage rsync -r dist/ gs://[YOUR_GCS_BUCKET_NAME]
+   pnpm build
    ```
-3. Ensure the bucket is configured for public access and set the index page:
+3. Sync the `dist/` compilation folders to your public GCS bucket:
    ```bash
-   gcloud storage buckets update gs://[YOUR_GCS_BUCKET_NAME] --web-main-page-suffix=index.html --web-error-page=index.html
+   gcloud storage rsync -r dist/ gs://[YOUR_WEBSITE_BUCKET_NAME]
    ```
+   *(Ensure you replace `[YOUR_WEBSITE_BUCKET_NAME]` with the value outputted by Terraform `website_bucket_name`)*
+
