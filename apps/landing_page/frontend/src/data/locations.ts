@@ -11,6 +11,7 @@ export interface Location {
   is24Hours: boolean;
   brands: string[];
   workingHours: string;
+  workingDays: string;
 }
 
 export const locationsData: Location[] = rawLocations as Location[];

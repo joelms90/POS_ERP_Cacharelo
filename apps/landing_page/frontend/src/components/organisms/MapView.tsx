@@ -73,8 +73,11 @@ export const MapView: React.FC<MapViewProps> = ({
               <div className="p-1" style={{ display: 'flex', flexDirection: 'column' }}>
                 <h4 className="font-semibold text-sm mb-1" style={{ color: '#ffffff', margin: '0 0 4px 0' }}>{loc.name}</h4>
                 <p className="text-xs mb-1" style={{ color: '#d0c5af', margin: '0 0 4px 0' }}>{loc.address}</p>
+                <p className="text-[10px] font-semibold uppercase" style={{ color: '#D4AF37', margin: '0 0 2px 0' }}>
+                  {loc.workingDays}
+                </p>
                 <p className="text-[10px] font-semibold uppercase" style={{ color: '#D4AF37', margin: '0 0 4px 0' }}>
-                  Horario: {loc.workingHours}
+                  {loc.workingHours}
                 </p>
                 <a
                   href={`https://www.google.com/maps/dir/?api=1&destination=${loc.latitude},${loc.longitude}`}

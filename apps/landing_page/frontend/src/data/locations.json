@@ -9,7 +9,8 @@
     "category": "city",
     "is24Hours": false,
     "brands": ["pastes", "hamburguesas"],
-    "workingHours": "7:00 am - 18:00 pm"
+    "workingHours": "7:00 am - 18:00 pm",
+    "workingDays": "Lunes a Domingo"
   },
   {
     "id": "polanco",
@@ -21,7 +22,8 @@
     "category": "city",
     "is24Hours": false,
     "brands": ["excelencia", "antano"],
-    "workingHours": "8:00 am - 20:00 pm"
+    "workingHours": "8:00 am - 20:00 pm",
+    "workingDays": "Lunes a Sábado"
   },
   {
     "id": "insurgentes",
@@ -33,7 +35,8 @@
     "category": "city",
     "is24Hours": false,
     "brands": ["pastes", "excelencia"],
-    "workingHours": "9:00 am - 21:00 pm"
+    "workingHours": "9:00 am - 21:00 pm",
+    "workingDays": "Lunes a Domingo"
   },
   {
     "id": "cacharelo-hq",
@@ -45,7 +48,8 @@
     "category": "transit",
     "is24Hours": false,
     "brands": ["pastes", "hamburguesas", "antano", "excelencia"],
-    "workingHours": "6:00 am - 22:00 pm"
+    "workingHours": "6:00 am - 22:00 pm",
+    "workingDays": "Lunes a Domingo"
   },
   {
     "id": "terminal-norte",
@@ -57,6 +61,7 @@
     "category": "transit",
     "is24Hours": false,
     "brands": ["pastes", "hamburguesas"],
-    "workingHours": "5:00 am - 23:00 pm"
+    "workingHours": "5:00 am - 23:00 pm",
+    "workingDays": "Lunes a Domingo"
   }
 ]
