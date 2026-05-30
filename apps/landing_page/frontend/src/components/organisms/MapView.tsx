@@ -70,12 +70,36 @@ export const MapView: React.FC<MapViewProps> = ({
             }}
           >
             <Popup>
-              <div className="p-1">
-                <h4 className="font-semibold text-sm text-white mb-1">{loc.name}</h4>
-                <p className="text-xs text-on-surface-variant mb-1">{loc.address}</p>
-                <p className="text-[10px] text-mafia-gold font-semibold uppercase">
+              <div className="p-1" style={{ display: 'flex', flexDirection: 'column' }}>
+                <h4 className="font-semibold text-sm mb-1" style={{ color: '#ffffff', margin: '0 0 4px 0' }}>{loc.name}</h4>
+                <p className="text-xs mb-1" style={{ color: '#d0c5af', margin: '0 0 4px 0' }}>{loc.address}</p>
+                <p className="text-[10px] font-semibold uppercase" style={{ color: '#D4AF37', margin: '0 0 4px 0' }}>
                   Horario Comercial
                 </p>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${loc.latitude},${loc.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    backgroundColor: '#D4AF37',
+                    color: '#0B0B0C',
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    textDecoration: 'none',
+                    marginTop: '6px',
+                    textAlign: 'center'
+                  }}
+                  className="hover:!bg-white hover:!text-black transition-colors"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>directions</span>
+                  Cómo llegar
+                </a>
               </div>
             </Popup>
           </Marker>
