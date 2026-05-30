@@ -22,7 +22,7 @@ export const Header: React.FC = () => {
       <div className="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto py-4">
         {/* Brand */}
         <a
-          className="text-xl md:text-2xl font-hero text-mafia-gold font-spec-hero flex items-center gap-2"
+          className="text-xl md:text-2xl font-hero text-mafia-gold font-spec-brand flex items-center gap-2"
           href="#"
           onClick={(e) => handleScroll(e, 'top')}
         >

@@ -15,7 +15,7 @@ export const Footer: React.FC = () => {
     <footer className="bg-[#0d0f0f] border-t border-outline-variant/50 transition-all duration-300 w-full">
       <div className="flex flex-col md:flex-row justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-12 max-w-container-max mx-auto gap-gutter">
         {/* Brand */}
-        <div className="font-hero font-spec-hero text-mafia-gold text-xl md:text-2xl mb-6 md:mb-0">
+        <div className="font-hero font-spec-brand text-mafia-gold text-xl md:text-2xl mb-6 md:mb-0">
           Grupo Cacharelo
         </div>
 
