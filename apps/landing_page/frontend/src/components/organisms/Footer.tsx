@@ -1,6 +1,11 @@
 import React from 'react';
 
-export const Footer: React.FC = () => {
+interface FooterProps {
+  onOpenPrivacy?: () => void;
+  onOpenTerms?: () => void;
+}
+
+export const Footer: React.FC<FooterProps> = ({ onOpenPrivacy, onOpenTerms }) => {
   const handleScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
     e.preventDefault();
     const element = document.getElementById(targetId);
@@ -21,18 +26,18 @@ export const Footer: React.FC = () => {
 
         {/* Links */}
         <div className="flex flex-wrap justify-center gap-6 font-sans font-semibold text-xs uppercase">
-          <a
-            className="text-on-surface-variant hover:text-primary transition-all duration-300"
-            href="#privacidad"
+          <button
+            className="text-on-surface-variant hover:text-primary transition-all duration-300 cursor-pointer focus:outline-none bg-transparent border-none p-0"
+            onClick={onOpenPrivacy}
           >
             Privacidad
-          </a>
-          <a
-            className="text-on-surface-variant hover:text-primary transition-all duration-300"
-            href="#terminos"
+          </button>
+          <button
+            className="text-on-surface-variant hover:text-primary transition-all duration-300 cursor-pointer focus:outline-none bg-transparent border-none p-0"
+            onClick={onOpenTerms}
           >
             Términos
-          </a>
+          </button>
           <a
             className="text-on-surface-variant hover:text-primary transition-all duration-300"
             href="#linea-segura"

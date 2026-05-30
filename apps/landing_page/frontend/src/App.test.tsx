@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import App from './App';
 
@@ -36,5 +36,35 @@ describe('Grupo Cacharelo Landing Page Rendering', () => {
     expect(screen.getByRole('heading', { name: /únete a la familia/i })).toBeInTheDocument();
     expect(screen.getByText('55 9244 9939')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /enviar mensaje/i })).toBeInTheDocument();
+  });
+
+  it('opens and closes the privacy modal', () => {
+    render(<App />);
+    expect(screen.queryByRole('heading', { name: /aviso de privacidad/i })).not.toBeInTheDocument();
+
+    const privacyBtn = screen.getByRole('button', { name: /privacidad/i });
+    fireEvent.click(privacyBtn);
+
+    expect(screen.getByRole('heading', { name: /aviso de privacidad/i })).toBeInTheDocument();
+
+    const closeBtn = screen.getByRole('button', { name: /close modal/i });
+    fireEvent.click(closeBtn);
+
+    expect(screen.queryByRole('heading', { name: /aviso de privacidad/i })).not.toBeInTheDocument();
+  });
+
+  it('opens and closes the terms modal', () => {
+    render(<App />);
+    expect(screen.queryByRole('heading', { name: /términos y condiciones/i })).not.toBeInTheDocument();
+
+    const termsBtn = screen.getByRole('button', { name: /términos/i });
+    fireEvent.click(termsBtn);
+
+    expect(screen.getByRole('heading', { name: /términos y condiciones/i })).toBeInTheDocument();
+
+    const closeBtn = screen.getByRole('button', { name: /close modal/i });
+    fireEvent.click(closeBtn);
+
+    expect(screen.queryByRole('heading', { name: /términos y condiciones/i })).not.toBeInTheDocument();
   });
 });

@@ -11,7 +11,7 @@ This document tracks completed tasks, the current state, and the list of front-e
 | **Phase 3: US1 (MVP)** | Brand identity, typography, buttons, header/footer, and brand cards. | `✓ COMPLETE` | Unit tests passed. |
 | **Phase 4: US2 (Maps)** | Leaflet, map tiles, and tab switcher. | `✓ COMPLETE` | Unit tests passed. |
 | **Phase 5: US3 (Form)** | ContactForm component, spam protection, CORS, and Firestore integration. | `✓ COMPLETE` | Backend/Frontend tests passed. |
-| **Phase 6: Polish** | SEO parameters, service worker offline registration, and build compilations. | `✓ IN PROGRESS` | Frontend and GCF compile cleanly. |
+| **Phase 6: Polish** | SEO parameters, service worker, and Privacy/Terms modal integrations. | `✓ COMPLETE` | All tests pass, builds successfully. |
 
 ---
 
