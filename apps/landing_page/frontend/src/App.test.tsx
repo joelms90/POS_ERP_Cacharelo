@@ -23,6 +23,22 @@ describe('Grupo Cacharelo Landing Page Rendering', () => {
     expect(screen.getByText('La Excelencia')).toBeInTheDocument();
   });
 
+  it('expands and collapses a brand card on click', () => {
+    render(<App />);
+    expect(screen.queryByText(/Especialidades:/i)).not.toBeInTheDocument();
+
+    const pastesCard = screen.getByText('Pastes y Empanadas').closest('.interactive-card')!;
+    fireEvent.click(pastesCard);
+
+    expect(screen.getByText(/Especialidades:/i)).toBeInTheDocument();
+    expect(screen.getByText('Papas con Carne (Minero)')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /descargar menú pdf/i })).toBeInTheDocument();
+
+    fireEvent.click(pastesCard);
+
+    expect(screen.queryByText(/Especialidades:/i)).not.toBeInTheDocument();
+  });
+
   it('renders the territories section tabs', () => {
     render(<App />);
     expect(screen.getByRole('button', { name: /en la ciudad/i })).toBeInTheDocument();
