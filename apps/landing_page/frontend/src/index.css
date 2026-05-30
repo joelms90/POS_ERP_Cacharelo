@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+@theme {
+  /* Mafia theme colors matching DESIGN.md */
+  --color-mafia-base: #0B0B0C;
+  --color-mafia-surface: #121214;
+  --color-mafia-surface-end: #0D0D0E;
+  --color-mafia-bronze: #2A2415;
+  --color-mafia-gold: #D4AF37;
+
+  /* Mapped UI Tokens */
+  --color-background: #121414;
+  --color-surface: #121414;
+  --color-on-surface: #e2e2e2;
+  --color-on-surface-variant: #d0c5af;
+  --color-primary: #f2ca50;
+  --color-primary-container: #d4af37;
+  --color-on-primary-container: #3c2f00;
+  --color-outline: #99907c;
+  --color-outline-variant: #4d4635;
+  --color-error: #ffb4ab;
+
+  /* Custom Spacing from DESIGN.md */
+  --spacing-margin-mobile: 20px;
+  --spacing-margin-desktop: 64px;
+  --spacing-gutter: 24px;
+  --spacing-unit: 8px;
+  --spacing-container-max: 1200px;
+
+  /* Custom Typography families */
+  --font-serif: "Bodoni Moda", "Playfair Display", Georgia, serif;
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-hero: "Bodoni Moda", "Playfair Display", serif;
+
+  /* Custom glow shadow */
+  --shadow-glow-gold: 0 0 20px rgba(212, 175, 55, 0.15);
+}
+
+/* Base style overrides */
+body {
+  background-color: #0B0B0C;
+  color: #e2e2e2;
+}
+
+/* Custom cinematic utility styles */
+@layer utilities {
+  .bg-mafia-gradient {
+    background: linear-gradient(180deg, #121214 0%, #0D0D0E 100%);
+  }
+
+  .divider-cinematic {
+    height: 1px;
+    background: radial-gradient(circle, rgba(42, 36, 21, 1) 0%, rgba(42, 36, 21, 0) 100%);
+  }
+
+  .font-spec-hero {
+    font-family: var(--font-hero);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+
+  .font-spec-dish {
+    font-family: "Playfair Display", serif;
+    font-weight: 700;
+    letter-spacing: 0.025em;
+  }
+
+  .font-spec-body {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    line-height: 1.625;
+  }
+
+  /* Interactive card gold hover effects */
+  .interactive-card {
+    border: 1px solid #2A2415;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .interactive-card:hover {
+    border-color: #D4AF37;
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(212, 175, 55, 0.15);
+  }
+
+  /* Custom Scrollbar for a premium look */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0B0B0C;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2A2415;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #D4AF37;
+  }
+}
+
+/* Overriding default Leaflet map dark styling to blend in with Empire Noir */
+.leaflet-container {
+  background: #0B0B0C !important;
+  font-family: var(--font-sans);
+}
+
+.leaflet-tile {
+  filter: grayscale(1) invert(1) contrast(1.2) brightness(0.9);
+}
+
+.leaflet-bar {
+  border: 1px solid #2A2415 !important;
+  background-color: #121214 !important;
+}
+
+.leaflet-bar a {
+  background-color: #121214 !important;
+  color: #e2e2e2 !important;
+  border-bottom: 1px solid #2A2415 !important;
+}
+
+.leaflet-bar a:hover {
+  background-color: #2A2415 !important;
+  color: #D4AF37 !important;
+}
+
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+  background: #121214 !important;
+  color: #e2e2e2 !important;
+  border: 1px solid #2A2415 !important;
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.1) !important;
+}

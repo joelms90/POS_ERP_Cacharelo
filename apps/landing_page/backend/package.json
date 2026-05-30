@@ -1,0 +1,26 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "predev": "pnpm build",
+    "dev": "functions-framework --source=dist --target=submitInquiry",
+    "start": "functions-framework --source=dist --target=submitInquiry",
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^8.6.0",
+    "@google-cloud/functions-framework": "^5.0.2"
+  }
+}
