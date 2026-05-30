@@ -1,0 +1,96 @@
+openapi: 3.0.3
+info:
+  title: Grupo Cacharelo Contact API
+  description: HTTPS Google Cloud Function endpoint for landing page inquiry submissions
+  version: 1.0.0
+servers:
+  - url: https://us-central1-pos-erp-landing.cloudfunctions.net
+paths:
+  /submit-inquiry:
+    post:
+      summary: Submit a contact inquiry
+      operationId: submitInquiry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InquiryPayload'
+      responses:
+        '201':
+          description: Inquiry successfully recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Inquiry received successfully"
+                  id:
+                    type: string
+                    format: uuid
+                    example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    InquiryPayload:
+      type: object
+      required:
+        - name
+        - email
+        - subject
+        - message
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          example: "Don Corleone"
+        email:
+          type: string
+          format: email
+          example: "vitoc@cacharelo.com"
+        phone:
+          type: string
+          maxLength: 20
+          example: "+525592449939"
+        subject:
+          type: string
+          maxLength: 150
+          example: "Franchise Inquiry"
+        message:
+          type: string
+          maxLength: 1000
+          example: "I would like to open a franchise of Pastes y Empanadas in Guadalajara."
+        honeypot:
+          type: string
+          description: Faux input field to block bots. Must be empty.
+          example: ""
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Missing required fields"
+        details:
+          type: array
+          items:
+            type: string
+          example: ["email must be a valid email format"]
