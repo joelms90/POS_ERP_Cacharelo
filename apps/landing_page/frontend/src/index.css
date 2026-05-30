@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Corleone";
+  src: url("/fonts/Corleone-Regular.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Corleone Due";
+  src: url("/fonts/Corleone-Due-Regular.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
 @theme {
   /* Mafia theme colors matching DESIGN.md */
   --color-mafia-base: #0B0B0C;
@@ -30,7 +44,7 @@
   /* Custom Typography families */
   --font-serif: "Bodoni Moda", "Playfair Display", Georgia, serif;
   --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-hero: "Bodoni Moda", "Playfair Display", serif;
+  --font-hero: "Corleone", "Bodoni Moda", serif;
 
   /* Custom glow shadow */
   --shadow-glow-gold: 0 0 20px rgba(212, 175, 55, 0.15);
