@@ -19,8 +19,8 @@ describe('Grupo Cacharelo Landing Page Rendering', () => {
     render(<App />);
     expect(screen.getByText('Pastes y Empanadas')).toBeInTheDocument();
     expect(screen.getByText('Las Hamburguesas')).toBeInTheDocument();
-    expect(screen.getByText('El Sabor de Antaño')).toBeInTheDocument();
-    expect(screen.getByText('La Excelencia')).toBeInTheDocument();
+    expect(screen.getAllByText('El Sabor de Antaño')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('La Excelencia')[0]).toBeInTheDocument();
   });
 
   it('expands and collapses a brand card on click', () => {
@@ -41,8 +41,11 @@ describe('Grupo Cacharelo Landing Page Rendering', () => {
 
   it('renders the territories section tabs', () => {
     render(<App />);
-    expect(screen.getByRole('button', { name: /en la ciudad/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /en tránsito/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /todos/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /pastes/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /hamburguesas/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /el sabor de antaño/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /la excelencia/i })).toBeInTheDocument();
   });
 
   it('renders the contact form and contact options', () => {

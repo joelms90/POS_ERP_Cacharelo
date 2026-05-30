@@ -6,20 +6,17 @@ import { locationsData } from '../../data/locations';
 import type { Location } from '../../data/locations';
 
 export const MapTabber: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'city' | 'transit'>('city');
+  const [activeTab, setActiveTab] = useState<'all' | 'pastes' | 'hamburguesas' | 'antano' | 'excelencia'>('all');
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
 
   const filteredLocations = useMemo(() => {
-    if (activeTab === 'city') {
-      return locationsData.filter((loc) => loc.category === 'city');
+    if (activeTab === 'all') {
+      return locationsData;
     }
-    if (activeTab === 'transit') {
-      return locationsData.filter((loc) => loc.category === 'transit');
-    }
-    return locationsData;
+    return locationsData.filter((loc) => loc.brands.includes(activeTab));
   }, [activeTab]);
 
-  const handleTabChange = (tab: 'city' | 'transit') => {
+  const handleTabChange = (tab: 'all' | 'pastes' | 'hamburguesas' | 'antano' | 'excelencia') => {
     setActiveTab(tab);
     setSelectedLocation(null);
   };
@@ -36,18 +33,36 @@ export const MapTabber: React.FC = () => {
         </Typography>
 
         {/* Tabs Controller */}
-        <div className="flex flex-col md:flex-row justify-center gap-2 mb-8 max-w-2xl mx-auto bg-mafia-surface border border-mafia-bronze rounded-lg p-1">
+        <div className="flex flex-wrap justify-center gap-2 mb-8 max-w-5xl mx-auto bg-mafia-surface border border-mafia-bronze rounded-lg p-1">
           <TabItem
-            active={activeTab === 'city'}
-            onClick={() => handleTabChange('city')}
-            icon="location_on"
-            label="En La Ciudad"
+            active={activeTab === 'all'}
+            onClick={() => handleTabChange('all')}
+            icon="map"
+            label="Todos"
           />
           <TabItem
-            active={activeTab === 'transit'}
-            onClick={() => handleTabChange('transit')}
-            icon="directions_bus"
-            label="En Tránsito"
+            active={activeTab === 'pastes'}
+            onClick={() => handleTabChange('pastes')}
+            icon="bakery_dining"
+            label="Pastes"
+          />
+          <TabItem
+            active={activeTab === 'hamburguesas'}
+            onClick={() => handleTabChange('hamburguesas')}
+            icon="lunch_dining"
+            label="Hamburguesas"
+          />
+          <TabItem
+            active={activeTab === 'antano'}
+            onClick={() => handleTabChange('antano')}
+            icon="restaurant"
+            label="El Sabor de Antaño"
+          />
+          <TabItem
+            active={activeTab === 'excelencia'}
+            onClick={() => handleTabChange('excelencia')}
+            icon="local_cafe"
+            label="La Excelencia"
           />
         </div>
 
@@ -103,7 +118,7 @@ export const MapTabber: React.FC = () => {
               })}
               {filteredLocations.length === 0 && (
                 <div className="py-8 text-center text-on-surface-variant">
-                  No hay locaciones disponibles en este sector.
+                  No hay locaciones disponibles para esta marca.
                 </div>
               )}
             </div>
