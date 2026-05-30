@@ -18,7 +18,7 @@ This document tracks completed tasks, the current state, and the list of front-e
 ## 🔍 What We Have Done So Far
 
 1. **Vite React TS Frontend**: Bootstrapped in [apps/landing_page/frontend/](file:///Users/joelmorales/web/POS-ERP/apps/landing_page/frontend/).
-2. **Tailwind CSS v4 & Fonts**: Configured in [src/index.css](file:///Users/joelmorales/web/POS-ERP/apps/landing_page/frontend/src/index.css) to support Bodoni Moda, Playfair Display, and Inter fonts.
+2. **Tailwind CSS v4 & Fonts**: Configured in [src/index.css](file:///Users/joelmorales/web/POS-ERP/apps/landing_page/frontend/src/index.css) to support custom Corleone OTF fonts, Bodoni Moda, Playfair Display, and Inter fonts.
 3. **Atomic Components**: Developed atoms (`Button`, `Typography`), molecules (`BrandCard`, `TabItem`), organisms (`Header`, `Hero`, `BrandGrid`, `MapTabber`, `MapView`, `ContactForm`), templates, and pages.
 4. **Interactive Leaflet Map**: Blended with CartoDB Dark Matter tile filters and gold coordinates markers.
 5. **HTTPS GCF Backend**: Written in [apps/landing_page/backend/](file:///Users/joelmorales/web/POS-ERP/apps/landing_page/backend/) with robust payload validations, CORS permissions, and Firestore storage.
