@@ -10,6 +10,7 @@ export interface Location {
   category: 'city' | 'transit';
   is24Hours: boolean;
   brands: string[];
+  workingHours: string;
 }
 
 export const locationsData: Location[] = rawLocations as Location[];

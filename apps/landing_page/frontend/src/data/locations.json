@@ -8,7 +8,8 @@
     "longitude": -99.1620,
     "category": "city",
     "is24Hours": false,
-    "brands": ["pastes", "hamburguesas"]
+    "brands": ["pastes", "hamburguesas"],
+    "workingHours": "7:00 am - 18:00 pm"
   },
   {
     "id": "polanco",
@@ -19,7 +20,8 @@
     "longitude": -99.1912,
     "category": "city",
     "is24Hours": false,
-    "brands": ["excelencia", "antano"]
+    "brands": ["excelencia", "antano"],
+    "workingHours": "8:00 am - 20:00 pm"
   },
   {
     "id": "insurgentes",
@@ -30,7 +32,8 @@
     "longitude": -99.1631,
     "category": "city",
     "is24Hours": false,
-    "brands": ["pastes", "excelencia"]
+    "brands": ["pastes", "excelencia"],
+    "workingHours": "9:00 am - 21:00 pm"
   },
   {
     "id": "cacharelo-hq",
@@ -41,7 +44,8 @@
     "longitude": -99.1555,
     "category": "transit",
     "is24Hours": false,
-    "brands": ["pastes", "hamburguesas", "antano", "excelencia"]
+    "brands": ["pastes", "hamburguesas", "antano", "excelencia"],
+    "workingHours": "6:00 am - 22:00 pm"
   },
   {
     "id": "terminal-norte",
@@ -52,6 +56,7 @@
     "longitude": -99.1415,
     "category": "transit",
     "is24Hours": false,
-    "brands": ["pastes", "hamburguesas"]
+    "brands": ["pastes", "hamburguesas"],
+    "workingHours": "5:00 am - 23:00 pm"
   }
 ]
