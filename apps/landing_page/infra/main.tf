@@ -18,6 +18,54 @@ resource "google_project_service" "services" {
   disable_on_destroy = false
 }
 
+# Disable organization policy restricting public sharing for this project
+resource "google_project_organization_policy" "disable_public_sharing_restriction" {
+  project    = var.project_id
+  constraint = "gcp.restrictPublicSharing"
+
+  boolean_policy {
+    enforced = false
+  }
+
+  depends_on = [google_project_service.services]
+}
+
+# Fetch project metadata (needed for project number)
+data "google_project" "project" {}
+
+# Grant required permissions to the Cloud Build service account
+resource "google_project_iam_member" "cloudbuild_logging" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+
+  depends_on = [google_project_service.services]
+}
+
+resource "google_project_iam_member" "cloudbuild_storage" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+
+  depends_on = [google_project_service.services]
+}
+
+resource "google_project_iam_member" "cloudbuild_artifactregistry" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+
+  depends_on = [google_project_service.services]
+}
+
+resource "google_project_iam_member" "cloudbuild_service_account_user" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountUser"
+  member  = "serviceAccount:${data.google_project.project.number}@cloudbuild.gserviceaccount.com"
+
+  depends_on = [google_project_service.services]
+}
+
 # 1. GCS Bucket for Static Frontend Web Hosting
 resource "google_storage_bucket" "frontend_bucket" {
   name                        = var.bucket_name
@@ -39,7 +87,10 @@ resource "google_storage_bucket_iam_member" "public_rule" {
   role   = "roles/storage.objectViewer"
   member = "allUsers"
 
-  depends_on = [google_storage_bucket.frontend_bucket]
+  depends_on = [
+    google_storage_bucket.frontend_bucket,
+    google_project_organization_policy.disable_public_sharing_restriction
+  ]
 }
 
 # 2. GCS Bucket for Function Source Code Archives
@@ -100,7 +151,11 @@ resource "google_cloudfunctions2_function" "submit_inquiry" {
 
   depends_on = [
     google_project_service.services,
-    google_storage_bucket_object.function_zip_object
+    google_storage_bucket_object.function_zip_object,
+    google_project_iam_member.cloudbuild_logging,
+    google_project_iam_member.cloudbuild_storage,
+    google_project_iam_member.cloudbuild_artifactregistry,
+    google_project_iam_member.cloudbuild_service_account_user
   ]
 }
 
