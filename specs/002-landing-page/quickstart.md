@@ -55,6 +55,33 @@ gcloud auth application-default login
 ```
 *This credentials file will be automatically discovered and used by the `@google-cloud/firestore` library during local execution.*
 
+### 2.5 Handling Organization Policies (Domain Restricted Sharing)
+If you are deploying public resources (such as `allUsers` access on a GCS bucket or Cloud Run function invoker) in a newer GCP Organization, the deployment may fail due to the **Domain restricted sharing** (`iam.allowedPolicyMemberDomains`) constraint. 
+
+To override this restriction at the project level:
+1. **Grant Policy Admin Permission**: Make sure your account has the **Organization Policy Administrator** (`roles/orgpolicy.policyAdmin`) role. If you are an Organization Administrator, you can grant it to yourself via the CLI:
+   ```bash
+   gcloud organizations add-iam-policy-binding YOUR_ORGANIZATION_ID \
+     --member="user:your-email@domain.com" \
+     --role="roles/orgpolicy.policyAdmin"
+   ```
+2. **Enable the Org Policy API**:
+   ```bash
+   gcloud services enable orgpolicy.googleapis.com --project=YOUR_PROJECT_ID
+   ```
+3. **Apply the Policy Override**:
+   Create a `policy.yaml` file:
+   ```yaml
+   name: projects/YOUR_PROJECT_ID/policies/iam.allowedPolicyMemberDomains
+   spec:
+     rules:
+     - allowAll: true
+   ```
+   Apply it via the CLI:
+   ```bash
+   gcloud org-policies set-policy policy.yaml
+   ```
+
 ---
 
 ## 3. Local Development Setup
