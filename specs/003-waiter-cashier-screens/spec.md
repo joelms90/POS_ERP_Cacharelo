@@ -4,7 +4,7 @@
 
 **Created**: 2026-06-02
 
-**Status**: Draft
+**Status**: Approved
 
 **Input**: User description: "I want that you give me a spec for desigining the application screens for the waiter, cashier"
 
@@ -108,44 +108,8 @@ As a restaurant manager or operator, I want a persistent system status monitor t
 
 ---
 
-## Clarifications Needed
+## Design Decisions (Clarifications Resolved)
 
-Please review the following design and scope alternatives:
-
-### Question 1: Table Layout Presentation
-**Context**: We need to represent tables and their locations within dining zones on the tablet screen.
-**What we need to know**: Should the layout be a fully custom graphical map (draggable table items representing actual floor plan coordinates) or a structured, responsive grid list categorized by zone?
-
-| Option | Answer | Implications |
-|--------|--------|--------------|
-| A (Recommended) | **Responsive Grid List** | Much simpler to implement, fits all tablet resolutions automatically, and provides high speed of operation without configuration overhead. |
-| B | **Graphical Coordinate Map** | More intuitive representation of the restaurant layout, but requires a setup editor to place tables and coordinates, increasing implementation scope. |
-
-**Your choice**: _[A or B]_
-
----
-
-### Question 2: Kitchen/Bar Ready Notifications
-**Context**: Waiters need to know when orders are ready to be picked up from the preparation zones.
-**What we need to know**: How should waiters receive ready notifications on their handheld tablets?
-
-| Option | Answer | Implications |
-|--------|--------|--------------|
-| A (Recommended) | **Visual Tab Badge + Floating Toast** | Subtle and highly visible. A red badge with counts appears on a "Ready" header tab, accompanied by a small floating card that fades after 5 seconds. |
-| B | **Dedicated Notification Panel** | A full panel that requires opening. Reduces clutter, but increases taps to check status and might cause delays in picking up food. |
-| C | **Sound Notification Alert** | System triggers a sound alert. Highly effective in noisy environments, but can be annoying if frequent and requires system sound permissions. |
-
-**Your choice**: _[A, B, or C]_
-
----
-
-### Question 3: Split Billing Interface
-**Context**: Cashiers frequently handle customers asking to split bills.
-**What we need to know**: What level of splitting complexity is required for the v1 Cashier Screen?
-
-| Option | Answer | Implications |
-|--------|--------|--------------|
-| A (Recommended) | **Numeric Equal Split + Item Checkout** | Allows splitting the total bill amount equally among N people, or selecting specific items from the order list to pay separately. Covers 90% of use cases with clean UI. |
-| B | **Visual Seat-Based drag-and-drop** | Dragging items from a main list into virtual seats. Very interactive and premium, but significantly increases interface complexity and development time. |
-
-**Your choice**: _[A or B]_
+- **Table Layout Presentation**: **Option B - Graphical Coordinate Map** (draggable table items representing actual floor plan coordinates to provide intuitive spatial representation).
+- **Kitchen/Bar Ready Notifications**: **Option A - Visual Tab Badge + Floating Toast** (subtle visual indicator, counts on a 'Ready' tab with a fading pop-up card for immediate waiter feedback).
+- **Split Billing Interface**: **Option A - Numeric Equal Split + Item Selection** (allow cashiers to split total bill equally by N or checkout selected items separately; balances 90% of restaurant billing splits with efficient, clean UI).

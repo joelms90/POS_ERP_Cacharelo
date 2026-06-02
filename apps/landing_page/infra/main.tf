@@ -19,19 +19,6 @@ resource "google_project_service" "services" {
   disable_on_destroy = false
 }
 
-# Disable organization policy restricting public sharing for this project
-# This enables public website hosting on GCS and anonymous access to Cloud Run (for the contact form)
-resource "google_project_organization_policy" "disable_public_sharing_restriction" {
-  project    = var.project_id
-  constraint = "gcp.restrictPublicSharing"
-
-  boolean_policy {
-    enforced = false
-  }
-
-  depends_on = [google_project_service.services]
-}
-
 # Fetch project metadata
 data "google_project" "project" {}
 
@@ -93,7 +80,6 @@ resource "time_sleep" "wait_for_apis_and_iam" {
   create_duration = "30s"
   depends_on = [
     google_project_service.services,
-    google_project_organization_policy.disable_public_sharing_restriction,
     google_service_account.function_sa,
     google_service_account.build_sa,
     google_project_iam_member.custom_build_logging,
@@ -125,8 +111,6 @@ resource "google_storage_bucket_iam_member" "public_rule" {
   bucket = google_storage_bucket.frontend_bucket.name
   role   = "roles/storage.objectViewer"
   member = "allUsers"
-
-  depends_on = [google_storage_bucket.frontend_bucket]
 }
 
 # 2. Bucket exclusivo para el código de la función
@@ -193,6 +177,4 @@ resource "google_cloud_run_service_iam_member" "invoker" {
   service  = google_cloudfunctions2_function.submit_inquiry.name
   role     = "roles/run.invoker"
   member   = "allUsers"
-
-  depends_on = [google_cloudfunctions2_function.submit_inquiry]
 }
