@@ -9,6 +9,8 @@ This table tracks active, upcoming, and blocked tasks. Update this table as task
 | **T074**<br>Run PostgreSQL migration validation for `apps/sync_api/migrations/` | Developer | `#todo` | 2026-05-30 | Spin up local Postgres container to run and verify baseline migrations syntax. |
 | **T075**<br>Validate quickstart end-to-end and record results | Developer | `#todo` | 2026-05-30 | Follow validation scripts in `quickstart.md` for cash transactions, print queues, and reconnect syncs. |
 | **Architectural Review**<br>Review offline PIN caching & database encryption | Architect | `#blocked` | 2026-05-30 | Blocked by security audit. Need to approve the caching mechanism for user PIN hashes. |
+| **Waiter & Cashier Screens**<br>Design specs and planning documents | Antigravity | `#completed` | 2026-06-02 | Spec, Plan, Data Model, Research, and Tasks generated. |
+
 
 ---
 
