@@ -1,0 +1,423 @@
+import 'dart:math';
+import 'package:flutter/material.dart';
+
+enum TableState { free, occupied, billing, cleaning }
+enum TableShape { circle, square }
+enum UserRole { waiter, cashier, kitchen, none }
+
+class TableModel {
+  final int id;
+  final String label;
+  TableState state;
+  final TableShape shape;
+  final String zone;
+  final double x; // Percent-based X coordinate
+  final double y; // Percent-based Y coordinate
+  List<OrderItem> items;
+  int guests;
+  double discountPercentage;
+
+  TableModel({
+    required this.id,
+    required this.label,
+    this.state = TableState.free,
+    required this.shape,
+    required this.zone,
+    required this.x,
+    required this.y,
+    this.items = const [],
+    this.guests = 0,
+    this.discountPercentage = 0.0,
+  });
+
+  double get subtotal => items.fold(0.0, (sum, item) => sum + item.totalPrice);
+  double get discountAmount => subtotal * (discountPercentage / 100.0);
+  double get total => subtotal - discountAmount;
+
+  TableModel copyWith({
+    TableState? state,
+    List<OrderItem>? items,
+    int? guests,
+    double? discountPercentage,
+  }) {
+    return TableModel(
+      id: id,
+      label: label,
+      state: state ?? this.state,
+      shape: shape,
+      zone: zone,
+      x: x,
+      y: y,
+      items: items ?? List.from(this.items),
+      guests: guests ?? this.guests,
+      discountPercentage: discountPercentage ?? this.discountPercentage,
+    );
+  }
+}
+
+class MenuItem {
+  final String id;
+  final String name;
+  final double price;
+  final String category;
+  final String imagePath;
+  final List<String> modifierGroups;
+
+  const MenuItem({
+    required this.id,
+    required this.name,
+    required this.price,
+    required this.category,
+    this.imagePath = '',
+    this.modifierGroups = const [],
+  });
+}
+
+class OrderItem {
+  final MenuItem item;
+  int quantity;
+  List<String> modifiers;
+  String notes;
+
+  OrderItem({
+    required this.item,
+    this.quantity = 1,
+    this.modifiers = const [],
+    this.notes = '',
+  });
+
+  double get totalPrice => (item.price + (modifiers.length * 1.5)) * quantity;
+
+  OrderItem copyWith({
+    int? quantity,
+    List<String>? modifiers,
+    String? notes,
+  }) {
+    return OrderItem(
+      item: item,
+      quantity: quantity ?? this.quantity,
+      modifiers: modifiers ?? List.from(this.modifiers),
+      notes: notes ?? this.notes,
+    );
+  }
+}
+
+class KitchenOrder {
+  final String id;
+  final String tableLabel;
+  final List<OrderItem> items;
+  final DateTime timestamp;
+  String status; // 'pending', 'preparing', 'ready', 'served'
+
+  KitchenOrder({
+    required this.id,
+    required this.tableLabel,
+    required this.items,
+    required this.timestamp,
+    this.status = 'pending',
+  });
+}
+
+class PrintJob {
+  final String id;
+  final String title;
+  final String details;
+  final String target; // 'Kitchen', 'Bar', 'Cashier'
+  String status; // 'queued', 'failed', 'printed'
+  final DateTime timestamp;
+
+  PrintJob({
+    required this.id,
+    required this.title,
+    required this.details,
+    required this.target,
+    this.status = 'queued',
+    required this.timestamp,
+  });
+}
+
+class AppState extends ChangeNotifier {
+  UserRole currentUserRole = UserRole.none;
+  String currentUserName = "";
+  
+  // Tables state
+  List<TableModel> tables = [];
+  
+  // Kitchen orders
+  List<KitchenOrder> kitchenOrders = [];
+  
+  // Printer Queue
+  List<PrintJob> printJobs = [];
+  
+  // Shift controls (Cashier)
+  bool isShiftOpen = false;
+  double cashDrawerAmount = 0.0;
+  
+  // Offline & sync states
+  bool isOnline = true;
+  int pendingSyncCount = 0;
+  
+  // Notification queue (for alerts on waiter screen)
+  List<String> readyNotifications = [];
+
+  // Active table selected in Waiter / Cashier views
+  TableModel? selectedTable;
+
+  AppState() {
+    _initMockData();
+  }
+
+  void _initMockData() {
+    // Generate mock tables for 3 zones: Salón Principal, Terraza, Bar
+    tables = [
+      // Salón Principal
+      TableModel(id: 1, label: 'Mesa 1', shape: TableShape.circle, zone: 'Salón Principal', x: 0.15, y: 0.25),
+      TableModel(id: 2, label: 'Mesa 2', shape: TableShape.square, zone: 'Salón Principal', x: 0.45, y: 0.25),
+      TableModel(id: 3, label: 'Mesa 3', shape: TableShape.circle, zone: 'Salón Principal', x: 0.75, y: 0.25),
+      TableModel(id: 4, label: 'Mesa 4', shape: TableShape.square, zone: 'Salón Principal', x: 0.15, y: 0.65),
+      TableModel(id: 5, label: 'Mesa 5', shape: TableShape.circle, zone: 'Salón Principal', x: 0.45, y: 0.65, state: TableState.occupied, guests: 2, items: [
+        OrderItem(item: menu[0], quantity: 2, modifiers: ['Queso Extra']),
+        OrderItem(item: menu[4], quantity: 2),
+      ]),
+      TableModel(id: 6, label: 'Mesa 6', shape: TableShape.square, zone: 'Salón Principal', x: 0.75, y: 0.65, state: TableState.billing, guests: 4, items: [
+        OrderItem(item: menu[1], quantity: 2),
+        OrderItem(item: menu[2], quantity: 2, modifiers: ['Bien Cocido']),
+        OrderItem(item: menu[5], quantity: 4),
+      ]),
+      
+      // Terraza
+      TableModel(id: 7, label: 'Terraza 1', shape: TableShape.square, zone: 'Terraza', x: 0.2, y: 0.3),
+      TableModel(id: 8, label: 'Terraza 2', shape: TableShape.circle, zone: 'Terraza', x: 0.5, y: 0.3),
+      TableModel(id: 9, label: 'Terraza 3', shape: TableShape.square, zone: 'Terraza', x: 0.8, y: 0.3),
+      TableModel(id: 10, label: 'Terraza 4', shape: TableShape.circle, zone: 'Terraza', x: 0.35, y: 0.7),
+
+      // Bar
+      TableModel(id: 11, label: 'Bar 1', shape: TableShape.circle, zone: 'Bar', x: 0.25, y: 0.45),
+      TableModel(id: 12, label: 'Bar 2', shape: TableShape.circle, zone: 'Bar', x: 0.75, y: 0.45),
+    ];
+  }
+
+  // Predefined Menu Items
+  static const List<MenuItem> menu = [
+    MenuItem(id: '1', name: 'Lasagna Bolognesa', price: 18.50, category: 'Pastas'),
+    MenuItem(id: '2', name: 'Fettuccine Alfredo', price: 16.00, category: 'Pastas'),
+    MenuItem(id: '3', name: 'Hamburguesa Empire', price: 14.50, category: 'Hamburguesas'),
+    MenuItem(id: '4', name: 'Hamburguesa de Pollo', price: 13.00, category: 'Hamburguesas'),
+    MenuItem(id: '5', name: 'Tiramisú de la Casa', price: 7.50, category: 'Postres'),
+    MenuItem(id: '6', name: 'Volcán de Chocolate', price: 8.50, category: 'Postres'),
+    MenuItem(id: '7', name: 'Vino Tinto Copa', price: 9.00, category: 'Bebidas'),
+    MenuItem(id: '8', name: 'Limonada de Coco', price: 5.50, category: 'Bebidas'),
+  ];
+
+  // Auth Operations
+  bool login(String pin) {
+    if (pin == "1111") {
+      currentUserRole = UserRole.waiter;
+      currentUserName = "Juan (Mesero)";
+      notifyListeners();
+      return true;
+    } else if (pin == "2222") {
+      currentUserRole = UserRole.cashier;
+      currentUserName = "Sofia (Cajero)";
+      notifyListeners();
+      return true;
+    } else if (pin == "3333") {
+      currentUserRole = UserRole.kitchen;
+      currentUserName = "Chef Carlos";
+      notifyListeners();
+      return true;
+    }
+    return false;
+  }
+
+  void logout() {
+    currentUserRole = UserRole.none;
+    currentUserName = "";
+    selectedTable = null;
+    notifyListeners();
+  }
+
+  // Network Offline Simulation Toggle
+  void toggleConnection() {
+    isOnline = !isOnline;
+    notifyListeners();
+  }
+
+  // Cashier Session Methods
+  void openShift(double initialFloat) {
+    isShiftOpen = true;
+    cashDrawerAmount = initialFloat;
+    notifyListeners();
+  }
+
+  void closeShift() {
+    isShiftOpen = false;
+    notifyListeners();
+  }
+
+  void addCashDrop(double amount) {
+    cashDrawerAmount += amount;
+    notifyListeners();
+  }
+
+  void removeCashDrop(double amount) {
+    cashDrawerAmount = max(0.0, cashDrawerAmount - amount);
+    notifyListeners();
+  }
+
+  // Waiter Order submission
+  void submitOrder(int tableId, List<OrderItem> cartItems, int guestsCount) {
+    final index = tables.indexWhere((t) => t.id == tableId);
+    if (index != -1) {
+      tables[index].items = List.from(cartItems);
+      tables[index].guests = guestsCount;
+      tables[index].state = TableState.occupied;
+
+      // Add print jobs
+      final newJobId = DateTime.now().millisecondsSinceEpoch.toString();
+      
+      // Determine targets
+      final hasKitchenItems = cartItems.any((i) => i.item.category != 'Bebidas');
+      final hasBarItems = cartItems.any((i) => i.item.category == 'Bebidas');
+
+      if (hasKitchenItems) {
+        printJobs.add(PrintJob(
+          id: '${newJobId}_k',
+          title: 'Comanda Cocina - ${tables[index].label}',
+          details: cartItems
+              .where((i) => i.item.category != 'Bebidas')
+              .map((i) => '${i.quantity}x ${i.item.name} (${i.modifiers.join(', ')}) ${i.notes}')
+              .join('\n'),
+          target: 'Cocina',
+          timestamp: DateTime.now(),
+          status: isOnline ? 'printed' : 'failed', // Offline simulation can fail prints
+        ));
+      }
+
+      if (hasBarItems) {
+        printJobs.add(PrintJob(
+          id: '${newJobId}_b',
+          title: 'Comanda Barra - ${tables[index].label}',
+          details: cartItems
+              .where((i) => i.item.category == 'Bebidas')
+              .map((i) => '${i.quantity}x ${i.item.name} (${i.modifiers.join(', ')}) ${i.notes}')
+              .join('\n'),
+          target: 'Barra',
+          timestamp: DateTime.now(),
+          status: isOnline ? 'printed' : 'failed',
+        ));
+      }
+
+      // Add to Kitchen Orders
+      kitchenOrders.add(KitchenOrder(
+        id: newJobId,
+        tableLabel: tables[index].label,
+        items: List.from(cartItems),
+        timestamp: DateTime.now(),
+      ));
+
+      if (!isOnline) {
+        pendingSyncCount++;
+      }
+
+      notifyListeners();
+    }
+  }
+
+  // Mark Table as ready for billing
+  void requestBilling(int tableId) {
+    final index = tables.indexWhere((t) => t.id == tableId);
+    if (index != -1) {
+      tables[index].state = TableState.billing;
+      notifyListeners();
+    }
+  }
+
+  // Checkout process
+  void checkoutTable(int tableId, {required double discount, required String paymentMethod, required String refCode}) {
+    final index = tables.indexWhere((t) => t.id == tableId);
+    if (index != -1) {
+      final t = tables[index];
+      t.discountPercentage = discount;
+      
+      // Calculate total
+      double finalTotal = t.total;
+
+      // Add to cash drawer if paid in cash
+      if (paymentMethod.toLowerCase() == 'efectivo') {
+        cashDrawerAmount += finalTotal;
+      }
+
+      // Print ticket
+      printJobs.add(PrintJob(
+        id: 'rec_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Factura - ${t.label}',
+        details: 'Total Pagado: \$${finalTotal.toStringAsFixed(2)}\nMetodo: $paymentMethod\nRef: $refCode\nItems:\n' +
+            t.items.map((i) => '${i.quantity}x ${i.item.name} - \$${i.totalPrice.toStringAsFixed(2)}').join('\n'),
+        target: 'Caja',
+        timestamp: DateTime.now(),
+        status: isOnline ? 'printed' : 'failed',
+      ));
+
+      // Reset Table
+      t.state = TableState.cleaning;
+      t.items = [];
+      t.guests = 0;
+      t.discountPercentage = 0;
+
+      if (!isOnline) {
+        pendingSyncCount++;
+      }
+
+      notifyListeners();
+    }
+  }
+
+  // Clean table (from cleaning to free)
+  void finishCleaning(int tableId) {
+    final index = tables.indexWhere((t) => t.id == tableId);
+    if (index != -1) {
+      tables[index].state = TableState.free;
+      notifyListeners();
+    }
+  }
+
+  // Kitchen Order operations
+  void updateKitchenOrderStatus(String orderId, String newStatus) {
+    final index = kitchenOrders.indexWhere((o) => o.id == orderId);
+    if (index != -1) {
+      kitchenOrders[index].status = newStatus;
+      
+      if (newStatus == 'ready') {
+        // Notification for waiter
+        final String notificationText = '¡Pedido listo para la ${kitchenOrders[index].tableLabel}!';
+        readyNotifications.add(notificationText);
+        
+        // Also highlight table as needing service or update list
+      }
+      notifyListeners();
+    }
+  }
+
+  void clearNotification(String notification) {
+    readyNotifications.remove(notification);
+    notifyListeners();
+  }
+
+  // Printer Retry logic
+  void retryPrintJob(String jobId) {
+    final index = printJobs.indexWhere((j) => j.id == jobId);
+    if (index != -1) {
+      printJobs[index].status = 'printed';
+      notifyListeners();
+    }
+  }
+
+  // Sync operations manually triggered
+  void syncOfflineTransactions() {
+    if (isOnline) {
+      pendingSyncCount = 0;
+      notifyListeners();
+    }
+  }
+}

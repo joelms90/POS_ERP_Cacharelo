@@ -18,7 +18,7 @@
 
 **Purpose**: Project initialization and folder structure setups.
 
-- [ ] T001 Create UI subdirectories `apps/pos_flutter/lib/ui/common/`, `apps/pos_flutter/lib/ui/widgets/`, `apps/pos_flutter/lib/ui/waiter/`, and `apps/pos_flutter/lib/ui/cashier/`
+- [x] T001 Create UI subdirectories `apps/pos_flutter/lib/ui/common/`, `apps/pos_flutter/lib/ui/widgets/`, `apps/pos_flutter/lib/ui/waiter/`, and `apps/pos_flutter/lib/ui/cashier/`
 - [ ] T002 Configure mock floor layout data in JSON format at `apps/pos_flutter/assets/floor_plan_mesa.json`
 
 ---
@@ -29,8 +29,8 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T003 [P] Implement Empire Noir color tokens in `apps/pos_flutter/lib/ui/common/colors.dart`
-- [ ] T004 [P] Configure serif and sans-serif text styles in `apps/pos_flutter/lib/ui/common/theme.dart`
+- [x] T003 [P] Implement Empire Noir color tokens in `apps/pos_flutter/lib/ui/common/colors.dart`
+- [x] T004 [P] Configure serif and sans-serif text styles in `apps/pos_flutter/lib/ui/common/theme.dart`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin.
 
@@ -44,12 +44,12 @@
 
 ### Implementation for User Story 1
 
-- [ ] T005 [P] [US1] Create interactive table coordinates widget `apps/pos_flutter/lib/ui/widgets/table_node.dart`
-- [ ] T006 [P] [US1] Create high-density food item tile widget `apps/pos_flutter/lib/ui/widgets/menu_card.dart`
-- [ ] T007 [P] [US1] Create item custom modifiers dialog `apps/pos_flutter/lib/ui/waiter/modifier_dialog.dart`
+- [x] T005 [P] [US1] Create interactive table coordinates widget `apps/pos_flutter/lib/ui/widgets/table_node.dart`
+- [x] T006 [P] [US1] Create high-density food item tile widget `apps/pos_flutter/lib/ui/widgets/menu_card.dart`
+- [x] T007 [P] [US1] Create item custom modifiers dialog `apps/pos_flutter/lib/ui/waiter/modifier_dialog.dart`
 - [ ] T008 [US1] Create zone-tabs filter layout `apps/pos_flutter/lib/ui/waiter/zone_tabs.dart`
-- [ ] T009 [US1] Create the main order taking cart view `apps/pos_flutter/lib/ui/waiter/cart_sidebar.dart`
-- [ ] T010 [US1] Assemble the primary Waiter dashboard at `apps/pos_flutter/lib/ui/waiter/waiter_ordering_screen.dart`
+- [x] T009 [US1] Create the main order taking cart view `apps/pos_flutter/lib/ui/waiter/cart_sidebar.dart`
+- [x] T010 [US1] Assemble the primary Waiter dashboard at `apps/pos_flutter/lib/ui/waiter/waiter_ordering_screen.dart`
 - [ ] T011 [US1] Add widget test for TableNode states in `apps/pos_flutter/test/ui/table_node_test.dart`
 - [ ] T012 [US1] Add widget test for the order taking flow in `apps/pos_flutter/test/ui/waiter_ordering_screen_test.dart`
 
@@ -65,10 +65,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T013 [P] [US2] Implement cash float entry and Corte X/Z controls in `apps/pos_flutter/lib/ui/cashier/shift_control_panel.dart`
-- [ ] T014 [P] [US2] Implement equal split slider and item checklist selector widget in `apps/pos_flutter/lib/ui/cashier/split_checkout_view.dart`
-- [ ] T015 [US2] Create Cashier Dashboard listing active tables needing checkout in `apps/pos_flutter/lib/ui/cashier/cashier_dashboard_screen.dart`
-- [ ] T016 [US2] Integrate the split checkout view into Cashier Dashboard for selected table checkout
+- [x] T013 [P] [US2] Implement cash float entry and Corte X/Z controls in `apps/pos_flutter/lib/ui/cashier/shift_control_panel.dart`
+- [x] T014 [P] [US2] Implement equal split slider and item checklist selector widget in `apps/pos_flutter/lib/ui/cashier/split_checkout_view.dart`
+- [x] T015 [US2] Create Cashier Dashboard listing active tables needing checkout in `apps/pos_flutter/lib/ui/cashier/cashier_dashboard_screen.dart`
+- [x] T016 [US2] Integrate the split checkout view into Cashier Dashboard for selected table checkout
 - [ ] T017 [US2] Add unit test for billing splits math inside `apps/pos_flutter/test/ui/split_checkout_view_test.dart`
 
 **Checkpoint**: User Stories 1 and 2 are integrated. Cashiers can checkout orders created by waiters.
@@ -83,10 +83,10 @@
 
 ### Implementation for User Story 3
 
-- [ ] T018 [P] [US3] Create connection and sync warning header widget `apps/pos_flutter/lib/ui/widgets/offline_status_bar.dart`
-- [ ] T019 [P] [US3] Implement floating order-ready toast widget in `apps/pos_flutter/lib/ui/widgets/custom_toast.dart`
-- [ ] T020 [US3] Create print queue monitor dashboard with retry action at `apps/pos_flutter/lib/ui/widgets/printer_monitor_panel.dart`
-- [ ] T021 [US3] Integrate status bar, overlay toasts, and print monitor triggers into Waiter and Cashier dashboards
+- [x] T018 [P] [US3] Create connection and sync warning header widget `apps/pos_flutter/lib/ui/widgets/offline_status_bar.dart`
+- [x] T019 [P] [US3] Implement floating order-ready toast widget in `apps/pos_flutter/lib/ui/widgets/custom_toast.dart`
+- [x] T020 [US3] Create print queue monitor dashboard with retry action at `apps/pos_flutter/lib/ui/widgets/printer_monitor_panel.dart`
+- [x] T021 [US3] Integrate status bar, overlay toasts, and print monitor triggers into Waiter and Cashier dashboards
 
 **Checkpoint**: Full offline visibility and notifications are integrated.
 
