@@ -14,7 +14,8 @@ class KitchenDashboardScreen extends StatefulWidget {
 }
 
 class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
-  String selectedFilter = 'TODOS'; // 'TODOS', 'PENDIENTES', 'EN PREPARACIÓN', 'LISTOS'
+  String selectedFilter =
+      'TODOS'; // 'TODOS', 'PENDIENTES', 'EN PREPARACIÓN', 'LISTOS'
 
   @override
   Widget build(BuildContext context) {
@@ -26,8 +27,9 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
           builder: (context, _) {
             // Filter kitchen tickets
             final activeOrders = widget.state.kitchenOrders.where((order) {
-              if (order.status == 'served') return false; // Served orders are archived
-              
+              if (order.status == 'served')
+                return false; // Served orders are archived
+
               if (selectedFilter == 'PENDIENTES') {
                 return order.status == 'pending';
               }
@@ -44,17 +46,15 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
               children: [
                 // Top status bar
                 OfflineStatusBar(state: widget.state),
-                
+
                 // Header
                 _buildHeader(context),
-                
+
                 // Filters
                 _buildFilterBar(),
 
                 // Active orders tickets grid
-                Expanded(
-                  child: _buildTicketsGrid(activeOrders),
-                ),
+                Expanded(child: _buildTicketsGrid(activeOrders)),
               ],
             );
           },
@@ -68,7 +68,9 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: const BoxDecoration(
         color: EmpireColors.onyxSurface,
-        border: Border(bottom: BorderSide(color: EmpireColors.agedBronzeDark, width: 1)),
+        border: Border(
+          bottom: BorderSide(color: EmpireColors.agedBronzeDark, width: 1),
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -81,7 +83,11 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
                   color: EmpireColors.champagneGold.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Icon(Icons.soup_kitchen, color: EmpireColors.champagneGold, size: 20),
+                child: const Icon(
+                  Icons.soup_kitchen,
+                  color: EmpireColors.champagneGold,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Text(
@@ -105,7 +111,9 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
                 onPressed: () {
                   widget.state.logout();
                   Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => LoginScreen(state: widget.state)),
+                    MaterialPageRoute(
+                      builder: (context) => LoginScreen(state: widget.state),
+                    ),
                   );
                 },
                 icon: const Icon(Icons.logout, color: EmpireColors.errorRed),
@@ -120,7 +128,7 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
 
   Widget _buildFilterBar() {
     final filters = ['TODOS', 'PENDIENTES', 'EN PREPARACIÓN', 'LISTOS'];
-    
+
     return Container(
       padding: const EdgeInsets.all(12),
       color: EmpireColors.obsidian,
@@ -141,12 +149,16 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
               selectedColor: EmpireColors.champagneGold,
               backgroundColor: EmpireColors.onyxSurface,
               labelStyle: TextStyle(
-                color: isSelected ? EmpireColors.obsidian : EmpireColors.textPrimary,
+                color: isSelected
+                    ? EmpireColors.obsidian
+                    : EmpireColors.textPrimary,
                 fontWeight: FontWeight.bold,
                 fontSize: 11,
               ),
               side: BorderSide(
-                color: isSelected ? EmpireColors.champagneGold : EmpireColors.agedBronzeDark,
+                color: isSelected
+                    ? EmpireColors.champagneGold
+                    : EmpireColors.agedBronzeDark,
                 width: 1,
               ),
             ),
@@ -162,7 +174,11 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.assignment_turned_in_outlined, color: EmpireColors.textSecondary, size: 48),
+            Icon(
+              Icons.assignment_turned_in_outlined,
+              color: EmpireColors.textSecondary,
+              size: 48,
+            ),
             SizedBox(height: 12),
             Text(
               'No hay comandas activas en cocina.',
@@ -184,7 +200,9 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
       itemCount: orders.length,
       itemBuilder: (context, index) {
         final order = orders[index];
-        final minutesElapsed = DateTime.now().difference(order.timestamp).inMinutes;
+        final minutesElapsed = DateTime.now()
+            .difference(order.timestamp)
+            .inMinutes;
 
         return Card(
           color: EmpireColors.onyxSurface,
@@ -215,9 +233,13 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
                     Text(
                       'Hace $minutesElapsed min',
                       style: TextStyle(
-                        color: minutesElapsed > 15 ? EmpireColors.errorRed : EmpireColors.textSecondary,
+                        color: minutesElapsed > 15
+                            ? EmpireColors.errorRed
+                            : EmpireColors.textSecondary,
                         fontSize: 11,
-                        fontWeight: minutesElapsed > 15 ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: minutesElapsed > 15
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
                   ],
@@ -228,7 +250,10 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: _getStatusBgColor(order.status),
                         borderRadius: BorderRadius.circular(4),
@@ -282,18 +307,31 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
                             ),
                             if (item.modifiers.isNotEmpty)
                               Padding(
-                                padding: const EdgeInsets.only(left: 20, top: 2),
+                                padding: const EdgeInsets.only(
+                                  left: 20,
+                                  top: 2,
+                                ),
                                 child: Text(
                                   '+ ' + item.modifiers.join(', '),
-                                  style: const TextStyle(color: EmpireColors.textGold, fontSize: 10),
+                                  style: const TextStyle(
+                                    color: EmpireColors.textGold,
+                                    fontSize: 10,
+                                  ),
                                 ),
                               ),
                             if (item.notes.isNotEmpty)
                               Padding(
-                                padding: const EdgeInsets.only(left: 20, top: 1),
+                                padding: const EdgeInsets.only(
+                                  left: 20,
+                                  top: 1,
+                                ),
                                 child: Text(
                                   'Nota: ${item.notes}',
-                                  style: const TextStyle(color: EmpireColors.textSecondary, fontSize: 10, fontStyle: FontStyle.italic),
+                                  style: const TextStyle(
+                                    color: EmpireColors.textSecondary,
+                                    fontSize: 10,
+                                    fontStyle: FontStyle.italic,
+                                  ),
                                 ),
                               ),
                           ],
@@ -332,13 +370,15 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
         return ElevatedButton(
           onPressed: () {
             widget.state.updateKitchenOrderStatus(order.id, 'ready');
-            
+
             // Mark table as billing or notify ready
             // We can also trigger a SnackBar in KDS
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 backgroundColor: EmpireColors.successGreen,
-                content: Text('¡Pedido para la ${order.tableLabel} marcado como LISTO!'),
+                content: Text(
+                  '¡Pedido para la ${order.tableLabel} marcado como LISTO!',
+                ),
               ),
             );
           },

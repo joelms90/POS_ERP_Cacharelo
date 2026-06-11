@@ -63,14 +63,17 @@ void main() {
       secureStorageService = SecureStorageService(secureStorage: fakeStorage);
     });
 
-    test('getOrCreateDatabaseKey creates a 32-byte key and persists it', () async {
-      final key1 = await secureStorageService.getOrCreateDatabaseKey();
-      expect(key1.length, equals(32));
+    test(
+      'getOrCreateDatabaseKey creates a 32-byte key and persists it',
+      () async {
+        final key1 = await secureStorageService.getOrCreateDatabaseKey();
+        expect(key1.length, equals(32));
 
-      // Key should persist and return the same bytes
-      final key2 = await secureStorageService.getOrCreateDatabaseKey();
-      expect(key2, equals(key1));
-    });
+        // Key should persist and return the same bytes
+        final key2 = await secureStorageService.getOrCreateDatabaseKey();
+        expect(key2, equals(key1));
+      },
+    );
 
     test('hashPin returns consistent salted SHA-256 hash', () async {
       final hash1 = await secureStorageService.hashPin('1111');
@@ -84,7 +87,9 @@ void main() {
 
     test('cacheUserOffline and verifyOfflineCredentials flow works', () async {
       // Should return null for non-cached PIN
-      final credsBefore = await secureStorageService.verifyOfflineCredentials('1234');
+      final credsBefore = await secureStorageService.verifyOfflineCredentials(
+        '1234',
+      );
       expect(credsBefore, isNull);
 
       // Cache a user
@@ -95,7 +100,9 @@ void main() {
       );
 
       // Verify the credentials offline
-      final credsAfter = await secureStorageService.verifyOfflineCredentials('1234');
+      final credsAfter = await secureStorageService.verifyOfflineCredentials(
+        '1234',
+      );
       expect(credsAfter, isNotNull);
       expect(credsAfter!['name'], equals('Carlos (Chef)'));
       expect(credsAfter['role'], equals('kitchen'));
@@ -108,12 +115,16 @@ void main() {
         role: 'cashier',
       );
 
-      final credsBefore = await secureStorageService.verifyOfflineCredentials('2222');
+      final credsBefore = await secureStorageService.verifyOfflineCredentials(
+        '2222',
+      );
       expect(credsBefore, isNotNull);
 
       await secureStorageService.clearCachedCredentials();
 
-      final credsAfter = await secureStorageService.verifyOfflineCredentials('2222');
+      final credsAfter = await secureStorageService.verifyOfflineCredentials(
+        '2222',
+      );
       expect(credsAfter, isNull);
     });
   });

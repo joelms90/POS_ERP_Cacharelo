@@ -5,11 +5,15 @@ import '../common/app_state.dart';
 class ModifierDialog extends StatefulWidget {
   final MenuItem item;
   final OrderItem? existingOrderItem;
+  final List<String> guestGenders;
+  final int initialSelectedGuestIndex;
 
   const ModifierDialog({
     super.key,
     required this.item,
     this.existingOrderItem,
+    required this.guestGenders,
+    required this.initialSelectedGuestIndex,
   });
 
   @override
@@ -20,12 +24,30 @@ class _ModifierDialogState extends State<ModifierDialog> {
   int quantity = 1;
   List<String> selectedModifiers = [];
   final TextEditingController _notesController = TextEditingController();
+  int selectedGuestIndex = 0;
 
   // Predefined modifiers list based on category
   final Map<String, List<String>> _availableModifiers = {
-    'Pastas': ['Queso Extra', 'Salsa de Ajo', 'Pan con Ajo Adicional', 'Champiñones Extra'],
-    'Hamburguesas': ['Papas Fritas', 'Tocino Extra', 'Queso Cheddar', 'Término Medio', 'Bien Cocido', 'Sin Cebolla'],
-    'Postres': ['Helado de Vainilla', 'Fresa Adicional', 'Crema Batida', 'Salsa de Chocolate'],
+    'Pastas': [
+      'Queso Extra',
+      'Salsa de Ajo',
+      'Pan con Ajo Adicional',
+      'Champiñones Extra',
+    ],
+    'Hamburguesas': [
+      'Papas Fritas',
+      'Tocino Extra',
+      'Queso Cheddar',
+      'Término Medio',
+      'Bien Cocido',
+      'Sin Cebolla',
+    ],
+    'Postres': [
+      'Helado de Vainilla',
+      'Fresa Adicional',
+      'Crema Batida',
+      'Salsa de Chocolate',
+    ],
     'Bebidas': ['Hielo', 'Sin Azúcar', 'Limón Extra', 'Endulzante'],
   };
 
@@ -36,6 +58,15 @@ class _ModifierDialogState extends State<ModifierDialog> {
       quantity = widget.existingOrderItem!.quantity;
       selectedModifiers = List.from(widget.existingOrderItem!.modifiers);
       _notesController.text = widget.existingOrderItem!.notes;
+      if (widget.existingOrderItem!.assignedGuest != null) {
+        final label = widget.existingOrderItem!.assignedGuest!;
+        final match = RegExp(r'P(\d+)').firstMatch(label);
+        if (match != null) {
+          selectedGuestIndex = int.parse(match.group(1)!) - 1;
+        }
+      }
+    } else {
+      selectedGuestIndex = widget.initialSelectedGuestIndex;
     }
   }
 
@@ -47,9 +78,12 @@ class _ModifierDialogState extends State<ModifierDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final modifiers = _availableModifiers[widget.item.category] ?? ['Extra Queso', 'Picante', 'Sin Sal'];
+    final modifiers =
+        _availableModifiers[widget.item.category] ??
+        ['Extra Queso', 'Picante', 'Sin Sal'];
     final basePrice = widget.item.price;
-    final totalPrice = (basePrice + (selectedModifiers.length * 1.5)) * quantity;
+    final totalPrice =
+        (basePrice + (selectedModifiers.length * 1.5)) * quantity;
 
     return Dialog(
       backgroundColor: EmpireColors.obsidian,
@@ -82,14 +116,20 @@ class _ModifierDialogState extends State<ModifierDialog> {
                       const SizedBox(height: 4),
                       Text(
                         'Precio base: \$${basePrice.toStringAsFixed(2)}',
-                        style: const TextStyle(color: EmpireColors.textSecondary, fontSize: 13),
+                        style: const TextStyle(
+                          color: EmpireColors.textSecondary,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close, color: EmpireColors.textSecondary),
+                  icon: const Icon(
+                    Icons.close,
+                    color: EmpireColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -120,7 +160,10 @@ class _ModifierDialogState extends State<ModifierDialog> {
                                 setState(() => quantity--);
                               }
                             },
-                            icon: const Icon(Icons.remove_circle_outline, color: EmpireColors.champagneGold),
+                            icon: const Icon(
+                              Icons.remove_circle_outline,
+                              color: EmpireColors.champagneGold,
+                            ),
                           ),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -137,7 +180,10 @@ class _ModifierDialogState extends State<ModifierDialog> {
                             onPressed: () {
                               setState(() => quantity++);
                             },
-                            icon: const Icon(Icons.add_circle_outline, color: EmpireColors.champagneGold),
+                            icon: const Icon(
+                              Icons.add_circle_outline,
+                              color: EmpireColors.champagneGold,
+                            ),
                           ),
                         ],
                       ),
@@ -174,22 +220,82 @@ class _ModifierDialogState extends State<ModifierDialog> {
                             }
                           });
                         },
-                        selectedColor: EmpireColors.champagneGold.withOpacity(0.2),
+                        selectedColor: EmpireColors.champagneGold.withOpacity(
+                          0.2,
+                        ),
                         backgroundColor: EmpireColors.charcoalSurface,
                         labelStyle: TextStyle(
-                          color: isSelected ? EmpireColors.champagneGold : EmpireColors.textPrimary,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected
+                              ? EmpireColors.champagneGold
+                              : EmpireColors.textPrimary,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                           fontSize: 12,
                         ),
                         side: BorderSide(
-                          color: isSelected ? EmpireColors.champagneGold : EmpireColors.agedBronzeDark,
+                          color: isSelected
+                              ? EmpireColors.champagneGold
+                              : EmpireColors.agedBronzeDark,
                           width: 1,
                         ),
                         checkmarkColor: EmpireColors.champagneGold,
                       );
                     }).toList(),
                   ),
-                  
+
+                  const SizedBox(height: 20),
+
+                  // Assigned Guest Selector
+                  const Text(
+                    'Asignar a Comensal',
+                    style: TextStyle(
+                      color: EmpireColors.textGold,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    children: List.generate(widget.guestGenders.length, (
+                      index,
+                    ) {
+                      final gender = widget.guestGenders[index];
+                      final isSelected = selectedGuestIndex == index;
+                      final emoji = gender == 'F'
+                          ? '👩'
+                          : (gender == 'K' ? '🧒' : '👨');
+                      return ChoiceChip(
+                        label: Text('P${index + 1} $emoji'),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          if (selected) {
+                            setState(() => selectedGuestIndex = index);
+                          }
+                        },
+                        selectedColor: EmpireColors.champagneGold.withOpacity(
+                          0.2,
+                        ),
+                        backgroundColor: EmpireColors.charcoalSurface,
+                        labelStyle: TextStyle(
+                          color: isSelected
+                              ? EmpireColors.champagneGold
+                              : EmpireColors.textPrimary,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          fontSize: 12,
+                        ),
+                        side: BorderSide(
+                          color: isSelected
+                              ? EmpireColors.champagneGold
+                              : EmpireColors.agedBronzeDark,
+                          width: 1,
+                        ),
+                      );
+                    }),
+                  ),
                   const SizedBox(height: 20),
 
                   // Kitchen Notes
@@ -209,7 +315,10 @@ class _ModifierDialogState extends State<ModifierDialog> {
                       hintStyle: TextStyle(fontSize: 12),
                     ),
                     maxLines: 2,
-                    style: const TextStyle(fontSize: 13, color: EmpireColors.textPrimary),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: EmpireColors.textPrimary,
+                    ),
                   ),
                 ],
               ),
@@ -226,7 +335,11 @@ class _ModifierDialogState extends State<ModifierDialog> {
                   children: [
                     const Text(
                       'TOTAL DETALLADO',
-                      style: TextStyle(color: EmpireColors.textSecondary, fontSize: 10, letterSpacing: 0.8),
+                      style: TextStyle(
+                        color: EmpireColors.textSecondary,
+                        fontSize: 10,
+                        letterSpacing: 0.8,
+                      ),
                     ),
                     Text(
                       '\$${totalPrice.toStringAsFixed(2)}',
@@ -245,6 +358,7 @@ class _ModifierDialogState extends State<ModifierDialog> {
                       quantity: quantity,
                       modifiers: List.from(selectedModifiers),
                       notes: _notesController.text,
+                      assignedGuest: 'P${selectedGuestIndex + 1}',
                     );
                     Navigator.of(context).pop(orderItem);
                   },

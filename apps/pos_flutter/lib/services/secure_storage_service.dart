@@ -11,7 +11,7 @@ class SecureStorageService {
   static const String _usersCacheKey = 'cached_offline_users';
 
   SecureStorageService({FlutterSecureStorage? secureStorage})
-      : _secureStorage = secureStorage ?? const FlutterSecureStorage();
+    : _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   // Retrieve or generate a 32-byte key for database encryption
   Future<Uint8List> getOrCreateDatabaseKey() async {
@@ -25,7 +25,7 @@ class SecureStorageService {
     final keyBytes = Uint8List.fromList(
       List<int>.generate(32, (_) => random.nextInt(256)),
     );
-    
+
     // Save to secure storage in hex format
     final hexString = bytesToHex(keyBytes);
     await _secureStorage.write(key: _dbKeyName, value: hexString);
@@ -72,11 +72,7 @@ class SecureStorageService {
     // Remove existing user with the same name to avoid duplication
     users.removeWhere((u) => u['name'] == name);
 
-    users.add({
-      'name': name,
-      'pinHash': hashedPin,
-      'role': role,
-    });
+    users.add({'name': name, 'pinHash': hashedPin, 'role': role});
 
     await _secureStorage.write(key: _usersCacheKey, value: jsonEncode(users));
   }

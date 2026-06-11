@@ -6,11 +6,7 @@ class MenuCard extends StatelessWidget {
   final MenuItem item;
   final VoidCallback onTap;
 
-  const MenuCard({
-    super.key,
-    required this.item,
-    required this.onTap,
-  });
+  const MenuCard({super.key, required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +30,10 @@ class MenuCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: EmpireColors.charcoalSurface,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: EmpireColors.agedBronzeDark.withOpacity(0.5), width: 1),
+                    border: Border.all(
+                      color: EmpireColors.agedBronzeDark.withOpacity(0.5),
+                      width: 1,
+                    ),
                   ),
                   child: Center(
                     child: Icon(
@@ -46,7 +45,7 @@ class MenuCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              
+
               // Item Name
               Text(
                 item.name,

@@ -7,22 +7,26 @@ class OfflineStatusBar extends StatelessWidget {
   final VoidCallback? onOpenPrinterQueue;
 
   const OfflineStatusBar({
-    super.key, 
+    super.key,
     required this.state,
     this.onOpenPrinterQueue,
   });
 
   @override
   Widget build(BuildContext context) {
-    final hasFailedPrinters = state.printJobs.any((job) => job.status == 'failed');
-    
+    final hasFailedPrinters = state.printJobs.any(
+      (job) => job.status == 'failed',
+    );
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: EmpireColors.onyxSurface,
         border: Border(
           bottom: BorderSide(
-            color: state.isOnline ? EmpireColors.agedBronzeDark : EmpireColors.warningOrange.withOpacity(0.5),
+            color: state.isOnline
+                ? EmpireColors.agedBronzeDark
+                : EmpireColors.warningOrange.withOpacity(0.5),
             width: 1,
           ),
         ),
@@ -38,10 +42,16 @@ class OfflineStatusBar extends StatelessWidget {
                 height: 8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: state.isOnline ? EmpireColors.successGreen : EmpireColors.warningOrange,
+                  color: state.isOnline
+                      ? EmpireColors.successGreen
+                      : EmpireColors.warningOrange,
                   boxShadow: [
                     BoxShadow(
-                      color: (state.isOnline ? EmpireColors.successGreen : EmpireColors.warningOrange).withOpacity(0.5),
+                      color:
+                          (state.isOnline
+                                  ? EmpireColors.successGreen
+                                  : EmpireColors.warningOrange)
+                              .withOpacity(0.5),
                       blurRadius: 6,
                       spreadRadius: 2,
                     ),
@@ -52,7 +62,9 @@ class OfflineStatusBar extends StatelessWidget {
               Text(
                 state.isOnline ? 'SISTEMA ONLINE' : 'TRABAJANDO FUERA DE LÍNEA',
                 style: TextStyle(
-                  color: state.isOnline ? EmpireColors.textPrimary : EmpireColors.textGold,
+                  color: state.isOnline
+                      ? EmpireColors.textPrimary
+                      : EmpireColors.textGold,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1,
@@ -61,11 +73,17 @@ class OfflineStatusBar extends StatelessWidget {
               if (!state.isOnline) ...[
                 const SizedBox(width: 16),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: EmpireColors.warningOrange.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: EmpireColors.warningOrange.withOpacity(0.5), width: 1),
+                    border: Border.all(
+                      color: EmpireColors.warningOrange.withOpacity(0.5),
+                      width: 1,
+                    ),
                   ),
                   child: Text(
                     '${state.pendingSyncCount} transacciones locales sin sincronizar',
@@ -87,16 +105,26 @@ class OfflineStatusBar extends StatelessWidget {
                 GestureDetector(
                   onTap: onOpenPrinterQueue,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: EmpireColors.errorRed.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: EmpireColors.errorRed.withOpacity(0.6), width: 1),
+                      border: Border.all(
+                        color: EmpireColors.errorRed.withOpacity(0.6),
+                        width: 1,
+                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.print_disabled, size: 14, color: EmpireColors.errorRed),
+                        const Icon(
+                          Icons.print_disabled,
+                          size: 14,
+                          color: EmpireColors.errorRed,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           '${state.printJobs.where((j) => j.status == 'failed').length} comanda(s) fallida(s)',
@@ -119,7 +147,10 @@ class OfflineStatusBar extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: EmpireColors.obsidian,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: EmpireColors.agedBronzeDark, width: 1),
+                  border: Border.all(
+                    color: EmpireColors.agedBronzeDark,
+                    width: 1,
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -143,9 +174,13 @@ class OfflineStatusBar extends StatelessWidget {
                         }
                       },
                       activeColor: EmpireColors.successGreen,
-                      activeTrackColor: EmpireColors.successGreen.withOpacity(0.2),
+                      activeTrackColor: EmpireColors.successGreen.withOpacity(
+                        0.2,
+                      ),
                       inactiveThumbColor: EmpireColors.errorRed,
-                      inactiveTrackColor: EmpireColors.errorRed.withOpacity(0.2),
+                      inactiveTrackColor: EmpireColors.errorRed.withOpacity(
+                        0.2,
+                      ),
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                   ],

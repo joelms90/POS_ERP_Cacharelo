@@ -5,10 +5,10 @@ import 'ui/login_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize AppState in-memory state manager
   final appState = AppState();
-  
+
   runApp(MyApp(state: appState));
 }
 

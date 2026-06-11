@@ -6,17 +6,14 @@ class TableNode extends StatefulWidget {
   final TableModel table;
   final VoidCallback onTap;
 
-  const TableNode({
-    super.key,
-    required this.table,
-    required this.onTap,
-  });
+  const TableNode({super.key, required this.table, required this.onTap});
 
   @override
   State<TableNode> createState() => _TableNodeState();
 }
 
-class _TableNodeState extends State<TableNode> with SingleTickerProviderStateMixin {
+class _TableNodeState extends State<TableNode>
+    with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
@@ -27,12 +24,9 @@ class _TableNodeState extends State<TableNode> with SingleTickerProviderStateMix
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
-    
+
     _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
-      CurvedAnimation(
-        parent: _pulseController,
-        curve: Curves.easeInOut,
-      ),
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
     if (widget.table.state == TableState.billing) {
@@ -84,7 +78,9 @@ class _TableNodeState extends State<TableNode> with SingleTickerProviderStateMix
       decoration: BoxDecoration(
         shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
         borderRadius: isCircle ? null : BorderRadius.circular(10),
-        color: widget.table.state == TableState.occupied ? stateColor.withOpacity(0.2) : stateColor,
+        color: widget.table.state == TableState.occupied
+            ? stateColor.withOpacity(0.2)
+            : stateColor,
         border: Border.all(
           color: borderColor,
           width: widget.table.state == TableState.billing ? 2.5 : 1.5,

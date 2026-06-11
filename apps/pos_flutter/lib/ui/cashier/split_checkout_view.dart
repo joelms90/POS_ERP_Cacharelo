@@ -64,8 +64,10 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
   }
 
   void _processPayment() {
-    final refCode = selectedPaymentMethod == 'Tarjeta' ? _cardRefController.text : 'Efectivo';
-    
+    final refCode = selectedPaymentMethod == 'Tarjeta'
+        ? _cardRefController.text
+        : 'Efectivo';
+
     if (selectedPaymentMethod == 'Tarjeta' && refCode.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -82,7 +84,9 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             backgroundColor: EmpireColors.errorRed,
-            content: Text('Efectivo recibido es menor que el total de la cuenta.'),
+            content: Text(
+              'Efectivo recibido es menor que el total de la cuenta.',
+            ),
           ),
         );
         return;
@@ -111,7 +115,12 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: EmpireColors.agedBronzeDark, width: 1.5)),
+              border: Border(
+                bottom: BorderSide(
+                  color: EmpireColors.agedBronzeDark,
+                  width: 1.5,
+                ),
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -129,13 +138,19 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                     const SizedBox(height: 4),
                     Text(
                       'Mesa: ${widget.table.label} • Total Original: \$${(widget.table.subtotal * 1.16).toStringAsFixed(2)}',
-                      style: const TextStyle(color: EmpireColors.textSecondary, fontSize: 13),
+                      style: const TextStyle(
+                        color: EmpireColors.textSecondary,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
                 IconButton(
                   onPressed: widget.onCancel,
-                  icon: const Icon(Icons.close, color: EmpireColors.textSecondary),
+                  icon: const Icon(
+                    Icons.close,
+                    color: EmpireColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -151,13 +166,19 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                   children: [
                     Expanded(
                       child: ChoiceChip(
-                        label: const Text('DIVISIÓN EQUITATIVA', textAlign: TextAlign.center),
+                        label: const Text(
+                          'DIVISIÓN EQUITATIVA',
+                          textAlign: TextAlign.center,
+                        ),
                         selected: isEqualSplit,
-                        onSelected: (val) => setState(() => isEqualSplit = true),
+                        onSelected: (val) =>
+                            setState(() => isEqualSplit = true),
                         selectedColor: EmpireColors.champagneGold,
                         backgroundColor: EmpireColors.charcoalSurface,
                         labelStyle: TextStyle(
-                          color: isEqualSplit ? EmpireColors.obsidian : EmpireColors.textPrimary,
+                          color: isEqualSplit
+                              ? EmpireColors.obsidian
+                              : EmpireColors.textPrimary,
                           fontWeight: FontWeight.bold,
                           fontSize: 11,
                         ),
@@ -166,13 +187,19 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ChoiceChip(
-                        label: const Text('POR ARTÍCULOS', textAlign: TextAlign.center),
+                        label: const Text(
+                          'POR ARTÍCULOS',
+                          textAlign: TextAlign.center,
+                        ),
                         selected: !isEqualSplit,
-                        onSelected: (val) => setState(() => isEqualSplit = false),
+                        onSelected: (val) =>
+                            setState(() => isEqualSplit = false),
                         selectedColor: EmpireColors.champagneGold,
                         backgroundColor: EmpireColors.charcoalSurface,
                         labelStyle: TextStyle(
-                          color: !isEqualSplit ? EmpireColors.obsidian : EmpireColors.textPrimary,
+                          color: !isEqualSplit
+                              ? EmpireColors.obsidian
+                              : EmpireColors.textPrimary,
                           fontWeight: FontWeight.bold,
                           fontSize: 11,
                         ),
@@ -186,7 +213,11 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                 if (isEqualSplit) ...[
                   const Text(
                     'Dividir Cuenta (Número de Personas):',
-                    style: TextStyle(color: EmpireColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
+                    style: TextStyle(
+                      color: EmpireColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   Row(
@@ -197,40 +228,141 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                             setState(() => splitCount--);
                           }
                         },
-                        icon: const Icon(Icons.remove_circle_outline, color: EmpireColors.champagneGold),
+                        icon: const Icon(
+                          Icons.remove_circle_outline,
+                          color: EmpireColors.champagneGold,
+                        ),
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
                           '$splitCount',
-                          style: const TextStyle(color: EmpireColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 20),
+                          style: const TextStyle(
+                            color: EmpireColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 20,
+                          ),
                         ),
                       ),
                       IconButton(
                         onPressed: () {
                           setState(() => splitCount++);
                         },
-                        icon: const Icon(Icons.add_circle_outline, color: EmpireColors.champagneGold),
+                        icon: const Icon(
+                          Icons.add_circle_outline,
+                          color: EmpireColors.champagneGold,
+                        ),
                       ),
                       const SizedBox(width: 20),
                       Text(
                         'Total original dividido en $splitCount partes.',
-                        style: const TextStyle(color: EmpireColors.textSecondary, fontSize: 11),
+                        style: const TextStyle(
+                          color: EmpireColors.textSecondary,
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
                 ] else ...[
                   const Text(
                     'Selecciona los artículos a cobrar en esta sub-cuenta:',
-                    style: TextStyle(color: EmpireColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
+                    style: TextStyle(
+                      color: EmpireColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
                   const SizedBox(height: 10),
+
+                  // Seat-based fast select bar
+                  if (widget.table.guestGenders.isNotEmpty) ...[
+                    const Text(
+                      'Seleccionar por Comensal:',
+                      style: TextStyle(
+                        color: EmpireColors.textGold,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 36,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: widget.table.guestGenders.length,
+                        itemBuilder: (context, index) {
+                          final guestLabel = 'P${index + 1}';
+                          final gender = widget.table.guestGenders[index];
+                          final emoji = gender == 'F'
+                              ? '👩'
+                              : (gender == 'K' ? '🧒' : '👨');
+
+                          final guestItemsIndices = <int>[];
+                          for (int i = 0; i < widget.table.items.length; i++) {
+                            if (widget.table.items[i].assignedGuest ==
+                                guestLabel) {
+                              guestItemsIndices.add(i);
+                            }
+                          }
+                          final hasItems = guestItemsIndices.isNotEmpty;
+                          final allSelected =
+                              hasItems &&
+                              guestItemsIndices.every(
+                                (idx) => selectedItemIndexes.contains(idx),
+                              );
+
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text('$guestLabel $emoji'),
+                              selected: allSelected,
+                              onSelected: (val) {
+                                setState(() {
+                                  if (allSelected) {
+                                    for (var idx in guestItemsIndices) {
+                                      selectedItemIndexes.remove(idx);
+                                    }
+                                  } else {
+                                    for (var idx in guestItemsIndices) {
+                                      if (!selectedItemIndexes.contains(idx)) {
+                                        selectedItemIndexes.add(idx);
+                                      }
+                                    }
+                                  }
+                                });
+                              },
+                              selectedColor: EmpireColors.champagneGold,
+                              backgroundColor: EmpireColors.charcoalSurface,
+                              labelStyle: TextStyle(
+                                color: allSelected
+                                    ? EmpireColors.obsidian
+                                    : EmpireColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                              side: BorderSide(
+                                color: allSelected
+                                    ? EmpireColors.champagneGold
+                                    : EmpireColors.agedBronzeDark,
+                                width: 1,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
                   Container(
                     constraints: const BoxConstraints(maxHeight: 180),
                     decoration: BoxDecoration(
                       color: EmpireColors.charcoalSurface,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: EmpireColors.agedBronzeDark, width: 1),
+                      border: Border.all(
+                        color: EmpireColors.agedBronzeDark,
+                        width: 1,
+                      ),
                     ),
                     child: ListView.builder(
                       shrinkWrap: true,
@@ -238,11 +370,82 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                       itemBuilder: (context, index) {
                         final item = widget.table.items[index];
                         final isChecked = selectedItemIndexes.contains(index);
+
+                        final assignedGuest = item.assignedGuest;
+                        String guestEmoji = '👨';
+                        if (assignedGuest != null) {
+                          final match = RegExp(
+                            r'P(\d+)',
+                          ).firstMatch(assignedGuest);
+                          if (match != null) {
+                            final idx = int.parse(match.group(1)!) - 1;
+                            if (idx >= 0 &&
+                                idx < widget.table.guestGenders.length) {
+                              final gender = widget.table.guestGenders[idx];
+                              guestEmoji = gender == 'F'
+                                  ? '👩'
+                                  : (gender == 'K' ? '🧒' : '👨');
+                            }
+                          }
+                        }
+
                         return CheckboxListTile(
                           value: isChecked,
-                          title: Text(item.item.name, style: const TextStyle(color: EmpireColors.textPrimary, fontSize: 13)),
-                          subtitle: Text('Cantidad: ${item.quantity}', style: const TextStyle(color: EmpireColors.textSecondary, fontSize: 11)),
-                          secondary: Text('\$${item.totalPrice.toStringAsFixed(2)}', style: const TextStyle(color: EmpireColors.textGold, fontSize: 13, fontWeight: FontWeight.bold)),
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  item.item.name,
+                                  style: const TextStyle(
+                                    color: EmpireColors.textPrimary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              if (assignedGuest != null) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 5,
+                                    vertical: 1.5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: EmpireColors.champagneGold
+                                        .withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: EmpireColors.champagneGold
+                                          .withOpacity(0.4),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '$assignedGuest $guestEmoji',
+                                    style: const TextStyle(
+                                      color: EmpireColors.champagneGold,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          subtitle: Text(
+                            'Cantidad: ${item.quantity}',
+                            style: const TextStyle(
+                              color: EmpireColors.textSecondary,
+                              fontSize: 11,
+                            ),
+                          ),
+                          secondary: Text(
+                            '\$${item.totalPrice.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              color: EmpireColors.textGold,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           onChanged: (val) {
                             setState(() {
                               if (val == true) {
@@ -265,7 +468,11 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                 // Discounts Segment
                 const Text(
                   'Aplicar Descuento Especial:',
-                  style: TextStyle(color: EmpireColors.textGold, fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(
+                    color: EmpireColors.textGold,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 Wrap(
@@ -273,22 +480,32 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                   children: discounts.map((disc) {
                     final isSelected = selectedDiscount == disc;
                     return ChoiceChip(
-                      label: Text(disc == 0.0 ? 'Sin Descuento' : '${disc.toInt()}%'),
+                      label: Text(
+                        disc == 0.0 ? 'Sin Descuento' : '${disc.toInt()}%',
+                      ),
                       selected: isSelected,
                       onSelected: (selected) {
                         if (selected) {
                           setState(() => selectedDiscount = disc);
                         }
                       },
-                      selectedColor: EmpireColors.champagneGold.withOpacity(0.2),
+                      selectedColor: EmpireColors.champagneGold.withOpacity(
+                        0.2,
+                      ),
                       backgroundColor: EmpireColors.charcoalSurface,
                       labelStyle: TextStyle(
-                        color: isSelected ? EmpireColors.champagneGold : EmpireColors.textPrimary,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected
+                            ? EmpireColors.champagneGold
+                            : EmpireColors.textPrimary,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                         fontSize: 12,
                       ),
                       side: BorderSide(
-                        color: isSelected ? EmpireColors.champagneGold : EmpireColors.agedBronzeDark,
+                        color: isSelected
+                            ? EmpireColors.champagneGold
+                            : EmpireColors.agedBronzeDark,
                         width: 1,
                       ),
                     );
@@ -300,14 +517,22 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                 // Payment Method
                 const Text(
                   'Método de Pago:',
-                  style: TextStyle(color: EmpireColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(
+                    color: EmpireColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
                       child: ChoiceChip(
-                        avatar: const Icon(Icons.money, size: 16, color: EmpireColors.textPrimary),
+                        avatar: const Icon(
+                          Icons.money,
+                          size: 16,
+                          color: EmpireColors.textPrimary,
+                        ),
                         label: const Text('EFECTIVO'),
                         selected: selectedPaymentMethod == 'Efectivo',
                         onSelected: (selected) {
@@ -315,14 +540,20 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                             setState(() => selectedPaymentMethod = 'Efectivo');
                           }
                         },
-                        selectedColor: EmpireColors.champagneGold.withOpacity(0.3),
+                        selectedColor: EmpireColors.champagneGold.withOpacity(
+                          0.3,
+                        ),
                         backgroundColor: EmpireColors.charcoalSurface,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: ChoiceChip(
-                        avatar: const Icon(Icons.credit_card, size: 16, color: EmpireColors.textPrimary),
+                        avatar: const Icon(
+                          Icons.credit_card,
+                          size: 16,
+                          color: EmpireColors.textPrimary,
+                        ),
                         label: const Text('TARJETA'),
                         selected: selectedPaymentMethod == 'Tarjeta',
                         onSelected: (selected) {
@@ -330,7 +561,9 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                             setState(() => selectedPaymentMethod = 'Tarjeta');
                           }
                         },
-                        selectedColor: EmpireColors.champagneGold.withOpacity(0.3),
+                        selectedColor: EmpireColors.champagneGold.withOpacity(
+                          0.3,
+                        ),
                         backgroundColor: EmpireColors.charcoalSurface,
                       ),
                     ),
@@ -343,7 +576,9 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                 if (selectedPaymentMethod == 'Efectivo') ...[
                   TextField(
                     controller: _cashReceivedController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     decoration: const InputDecoration(
                       labelText: 'Monto Recibido',
                       prefixText: '\$ ',
@@ -356,10 +591,20 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Cambio a devolver:', style: TextStyle(color: EmpireColors.textSecondary, fontSize: 13)),
+                      const Text(
+                        'Cambio a devolver:',
+                        style: TextStyle(
+                          color: EmpireColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
                       Text(
                         '\$${cashChange.toStringAsFixed(2)}',
-                        style: const TextStyle(color: EmpireColors.successGreen, fontWeight: FontWeight.bold, fontSize: 16),
+                        style: const TextStyle(
+                          color: EmpireColors.successGreen,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ],
                   ),
@@ -375,7 +620,11 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                   const SizedBox(height: 8),
                   const Text(
                     'Para cobros offline, verifique la aprobación en la terminal e inserte el número de transacción.',
-                    style: TextStyle(color: EmpireColors.textSecondary, fontSize: 11, fontStyle: FontStyle.italic),
+                    style: TextStyle(
+                      color: EmpireColors.textSecondary,
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ],
               ],
@@ -387,7 +636,9 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
             padding: const EdgeInsets.all(20),
             decoration: const BoxDecoration(
               color: EmpireColors.charcoalSurface,
-              border: Border(top: BorderSide(color: EmpireColors.agedBronzeDark, width: 1.5)),
+              border: Border(
+                top: BorderSide(color: EmpireColors.agedBronzeDark, width: 1.5),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -395,8 +646,20 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Subtotal Subcuenta', style: TextStyle(color: EmpireColors.textSecondary, fontSize: 13)),
-                    Text('\$${currentSubtotal.toStringAsFixed(2)}', style: const TextStyle(color: EmpireColors.textPrimary, fontSize: 13)),
+                    const Text(
+                      'Subtotal Subcuenta',
+                      style: TextStyle(
+                        color: EmpireColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                    Text(
+                      '\$${currentSubtotal.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: EmpireColors.textPrimary,
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
                 ),
                 if (selectedDiscount > 0) ...[
@@ -404,8 +667,20 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Descuento (${selectedDiscount.toInt()}%)', style: const TextStyle(color: EmpireColors.textSecondary, fontSize: 13)),
-                      Text('-\$${discountAmount.toStringAsFixed(2)}', style: const TextStyle(color: EmpireColors.errorRed, fontSize: 13)),
+                      Text(
+                        'Descuento (${selectedDiscount.toInt()}%)',
+                        style: const TextStyle(
+                          color: EmpireColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                      Text(
+                        '-\$${discountAmount.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          color: EmpireColors.errorRed,
+                          fontSize: 13,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -413,8 +688,20 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('IVA (16%)', style: TextStyle(color: EmpireColors.textSecondary, fontSize: 13)),
-                    Text('\$${currentTax.toStringAsFixed(2)}', style: const TextStyle(color: EmpireColors.textPrimary, fontSize: 13)),
+                    const Text(
+                      'IVA (16%)',
+                      style: TextStyle(
+                        color: EmpireColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                    Text(
+                      '\$${currentTax.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: EmpireColors.textPrimary,
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
                 ),
                 const Divider(color: EmpireColors.agedBronzeDark, height: 16),
@@ -423,7 +710,11 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                   children: [
                     const Text(
                       'TOTAL A COBRAR',
-                      style: TextStyle(color: EmpireColors.textGold, fontWeight: FontWeight.bold, fontSize: 15),
+                      style: TextStyle(
+                        color: EmpireColors.textGold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
                     ),
                     Text(
                       '\$${currentTotal.toStringAsFixed(2)}',
@@ -442,7 +733,9 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                     backgroundColor: EmpireColors.champagneGold,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: Text('PROCESAR COBRO (\$${currentTotal.toStringAsFixed(2)})'),
+                  child: Text(
+                    'PROCESAR COBRO (\$${currentTotal.toStringAsFixed(2)})',
+                  ),
                 ),
               ],
             ),

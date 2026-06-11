@@ -6,7 +6,9 @@ import 'dart:convert';
 import '../../services/secure_storage_service.dart';
 
 enum TableState { free, occupied, billing, cleaning }
+
 enum TableShape { circle, square }
+
 enum UserRole { waiter, cashier, kitchen, none }
 
 class TableModel {
@@ -20,6 +22,8 @@ class TableModel {
   List<OrderItem> items;
   int guests;
   double discountPercentage;
+  List<String>
+  guestGenders; // Tracks genders of guests: 'M' (Male), 'F' (Female), 'K' (Kid)
 
   TableModel({
     required this.id,
@@ -32,6 +36,7 @@ class TableModel {
     this.items = const [],
     this.guests = 0,
     this.discountPercentage = 0.0,
+    this.guestGenders = const ['M'],
   });
 
   double get subtotal => items.fold(0.0, (sum, item) => sum + item.totalPrice);
@@ -43,6 +48,7 @@ class TableModel {
     List<OrderItem>? items,
     int? guests,
     double? discountPercentage,
+    List<String>? guestGenders,
   }) {
     return TableModel(
       id: id,
@@ -55,6 +61,7 @@ class TableModel {
       items: items ?? List.from(this.items),
       guests: guests ?? this.guests,
       discountPercentage: discountPercentage ?? this.discountPercentage,
+      guestGenders: guestGenders ?? List.from(this.guestGenders),
     );
   }
 }
@@ -82,12 +89,16 @@ class OrderItem {
   int quantity;
   List<String> modifiers;
   String notes;
+  String? assignedGuest; // e.g. 'P1'
+  bool isSent;
 
   OrderItem({
     required this.item,
     this.quantity = 1,
     this.modifiers = const [],
     this.notes = '',
+    this.assignedGuest,
+    this.isSent = false,
   });
 
   double get totalPrice => (item.price + (modifiers.length * 1.5)) * quantity;
@@ -96,12 +107,16 @@ class OrderItem {
     int? quantity,
     List<String>? modifiers,
     String? notes,
+    String? assignedGuest,
+    bool? isSent,
   }) {
     return OrderItem(
       item: item,
       quantity: quantity ?? this.quantity,
       modifiers: modifiers ?? List.from(this.modifiers),
       notes: notes ?? this.notes,
+      assignedGuest: assignedGuest ?? this.assignedGuest,
+      isSent: isSent ?? this.isSent,
     );
   }
 }
@@ -143,24 +158,24 @@ class PrintJob {
 class AppState extends ChangeNotifier {
   UserRole currentUserRole = UserRole.none;
   String currentUserName = "";
-  
+
   // Tables state
   List<TableModel> tables = [];
-  
+
   // Kitchen orders
   List<KitchenOrder> kitchenOrders = [];
-  
+
   // Printer Queue
   List<PrintJob> printJobs = [];
-  
+
   // Shift controls (Cashier)
   bool isShiftOpen = false;
   double cashDrawerAmount = 0.0;
-  
+
   // Offline & sync states
   bool isOnline = true;
   int pendingSyncCount = 0;
-  
+
   // Notification queue (for alerts on waiter screen)
   List<String> readyNotifications = [];
 
@@ -170,14 +185,16 @@ class AppState extends ChangeNotifier {
   final SecureStorageService _secureStorageService;
 
   AppState({SecureStorageService? secureStorageService})
-      : _secureStorageService = secureStorageService ?? SecureStorageService() {
+    : _secureStorageService = secureStorageService ?? SecureStorageService() {
     _initMockData();
     _seedDefaultUsersOffline();
   }
 
   Future<void> _seedDefaultUsersOffline() async {
     try {
-      final cached = await _secureStorageService.verifyOfflineCredentials('1111');
+      final cached = await _secureStorageService.verifyOfflineCredentials(
+        '1111',
+      );
       if (cached == null) {
         await _secureStorageService.cacheUserOffline(
           name: 'Juan (Mesero)',
@@ -204,42 +221,182 @@ class AppState extends ChangeNotifier {
     // Generate mock tables for 3 zones: Salón Principal, Terraza, Bar
     tables = [
       // Salón Principal
-      TableModel(id: 1, label: 'Mesa 1', shape: TableShape.circle, zone: 'Salón Principal', x: 0.15, y: 0.25),
-      TableModel(id: 2, label: 'Mesa 2', shape: TableShape.square, zone: 'Salón Principal', x: 0.45, y: 0.25),
-      TableModel(id: 3, label: 'Mesa 3', shape: TableShape.circle, zone: 'Salón Principal', x: 0.75, y: 0.25),
-      TableModel(id: 4, label: 'Mesa 4', shape: TableShape.square, zone: 'Salón Principal', x: 0.15, y: 0.65),
-      TableModel(id: 5, label: 'Mesa 5', shape: TableShape.circle, zone: 'Salón Principal', x: 0.45, y: 0.65, state: TableState.occupied, guests: 2, items: [
-        OrderItem(item: menu[0], quantity: 2, modifiers: ['Queso Extra']),
-        OrderItem(item: menu[4], quantity: 2),
-      ]),
-      TableModel(id: 6, label: 'Mesa 6', shape: TableShape.square, zone: 'Salón Principal', x: 0.75, y: 0.65, state: TableState.billing, guests: 4, items: [
-        OrderItem(item: menu[1], quantity: 2),
-        OrderItem(item: menu[2], quantity: 2, modifiers: ['Bien Cocido']),
-        OrderItem(item: menu[5], quantity: 4),
-      ]),
-      
+      TableModel(
+        id: 1,
+        label: 'Mesa 1',
+        shape: TableShape.circle,
+        zone: 'Salón Principal',
+        x: 0.15,
+        y: 0.25,
+      ),
+      TableModel(
+        id: 2,
+        label: 'Mesa 2',
+        shape: TableShape.square,
+        zone: 'Salón Principal',
+        x: 0.45,
+        y: 0.25,
+      ),
+      TableModel(
+        id: 3,
+        label: 'Mesa 3',
+        shape: TableShape.circle,
+        zone: 'Salón Principal',
+        x: 0.75,
+        y: 0.25,
+      ),
+      TableModel(
+        id: 4,
+        label: 'Mesa 4',
+        shape: TableShape.square,
+        zone: 'Salón Principal',
+        x: 0.15,
+        y: 0.65,
+      ),
+      TableModel(
+        id: 5,
+        label: 'Mesa 5',
+        shape: TableShape.circle,
+        zone: 'Salón Principal',
+        x: 0.45,
+        y: 0.65,
+        state: TableState.occupied,
+        guests: 2,
+        items: [
+          OrderItem(
+            item: menu[0],
+            quantity: 2,
+            modifiers: ['Queso Extra'],
+            isSent: true,
+          ),
+          OrderItem(item: menu[4], quantity: 2, isSent: true),
+        ],
+      ),
+      TableModel(
+        id: 6,
+        label: 'Mesa 6',
+        shape: TableShape.square,
+        zone: 'Salón Principal',
+        x: 0.75,
+        y: 0.65,
+        state: TableState.billing,
+        guests: 4,
+        items: [
+          OrderItem(item: menu[1], quantity: 2, isSent: true),
+          OrderItem(
+            item: menu[2],
+            quantity: 2,
+            modifiers: ['Bien Cocido'],
+            isSent: true,
+          ),
+          OrderItem(item: menu[5], quantity: 4, isSent: true),
+        ],
+      ),
+
       // Terraza
-      TableModel(id: 7, label: 'Terraza 1', shape: TableShape.square, zone: 'Terraza', x: 0.2, y: 0.3),
-      TableModel(id: 8, label: 'Terraza 2', shape: TableShape.circle, zone: 'Terraza', x: 0.5, y: 0.3),
-      TableModel(id: 9, label: 'Terraza 3', shape: TableShape.square, zone: 'Terraza', x: 0.8, y: 0.3),
-      TableModel(id: 10, label: 'Terraza 4', shape: TableShape.circle, zone: 'Terraza', x: 0.35, y: 0.7),
+      TableModel(
+        id: 7,
+        label: 'Terraza 1',
+        shape: TableShape.square,
+        zone: 'Terraza',
+        x: 0.2,
+        y: 0.3,
+      ),
+      TableModel(
+        id: 8,
+        label: 'Terraza 2',
+        shape: TableShape.circle,
+        zone: 'Terraza',
+        x: 0.5,
+        y: 0.3,
+      ),
+      TableModel(
+        id: 9,
+        label: 'Terraza 3',
+        shape: TableShape.square,
+        zone: 'Terraza',
+        x: 0.8,
+        y: 0.3,
+      ),
+      TableModel(
+        id: 10,
+        label: 'Terraza 4',
+        shape: TableShape.circle,
+        zone: 'Terraza',
+        x: 0.35,
+        y: 0.7,
+      ),
 
       // Bar
-      TableModel(id: 11, label: 'Bar 1', shape: TableShape.circle, zone: 'Bar', x: 0.25, y: 0.45),
-      TableModel(id: 12, label: 'Bar 2', shape: TableShape.circle, zone: 'Bar', x: 0.75, y: 0.45),
+      TableModel(
+        id: 11,
+        label: 'Bar 1',
+        shape: TableShape.circle,
+        zone: 'Bar',
+        x: 0.25,
+        y: 0.45,
+      ),
+      TableModel(
+        id: 12,
+        label: 'Bar 2',
+        shape: TableShape.circle,
+        zone: 'Bar',
+        x: 0.75,
+        y: 0.45,
+      ),
     ];
   }
 
   // Predefined Menu Items
   static const List<MenuItem> menu = [
-    MenuItem(id: '1', name: 'Lasagna Bolognesa', price: 18.50, category: 'Pastas'),
-    MenuItem(id: '2', name: 'Fettuccine Alfredo', price: 16.00, category: 'Pastas'),
-    MenuItem(id: '3', name: 'Hamburguesa Empire', price: 14.50, category: 'Hamburguesas'),
-    MenuItem(id: '4', name: 'Hamburguesa de Pollo', price: 13.00, category: 'Hamburguesas'),
-    MenuItem(id: '5', name: 'Tiramisú de la Casa', price: 7.50, category: 'Postres'),
-    MenuItem(id: '6', name: 'Volcán de Chocolate', price: 8.50, category: 'Postres'),
-    MenuItem(id: '7', name: 'Vino Tinto Copa', price: 9.00, category: 'Bebidas'),
-    MenuItem(id: '8', name: 'Limonada de Coco', price: 5.50, category: 'Bebidas'),
+    MenuItem(
+      id: '1',
+      name: 'Lasagna Bolognesa',
+      price: 18.50,
+      category: 'Pastas',
+    ),
+    MenuItem(
+      id: '2',
+      name: 'Fettuccine Alfredo',
+      price: 16.00,
+      category: 'Pastas',
+    ),
+    MenuItem(
+      id: '3',
+      name: 'Hamburguesa Empire',
+      price: 14.50,
+      category: 'Hamburguesas',
+    ),
+    MenuItem(
+      id: '4',
+      name: 'Hamburguesa de Pollo',
+      price: 13.00,
+      category: 'Hamburguesas',
+    ),
+    MenuItem(
+      id: '5',
+      name: 'Tiramisú de la Casa',
+      price: 7.50,
+      category: 'Postres',
+    ),
+    MenuItem(
+      id: '6',
+      name: 'Volcán de Chocolate',
+      price: 8.50,
+      category: 'Postres',
+    ),
+    MenuItem(
+      id: '7',
+      name: 'Vino Tinto Copa',
+      price: 9.00,
+      category: 'Bebidas',
+    ),
+    MenuItem(
+      id: '8',
+      name: 'Limonada de Coco',
+      price: 5.50,
+      category: 'Bebidas',
+    ),
   ];
 
   // Auth Operations (Query backend, fallback to offline local cache)
@@ -247,11 +404,13 @@ class AppState extends ChangeNotifier {
     try {
       // Android emulators use 10.0.2.2 to access the host machine's localhost
       final String host = Platform.isAndroid ? '10.0.2.2' : 'localhost';
-      final response = await http.post(
-        Uri.parse('http://$host:3000/api/auth/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'pin': pin}),
-      ).timeout(const Duration(seconds: 2));
+      final response = await http
+          .post(
+            Uri.parse('http://$host:3000/api/auth/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'pin': pin}),
+          )
+          .timeout(const Duration(seconds: 2));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -259,25 +418,29 @@ class AppState extends ChangeNotifier {
           final userData = data['user'];
           currentUserName = userData['name'];
           currentUserRole = _parseRole(userData['role']);
-          
+
           // Securely cache credentials locally
           await _secureStorageService.cacheUserOffline(
             name: userData['name'],
             pin: pin,
             role: userData['role'],
           );
-          
+
           notifyListeners();
           return true;
         }
       }
     } catch (e) {
-      debugPrint('Error de conexión con el servidor de autenticación, usando credenciales locales: $e');
+      debugPrint(
+        'Error de conexión con el servidor de autenticación, usando credenciales locales: $e',
+      );
     }
 
     // Fallback offline secure credentials validation
     try {
-      final offlineUser = await _secureStorageService.verifyOfflineCredentials(pin);
+      final offlineUser = await _secureStorageService.verifyOfflineCredentials(
+        pin,
+      );
       if (offlineUser != null) {
         currentUserName = offlineUser['name']!;
         currentUserRole = _parseRole(offlineUser['role']!);
@@ -340,55 +503,85 @@ class AppState extends ChangeNotifier {
   }
 
   // Waiter Order submission
-  void submitOrder(int tableId, List<OrderItem> cartItems, int guestsCount) {
+  void submitOrder(
+    int tableId,
+    List<OrderItem> cartItems,
+    int guestsCount,
+    List<String> genders,
+  ) {
     final index = tables.indexWhere((t) => t.id == tableId);
     if (index != -1) {
-      tables[index].items = List.from(cartItems);
+      // Filter out only new (unsent) items to print and send to kitchen
+      final newItems = cartItems.where((i) => !i.isSent).toList();
+
+      // Mark all cart items as sent
+      final updatedItems = cartItems
+          .map((i) => i.copyWith(isSent: true))
+          .toList();
+
+      tables[index].items = updatedItems;
       tables[index].guests = guestsCount;
+      tables[index].guestGenders = List.from(genders);
       tables[index].state = TableState.occupied;
 
-      // Add print jobs
-      final newJobId = DateTime.now().millisecondsSinceEpoch.toString();
-      
-      // Determine targets
-      final hasKitchenItems = cartItems.any((i) => i.item.category != 'Bebidas');
-      final hasBarItems = cartItems.any((i) => i.item.category == 'Bebidas');
+      if (newItems.isNotEmpty) {
+        // Add print jobs
+        final newJobId = DateTime.now().millisecondsSinceEpoch.toString();
 
-      if (hasKitchenItems) {
-        printJobs.add(PrintJob(
-          id: '${newJobId}_k',
-          title: 'Comanda Cocina - ${tables[index].label}',
-          details: cartItems
-              .where((i) => i.item.category != 'Bebidas')
-              .map((i) => '${i.quantity}x ${i.item.name} (${i.modifiers.join(', ')}) ${i.notes}')
-              .join('\n'),
-          target: 'Cocina',
-          timestamp: DateTime.now(),
-          status: isOnline ? 'printed' : 'failed', // Offline simulation can fail prints
-        ));
+        // Determine targets
+        final hasKitchenItems = newItems.any(
+          (i) => i.item.category != 'Bebidas',
+        );
+        final hasBarItems = newItems.any((i) => i.item.category == 'Bebidas');
+
+        if (hasKitchenItems) {
+          printJobs.add(
+            PrintJob(
+              id: '${newJobId}_k',
+              title: 'Comanda Cocina - ${tables[index].label}',
+              details: newItems
+                  .where((i) => i.item.category != 'Bebidas')
+                  .map(
+                    (i) =>
+                        '${i.quantity}x ${i.item.name} (${i.modifiers.join(', ')}) ${i.notes}',
+                  )
+                  .join('\n'),
+              target: 'Cocina',
+              timestamp: DateTime.now(),
+              status: isOnline ? 'printed' : 'failed',
+            ),
+          );
+        }
+
+        if (hasBarItems) {
+          printJobs.add(
+            PrintJob(
+              id: '${newJobId}_b',
+              title: 'Comanda Barra - ${tables[index].label}',
+              details: newItems
+                  .where((i) => i.item.category == 'Bebidas')
+                  .map(
+                    (i) =>
+                        '${i.quantity}x ${i.item.name} (${i.modifiers.join(', ')}) ${i.notes}',
+                  )
+                  .join('\n'),
+              target: 'Barra',
+              timestamp: DateTime.now(),
+              status: isOnline ? 'printed' : 'failed',
+            ),
+          );
+        }
+
+        // Add to Kitchen Orders
+        kitchenOrders.add(
+          KitchenOrder(
+            id: newJobId,
+            tableLabel: tables[index].label,
+            items: List.from(newItems),
+            timestamp: DateTime.now(),
+          ),
+        );
       }
-
-      if (hasBarItems) {
-        printJobs.add(PrintJob(
-          id: '${newJobId}_b',
-          title: 'Comanda Barra - ${tables[index].label}',
-          details: cartItems
-              .where((i) => i.item.category == 'Bebidas')
-              .map((i) => '${i.quantity}x ${i.item.name} (${i.modifiers.join(', ')}) ${i.notes}')
-              .join('\n'),
-          target: 'Barra',
-          timestamp: DateTime.now(),
-          status: isOnline ? 'printed' : 'failed',
-        ));
-      }
-
-      // Add to Kitchen Orders
-      kitchenOrders.add(KitchenOrder(
-        id: newJobId,
-        tableLabel: tables[index].label,
-        items: List.from(cartItems),
-        timestamp: DateTime.now(),
-      ));
 
       if (!isOnline) {
         pendingSyncCount++;
@@ -408,12 +601,17 @@ class AppState extends ChangeNotifier {
   }
 
   // Checkout process
-  void checkoutTable(int tableId, {required double discount, required String paymentMethod, required String refCode}) {
+  void checkoutTable(
+    int tableId, {
+    required double discount,
+    required String paymentMethod,
+    required String refCode,
+  }) {
     final index = tables.indexWhere((t) => t.id == tableId);
     if (index != -1) {
       final t = tables[index];
       t.discountPercentage = discount;
-      
+
       // Calculate total
       double finalTotal = t.total;
 
@@ -423,15 +621,23 @@ class AppState extends ChangeNotifier {
       }
 
       // Print ticket
-      printJobs.add(PrintJob(
-        id: 'rec_${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Factura - ${t.label}',
-        details: 'Total Pagado: \$${finalTotal.toStringAsFixed(2)}\nMetodo: $paymentMethod\nRef: $refCode\nItems:\n' +
-            t.items.map((i) => '${i.quantity}x ${i.item.name} - \$${i.totalPrice.toStringAsFixed(2)}').join('\n'),
-        target: 'Caja',
-        timestamp: DateTime.now(),
-        status: isOnline ? 'printed' : 'failed',
-      ));
+      printJobs.add(
+        PrintJob(
+          id: 'rec_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Factura - ${t.label}',
+          details:
+              'Total Pagado: \$${finalTotal.toStringAsFixed(2)}\nMetodo: $paymentMethod\nRef: $refCode\nItems:\n' +
+              t.items
+                  .map(
+                    (i) =>
+                        '${i.quantity}x ${i.item.name} - \$${i.totalPrice.toStringAsFixed(2)}',
+                  )
+                  .join('\n'),
+          target: 'Caja',
+          timestamp: DateTime.now(),
+          status: isOnline ? 'printed' : 'failed',
+        ),
+      );
 
       // Reset Table
       t.state = TableState.cleaning;
@@ -461,12 +667,13 @@ class AppState extends ChangeNotifier {
     final index = kitchenOrders.indexWhere((o) => o.id == orderId);
     if (index != -1) {
       kitchenOrders[index].status = newStatus;
-      
+
       if (newStatus == 'ready') {
         // Notification for waiter
-        final String notificationText = '¡Pedido listo para la ${kitchenOrders[index].tableLabel}!';
+        final String notificationText =
+            '¡Pedido listo para la ${kitchenOrders[index].tableLabel}!';
         readyNotifications.add(notificationText);
-        
+
         // Also highlight table as needing service or update list
       }
       notifyListeners();

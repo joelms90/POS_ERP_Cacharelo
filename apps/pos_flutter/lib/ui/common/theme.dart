@@ -81,9 +81,7 @@ class EmpireTheme {
           backgroundColor: EmpireColors.champagneGold,
           foregroundColor: EmpireColors.obsidian,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           textStyle: GoogleFonts.inter(
             fontWeight: FontWeight.bold,
             fontSize: 15,
@@ -96,9 +94,7 @@ class EmpireTheme {
           foregroundColor: EmpireColors.champagneGold,
           side: const BorderSide(color: EmpireColors.agedBronze, width: 1.5),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           textStyle: GoogleFonts.inter(
             fontWeight: FontWeight.bold,
             fontSize: 15,
@@ -108,18 +104,30 @@ class EmpireTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: EmpireColors.onyxSurface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: EmpireColors.agedBronzeDark, width: 1),
+          borderSide: const BorderSide(
+            color: EmpireColors.agedBronzeDark,
+            width: 1,
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: EmpireColors.agedBronzeDark, width: 1),
+          borderSide: const BorderSide(
+            color: EmpireColors.agedBronzeDark,
+            width: 1,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: EmpireColors.champagneGold, width: 1.5),
+          borderSide: const BorderSide(
+            color: EmpireColors.champagneGold,
+            width: 1.5,
+          ),
         ),
         hintStyle: GoogleFonts.inter(color: EmpireColors.textSecondary),
         labelStyle: GoogleFonts.inter(color: EmpireColors.textPrimary),

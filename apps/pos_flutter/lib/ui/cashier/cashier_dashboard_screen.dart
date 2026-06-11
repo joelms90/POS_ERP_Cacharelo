@@ -36,7 +36,9 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
               if (selectedFilter == 'POR COBRAR') {
                 return t.state == TableState.billing;
               }
-              return t.state != TableState.free; // Show all active occupied/billing/cleaning tables
+              return t.state !=
+                  TableState
+                      .free; // Show all active occupied/billing/cleaning tables
             }).toList();
 
             return Stack(
@@ -55,7 +57,12 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                             flex: 6,
                             child: Container(
                               decoration: const BoxDecoration(
-                                border: Border(right: BorderSide(color: EmpireColors.agedBronzeDark, width: 1.5)),
+                                border: Border(
+                                  right: BorderSide(
+                                    color: EmpireColors.agedBronzeDark,
+                                    width: 1.5,
+                                  ),
+                                ),
                               ),
                               child: ShiftControlPanel(state: widget.state),
                             ),
@@ -68,7 +75,7 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 _buildFilterBar(),
-                                
+
                                 // Table grid
                                 Expanded(
                                   child: widget.state.isShiftOpen
@@ -80,25 +87,38 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                           ),
 
                           // Right Panel: Checkout options (visible when table is selected and shift is open)
-                          if (selectedTableForCheckout != null && widget.state.isShiftOpen)
+                          if (selectedTableForCheckout != null &&
+                              widget.state.isShiftOpen)
                             Expanded(
                               flex: 7,
                               child: Container(
                                 decoration: const BoxDecoration(
-                                  border: Border(left: BorderSide(color: EmpireColors.agedBronzeDark, width: 1.5)),
+                                  border: Border(
+                                    left: BorderSide(
+                                      color: EmpireColors.agedBronzeDark,
+                                      width: 1.5,
+                                    ),
+                                  ),
                                 ),
                                 child: SplitCheckoutView(
                                   table: selectedTableForCheckout!,
                                   state: widget.state,
                                   onCancel: () {
-                                    setState(() => selectedTableForCheckout = null);
+                                    setState(
+                                      () => selectedTableForCheckout = null,
+                                    );
                                   },
                                   onSuccess: () {
-                                    setState(() => selectedTableForCheckout = null);
+                                    setState(
+                                      () => selectedTableForCheckout = null,
+                                    );
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        backgroundColor: EmpireColors.successGreen,
-                                        content: Text('Facturación completada con éxito. Mesa liberada.'),
+                                        backgroundColor:
+                                            EmpireColors.successGreen,
+                                        content: Text(
+                                          'Facturación completada con éxito. Mesa liberada.',
+                                        ),
                                       ),
                                     );
                                   },
@@ -128,7 +148,8 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                         ),
                         child: PrinterMonitorPanel(
                           state: widget.state,
-                          onClose: () => setState(() => isPrinterQueueOpen = false),
+                          onClose: () =>
+                              setState(() => isPrinterQueueOpen = false),
                         ),
                       ),
                     ),
@@ -142,7 +163,9 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    final hasFailedPrinters = widget.state.printJobs.any((job) => job.status == 'failed');
+    final hasFailedPrinters = widget.state.printJobs.any(
+      (job) => job.status == 'failed',
+    );
     final isCheckoutActive = selectedTableForCheckout != null;
 
     return Container(
@@ -150,7 +173,9 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: const BoxDecoration(
         color: EmpireColors.onyxSurface,
-        border: Border(bottom: BorderSide(color: EmpireColors.agedBronzeDark, width: 1)),
+        border: Border(
+          bottom: BorderSide(color: EmpireColors.agedBronzeDark, width: 1),
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -161,26 +186,39 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
               if (isCheckoutActive) ...[
                 // Back arrow to clear selection (comes first)
                 IconButton(
-                  icon: const Icon(Icons.arrow_back, color: EmpireColors.textPrimary),
+                  icon: const Icon(
+                    Icons.arrow_back,
+                    color: EmpireColors.textPrimary,
+                  ),
                   tooltip: 'Volver a Panel',
                   onPressed: () {
                     setState(() => selectedTableForCheckout = null);
                   },
                 ),
                 const SizedBox(width: 12),
-                
+
                 // Table Context Badge (with a small table_restaurant icon)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: EmpireColors.champagneGold.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: EmpireColors.champagneGold, width: 1),
+                    border: Border.all(
+                      color: EmpireColors.champagneGold,
+                      width: 1,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.table_restaurant, color: EmpireColors.champagneGold, size: 14),
+                      const Icon(
+                        Icons.table_restaurant,
+                        color: EmpireColors.champagneGold,
+                        size: 14,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         selectedTableForCheckout!.label.toUpperCase(),
@@ -197,41 +235,50 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
               ],
             ],
           ),
-          
+
           // Right Side: Sections + Tools
           Row(
             children: [
               // --- SUB-GROUP 1: Section Navigation ---
               Icon(
                 Icons.point_of_sale,
-                color: isCheckoutActive ? EmpireColors.textSecondary : EmpireColors.champagneGold,
+                color: isCheckoutActive
+                    ? EmpireColors.textSecondary
+                    : EmpireColors.champagneGold,
               ),
-              
+
               const SizedBox(width: 12),
-              
+
               // --- Divider ---
               Container(
                 height: 20,
                 width: 1.5,
                 color: EmpireColors.agedBronzeDark,
               ),
-              
+
               const SizedBox(width: 12),
-          
+
               // --- SUB-GROUP 2: Status & Tools ---
               Icon(
                 widget.state.isOnline ? Icons.wifi : Icons.wifi_off,
-                color: widget.state.isOnline ? EmpireColors.successGreen : EmpireColors.warningOrange,
+                color: widget.state.isOnline
+                    ? EmpireColors.successGreen
+                    : EmpireColors.warningOrange,
                 size: 20,
               ),
               if (!widget.state.isOnline) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: EmpireColors.warningOrange.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: EmpireColors.warningOrange.withOpacity(0.4)),
+                    border: Border.all(
+                      color: EmpireColors.warningOrange.withOpacity(0.4),
+                    ),
                   ),
                   child: Text(
                     '${widget.state.pendingSyncCount}',
@@ -243,7 +290,7 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                   ),
                 ),
               ],
-              
+
               if (!isCheckoutActive) ...[
                 const SizedBox(width: 16),
                 Stack(
@@ -251,14 +298,16 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                   children: [
                     IconButton(
                       icon: Icon(
-                        Icons.print, 
-                        color: hasFailedPrinters 
-                            ? EmpireColors.errorRed 
+                        Icons.print,
+                        color: hasFailedPrinters
+                            ? EmpireColors.errorRed
                             : EmpireColors.champagneGold,
                       ),
                       tooltip: 'Monitor de Impresoras',
                       onPressed: () {
-                        setState(() => isPrinterQueueOpen = !isPrinterQueueOpen);
+                        setState(
+                          () => isPrinterQueueOpen = !isPrinterQueueOpen,
+                        );
                       },
                     ),
                     if (hasFailedPrinters)
@@ -283,12 +332,15 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                       ),
                   ],
                 ),
-                
+
                 const SizedBox(width: 12),
-                
+
                 // Gear Menu Popup (Infrequent Actions)
                 PopupMenuButton<String>(
-                  icon: const Icon(Icons.settings, color: EmpireColors.champagneGold),
+                  icon: const Icon(
+                    Icons.settings,
+                    color: EmpireColors.champagneGold,
+                  ),
                   color: EmpireColors.onyxSurface,
                   surfaceTintColor: Colors.transparent,
                   offset: const Offset(0, 40),
@@ -296,14 +348,18 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                     if (value == 'logout') {
                       widget.state.logout();
                       Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (context) => LoginScreen(state: widget.state)),
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              LoginScreen(state: widget.state),
+                        ),
                       );
                     }
                   },
                   itemBuilder: (BuildContext context) => [
                     // Connection Simulator Switch in dropdown
                     PopupMenuItem<String>(
-                      enabled: false, // Make it non-clickable as a whole menu item, so the switch is interactive
+                      enabled:
+                          false, // Make it non-clickable as a whole menu item, so the switch is interactive
                       child: StatefulBuilder(
                         builder: (context, setStateDropdown) {
                           return Row(
@@ -311,11 +367,18 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                             children: [
                               const Row(
                                 children: [
-                                  Icon(Icons.sync_alt, color: EmpireColors.textSecondary, size: 18),
+                                  Icon(
+                                    Icons.sync_alt,
+                                    color: EmpireColors.textSecondary,
+                                    size: 18,
+                                  ),
                                   SizedBox(width: 8),
                                   Text(
-                                    'Simular Conexión', 
-                                    style: TextStyle(color: EmpireColors.textPrimary, fontSize: 13),
+                                    'Simular Conexión',
+                                    style: TextStyle(
+                                      color: EmpireColors.textPrimary,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -330,8 +393,10 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                                   setStateDropdown(() {});
                                 },
                                 activeColor: EmpireColors.successGreen,
-                                activeTrackColor: EmpireColors.successGreen.withOpacity(0.2),
-                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                activeTrackColor: EmpireColors.successGreen
+                                    .withOpacity(0.2),
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
                               ),
                             ],
                           );
@@ -343,11 +408,18 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                       value: 'logout',
                       child: Row(
                         children: [
-                          Icon(Icons.logout, color: EmpireColors.errorRed, size: 18),
+                          Icon(
+                            Icons.logout,
+                            color: EmpireColors.errorRed,
+                            size: 18,
+                          ),
                           SizedBox(width: 8),
                           Text(
-                            'Cerrar Sesión', 
-                            style: TextStyle(color: EmpireColors.textPrimary, fontSize: 13),
+                            'Cerrar Sesión',
+                            style: TextStyle(
+                              color: EmpireColors.textPrimary,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -384,12 +456,16 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
               selectedColor: EmpireColors.champagneGold,
               backgroundColor: EmpireColors.onyxSurface,
               labelStyle: TextStyle(
-                color: isSelected ? EmpireColors.obsidian : EmpireColors.textPrimary,
+                color: isSelected
+                    ? EmpireColors.obsidian
+                    : EmpireColors.textPrimary,
                 fontWeight: FontWeight.bold,
                 fontSize: 11,
               ),
               side: BorderSide(
-                color: isSelected ? EmpireColors.champagneGold : EmpireColors.agedBronzeDark,
+                color: isSelected
+                    ? EmpireColors.champagneGold
+                    : EmpireColors.agedBronzeDark,
                 width: 1,
               ),
             ),
@@ -405,7 +481,11 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.table_bar_outlined, color: EmpireColors.textSecondary, size: 48),
+            Icon(
+              Icons.table_bar_outlined,
+              color: EmpireColors.textSecondary,
+              size: 48,
+            ),
             SizedBox(height: 12),
             Text(
               'No hay mesas activas con los filtros seleccionados.',
@@ -428,12 +508,15 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
       itemBuilder: (context, index) {
         final table = activeTables[index];
         final isSelected = selectedTableForCheckout?.id == table.id;
-        
+
         return Container(
           decoration: isSelected
               ? BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: EmpireColors.champagneGold, width: 2),
+                  border: Border.all(
+                    color: EmpireColors.champagneGold,
+                    width: 2,
+                  ),
                 )
               : null,
           child: Card(
@@ -441,7 +524,9 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
               side: BorderSide(
-                color: table.state == TableState.billing ? EmpireColors.textGold : EmpireColors.agedBronzeDark,
+                color: table.state == TableState.billing
+                    ? EmpireColors.textGold
+                    : EmpireColors.agedBronzeDark,
                 width: table.state == TableState.billing ? 1.5 : 1,
               ),
             ),
@@ -461,7 +546,10 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: table.state == TableState.billing
                                 ? EmpireColors.warningOrange.withOpacity(0.15)
@@ -469,9 +557,13 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            table.state == TableState.billing ? 'POR COBRAR' : 'OCUPADA',
+                            table.state == TableState.billing
+                                ? 'POR COBRAR'
+                                : 'OCUPADA',
                             style: TextStyle(
-                              color: table.state == TableState.billing ? EmpireColors.warningOrange : EmpireColors.textSecondary,
+                              color: table.state == TableState.billing
+                                  ? EmpireColors.warningOrange
+                                  : EmpireColors.textSecondary,
                               fontSize: 9,
                               fontWeight: FontWeight.bold,
                             ),
@@ -479,24 +571,41 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                         ),
                         Text(
                           '${table.guests} Pax',
-                          style: const TextStyle(color: EmpireColors.textSecondary, fontSize: 10),
+                          style: const TextStyle(
+                            color: EmpireColors.textSecondary,
+                            fontSize: 10,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
                     Text(
                       table.label,
-                      style: const TextStyle(color: EmpireColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 18),
+                      style: const TextStyle(
+                        color: EmpireColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Zona: ${table.zone}',
-                      style: const TextStyle(color: EmpireColors.textSecondary, fontSize: 11),
+                      style: const TextStyle(
+                        color: EmpireColors.textSecondary,
+                        fontSize: 11,
+                      ),
                     ),
-                    const Divider(color: EmpireColors.agedBronzeDark, height: 16),
+                    const Divider(
+                      color: EmpireColors.agedBronzeDark,
+                      height: 16,
+                    ),
                     Text(
                       '\$${(table.subtotal * 1.16).toStringAsFixed(2)}',
-                      style: const TextStyle(color: EmpireColors.champagneGold, fontWeight: FontWeight.bold, fontSize: 15),
+                      style: const TextStyle(
+                        color: EmpireColors.champagneGold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
                     ),
                   ],
                 ),
