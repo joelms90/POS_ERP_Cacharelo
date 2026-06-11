@@ -88,9 +88,9 @@ This roadmap tracks the high-level phases and tasks of the **Offline-First POS A
 - [x] **T069** Update sync OpenAPI schema with registered device and auth audit fields
 - [x] **T070** Add offline recovery and sync troubleshooting runbook
 - [x] **T071** Add RDS Proxy deployment notes and required env variables
-- [ ] **T072** Run Flutter analyzer and tests for `apps/pos_flutter`
+- [x] **T072** Run Flutter analyzer and tests for `apps/pos_flutter`
 - [x] **T073** Run Lambda TypeScript tests and contract tests for `apps/sync_api`
-- [ ] **T074** Run PostgreSQL migration validation for `apps/sync_api/migrations/`
+- [x] **T074** Run PostgreSQL migration validation for `apps/sync_api/migrations/`
 - [ ] **T075** Validate quickstart end-to-end and record results
 
 ---

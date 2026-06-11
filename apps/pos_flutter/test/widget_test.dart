@@ -16,8 +16,7 @@ void main() {
     await tester.pumpWidget(MyApp(state: appState));
 
     // Verify that our login screen loads and displays the branding text.
-    expect(find.text('EMPIRE NOIR'), findsOneWidget);
+    expect(find.text('Grupo Cacharelo'), findsOneWidget);
     expect(find.text('INGRESAR CREDENCIAL'), findsOneWidget);
   });
 }
-

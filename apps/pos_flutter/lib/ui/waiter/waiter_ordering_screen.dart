@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../common/colors.dart';
 import '../common/app_state.dart';
-import '../widgets/offline_status_bar.dart';
 import '../widgets/table_node.dart';
 import '../widgets/menu_card.dart';
 import '../widgets/custom_toast.dart';
@@ -26,6 +25,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
   String selectedMenuCategory = 'Pastas';
   
   bool isPrinterQueueOpen = false;
+  bool isCartOpen = false;
 
   @override
   Widget build(BuildContext context) {
@@ -42,69 +42,59 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
               children: [
                 Column(
                   children: [
-                    // Network & Sync warnings
-                    OfflineStatusBar(
-                      state: widget.state,
-                      onOpenPrinterQueue: () {
-                        setState(() => isPrinterQueueOpen = true);
-                      },
-                    ),
-
-                    // Navigation / Header bar
+                    // Consolidated Navigation, Tools & Status Header
                     _buildHeader(context),
 
                     // Main Panel (Dynamic based on whether a table is selected for ordering)
                     Expanded(
                       child: Row(
                         children: [
-                          // Left side: Floor map OR Menu selection
+                          // Left side: Floor map OR Menu selection OR Full-screen Cart
                           Expanded(
                             flex: 3,
                             child: activeOrderingTable == null
                                 ? _buildFloorMap(tablesInZone)
-                                : _buildMenuSection(categories),
+                                : (isCartOpen
+                                    ? CartSidebar(
+                                        table: activeOrderingTable!,
+                                        initialItems: currentCart,
+                                        onBackToMenu: () => setState(() => isCartOpen = false),
+                                        onConfirm: (finalItems, guests) {
+                                          widget.state.submitOrder(activeOrderingTable!.id, finalItems, guests);
+                                          
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              backgroundColor: EmpireColors.successGreen,
+                                              content: Text(
+                                                '¡Pedido confirmado para la ${activeOrderingTable!.label}! Comanda enviada.',
+                                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                              ),
+                                            ),
+                                          );
+
+                                          setState(() {
+                                            activeOrderingTable = null;
+                                            currentCart = [];
+                                            isCartOpen = false;
+                                          });
+                                        },
+                                        onCancel: () {
+                                          setState(() {
+                                            activeOrderingTable = null;
+                                            currentCart = [];
+                                            isCartOpen = false;
+                                          });
+                                        },
+                                      )
+                                    : _buildMenuSection(categories)),
                           ),
 
-                          // Right side: Details sidebar or general stats
-                          if (activeOrderingTable != null)
+                          // Right side: Info sidebar (only when no table is selected and cart is closed)
+                          if (activeOrderingTable == null)
                             Expanded(
                               flex: 1,
-                              child: Container(
-                                decoration: const BoxDecoration(
-                                  border: Border(left: BorderSide(color: EmpireColors.agedBronzeDark, width: 1.5)),
-                                ),
-                                child: CartSidebar(
-                                  table: activeOrderingTable!,
-                                  initialItems: currentCart,
-                                  onConfirm: (finalItems, guests) {
-                                    widget.state.submitOrder(activeOrderingTable!.id, finalItems, guests);
-                                    
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        backgroundColor: EmpireColors.successGreen,
-                                        content: Text(
-                                          '¡Pedido confirmado para la ${activeOrderingTable!.label}! Comanda enviada.',
-                                          style: const TextStyle(fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                    );
-
-                                    setState(() {
-                                      activeOrderingTable = null;
-                                      currentCart = [];
-                                    });
-                                  },
-                                  onCancel: () {
-                                    setState(() {
-                                      activeOrderingTable = null;
-                                      currentCart = [];
-                                    });
-                                  },
-                                ),
-                              ),
-                            )
-                          else
-                            _buildInfoSidebar(),
+                              child: _buildInfoSidebar(),
+                            ),
                         ],
                       ),
                     ),
@@ -147,12 +137,30 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
           },
         ),
       ),
+      floatingActionButton: activeOrderingTable != null && !isCartOpen
+          ? FloatingActionButton.extended(
+              onPressed: () => setState(() => isCartOpen = true),
+              backgroundColor: EmpireColors.champagneGold,
+              icon: const Icon(Icons.shopping_basket, color: EmpireColors.obsidian),
+              label: Text(
+                'VER COMANDA (${currentCart.fold<int>(0, (sum, i) => sum + i.quantity)}) - \$${currentCart.fold<double>(0.0, (sum, i) => sum + i.totalPrice).toStringAsFixed(2)}',
+                style: const TextStyle(
+                  color: EmpireColors.obsidian,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            )
+          : null,
     );
   }
 
   Widget _buildHeader(BuildContext context) {
+    final hasFailedPrinters = widget.state.printJobs.any((job) => job.status == 'failed');
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: const BoxDecoration(
         color: EmpireColors.onyxSurface,
         border: Border(bottom: BorderSide(color: EmpireColors.agedBronzeDark, width: 1)),
@@ -160,63 +168,242 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Left Side: Context & Action
           Row(
             children: [
               if (activeOrderingTable != null) ...[
-                OutlinedButton.icon(
+                // Back arrow - context-dependent back navigation (comes first)
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: EmpireColors.textPrimary),
+                  tooltip: isCartOpen ? 'Volver al Menú' : 'Volver al Mapa',
                   onPressed: () {
                     setState(() {
-                      activeOrderingTable = null;
-                      currentCart = [];
+                      if (isCartOpen) {
+                        isCartOpen = false;
+                      } else {
+                        activeOrderingTable = null;
+                        currentCart = [];
+                      }
                     });
                   },
-                  icon: const Icon(Icons.arrow_back, size: 16),
-                  label: const Text('VOLVER AL MAPA'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+                const SizedBox(width: 12),
+                
+                // Table Context Badge (with a small table_restaurant icon)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: EmpireColors.champagneGold.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: EmpireColors.champagneGold, width: 1),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.table_restaurant, color: EmpireColors.champagneGold, size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        activeOrderingTable!.label.toUpperCase(),
+                        style: const TextStyle(
+                          color: EmpireColors.champagneGold,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 20),
               ],
-              Text(
-                activeOrderingTable == null
-                    ? 'DISTRIBUCIÓN DE MESAS'
-                    : 'CREAR PEDIDO: ${activeOrderingTable!.label}',
-                style: Theme.of(context).appBarTheme.titleTextStyle,
-              ),
             ],
           ),
           
-          // User Details and controls
+          // Right Side: Sections + Tools
           Row(
             children: [
-              Text(
-                widget.state.currentUserName,
-                style: const TextStyle(
-                  color: EmpireColors.textGold,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
+              // --- SUB-GROUP 1: Section Navigation ---
+              IconButton(
+                icon: Icon(
+                  Icons.table_bar, 
+                  color: activeOrderingTable == null 
+                      ? EmpireColors.champagneGold 
+                      : EmpireColors.textSecondary,
                 ),
+                tooltip: 'Distribución de Mesas',
+                onPressed: activeOrderingTable == null 
+                    ? null 
+                    : () {
+                        setState(() {
+                          activeOrderingTable = null;
+                          currentCart = [];
+                          isCartOpen = false;
+                        });
+                      },
               ),
-              const SizedBox(width: 20),
-              IconButton(
-                onPressed: () {
-                  setState(() => isPrinterQueueOpen = !isPrinterQueueOpen);
-                },
-                icon: const Icon(Icons.print, color: EmpireColors.champagneGold),
-                tooltip: 'Monitor Impresoras',
+              if (activeOrderingTable != null) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: Icon(
+                    Icons.shopping_basket,
+                    color: isCartOpen 
+                        ? EmpireColors.champagneGold 
+                        : EmpireColors.textSecondary,
+                  ),
+                  tooltip: 'Detalle de Comanda',
+                  onPressed: () {
+                    setState(() => isCartOpen = !isCartOpen);
+                  },
+                ),
+              ],
+              
+              const SizedBox(width: 12),
+              
+              // --- Divider ---
+              Container(
+                height: 20,
+                width: 1.5,
+                color: EmpireColors.agedBronzeDark,
               ),
-              const SizedBox(width: 10),
-              IconButton(
-                onPressed: () {
-                  widget.state.logout();
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => LoginScreen(state: widget.state)),
-                  );
-                },
-                icon: const Icon(Icons.logout, color: EmpireColors.errorRed),
-                tooltip: 'Cerrar Sesión',
+              
+              const SizedBox(width: 12),
+              
+              // --- SUB-GROUP 2: Status & Tools ---
+              Icon(
+                widget.state.isOnline ? Icons.wifi : Icons.wifi_off,
+                color: widget.state.isOnline ? EmpireColors.successGreen : EmpireColors.warningOrange,
+                size: 20,
               ),
+              if (!widget.state.isOnline) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: EmpireColors.warningOrange.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: EmpireColors.warningOrange.withOpacity(0.4)),
+                  ),
+                  child: Text(
+                    '${widget.state.pendingSyncCount}',
+                    style: const TextStyle(
+                      color: EmpireColors.warningOrange,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ],
+              
+              if (!isCartOpen) ...[
+                const SizedBox(width: 16),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.print, 
+                        color: hasFailedPrinters 
+                            ? EmpireColors.errorRed 
+                            : EmpireColors.champagneGold,
+                      ),
+                      tooltip: 'Monitor de Impresoras',
+                      onPressed: () {
+                        setState(() => isPrinterQueueOpen = !isPrinterQueueOpen);
+                      },
+                    ),
+                    if (hasFailedPrinters)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: EmpireColors.errorRed,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '${widget.state.printJobs.where((j) => j.status == 'failed').length}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                
+                const SizedBox(width: 12),
+                
+                // Gear Menu Popup (Infrequent Actions)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.settings, color: EmpireColors.champagneGold),
+                  color: EmpireColors.onyxSurface,
+                  surfaceTintColor: Colors.transparent,
+                  offset: const Offset(0, 40),
+                  onSelected: (value) {
+                    if (value == 'logout') {
+                      widget.state.logout();
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(builder: (context) => LoginScreen(state: widget.state)),
+                      );
+                    }
+                  },
+                  itemBuilder: (BuildContext context) => [
+                    // Connection Simulator Switch in dropdown
+                    PopupMenuItem<String>(
+                      enabled: false, // Make it non-clickable as a whole menu item, so the switch is interactive
+                      child: StatefulBuilder(
+                        builder: (context, setStateDropdown) {
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.sync_alt, color: EmpireColors.textSecondary, size: 18),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Simular Conexión', 
+                                    style: TextStyle(color: EmpireColors.textPrimary, fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                              Switch(
+                                value: widget.state.isOnline,
+                                onChanged: (val) {
+                                  widget.state.toggleConnection();
+                                  if (widget.state.isOnline) {
+                                    widget.state.syncOfflineTransactions();
+                                  }
+                                  setState(() {});
+                                  setStateDropdown(() {});
+                                },
+                                activeColor: EmpireColors.successGreen,
+                                activeTrackColor: EmpireColors.successGreen.withOpacity(0.2),
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                    const PopupMenuDivider(height: 1),
+                    const PopupMenuItem<String>(
+                      value: 'logout',
+                      child: Row(
+                        children: [
+                          Icon(Icons.logout, color: EmpireColors.errorRed, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Cerrar Sesión', 
+                            style: TextStyle(color: EmpireColors.textPrimary, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ],
@@ -309,12 +496,13 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                               setState(() {
                                 activeOrderingTable = table;
                                 currentCart = List.from(table.items);
+                                isCartOpen = false;
                               });
                             }
                           },
                         ),
                       );
-                    }).toList(),
+                    }),
                   ],
                 );
               },
@@ -423,48 +611,50 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
 
     return Container(
       color: EmpireColors.onyxSurface,
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Estado de Sala',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: EmpireColors.champagneGold,
-              fontWeight: FontWeight.bold,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Estado de Sala',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: EmpireColors.champagneGold,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          _buildInfoStatCard('Mesas Libres', '$freeCount', EmpireColors.agedBronze),
-          const SizedBox(height: 16),
-          _buildInfoStatCard('Mesas Ocupadas', '$occupiedCount', EmpireColors.champagneGold),
-          const SizedBox(height: 16),
-          _buildInfoStatCard('Por Cobrar', '$billingCount', EmpireColors.textGold),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: EmpireColors.charcoalSurface,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: EmpireColors.agedBronzeDark, width: 1),
+            const SizedBox(height: 16),
+            _buildInfoStatCard('Mesas Libres', '$freeCount', EmpireColors.agedBronze),
+            const SizedBox(height: 12),
+            _buildInfoStatCard('Mesas Ocupadas', '$occupiedCount', EmpireColors.champagneGold),
+            const SizedBox(height: 12),
+            _buildInfoStatCard('Por Cobrar', '$billingCount', EmpireColors.textGold),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: EmpireColors.charcoalSurface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: EmpireColors.agedBronzeDark, width: 1),
+              ),
+              child: const Column(
+                children: [
+                  Icon(Icons.info_outline, color: EmpireColors.champagneGold, size: 24),
+                  SizedBox(height: 10),
+                  Text(
+                    'Instrucciones de Servicio:',
+                    style: TextStyle(color: EmpireColors.champagneGold, fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    '1. Selecciona una mesa libre para tomar un pedido.\n2. Si el icono de cocina arriba parpadea, hay platillos listos para servir.\n3. Presiona en mesas ocupadas para agregar artículos o solicitar facturación.',
+                    style: TextStyle(color: EmpireColors.textSecondary, fontSize: 11, height: 1.5),
+                  ),
+                ],
+              ),
             ),
-            child: const Column(
-              children: [
-                Icon(Icons.info_outline, color: EmpireColors.champagneGold, size: 24),
-                SizedBox(height: 10),
-                Text(
-                  'Instrucciones de Servicio:',
-                  style: TextStyle(color: EmpireColors.champagneGold, fontWeight: FontWeight.bold, fontSize: 12),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  '1. Selecciona una mesa libre para tomar un pedido.\n2. Si el icono de cocina arriba parpadea, hay platillos listos para servir.\n3. Presiona en mesas ocupadas para agregar artículos o solicitar facturación.',
-                  style: TextStyle(color: EmpireColors.textSecondary, fontSize: 11, height: 1.5),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

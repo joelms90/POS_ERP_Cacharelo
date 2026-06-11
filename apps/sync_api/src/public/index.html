@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Empire POS | Panel de Administración</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --obsidian: #0b0b0c;
+      --onyx: #161618;
+      --charcoal: #222225;
+      --gold: #d4af37;
+      --gold-light: #f3e5ab;
+      --bronze: #8c7853;
+      --bronze-dark: #2a2415;
+      --text-primary: #eaeaea;
+      --text-secondary: #a0a0a0;
+      --success: #4caf50;
+      --error: #e53935;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--obsidian);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      line-height: 1.6;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      border-bottom: 1px solid var(--bronze-dark);
+      padding-bottom: 24px;
+      margin-bottom: 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo-icon {
+      border: 1.5px solid var(--gold);
+      border-radius: 4px;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-icon svg {
+      fill: var(--gold);
+      width: 24px;
+      height: 24px;
+    }
+
+    h1 {
+      font-family: 'Bodoni Moda', serif;
+      font-size: 2.2rem;
+      letter-spacing: 2px;
+      color: var(--gold);
+      font-weight: 600;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-top: 4px;
+    }
+
+    .api-badge {
+      background-color: var(--bronze-dark);
+      border: 1px solid var(--bronze);
+      color: var(--gold-light);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .api-badge span {
+      width: 8px;
+      height: 8px;
+      background-color: var(--success);
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 8px var(--success);
+    }
+
+    /* Auth Screen styling */
+    .auth-container {
+      max-width: 400px;
+      margin: 100px auto;
+    }
+
+    .auth-title {
+      font-family: 'Bodoni Moda', serif;
+      color: var(--gold);
+      text-align: center;
+      font-size: 1.8rem;
+      margin-bottom: 24px;
+    }
+
+    /* Main Dashboard Grid */
+    .dashboard-panel {
+      display: none; /* Hidden by default until authenticated */
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 40px;
+    }
+
+    @media (max-width: 900px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--onyx);
+      border: 1px solid var(--bronze-dark);
+      border-radius: 12px;
+      padding: 32px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-title {
+      font-family: 'Bodoni Moda', serif;
+      color: var(--gold);
+      font-size: 1.4rem;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--bronze-dark);
+      padding-bottom: 12px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input, select {
+      width: 100%;
+      background-color: var(--obsidian);
+      border: 1px solid var(--bronze-dark);
+      color: var(--text-primary);
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: 'Inter', sans-serif;
+      transition: border-color 0.3s;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--gold);
+    }
+
+    button {
+      width: 100%;
+      background-color: var(--gold);
+      color: var(--obsidian);
+      border: none;
+      padding: 14px 24px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      transition: background-color 0.3s, transform 0.1s;
+    }
+
+    button:hover {
+      background-color: #e5c158;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logout-link {
+      color: var(--error);
+      text-decoration: underline;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background: none;
+      border: none;
+      width: auto;
+      padding: 0;
+    }
+
+    .logout-link:hover {
+      color: #ff5252;
+      background: none;
+    }
+
+    .user-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 20px;
+    }
+
+    .user-card {
+      background-color: var(--charcoal);
+      border: 1px solid var(--bronze-dark);
+      border-radius: 8px;
+      padding: 20px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 150px;
+    }
+
+    .user-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .user-name {
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: var(--text-primary);
+    }
+
+    .role-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .role-waiter {
+      background-color: rgba(212, 175, 55, 0.15);
+      color: var(--gold);
+      border: 1px solid var(--gold);
+    }
+
+    .role-cashier {
+      background-color: rgba(140, 120, 83, 0.15);
+      color: #e5c158;
+      border: 1px solid var(--bronze);
+    }
+
+    .role-kitchen {
+      background-color: rgba(76, 175, 80, 0.15);
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+
+    .user-pin {
+      font-family: monospace;
+      font-size: 1.2rem;
+      letter-spacing: 2px;
+      color: var(--gold-light);
+      margin-top: 8px;
+    }
+
+    .delete-btn {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background-color: rgba(229, 57, 53, 0.1);
+      border: 1px solid var(--error);
+      color: var(--error);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .delete-btn:hover {
+      background-color: var(--error);
+      color: var(--text-primary);
+    }
+
+    .notification {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .notification-success {
+      background-color: rgba(76, 175, 80, 0.15);
+      border: 1px solid var(--success);
+      color: var(--success);
+    }
+
+    .notification-error {
+      background-color: rgba(229, 57, 53, 0.15);
+      border: 1px solid var(--error);
+      color: var(--error);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo-container">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm8-3h-3V2h-2v12h3v8h2v-8h1V6c0-1.1-.9-2-2-2z"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Grupo Cacharelo</h1>
+          <div class="subtitle">Panel de Gestión de Usuarios y Accesos</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="logoutBtn" class="logout-link" onclick="logout()" style="display: none;">Cerrar Sesión Admin</button>
+        <div class="api-badge">
+          <span></span> Servidor de Sincronización POS Activo
+        </div>
+      </div>
+    </header>
+
+    <div id="notification" class="notification"></div>
+
+    <!-- 1. AUTH SCREEN -->
+    <div id="authPanel" class="auth-container">
+      <div class="card">
+        <h2 class="auth-title">Autenticación Requerida</h2>
+        <form id="authForm">
+          <div class="form-group">
+            <label for="adminPassword">Contraseña de Administrador</label>
+            <input type="password" id="adminPassword" required placeholder="Por defecto: admin123">
+          </div>
+          <button type="submit">DESBLOQUEAR CONTROLES</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 2. DASHBOARD PANEL -->
+    <div id="dashboardPanel" class="dashboard-panel">
+      <div class="main-grid">
+        <!-- User Creation Form -->
+        <div class="card">
+          <h2 class="card-title">Registrar Nuevo Acceso</h2>
+          <form id="userForm">
+            <div class="form-group">
+              <label for="name">Nombre de Empleado</label>
+              <input type="text" id="name" required placeholder="Ej. Juan Pérez">
+            </div>
+            <div class="form-group">
+              <label for="pin">Código PIN (4 Dígitos)</label>
+              <input type="text" id="pin" required maxlength="4" placeholder="Ej. 1234">
+            </div>
+            <div class="form-group">
+              <label for="role">Puesto / Rol</label>
+              <select id="role" required>
+                <option value="waiter">Mesero (Waiter)</option>
+                <option value="cashier">Cajero (Cashier)</option>
+                <option value="kitchen">Pantalla Cocina (Kitchen)</option>
+              </select>
+            </div>
+            <button type="submit">DAR DE ALTA ACCESO</button>
+          </form>
+        </div>
+
+        <!-- Users Grid -->
+        <div class="card">
+          <h2 class="card-title">Accesos Registrados</h2>
+          <div id="usersContainer" class="user-list">
+            <!-- User cards injected dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = '/api';
+    const authForm = document.getElementById('authForm');
+    const userForm = document.getElementById('userForm');
+    const authPanel = document.getElementById('authPanel');
+    const dashboardPanel = document.getElementById('dashboardPanel');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const usersContainer = document.getElementById('usersContainer');
+    const notification = document.getElementById('notification');
+
+    // Check if token exists on boot
+    let adminToken = localStorage.getItem('adminToken');
+    if (adminToken) {
+      showDashboard();
+    }
+
+    function showNotification(message, isSuccess = true) {
+      notification.textContent = message;
+      notification.className = `notification ${isSuccess ? 'notification-success' : 'notification-error'}`;
+      notification.style.display = 'block';
+      setTimeout(() => {
+        notification.style.display = 'none';
+      }, 4000);
+    }
+
+    function showDashboard() {
+      authPanel.style.display = 'none';
+      dashboardPanel.style.display = 'block';
+      logoutBtn.style.display = 'block';
+      fetchUsers();
+    }
+
+    function logout() {
+      localStorage.removeItem('adminToken');
+      adminToken = null;
+      authPanel.style.display = 'block';
+      dashboardPanel.style.display = 'none';
+      logoutBtn.style.display = 'none';
+      showNotification('Sesión de administrador cerrada.');
+    }
+
+    // Auth Submit
+    authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const password = document.getElementById('adminPassword').value;
+
+      try {
+        const response = await fetch(`${API_URL}/auth/admin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          adminToken = data.token;
+          localStorage.setItem('adminToken', adminToken);
+          authForm.reset();
+          showDashboard();
+          showNotification('Panel desbloqueado correctamente.');
+        } else {
+          showNotification(data.error || 'Contraseña incorrecta', false);
+        }
+      } catch (error) {
+        showNotification('Error al verificar credenciales de administrador', false);
+      }
+    });
+
+    // Fetch users (Protected with header)
+    async function fetchUsers() {
+      try {
+        const response = await fetch(`${API_URL}/users`, {
+          headers: {
+            'X-Admin-Token': adminToken
+          }
+        });
+
+        if (response.status === 401) {
+          logout();
+          showNotification('Sesión expirada. Inicie sesión nuevamente.', false);
+          return;
+        }
+
+        const users = await response.json();
+        renderUsers(users);
+      } catch (error) {
+        showNotification('Error al conectar con la base de datos de usuarios', false);
+      }
+    }
+
+    function renderUsers(users) {
+      usersContainer.innerHTML = '';
+      users.forEach(user => {
+        const roleLabels = {
+          waiter: 'Mesero',
+          cashier: 'Cajero',
+          kitchen: 'Cocina'
+        };
+
+        const card = document.createElement('div');
+        card.className = 'user-card';
+        card.innerHTML = `
+          <div class="user-card-header">
+            <div>
+              <div class="user-name">${user.name}</div>
+              <div class="user-pin">${user.pin}</div>
+            </div>
+            <span class="role-badge role-${user.role}">${roleLabels[user.role]}</span>
+          </div>
+          <button class="delete-btn" onclick="deleteUser('${user.id}')" title="Eliminar Acceso">
+            <svg style="width:16px;height:16px" viewBox="0 0 24 24">
+              <path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" />
+            </svg>
+          </button>
+        `;
+        usersContainer.appendChild(card);
+      });
+    }
+
+    // Add User (Protected with header)
+    userForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name').value;
+      const pin = document.getElementById('pin').value;
+      const role = document.getElementById('role').value;
+
+      try {
+        const response = await fetch(`${API_URL}/users`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Admin-Token': adminToken
+          },
+          body: JSON.stringify({ name, pin, role })
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+          showNotification('¡Acceso registrado correctamente!');
+          userForm.reset();
+          fetchUsers();
+        } else {
+          showNotification(data.error || 'Error al guardar el usuario', false);
+        }
+      } catch (error) {
+        showNotification('Error al enviar el formulario', false);
+      }
+    });
+
+    // Delete User (Protected with header)
+    async function deleteUser(id) {
+      if (!confirm('¿Seguro que deseas revocar el acceso de este usuario?')) return;
+      
+      try {
+        const response = await fetch(`${API_URL}/users/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'X-Admin-Token': adminToken
+          }
+        });
+
+        if (response.ok) {
+          showNotification('Acceso revocado con éxito');
+          fetchUsers();
+        } else {
+          const data = await response.json();
+          showNotification(data.error || 'Error al eliminar el acceso', false);
+        }
+      } catch (error) {
+        showNotification('Error al eliminar el acceso', false);
+      }
+    }
+  </script>
+</body>
+</html>

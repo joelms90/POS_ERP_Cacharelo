@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../common/colors.dart';
 import '../common/app_state.dart';
-import '../widgets/offline_status_bar.dart';
-import '../widgets/table_node.dart';
 import '../widgets/printer_monitor_panel.dart';
 import '../login_screen.dart';
 import 'shift_control_panel.dart';
@@ -45,13 +43,8 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
               children: [
                 Column(
                   children: [
-                    // Network Sync alerts
-                    OfflineStatusBar(
-                      state: widget.state,
-                      onOpenPrinterQueue: () {
-                        setState(() => isPrinterQueueOpen = true);
-                      },
-                    ),
+                    // Consolidated Navigation, Tools & Status Header
+                    _buildHeader(context),
 
                     // Main dashboard workspace
                     Expanded(
@@ -74,7 +67,6 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                _buildHeader(context),
                                 _buildFilterBar(),
                                 
                                 // Table grid
@@ -150,8 +142,12 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final hasFailedPrinters = widget.state.printJobs.any((job) => job.status == 'failed');
+    final isCheckoutActive = selectedTableForCheckout != null;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: const BoxDecoration(
         color: EmpireColors.onyxSurface,
         border: Border(bottom: BorderSide(color: EmpireColors.agedBronzeDark, width: 1)),
@@ -159,30 +155,206 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            'CONTROL DE FACTURACIÓN',
-            style: Theme.of(context).appBarTheme.titleTextStyle,
-          ),
+          // Left Side: Context & Action
           Row(
             children: [
-              IconButton(
-                onPressed: () {
-                  setState(() => isPrinterQueueOpen = !isPrinterQueueOpen);
-                },
-                icon: const Icon(Icons.print, color: EmpireColors.champagneGold),
-                tooltip: 'Monitor Impresoras',
+              if (isCheckoutActive) ...[
+                // Back arrow to clear selection (comes first)
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: EmpireColors.textPrimary),
+                  tooltip: 'Volver a Panel',
+                  onPressed: () {
+                    setState(() => selectedTableForCheckout = null);
+                  },
+                ),
+                const SizedBox(width: 12),
+                
+                // Table Context Badge (with a small table_restaurant icon)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: EmpireColors.champagneGold.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: EmpireColors.champagneGold, width: 1),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.table_restaurant, color: EmpireColors.champagneGold, size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        selectedTableForCheckout!.label.toUpperCase(),
+                        style: const TextStyle(
+                          color: EmpireColors.champagneGold,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          
+          // Right Side: Sections + Tools
+          Row(
+            children: [
+              // --- SUB-GROUP 1: Section Navigation ---
+              Icon(
+                Icons.point_of_sale,
+                color: isCheckoutActive ? EmpireColors.textSecondary : EmpireColors.champagneGold,
               ),
-              const SizedBox(width: 10),
-              IconButton(
-                onPressed: () {
-                  widget.state.logout();
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => LoginScreen(state: widget.state)),
-                  );
-                },
-                icon: const Icon(Icons.logout, color: EmpireColors.errorRed),
-                tooltip: 'Cerrar Sesión',
+              
+              const SizedBox(width: 12),
+              
+              // --- Divider ---
+              Container(
+                height: 20,
+                width: 1.5,
+                color: EmpireColors.agedBronzeDark,
               ),
+              
+              const SizedBox(width: 12),
+          
+              // --- SUB-GROUP 2: Status & Tools ---
+              Icon(
+                widget.state.isOnline ? Icons.wifi : Icons.wifi_off,
+                color: widget.state.isOnline ? EmpireColors.successGreen : EmpireColors.warningOrange,
+                size: 20,
+              ),
+              if (!widget.state.isOnline) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: EmpireColors.warningOrange.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: EmpireColors.warningOrange.withOpacity(0.4)),
+                  ),
+                  child: Text(
+                    '${widget.state.pendingSyncCount}',
+                    style: const TextStyle(
+                      color: EmpireColors.warningOrange,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ],
+              
+              if (!isCheckoutActive) ...[
+                const SizedBox(width: 16),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.print, 
+                        color: hasFailedPrinters 
+                            ? EmpireColors.errorRed 
+                            : EmpireColors.champagneGold,
+                      ),
+                      tooltip: 'Monitor de Impresoras',
+                      onPressed: () {
+                        setState(() => isPrinterQueueOpen = !isPrinterQueueOpen);
+                      },
+                    ),
+                    if (hasFailedPrinters)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: EmpireColors.errorRed,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '${widget.state.printJobs.where((j) => j.status == 'failed').length}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                
+                const SizedBox(width: 12),
+                
+                // Gear Menu Popup (Infrequent Actions)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.settings, color: EmpireColors.champagneGold),
+                  color: EmpireColors.onyxSurface,
+                  surfaceTintColor: Colors.transparent,
+                  offset: const Offset(0, 40),
+                  onSelected: (value) {
+                    if (value == 'logout') {
+                      widget.state.logout();
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(builder: (context) => LoginScreen(state: widget.state)),
+                      );
+                    }
+                  },
+                  itemBuilder: (BuildContext context) => [
+                    // Connection Simulator Switch in dropdown
+                    PopupMenuItem<String>(
+                      enabled: false, // Make it non-clickable as a whole menu item, so the switch is interactive
+                      child: StatefulBuilder(
+                        builder: (context, setStateDropdown) {
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.sync_alt, color: EmpireColors.textSecondary, size: 18),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Simular Conexión', 
+                                    style: TextStyle(color: EmpireColors.textPrimary, fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                              Switch(
+                                value: widget.state.isOnline,
+                                onChanged: (val) {
+                                  widget.state.toggleConnection();
+                                  if (widget.state.isOnline) {
+                                    widget.state.syncOfflineTransactions();
+                                  }
+                                  setState(() {});
+                                  setStateDropdown(() {});
+                                },
+                                activeColor: EmpireColors.successGreen,
+                                activeTrackColor: EmpireColors.successGreen.withOpacity(0.2),
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                    const PopupMenuDivider(height: 1),
+                    const PopupMenuItem<String>(
+                      value: 'logout',
+                      child: Row(
+                        children: [
+                          Icon(Icons.logout, color: EmpireColors.errorRed, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Cerrar Sesión', 
+                            style: TextStyle(color: EmpireColors.textPrimary, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ],

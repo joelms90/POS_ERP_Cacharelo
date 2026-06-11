@@ -1,0 +1,9 @@
+# GCP Settings
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+
+# Database Passwords (use strong values)
+db_password = "SuperSecureDatabasePassword123!"
+
+# Admin Passcode for Dashboard
+admin_password = "SecureAdminDashboardPasscode"

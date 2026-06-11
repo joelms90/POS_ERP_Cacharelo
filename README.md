@@ -41,6 +41,32 @@ graph TD
 - **Printing**: Raw ESC/POS generation with platform adapters (USB on Windows; Bluetooth/Network on Android).
 - **Backend API**: [sync_api](file:///Users/joelmorales/web/POS-ERP/apps/sync_api) — TypeScript Node.js 22.x running on AWS Lambda.
 - **Cloud Database**: AWS RDS PostgreSQL connected securely through **AWS RDS Proxy** to manage connection spikes.
+- **Database Migrations & Seeds**: Powered by [Knex.js](file:///Users/joelmorales/web/POS-ERP/apps/sync_api/knexfile.ts) with local database schemas defined in [apps/sync_api/migrations/](file:///Users/joelmorales/web/POS-ERP/apps/sync_api/migrations) and seeded via [apps/sync_api/seeds/](file:///Users/joelmorales/web/POS-ERP/apps/sync_api/seeds).
+
+---
+
+## 🛠️ Dev Commands Quick Reference (Makefile)
+
+We use a root-level [Makefile](file:///Users/joelmorales/web/POS-ERP/Makefile) to simplify local development, testing, and deployment.
+
+### Setup & Dev
+* `make install` - Install Node.js backend and Flutter frontend dependencies.
+* `make dev-backend` - Start Express API with watch/hot-reload mode.
+* `make dev-frontend` - Start the Flutter client application.
+
+### Local Database
+* `make db-up` - Boot local Postgres Docker container.
+* `make db-down` - Stop Postgres Docker container.
+* `make db-status` - View status of Postgres Docker container.
+* `make db-migrate` - Run pending migrations.
+* `make db-seed` - Run seed files.
+* `make db-rollback` - Rollback last batch of migrations.
+* `make db-reset` - Recreate, migrate, and seed the local database.
+
+### Quality & Deploy
+* `make lint` - Run `flutter analyze` on the client application.
+* `make test` - Run client unit/widget tests.
+* `make infra-init` / `infra-plan` / `infra-apply` - Manage GCP infrastructure via Terraform.
 
 ---
 

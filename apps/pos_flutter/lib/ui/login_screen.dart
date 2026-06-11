@@ -51,12 +51,12 @@ class _LoginScreenState extends State<LoginScreen> {
   void _processLogin() async {
     // Simulate brief processing time for premium feel
     await Future.delayed(const Duration(milliseconds: 300));
-    
-    final success = widget.state.login(pin);
+
+    final success = await widget.state.login(pin);
     if (success) {
       _handleClear();
       Widget nextScreen;
-      
+
       switch (widget.state.currentUserRole) {
         case UserRole.waiter:
           nextScreen = WaiterOrderingScreen(state: widget.state);
@@ -75,13 +75,20 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              const begin = Offset(0.0, 1.0);
-              const end = Offset.zero;
-              const curve = Curves.easeInOutQuart;
-              var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-              return SlideTransition(position: animation.drive(tween), child: child);
-            },
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  const begin = Offset(0.0, 1.0);
+                  const end = Offset.zero;
+                  const curve = Curves.easeInOutQuart;
+                  var tween = Tween(
+                    begin: begin,
+                    end: end,
+                  ).chain(CurveTween(curve: curve));
+                  return SlideTransition(
+                    position: animation.drive(tween),
+                    child: child,
+                  );
+                },
             transitionDuration: const Duration(milliseconds: 600),
           ),
         );
@@ -123,7 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
               listenable: widget.state,
               builder: (context, _) => OfflineStatusBar(state: widget.state),
             ),
-            
+
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -132,19 +139,24 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       // Left branding side (takes full width if portrait)
                       if (isLandscape)
-                        Expanded(
-                          flex: 12,
-                          child: _buildBrandingPanel(),
-                        ),
-                      
+                        Expanded(flex: 12, child: _buildBrandingPanel()),
+
                       // Right Keypad side
                       Expanded(
                         flex: 10,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 40,
+                            vertical: 20,
+                          ),
                           decoration: BoxDecoration(
                             border: isLandscape
-                                ? const Border(left: BorderSide(color: EmpireColors.agedBronzeDark, width: 1.5))
+                                ? const Border(
+                                    left: BorderSide(
+                                      color: EmpireColors.agedBronzeDark,
+                                      width: 1.5,
+                                    ),
+                                  )
                                 : null,
                           ),
                           child: Center(
@@ -154,33 +166,42 @@ class _LoginScreenState extends State<LoginScreen> {
                                 children: [
                                   Text(
                                     'INGRESAR CREDENCIAL',
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: EmpireColors.textGold,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1.5,
-                                      fontSize: 11,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: EmpireColors.textGold,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.5,
+                                          fontSize: 11,
+                                        ),
                                   ),
                                   const SizedBox(height: 30),
-                                  
+
                                   // PIN Code indicators
                                   _buildPinIndicators(),
-                                  
+
                                   const SizedBox(height: 20),
-                                  
+
                                   if (hasError)
                                     Text(
                                       errorMessage,
-                                      style: const TextStyle(color: EmpireColors.errorRed, fontSize: 13, fontWeight: FontWeight.bold),
+                                      style: const TextStyle(
+                                        color: EmpireColors.errorRed,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     )
                                   else
                                     const SizedBox(height: 18),
-                                    
+
                                   const SizedBox(height: 30),
-                                  
+
                                   // Numeric Keyboard
                                   Container(
-                                    constraints: const BoxConstraints(maxWidth: 320),
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 320,
+                                    ),
                                     child: _buildKeypadGrid(),
                                   ),
 
@@ -219,63 +240,70 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border.all(color: EmpireColors.champagneGold, width: 1.5),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: const Icon(
-              Icons.restaurant_menu,
-              color: EmpireColors.champagneGold,
-              size: 40,
-            ),
-          ),
-          const SizedBox(height: 40),
-          Text(
-            'EMPIRE NOIR',
-            style: Theme.of(context).textTheme.displayLarge?.copyWith(
-              fontSize: 48,
-              letterSpacing: 3,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: 80,
-            height: 1,
-            color: EmpireColors.champagneGold,
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Sistema de Punto de Venta y Gestión de Recursos. Diseñado con autoría local para operación continua offline.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: EmpireColors.textSecondary,
-              height: 1.6,
-            ),
-          ),
-          const SizedBox(height: 40),
-          Row(
-            children: [
-              const Icon(Icons.wifi_off, color: EmpireColors.agedBronze, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Seguridad Offline-First Activa',
-                  style: TextStyle(
-                    color: EmpireColors.agedBronze.withOpacity(0.9),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: EmpireColors.champagneGold,
+                    width: 1.5,
                   ),
+                  borderRadius: BorderRadius.circular(4),
                 ),
+                child: const Icon(
+                  Icons.restaurant_menu,
+                  color: EmpireColors.champagneGold,
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 40),
+              Text(
+                'Grupo Cacharelo',
+                style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                  fontSize: 48,
+                  letterSpacing: 3,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: 80,
+                height: 1,
+                color: EmpireColors.champagneGold,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Sistema de Punto de Venta y Gestión de Recursos. Diseñado con autoría local para operación continua offline.',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: EmpireColors.textSecondary,
+                  height: 1.6,
+                ),
+              ),
+              const SizedBox(height: 40),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.wifi_off,
+                    color: EmpireColors.agedBronze,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Seguridad Offline-First Activa',
+                      style: TextStyle(
+                        color: EmpireColors.agedBronze.withOpacity(0.9),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
-    ),
-  ),
-);
-}
+    );
+  }
 
   Widget _buildPinIndicators() {
     return Row(
@@ -292,7 +320,9 @@ class _LoginScreenState extends State<LoginScreen> {
             border: Border.all(
               color: hasError
                   ? EmpireColors.errorRed
-                  : (isActive ? EmpireColors.champagneGold : EmpireColors.agedBronze),
+                  : (isActive
+                        ? EmpireColors.champagneGold
+                        : EmpireColors.agedBronze),
               width: 2,
             ),
             boxShadow: isActive
@@ -301,7 +331,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: EmpireColors.champagneGold.withOpacity(0.5),
                       blurRadius: 8,
                       spreadRadius: 1,
-                    )
+                    ),
                   ]
                 : null,
           ),
@@ -315,7 +345,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ["1", "2", "3"],
       ["4", "5", "6"],
       ["7", "8", "9"],
-      ["C", "0", "del"]
+      ["C", "0", "del"],
     ];
 
     return GridView.builder(
@@ -332,7 +362,7 @@ class _LoginScreenState extends State<LoginScreen> {
         final row = index ~/ 3;
         final col = index % 3;
         final val = keys[row][col];
-        
+
         return _buildKeypadButton(val);
       },
     );
@@ -340,7 +370,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildKeypadButton(String label) {
     final isAction = label == "C" || label == "del";
-    
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -359,7 +389,9 @@ class _LoginScreenState extends State<LoginScreen> {
             shape: BoxShape.circle,
             color: EmpireColors.onyxSurface,
             border: Border.all(
-              color: isAction ? EmpireColors.agedBronzeDark : EmpireColors.agedBronze,
+              color: isAction
+                  ? EmpireColors.agedBronzeDark
+                  : EmpireColors.agedBronze,
               width: 1.2,
             ),
           ),
@@ -372,7 +404,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildButtonContent(String label) {
     if (label == "del") {
-      return const Icon(Icons.backspace_outlined, color: EmpireColors.textPrimary, size: 20);
+      return const Icon(
+        Icons.backspace_outlined,
+        color: EmpireColors.textPrimary,
+        size: 20,
+      );
     }
     if (label == "C") {
       return const Text(
@@ -424,7 +460,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.fingerprint, color: EmpireColors.champagneGold, size: 14),
+                    const Icon(
+                      Icons.fingerprint,
+                      color: EmpireColors.champagneGold,
+                      size: 14,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'Biometría',
@@ -444,9 +484,27 @@ class _LoginScreenState extends State<LoginScreen> {
             spacing: 12,
             runSpacing: 6,
             children: const [
-              Text('Mesero: 1111', style: TextStyle(color: EmpireColors.textSecondary, fontSize: 11)),
-              Text('Cajero: 2222', style: TextStyle(color: EmpireColors.textSecondary, fontSize: 11)),
-              Text('Cocina: 3333', style: TextStyle(color: EmpireColors.textSecondary, fontSize: 11)),
+              Text(
+                'Mesero: 1111',
+                style: TextStyle(
+                  color: EmpireColors.textSecondary,
+                  fontSize: 11,
+                ),
+              ),
+              Text(
+                'Cajero: 2222',
+                style: TextStyle(
+                  color: EmpireColors.textSecondary,
+                  fontSize: 11,
+                ),
+              ),
+              Text(
+                'Cocina: 3333',
+                style: TextStyle(
+                  color: EmpireColors.textSecondary,
+                  fontSize: 11,
+                ),
+              ),
             ],
           ),
         ],

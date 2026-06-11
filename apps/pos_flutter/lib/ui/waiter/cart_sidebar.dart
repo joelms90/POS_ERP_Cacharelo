@@ -5,6 +5,7 @@ import '../common/app_state.dart';
 class CartSidebar extends StatefulWidget {
   final TableModel table;
   final List<OrderItem> initialItems;
+  final VoidCallback onBackToMenu;
   final Function(List<OrderItem> finalItems, int guests) onConfirm;
   final VoidCallback onCancel;
 
@@ -12,6 +13,7 @@ class CartSidebar extends StatefulWidget {
     super.key,
     required this.table,
     required this.initialItems,
+    required this.onBackToMenu,
     required this.onConfirm,
     required this.onCancel,
   });
@@ -70,87 +72,222 @@ class _CartSidebarState extends State<CartSidebar> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: EmpireColors.onyxSurface,
+      color: EmpireColors.obsidian,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Left Pane: Items List
+          Expanded(
+            flex: 3,
+            child: _buildItemsPane(),
+          ),
+          
+          // Right Pane: Summary & Actions
+          Expanded(
+            flex: 2,
+            child: Container(
+              decoration: const BoxDecoration(
+                border: Border(left: BorderSide(color: EmpireColors.agedBronzeDark, width: 1.5)),
+              ),
+              child: _buildSummaryPane(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemsPane() {
+    if (_cartItems.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.shopping_basket_outlined, color: EmpireColors.textSecondary, size: 48),
+            SizedBox(height: 16),
+            Text(
+              'Comanda vacía\nAgrega platillos desde el menú',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: EmpireColors.textSecondary, fontSize: 14, height: 1.4),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(24),
+      itemCount: _cartItems.length,
+      itemBuilder: (context, index) {
+        final item = _cartItems[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: EmpireColors.charcoalSurface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: EmpireColors.agedBronzeDark, width: 1.2),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Quantity controls & display
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => _decrementQuantity(index),
+                    icon: const Icon(Icons.remove_circle_outlined, color: EmpireColors.textSecondary, size: 24),
+                  ),
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 32),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '${item.quantity}',
+                      style: const TextStyle(
+                        color: EmpireColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => _incrementQuantity(index),
+                    icon: const Icon(Icons.add_circle_outlined, color: EmpireColors.champagneGold, size: 24),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 16),
+              
+              // Details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.item.name,
+                      style: const TextStyle(
+                        color: EmpireColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    if (item.modifiers.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Agregados: ' + item.modifiers.join(', '),
+                        style: const TextStyle(
+                          color: EmpireColors.textGold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                    if (item.notes.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Nota: ${item.notes}',
+                        style: const TextStyle(
+                          color: EmpireColors.textSecondary,
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              
+              // Price & Delete
+              Row(
+                children: [
+                  Text(
+                    '\$${item.totalPrice.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: EmpireColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  IconButton(
+                    onPressed: () => _removeItem(index),
+                    icon: const Icon(Icons.delete_outline, color: EmpireColors.errorRed, size: 22),
+                    tooltip: 'Eliminar artículo',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSummaryPane() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Cart Header
+          // Guests (Pax) selector
           Container(
-            padding: const EdgeInsets.all(20),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: EmpireColors.agedBronzeDark, width: 1.5)),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: EmpireColors.charcoalSurface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: EmpireColors.agedBronzeDark, width: 1),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Detalle de Comanda',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: EmpireColors.champagneGold,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: EmpireColors.champagneGold.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: EmpireColors.champagneGold, width: 0.5),
-                      ),
-                      child: Text(
-                        widget.table.label,
-                        style: const TextStyle(
-                          color: EmpireColors.champagneGold,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
+                const Text(
+                  'Número de Comensales (Pax)',
+                  style: TextStyle(
+                    color: EmpireColors.textSecondary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
                 ),
-                const SizedBox(height: 16),
-                
-                // Guests Stepper (Pax)
+                const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Número de Comensales (Pax):',
-                      style: TextStyle(color: EmpireColors.textPrimary, fontSize: 13),
+                    const Row(
+                      children: [
+                        Icon(Icons.people_outline, color: EmpireColors.champagneGold, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Comensales:',
+                          style: TextStyle(color: EmpireColors.textPrimary, fontSize: 14),
+                        ),
+                      ],
                     ),
                     Row(
                       children: [
                         IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
                           onPressed: () {
                             if (_guests > 1) {
                               setState(() => _guests--);
                             }
                           },
-                          icon: const Icon(Icons.remove_circle_outline, color: EmpireColors.champagneGold, size: 22),
+                          icon: const Icon(Icons.remove_circle_outline, color: EmpireColors.champagneGold, size: 24),
                         ),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          child: Text(
-                            '$_guests',
-                            style: const TextStyle(
-                              color: EmpireColors.textPrimary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                           child: Text(
+                             '$_guests',
+                             style: const TextStyle(
+                               color: EmpireColors.textPrimary,
+                               fontWeight: FontWeight.bold,
+                               fontSize: 18,
+                             ),
+                           ),
                         ),
                         IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
                           onPressed: () {
                             setState(() => _guests++);
                           },
-                          icon: const Icon(Icons.add_circle_outline, color: EmpireColors.champagneGold, size: 22),
+                          icon: const Icon(Icons.add_circle_outline, color: EmpireColors.champagneGold, size: 24),
                         ),
                       ],
                     ),
@@ -159,149 +296,17 @@ class _CartSidebarState extends State<CartSidebar> {
               ],
             ),
           ),
-
-          // Cart List
-          Expanded(
-            child: _cartItems.isEmpty
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.shopping_basket_outlined, color: EmpireColors.textSecondary, size: 40),
-                        SizedBox(height: 12),
-                        Text(
-                          'Comanda vacía\nSelecciona ítems del menú',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: EmpireColors.textSecondary, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _cartItems.length,
-                    itemBuilder: (context, index) {
-                      final item = _cartItems[index];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: EmpireColors.charcoalSurface,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: EmpireColors.agedBronzeDark, width: 1),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                // Item details
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.item.name,
-                                        style: const TextStyle(
-                                          color: EmpireColors.textPrimary,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      if (item.modifiers.isNotEmpty) ...[
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Agregados: ' + item.modifiers.join(', '),
-                                          style: const TextStyle(
-                                            color: EmpireColors.textGold,
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                      ],
-                                      if (item.notes.isNotEmpty) ...[
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Nota: ${item.notes}',
-                                          style: const TextStyle(
-                                            color: EmpireColors.textSecondary,
-                                            fontSize: 11,
-                                            fontStyle: FontStyle.italic,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-
-                                // Subtotal per item
-                                Text(
-                                  '\$${item.totalPrice.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    color: EmpireColors.textPrimary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Divider(color: EmpireColors.agedBronzeDark, height: 16),
-                            
-                            // Bottom row: control steppers and remove button
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    IconButton(
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                      onPressed: () => _decrementQuantity(index),
-                                      icon: const Icon(Icons.remove_circle_outlined, color: EmpireColors.textSecondary, size: 20),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                                      child: Text(
-                                        '${item.quantity}',
-                                        style: const TextStyle(
-                                          color: EmpireColors.textPrimary,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                      onPressed: () => _incrementQuantity(index),
-                                      icon: const Icon(Icons.add_circle_outlined, color: EmpireColors.champagneGold, size: 20),
-                                    ),
-                                  ],
-                                ),
-                                IconButton(
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  onPressed: () => _removeItem(index),
-                                  icon: const Icon(Icons.delete_outline, color: EmpireColors.errorRed, size: 20),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
-
-          // Total Panel
+          const Spacer(),
+          
+          // Totals Box
           Container(
             padding: const EdgeInsets.all(20),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: EmpireColors.charcoalSurface,
-              border: Border(top: BorderSide(color: EmpireColors.agedBronzeDark, width: 1.5)),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: EmpireColors.agedBronzeDark, width: 1),
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -310,7 +315,7 @@ class _CartSidebarState extends State<CartSidebar> {
                     Text('\$${subtotal.toStringAsFixed(2)}', style: const TextStyle(color: EmpireColors.textPrimary, fontSize: 13)),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -318,57 +323,58 @@ class _CartSidebarState extends State<CartSidebar> {
                     Text('\$${tax.toStringAsFixed(2)}', style: const TextStyle(color: EmpireColors.textPrimary, fontSize: 13)),
                   ],
                 ),
-                const Divider(color: EmpireColors.agedBronzeDark, height: 16),
+                const Divider(color: EmpireColors.agedBronzeDark, height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'TOTAL',
-                      style: TextStyle(color: EmpireColors.textGold, fontWeight: FontWeight.bold, fontSize: 16),
+                      'TOTAL DE COMANDA',
+                      style: TextStyle(color: EmpireColors.textGold, fontWeight: FontWeight.bold, fontSize: 14),
                     ),
                     Text(
                       '\$${total.toStringAsFixed(2)}',
                       style: const TextStyle(
-                        color: EmpireColors.champagneGold,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Confirmation Actions
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: widget.onCancel,
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: const BorderSide(color: EmpireColors.errorRed, width: 1.2),
-                          foregroundColor: EmpireColors.errorRed,
-                        ),
-                        child: const Text('CANCELAR'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _cartItems.isEmpty
-                            ? null
-                            : () => widget.onConfirm(_cartItems, _guests),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          backgroundColor: EmpireColors.champagneGold,
-                        ),
-                        child: const Text('CONFIRMAR'),
-                      ),
+                         color: EmpireColors.champagneGold,
+                         fontWeight: FontWeight.bold,
+                         fontSize: 22,
+                       ),
                     ),
                   ],
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 24),
+
+          // Actions
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: widget.onCancel,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: const BorderSide(color: EmpireColors.errorRed, width: 1.2),
+                    foregroundColor: EmpireColors.errorRed,
+                  ),
+                  child: const Text('CANCELAR', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _cartItems.isEmpty
+                      ? null
+                      : () => widget.onConfirm(_cartItems, _guests),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: EmpireColors.champagneGold,
+                    foregroundColor: EmpireColors.obsidian,
+                  ),
+                  child: const Text('CONFIRMAR PEDIDO', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                ),
+              ),
+            ],
           ),
         ],
       ),

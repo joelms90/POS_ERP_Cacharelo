@@ -1,5 +1,9 @@
 import 'dart:math';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../../services/secure_storage_service.dart';
 
 enum TableState { free, occupied, billing, cleaning }
 enum TableShape { circle, square }
@@ -163,8 +167,37 @@ class AppState extends ChangeNotifier {
   // Active table selected in Waiter / Cashier views
   TableModel? selectedTable;
 
-  AppState() {
+  final SecureStorageService _secureStorageService;
+
+  AppState({SecureStorageService? secureStorageService})
+      : _secureStorageService = secureStorageService ?? SecureStorageService() {
     _initMockData();
+    _seedDefaultUsersOffline();
+  }
+
+  Future<void> _seedDefaultUsersOffline() async {
+    try {
+      final cached = await _secureStorageService.verifyOfflineCredentials('1111');
+      if (cached == null) {
+        await _secureStorageService.cacheUserOffline(
+          name: 'Juan (Mesero)',
+          pin: '1111',
+          role: 'waiter',
+        );
+        await _secureStorageService.cacheUserOffline(
+          name: 'Sofia (Cajero)',
+          pin: '2222',
+          role: 'cashier',
+        );
+        await _secureStorageService.cacheUserOffline(
+          name: 'Chef Carlos',
+          pin: '3333',
+          role: 'kitchen',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error writing default secure storage seed: $e');
+    }
   }
 
   void _initMockData() {
@@ -209,25 +242,66 @@ class AppState extends ChangeNotifier {
     MenuItem(id: '8', name: 'Limonada de Coco', price: 5.50, category: 'Bebidas'),
   ];
 
-  // Auth Operations
-  bool login(String pin) {
-    if (pin == "1111") {
-      currentUserRole = UserRole.waiter;
-      currentUserName = "Juan (Mesero)";
-      notifyListeners();
-      return true;
-    } else if (pin == "2222") {
-      currentUserRole = UserRole.cashier;
-      currentUserName = "Sofia (Cajero)";
-      notifyListeners();
-      return true;
-    } else if (pin == "3333") {
-      currentUserRole = UserRole.kitchen;
-      currentUserName = "Chef Carlos";
-      notifyListeners();
-      return true;
+  // Auth Operations (Query backend, fallback to offline local cache)
+  Future<bool> login(String pin) async {
+    try {
+      // Android emulators use 10.0.2.2 to access the host machine's localhost
+      final String host = Platform.isAndroid ? '10.0.2.2' : 'localhost';
+      final response = await http.post(
+        Uri.parse('http://$host:3000/api/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'pin': pin}),
+      ).timeout(const Duration(seconds: 2));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          final userData = data['user'];
+          currentUserName = userData['name'];
+          currentUserRole = _parseRole(userData['role']);
+          
+          // Securely cache credentials locally
+          await _secureStorageService.cacheUserOffline(
+            name: userData['name'],
+            pin: pin,
+            role: userData['role'],
+          );
+          
+          notifyListeners();
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error de conexión con el servidor de autenticación, usando credenciales locales: $e');
     }
+
+    // Fallback offline secure credentials validation
+    try {
+      final offlineUser = await _secureStorageService.verifyOfflineCredentials(pin);
+      if (offlineUser != null) {
+        currentUserName = offlineUser['name']!;
+        currentUserRole = _parseRole(offlineUser['role']!);
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Error during offline secure login verification: $e');
+    }
+
     return false;
+  }
+
+  UserRole _parseRole(String roleStr) {
+    switch (roleStr.toLowerCase()) {
+      case 'waiter':
+        return UserRole.waiter;
+      case 'cashier':
+        return UserRole.cashier;
+      case 'kitchen':
+        return UserRole.kitchen;
+      default:
+        return UserRole.none;
+    }
   }
 
   void logout() {
