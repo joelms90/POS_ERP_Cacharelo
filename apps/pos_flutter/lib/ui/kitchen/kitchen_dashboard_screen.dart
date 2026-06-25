@@ -25,11 +25,21 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
         child: ListenableBuilder(
           listenable: widget.state,
           builder: (context, _) {
-            // Filter kitchen tickets
-            final activeOrders = widget.state.kitchenOrders.where((order) {
-              if (order.status == 'served')
-                return false; // Served orders are archived
+            final allActiveOrders = widget.state.kitchenOrders
+                .where((o) => o.status != 'served')
+                .toList();
+            final pendingCount = allActiveOrders
+                .where((o) => o.status == 'pending')
+                .length;
+            final preparingCount = allActiveOrders
+                .where((o) => o.status == 'preparing')
+                .length;
+            final readyCount = allActiveOrders
+                .where((o) => o.status == 'ready')
+                .length;
 
+            // Filter kitchen tickets
+            final activeOrders = allActiveOrders.where((order) {
               if (selectedFilter == 'PENDIENTES') {
                 return order.status == 'pending';
               }
@@ -48,7 +58,7 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
                 OfflineStatusBar(state: widget.state),
 
                 // Header
-                _buildHeader(context),
+                _buildHeader(context, pendingCount, preparingCount, readyCount),
 
                 // Filters
                 _buildFilterBar(),
@@ -63,9 +73,9 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, int pending, int preparing, int ready) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: const BoxDecoration(
         color: EmpireColors.onyxSurface,
         border: Border(
@@ -75,6 +85,7 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Left: Title
           Row(
             children: [
               Container(
@@ -96,6 +107,19 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
               ),
             ],
           ),
+
+          // Center: Load counters
+          Row(
+            children: [
+              _buildHeaderCounter('PENDIENTES', pending, EmpireColors.errorRed),
+              const SizedBox(width: 12),
+              _buildHeaderCounter('PREPARANDO', preparing, EmpireColors.warningOrange),
+              const SizedBox(width: 12),
+              _buildHeaderCounter('LISTOS', ready, EmpireColors.successGreen),
+            ],
+          ),
+
+          // Right: Operator Info & Logout
           Row(
             children: [
               Text(
@@ -120,6 +144,47 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
                 tooltip: 'Cerrar Sesión',
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderCounter(String label, int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '$count',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -189,14 +254,9 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
       );
     }
 
-    return GridView.builder(
+    return ListView.builder(
+      scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.all(20),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 0.82,
-      ),
       itemCount: orders.length,
       itemBuilder: (context, index) {
         final order = orders[index];
@@ -204,153 +264,215 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
             .difference(order.timestamp)
             .inMinutes;
 
-        return Card(
-          color: EmpireColors.onyxSurface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: _getStatusBorderColor(order.status),
-              width: 1.5,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Card Header: Table label and elapsed time
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      order.tableLabel,
-                      style: const TextStyle(
-                        color: EmpireColors.champagneGold,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Text(
-                      'Hace $minutesElapsed min',
-                      style: TextStyle(
-                        color: minutesElapsed > 15
-                            ? EmpireColors.errorRed
-                            : EmpireColors.textSecondary,
-                        fontSize: 11,
-                        fontWeight: minutesElapsed > 15
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
+        // Determine border and alert colors based on elapsed time
+        final Color cardColor = _getTimeAlertBorderColor(minutesElapsed, order.status);
 
-                // Status Badge
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getStatusBgColor(order.status),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        _getStatusLabel(order.status).toUpperCase(),
-                        style: TextStyle(
-                          color: _getStatusBorderColor(order.status),
-                          fontSize: 9,
+        return Container(
+          width: 320,
+          margin: const EdgeInsets.only(right: 16),
+          child: Card(
+            color: EmpireColors.onyxSurface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: cardColor,
+                width: minutesElapsed > 15 && order.status != 'ready' ? 2.5 : 1.5,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Card Header: Table label and elapsed time
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        order.tableLabel,
+                        style: const TextStyle(
+                          color: EmpireColors.champagneGold,
                           fontWeight: FontWeight.bold,
+                          fontSize: 18,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const Divider(color: EmpireColors.agedBronzeDark, height: 20),
-
-                // Order items list
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: order.items.length,
-                    itemBuilder: (context, idx) {
-                      final item = order.items[idx];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      
+                      // Highlight elapsed time if it exceeds 15 minutes
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: minutesElapsed > 15 && order.status != 'ready'
+                              ? EmpireColors.errorRed.withOpacity(0.2)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${item.quantity}x ',
-                                  style: const TextStyle(
-                                    color: EmpireColors.champagneGold,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Text(
-                                    item.item.name,
+                            if (minutesElapsed > 15 && order.status != 'ready') ...[
+                              const Icon(
+                                Icons.warning_amber_rounded,
+                                color: EmpireColors.errorRed,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            Text(
+                              'Hace $minutesElapsed min',
+                              style: TextStyle(
+                                color: minutesElapsed > 15 && order.status != 'ready'
+                                    ? EmpireColors.errorRed
+                                    : EmpireColors.textSecondary,
+                                fontSize: 12,
+                                fontWeight: minutesElapsed > 15 && order.status != 'ready'
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Status Badge
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getStatusBgColor(order.status),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          _getStatusLabel(order.status).toUpperCase(),
+                          style: TextStyle(
+                            color: _getStatusBorderColor(order.status),
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: EmpireColors.agedBronzeDark, height: 20),
+
+                  // Order items list - scrollable internally
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: order.items.length,
+                      itemBuilder: (context, idx) {
+                        final item = order.items[idx];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${item.quantity}x ',
                                     style: const TextStyle(
-                                      color: EmpireColors.textPrimary,
+                                      color: EmpireColors.champagneGold,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      item.item.name,
+                                      style: const TextStyle(
+                                        color: EmpireColors.textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (item.modifiers.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: 24,
+                                    top: 3,
+                                  ),
+                                  child: Text(
+                                    '+ ' + item.modifiers.join(', '),
+                                    style: const TextStyle(
+                                      color: EmpireColors.textGold,
+                                      fontSize: 11,
                                       fontWeight: FontWeight.w500,
-                                      fontSize: 13,
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
-                            if (item.modifiers.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  left: 20,
-                                  top: 2,
-                                ),
-                                child: Text(
-                                  '+ ' + item.modifiers.join(', '),
-                                  style: const TextStyle(
-                                    color: EmpireColors.textGold,
-                                    fontSize: 10,
+                              if (item.notes.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: 24,
+                                    top: 3,
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: EmpireColors.textGold.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: EmpireColors.textGold.withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Nota: ${item.notes}',
+                                      style: const TextStyle(
+                                        color: EmpireColors.textGold,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
-                            if (item.notes.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  left: 20,
-                                  top: 1,
-                                ),
-                                child: Text(
-                                  'Nota: ${item.notes}',
-                                  style: const TextStyle(
-                                    color: EmpireColors.textSecondary,
-                                    fontSize: 10,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      );
-                    },
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
 
-                const Divider(color: EmpireColors.agedBronzeDark, height: 20),
+                  const Divider(color: EmpireColors.agedBronzeDark, height: 20),
 
-                // Actions Footer button
-                _buildActionButton(order),
-              ],
+                  // Actions Footer button - pinned at bottom of card
+                  SizedBox(
+                    height: 44,
+                    width: double.infinity,
+                    child: _buildActionButton(order),
+                  ),
+                ],
+              ),
             ),
           ),
         );
       },
     );
+  }
+
+  Color _getTimeAlertBorderColor(int minutesElapsed, String status) {
+    if (status == 'ready') {
+      return EmpireColors.successGreen;
+    }
+    if (minutesElapsed > 15) {
+      return EmpireColors.errorRed;
+    }
+    if (minutesElapsed >= 10) {
+      return EmpireColors.warningOrange;
+    }
+    return _getStatusBorderColor(status);
   }
 
   Widget _buildActionButton(KitchenOrder order) {
