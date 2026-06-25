@@ -727,7 +727,7 @@ class AppState extends ChangeNotifier {
       job.status = 'queued';
       notifyListeners();
 
-      if (connectedPrinterMac != null) {
+      if (connectedPrinterMac != null && job.target == 'Caja') {
         final success = await _printToPhysicalPrinter(job.details);
         job.status = success ? 'printed' : 'failed';
       } else {
@@ -829,7 +829,7 @@ class AppState extends ChangeNotifier {
     printJobs.add(job);
     notifyListeners();
 
-    if (connectedPrinterMac != null) {
+    if (connectedPrinterMac != null && job.target == 'Caja') {
       job.status = 'queued';
       notifyListeners();
       final success = await _printToPhysicalPrinter(job.details);
