@@ -192,115 +192,117 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
     return Container(
       color: EmpireColors.onyxSurface,
       padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Shift details
-          Text(
-            'Turno de Caja',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: EmpireColors.champagneGold,
-              fontWeight: FontWeight.bold,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Shift details
+            Text(
+              'Turno de Caja',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: EmpireColors.champagneGold,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
-
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: EmpireColors.charcoalSurface,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: EmpireColors.agedBronzeDark, width: 1),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'SALDO EN CAJA',
-                  style: TextStyle(
-                    color: EmpireColors.textSecondary,
-                    fontSize: 10,
-                    letterSpacing: 0.8,
+            const SizedBox(height: 20),
+    
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: EmpireColors.charcoalSurface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: EmpireColors.agedBronzeDark, width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'SALDO EN CAJA',
+                    style: TextStyle(
+                      color: EmpireColors.textSecondary,
+                      fontSize: 10,
+                      letterSpacing: 0.8,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '\$${widget.state.cashDrawerAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    color: EmpireColors.champagneGold,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+                  const SizedBox(height: 4),
+                  Text(
+                    '\$${widget.state.cashDrawerAmount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: EmpireColors.champagneGold,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Cajero: ${widget.state.currentUserName}',
-                  style: const TextStyle(
-                    color: EmpireColors.textPrimary,
-                    fontSize: 12,
+                  const SizedBox(height: 8),
+                  Text(
+                    'Cajero: ${widget.state.currentUserName}',
+                    style: const TextStyle(
+                      color: EmpireColors.textPrimary,
+                      fontSize: 12,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-
-          // Cash Flow Actions
-          const Text(
-            'MOVIMIENTOS DE CAJA',
-            style: TextStyle(
-              color: EmpireColors.textGold,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
+            const SizedBox(height: 24),
+    
+            // Cash Flow Actions
+            const Text(
+              'MOVIMIENTOS DE CAJA',
+              style: TextStyle(
+                color: EmpireColors.textGold,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          ElevatedButton.icon(
-            onPressed: () => _showDropDialog(true),
-            icon: const Icon(Icons.arrow_downward, size: 16),
-            label: const Text('INGRESO (CASH-IN)'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: EmpireColors.successGreen.withOpacity(0.8),
-              foregroundColor: Colors.white,
+            const SizedBox(height: 10),
+            ElevatedButton.icon(
+              onPressed: () => _showDropDialog(true),
+              icon: const Icon(Icons.arrow_downward, size: 16),
+              label: const Text('INGRESO (CASH-IN)'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: EmpireColors.successGreen.withOpacity(0.8),
+                foregroundColor: Colors.white,
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          ElevatedButton.icon(
-            onPressed: () => _showDropDialog(false),
-            icon: const Icon(Icons.arrow_upward, size: 16),
-            label: const Text('RETIRO (CASH-OUT)'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: EmpireColors.errorRed.withOpacity(0.8),
-              foregroundColor: Colors.white,
+            const SizedBox(height: 10),
+            ElevatedButton.icon(
+              onPressed: () => _showDropDialog(false),
+              icon: const Icon(Icons.arrow_upward, size: 16),
+              label: const Text('RETIRO (CASH-OUT)'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: EmpireColors.errorRed.withOpacity(0.8),
+                foregroundColor: Colors.white,
+              ),
             ),
-          ),
-
-          const Spacer(),
-
-          // Z / X Reports
-          const Text(
-            'CORTES PARCIALES / FINALES',
-            style: TextStyle(
-              color: EmpireColors.textSecondary,
-              fontWeight: FontWeight.bold,
-              fontSize: 11,
+    
+            const SizedBox(height: 24),
+    
+            // Z / X Reports
+            const Text(
+              'CORTES PARCIALES / FINALES',
+              style: TextStyle(
+                color: EmpireColors.textSecondary,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton(
-            onPressed: () => _printCorte('X'),
-            child: const Text('CORTEX (PARCIAL)'),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton(
-            onPressed: () => _printCorte('Z'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: EmpireColors.errorRed,
-              side: const BorderSide(color: EmpireColors.errorRed, width: 1.2),
+            const SizedBox(height: 10),
+            OutlinedButton(
+              onPressed: () => _printCorte('X'),
+              child: const Text('CORTEX (PARCIAL)'),
             ),
-            child: const Text('CORTE Z (CIERRE DE CAJA)'),
-          ),
-        ],
+            const SizedBox(height: 10),
+            OutlinedButton(
+              onPressed: () => _printCorte('Z'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: EmpireColors.errorRed,
+                side: const BorderSide(color: EmpireColors.errorRed, width: 1.2),
+              ),
+              child: const Text('CORTE Z (CIERRE DE CAJA)'),
+            ),
+          ],
+        ),
       ),
     );
   }

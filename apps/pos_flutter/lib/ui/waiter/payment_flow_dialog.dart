@@ -39,7 +39,7 @@ class _PaymentFlowDialogState extends State<PaymentFlowDialog> {
   String _generatePreCuentaTicket() {
     final buffer = StringBuffer();
     buffer.writeln(widget.state.formatCenter('=== PRE-CUENTA ==='));
-    buffer.writeln(widget.state.formatCenter('EMPIRE NOIR RESTAURANTE'));
+    buffer.writeln(widget.state.formatCenter('GRUPO CACHARELO'));
     buffer.writeln(widget.state.formatCenter(widget.table.label));
     final dateStr = DateTime.now().toString().substring(0, 16);
     buffer.writeln(widget.state.formatRow('Fecha:', dateStr));
@@ -77,7 +77,7 @@ class _PaymentFlowDialogState extends State<PaymentFlowDialog> {
   String _generateCardCheckoutTicket(String cardBrand, String last4) {
     final buffer = StringBuffer();
     buffer.writeln(widget.state.formatCenter('=== COMPROBANTE PAGO ==='));
-    buffer.writeln(widget.state.formatCenter('EMPIRE NOIR RESTAURANTE'));
+    buffer.writeln(widget.state.formatCenter('GRUPO CACHARELO'));
     buffer.writeln(widget.state.formatCenter(widget.table.label));
     final dateStr = DateTime.now().toString().substring(0, 16);
     buffer.writeln(widget.state.formatRow('Fecha:', dateStr));

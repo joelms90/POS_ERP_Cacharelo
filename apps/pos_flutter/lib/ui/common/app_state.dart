@@ -626,18 +626,48 @@ class AppState extends ChangeNotifier {
       }
 
       // Print ticket
+      final buffer = StringBuffer();
+      buffer.writeln(formatCenter('=== COMPROBANTE DE PAGO ==='));
+      buffer.writeln(formatCenter('GRUPO CACHARELO'));
+      buffer.writeln(formatCenter(t.label));
+      final dateStr = DateTime.now().toString().substring(0, 16);
+      buffer.writeln(formatRow('Fecha:', dateStr));
+      buffer.writeln(formatRow('Cajero:', currentUserName));
+      buffer.writeln(formatDivider());
+      buffer.writeln(formatRow('Metodo:', paymentMethod.toUpperCase()));
+      if (refCode.isNotEmpty && refCode != 'Efectivo') {
+        buffer.writeln(formatRow('Referencia:', refCode));
+      }
+      buffer.writeln(formatDivider());
+      buffer.writeln(formatRow('Cant Descripcion', 'Total'));
+      buffer.writeln(formatDivider());
+      for (final item in t.items) {
+        final line = '${item.quantity}x ${item.item.name}';
+        final priceStr = '\$${item.totalPrice.toStringAsFixed(2)}';
+        buffer.writeln(formatRow(line, priceStr));
+        if (item.modifiers.isNotEmpty) {
+          buffer.writeln('   + ${item.modifiers.join(', ')}');
+        }
+      }
+      buffer.writeln(formatDivider());
+      buffer.writeln(formatRow('Subtotal:', '\$${t.subtotal.toStringAsFixed(2)}'));
+      if (discount > 0) {
+        final discAmt = t.subtotal * (discount / 100.0);
+        buffer.writeln(formatRow('Desc (${discount.toInt()}%):', '-\$${discAmt.toStringAsFixed(2)}'));
+      }
+      final tax = (t.subtotal - (t.subtotal * (discount / 100.0))) * 0.16;
+      buffer.writeln(formatRow('IVA (16%):', '\$${tax.toStringAsFixed(2)}'));
+      buffer.writeln(formatDivider(char: '='));
+      buffer.writeln(formatRow('TOTAL PAGADO:', '\$${finalTotal.toStringAsFixed(2)}'));
+      buffer.writeln(formatDivider(char: '='));
+      buffer.writeln('');
+      buffer.writeln(formatCenter('GRACIAS POR SU COMPRA'));
+
       enqueuePrintJob(
         PrintJob(
           id: 'rec_${DateTime.now().millisecondsSinceEpoch}',
           title: 'Factura - ${t.label}',
-          details:
-              'Total Pagado: \$${finalTotal.toStringAsFixed(2)}\nMetodo: $paymentMethod\nRef: $refCode\nItems:\n' +
-              t.items
-                  .map(
-                    (i) =>
-                        '${i.quantity}x ${i.item.name} - \$${i.totalPrice.toStringAsFixed(2)}',
-                  )
-                  .join('\n'),
+          details: buffer.toString(),
           target: 'Caja',
           timestamp: DateTime.now(),
         ),

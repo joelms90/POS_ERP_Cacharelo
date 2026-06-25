@@ -69,63 +69,47 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                             ),
                           ),
 
-                          // Center Panel: Interactive active tables grid
+                          // Main Area: Either Active tables grid or Full-screen Checkout (flex 18)
                           Expanded(
-                            flex: 12,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _buildFilterBar(),
-
-                                // Table grid
-                                Expanded(
-                                  child: widget.state.isShiftOpen
-                                      ? _buildActiveTablesGrid(filteredTables)
-                                      : _buildLockedOverlay(),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Right Panel: Checkout options (visible when table is selected and shift is open)
-                          if (selectedTableForCheckout != null &&
-                              widget.state.isShiftOpen)
-                            Expanded(
-                              flex: 7,
-                              child: Container(
-                                decoration: const BoxDecoration(
-                                  border: Border(
-                                    left: BorderSide(
-                                      color: EmpireColors.agedBronzeDark,
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                ),
-                                child: SplitCheckoutView(
-                                  table: selectedTableForCheckout!,
-                                  state: widget.state,
-                                  onCancel: () {
-                                    setState(
-                                      () => selectedTableForCheckout = null,
-                                    );
-                                  },
-                                  onSuccess: () {
-                                    setState(
-                                      () => selectedTableForCheckout = null,
-                                    );
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        backgroundColor:
-                                            EmpireColors.successGreen,
-                                        content: Text(
-                                          'Facturación completada con éxito. Mesa liberada.',
+                            flex: 18,
+                            child: (selectedTableForCheckout != null && widget.state.isShiftOpen)
+                                ? SplitCheckoutView(
+                                    table: selectedTableForCheckout!,
+                                    state: widget.state,
+                                    onCancel: () {
+                                      setState(
+                                        () => selectedTableForCheckout = null,
+                                      );
+                                    },
+                                    onSuccess: () {
+                                      setState(
+                                        () => selectedTableForCheckout = null,
+                                      );
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          backgroundColor:
+                                              EmpireColors.successGreen,
+                                          content: Text(
+                                            'Facturación completada con éxito. Mesa liberada.',
+                                          ),
                                         ),
+                                      );
+                                    },
+                                  )
+                                : Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      _buildFilterBar(),
+
+                                      // Table grid
+                                      Expanded(
+                                        child: widget.state.isShiftOpen
+                                            ? _buildActiveTablesGrid(filteredTables)
+                                            : _buildLockedOverlay(),
                                       ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
+                                    ],
+                                  ),
+                          ),
                         ],
                       ),
                     ),
@@ -530,7 +514,7 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
         crossAxisCount: 3,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: 1.1,
+        childAspectRatio: 1.3,
       ),
       itemCount: activeTables.length,
       itemBuilder: (context, index) {
@@ -566,73 +550,86 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
               },
               borderRadius: BorderRadius.circular(10),
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: table.state == TableState.billing
-                                ? EmpireColors.warningOrange.withOpacity(0.15)
-                                : EmpireColors.agedBronzeDark,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            table.state == TableState.billing
-                                ? 'POR COBRAR'
-                                : 'OCUPADA',
-                            style: TextStyle(
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
                               color: table.state == TableState.billing
-                                  ? EmpireColors.warningOrange
-                                  : EmpireColors.textSecondary,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
+                                  ? EmpireColors.warningOrange.withOpacity(0.15)
+                                  : EmpireColors.agedBronzeDark,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              table.state == TableState.billing
+                                  ? 'POR COBRAR'
+                                  : 'OCUPADA',
+                              style: TextStyle(
+                                color: table.state == TableState.billing
+                                    ? EmpireColors.warningOrange
+                                    : EmpireColors.textSecondary,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                        Text(
-                          '${table.guests} Pax',
-                          style: const TextStyle(
-                            color: EmpireColors.textSecondary,
-                            fontSize: 10,
+                          const SizedBox(width: 8),
+                          Text(
+                            '${table.guests} Pax',
+                            style: const TextStyle(
+                              color: EmpireColors.textSecondary,
+                              fontSize: 10,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      table.label,
-                      style: const TextStyle(
-                        color: EmpireColors.textPrimary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Zona: ${table.zone}',
-                      style: const TextStyle(
-                        color: EmpireColors.textSecondary,
-                        fontSize: 11,
+                    const SizedBox(height: 8),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        table.label,
+                        style: const TextStyle(
+                          color: EmpireColors.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Zona: ${table.zone}',
+                        style: const TextStyle(
+                          color: EmpireColors.textSecondary,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
                     const Divider(
                       color: EmpireColors.agedBronzeDark,
-                      height: 16,
+                      height: 8,
                     ),
-                    Text(
-                      '\$${(table.subtotal * 1.16).toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: EmpireColors.champagneGold,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '\$${(table.subtotal * 1.16).toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          color: EmpireColors.champagneGold,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
                       ),
                     ),
                   ],
