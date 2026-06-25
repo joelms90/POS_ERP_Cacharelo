@@ -224,30 +224,30 @@ class PrinterMonitorPanel extends StatelessWidget {
               ),
             ),
 
-            if (isFailed) ...[
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => state.retryPrintJob(job.id),
-                    icon: const Icon(Icons.refresh, size: 16),
-                    label: const Text('REINTENTAR IMPRESIÓN'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      foregroundColor: EmpireColors.champagneGold,
-                      side: const BorderSide(
-                        color: EmpireColors.champagneGold,
-                        width: 1,
-                      ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => state.retryPrintJob(job.id),
+                  icon: Icon(isFailed ? Icons.refresh : Icons.print, size: 16),
+                  label: Text(
+                    isFailed ? 'REINTENTAR IMPRESIÓN' : 'REIMPRIMIR TICKET',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    foregroundColor: EmpireColors.champagneGold,
+                    side: const BorderSide(
+                      color: EmpireColors.champagneGold,
+                      width: 1,
                     ),
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ],
         ),
       ),

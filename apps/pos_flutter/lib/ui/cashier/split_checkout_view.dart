@@ -125,14 +125,17 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  
+
                   // Amount Summary Card
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: EmpireColors.charcoalSurface,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: EmpireColors.agedBronzeDark, width: 1),
+                      border: Border.all(
+                        color: EmpireColors.agedBronzeDark,
+                        width: 1,
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -156,7 +159,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        
+
                         if (selectedDiscount > 0) ...[
                           const SizedBox(height: 12),
                           Text(
@@ -178,7 +181,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                             ),
                           ),
                         ],
-                        
+
                         const SizedBox(height: 12),
                         const Text(
                           'IVA (16%)',
@@ -198,9 +201,12 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        
-                        const Divider(color: EmpireColors.agedBronzeDark, height: 24),
-                        
+
+                        const Divider(
+                          color: EmpireColors.agedBronzeDark,
+                          height: 24,
+                        ),
+
                         const Text(
                           'TOTAL A COBRAR',
                           style: TextStyle(
@@ -219,7 +225,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                             style: const TextStyle(
                               color: EmpireColors.champagneGold,
                               fontWeight: FontWeight.bold,
-                              fontSize: 28,
+                              fontSize: 20,
                             ),
                           ),
                         ),
@@ -227,7 +233,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Payment method details summary
                   if (selectedPaymentMethod == 'Efectivo') ...[
                     Container(
@@ -253,7 +259,10 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                           const SizedBox(height: 8),
                           const Text(
                             'Recibido',
-                            style: TextStyle(color: EmpireColors.textSecondary, fontSize: 9),
+                            style: TextStyle(
+                              color: EmpireColors.textSecondary,
+                              fontSize: 9,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -267,7 +276,10 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                           const SizedBox(height: 8),
                           const Text(
                             'Cambio',
-                            style: TextStyle(color: EmpireColors.textSecondary, fontSize: 9),
+                            style: TextStyle(
+                              color: EmpireColors.textSecondary,
+                              fontSize: 9,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -282,7 +294,8 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                  ] else if (selectedPaymentMethod == 'Tarjeta' && _cardRefController.text.isNotEmpty) ...[
+                  ] else if (selectedPaymentMethod == 'Tarjeta' &&
+                      _cardRefController.text.isNotEmpty) ...[
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -306,7 +319,10 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                           const SizedBox(height: 8),
                           const Text(
                             'Referencia',
-                            style: TextStyle(color: EmpireColors.textSecondary, fontSize: 9),
+                            style: TextStyle(
+                              color: EmpireColors.textSecondary,
+                              fontSize: 9,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -337,10 +353,8 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
-                'PROCESAR COBRO (\$${currentTotal.toStringAsFixed(2)})',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
+                'PROCESAR COBRO',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ),
