@@ -593,7 +593,7 @@ class _CartSidebarState extends State<CartSidebar> {
                 color: EmpireColors.obsidian,
               ),
               label: const Text(
-                'SOLICITAR CUENTA (POR COBRAR)',
+                'COBRAR CUENTA',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.5,

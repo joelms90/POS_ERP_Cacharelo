@@ -1,7 +1,7 @@
 [
   {
     "id": "planta",
-    "name": "Sucursal Planta",
+    "name": "Sucursal Leyes de Reforma",
     "address": "UAM Sur 21 No. 159 A, entre Calle 8 y Calle 10, Leyes de reforma 1a Secc., Iztapalapa, C.P. 09310 CDMX",
     "phone": "55 9244 9939",
     "latitude": 19.3768,
@@ -194,5 +194,19 @@
     "workingHours": "LUN A SABADO DE 07 AM A 09 PM / SABADO DE 08 AM A 0 PM",
     "workingDays": "Lunes a Sábado",
     "mapsUrl": "NONE"
+  },
+  {
+    "id": "taxquena",
+    "name": "Terminal del Sur Taxqueña",
+    "address": "Av. Taxqueña 1320, Campestre Churubusco, Coyoacán, 04200 CDMX",
+    "phone": "55 9244 9939",
+    "latitude": 19.3424137,
+    "longitude": -99.1414925,
+    "category": "transit",
+    "is24Hours": false,
+    "brands": ["pastes", "hamburguesas", "antano", "excelencia"],
+    "workingHours": "CAFETERIA CACHARELO Sala 2 - 24 HORAS; PASTES CACHARELO Sala 1 y 2 - 24 HORAS; ISLA PASTES CACHARELO Sala 3 - 24 HORAS; HAMBURGUESAS MR CACHARELO Sala 2 - 6 AM a 10 PM; Q TORTAS CACHARELO Sala 2 Puerta Principal - 6 AM a 10 PM",
+    "workingDays": "Lunes a Domingo",
+    "mapsUrl": "https://www.google.com/maps/place/Central+de+Autobuses+del+Sur+Terminal+Taxque%C3%B1a/@19.3424137,-99.1414925,17z/data=!4m6!3m5!1s0x85d1ff52b6d36f5f:0xfd9d7d1de2a2d94b!8m2!3d19.3425214!4d-99.1389545!16s%2Fg%2F11g2260ks9?entry=ttu&g_ep=EgoyMDI2MDYyMi4wIKXMDSoASAFQAw%3D%3D"
   }
 ]

@@ -5,9 +5,11 @@ import '../widgets/table_node.dart';
 import '../widgets/menu_card.dart';
 import '../widgets/custom_toast.dart';
 import '../widgets/printer_monitor_panel.dart';
+import '../widgets/bluetooth_settings_dialog.dart';
 import '../login_screen.dart';
 import 'modifier_dialog.dart';
 import 'cart_sidebar.dart';
+import 'payment_flow_dialog.dart';
 
 class WaiterOrderingScreen extends StatefulWidget {
   final AppState state;
@@ -80,26 +82,32 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                           initialItems: currentCart,
                                           activeGenders: activeGenders,
                                           onRemoveGuest: _handleRemoveGuest,
-                                          onBillingRequested: () {
-                                            widget.state.requestBilling(
-                                              activeOrderingTable!.id,
-                                            );
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                backgroundColor:
-                                                    EmpireColors.successGreen,
-                                                content: Text(
-                                                  'Mesa ${activeOrderingTable!.label} marcada POR COBRAR y pre-cuenta enviada a caja.',
-                                                ),
+                                          onBillingRequested: () async {
+                                            final result = await showDialog<String>(
+                                              context: context,
+                                              builder: (context) => PaymentFlowDialog(
+                                                table: activeOrderingTable!,
+                                                state: widget.state,
                                               ),
                                             );
-                                            setState(() {
-                                              activeOrderingTable = null;
-                                              currentCart = [];
-                                              isCartOpen = false;
-                                            });
+                                            if (result != null) {
+                                              if (!context.mounted) return;
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  backgroundColor: EmpireColors.successGreen,
+                                                  content: Text(
+                                                    result == 'efectivo'
+                                                        ? 'Mesa ${activeOrderingTable!.label} marcada POR COBRAR y pre-cuenta enviada a caja.'
+                                                        : 'Cobro con tarjeta completado. Mesa ${activeOrderingTable!.label} en limpieza.',
+                                                  ),
+                                                ),
+                                              );
+                                              setState(() {
+                                                activeOrderingTable = null;
+                                                currentCart = [];
+                                                isCartOpen = false;
+                                              });
+                                            }
                                           },
                                           onBackToMenu: () => setState(
                                             () => isCartOpen = false,
@@ -437,9 +445,36 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                               LoginScreen(state: widget.state),
                         ),
                       );
+                    } else if (value == 'printer') {
+                      showDialog(
+                        context: context,
+                        builder: (context) =>
+                            BluetoothSettingsDialog(state: widget.state),
+                      );
                     }
                   },
                   itemBuilder: (BuildContext context) => [
+                    const PopupMenuItem<String>(
+                      value: 'printer',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.print,
+                            color: EmpireColors.champagneGold,
+                            size: 18,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Configurar Impresora',
+                            style: TextStyle(
+                              color: EmpireColors.textPrimary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(height: 1),
                     // Connection Simulator Switch in dropdown
                     PopupMenuItem<String>(
                       enabled:

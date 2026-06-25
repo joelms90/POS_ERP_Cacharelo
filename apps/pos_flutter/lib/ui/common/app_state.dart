@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import '../../services/secure_storage_service.dart';
 
 enum TableState { free, occupied, billing, cleaning }
@@ -182,12 +183,18 @@ class AppState extends ChangeNotifier {
   // Active table selected in Waiter / Cashier views
   TableModel? selectedTable;
 
+  // Bluetooth printer connection state
+  String? connectedPrinterMac;
+  String? connectedPrinterName;
+  bool isConnectingPrinter = false;
+
   final SecureStorageService _secureStorageService;
 
   AppState({SecureStorageService? secureStorageService})
     : _secureStorageService = secureStorageService ?? SecureStorageService() {
     _initMockData();
     _seedDefaultUsersOffline();
+    _autoConnectPrinter();
   }
 
   Future<void> _seedDefaultUsersOffline() async {
@@ -535,7 +542,7 @@ class AppState extends ChangeNotifier {
         final hasBarItems = newItems.any((i) => i.item.category == 'Bebidas');
 
         if (hasKitchenItems) {
-          printJobs.add(
+          enqueuePrintJob(
             PrintJob(
               id: '${newJobId}_k',
               title: 'Comanda Cocina - ${tables[index].label}',
@@ -548,13 +555,12 @@ class AppState extends ChangeNotifier {
                   .join('\n'),
               target: 'Cocina',
               timestamp: DateTime.now(),
-              status: isOnline ? 'printed' : 'failed',
             ),
           );
         }
 
         if (hasBarItems) {
-          printJobs.add(
+          enqueuePrintJob(
             PrintJob(
               id: '${newJobId}_b',
               title: 'Comanda Barra - ${tables[index].label}',
@@ -567,7 +573,6 @@ class AppState extends ChangeNotifier {
                   .join('\n'),
               target: 'Barra',
               timestamp: DateTime.now(),
-              status: isOnline ? 'printed' : 'failed',
             ),
           );
         }
@@ -621,7 +626,7 @@ class AppState extends ChangeNotifier {
       }
 
       // Print ticket
-      printJobs.add(
+      enqueuePrintJob(
         PrintJob(
           id: 'rec_${DateTime.now().millisecondsSinceEpoch}',
           title: 'Factura - ${t.label}',
@@ -635,7 +640,6 @@ class AppState extends ChangeNotifier {
                   .join('\n'),
           target: 'Caja',
           timestamp: DateTime.now(),
-          status: isOnline ? 'printed' : 'failed',
         ),
       );
 
@@ -686,12 +690,124 @@ class AppState extends ChangeNotifier {
   }
 
   // Printer Retry logic
-  void retryPrintJob(String jobId) {
+  Future<void> retryPrintJob(String jobId) async {
     final index = printJobs.indexWhere((j) => j.id == jobId);
     if (index != -1) {
-      printJobs[index].status = 'printed';
+      final job = printJobs[index];
+      job.status = 'queued';
+      notifyListeners();
+
+      if (connectedPrinterMac != null) {
+        final success = await _printToPhysicalPrinter(job.details);
+        job.status = success ? 'printed' : 'failed';
+      } else {
+        job.status = 'printed';
+      }
       notifyListeners();
     }
+  }
+
+  // Bluetooth printer connectivity
+  Future<bool> connectToPrinter(String mac, String name) async {
+    isConnectingPrinter = true;
+    notifyListeners();
+    if (mac == '00:11:22:33:44:55') {
+      connectedPrinterMac = mac;
+      connectedPrinterName = name;
+      await _secureStorageService.savePrinter(mac, name);
+      isConnectingPrinter = false;
+      notifyListeners();
+      return true;
+    }
+    try {
+      final success = await PrintBluetoothThermal.connect(macPrinterAddress: mac);
+      if (success) {
+        connectedPrinterMac = mac;
+        connectedPrinterName = name;
+        await _secureStorageService.savePrinter(mac, name);
+        isConnectingPrinter = false;
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Error connecting to printer: $e');
+    }
+    isConnectingPrinter = false;
+    notifyListeners();
+    return false;
+  }
+
+  Future<void> disconnectPrinter() async {
+    if (connectedPrinterMac != '00:11:22:33:44:55') {
+      try {
+        await PrintBluetoothThermal.disconnect;
+      } catch (e) {
+        debugPrint('Error disconnecting printer: $e');
+      }
+    }
+    connectedPrinterMac = null;
+    connectedPrinterName = null;
+    await _secureStorageService.clearSavedPrinter();
+    notifyListeners();
+  }
+
+  Future<void> _autoConnectPrinter() async {
+    try {
+      final saved = await _secureStorageService.getSavedPrinter();
+      if (saved != null) {
+        final mac = saved['mac']!;
+        final name = saved['name']!;
+        if (mac == '00:11:22:33:44:55') {
+          connectedPrinterMac = mac;
+          connectedPrinterName = name;
+          notifyListeners();
+          return;
+        }
+        final success = await PrintBluetoothThermal.connect(macPrinterAddress: mac);
+        if (success) {
+          connectedPrinterMac = mac;
+          connectedPrinterName = name;
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error auto-connecting printer: $e');
+    }
+  }
+
+  Future<bool> _printToPhysicalPrinter(String details) async {
+    if (connectedPrinterMac == null) return false;
+    if (connectedPrinterMac == '00:11:22:33:44:55') {
+      debugPrint('Simulated Printer Print Job:\n$details');
+      return true;
+    }
+    try {
+      final isConnected = await PrintBluetoothThermal.connectionStatus;
+      if (!isConnected) {
+        final reconnected = await PrintBluetoothThermal.connect(macPrinterAddress: connectedPrinterMac!);
+        if (!reconnected) return false;
+      }
+      final bytes = latin1.encode(details + '\n\n\n\n').toList();
+      return await PrintBluetoothThermal.writeBytes(bytes);
+    } catch (e) {
+      debugPrint('Error printing to physical printer: $e');
+      return false;
+    }
+  }
+
+  Future<void> enqueuePrintJob(PrintJob job) async {
+    printJobs.add(job);
+    notifyListeners();
+
+    if (connectedPrinterMac != null) {
+      job.status = 'queued';
+      notifyListeners();
+      final success = await _printToPhysicalPrinter(job.details);
+      job.status = success ? 'printed' : 'failed';
+    } else {
+      job.status = isOnline ? 'printed' : 'failed';
+    }
+    notifyListeners();
   }
 
   // Sync operations manually triggered
@@ -700,5 +816,30 @@ class AppState extends ChangeNotifier {
       pendingSyncCount = 0;
       notifyListeners();
     }
+  }
+
+  // Format helpers for 58mm thermal printer (32 columns max)
+  String formatCenter(String text, {int width = 32}) {
+    if (text.length >= width) return text.substring(0, width);
+    final leftPadding = (width - text.length) ~/ 2;
+    final rightPadding = width - text.length - leftPadding;
+    return ' ' * leftPadding + text + ' ' * rightPadding;
+  }
+
+  String formatRow(String left, String right, {int width = 32}) {
+    if (left.length + right.length >= width) {
+      final allowedLeftWidth = width - right.length - 1;
+      if (allowedLeftWidth > 0) {
+        left = left.substring(0, allowedLeftWidth);
+      } else {
+        return right.substring(0, min(right.length, width));
+      }
+    }
+    final padding = width - left.length - right.length;
+    return left + ' ' * padding + right;
+  }
+
+  String formatDivider({String char = '-', int width = 32}) {
+    return char * width;
   }
 }

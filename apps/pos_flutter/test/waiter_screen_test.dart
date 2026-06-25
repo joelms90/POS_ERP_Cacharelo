@@ -292,13 +292,18 @@ void main() {
     await tester.tap(find.textContaining('VER COMANDA'));
     await tester.pumpAndSettle();
 
-    // 3. Verify SOLICITAR CUENTA button is visible
-    expect(find.text('SOLICITAR CUENTA (POR COBRAR)'), findsOneWidget);
+    // 3. Verify COBRAR CUENTA button is visible
+    expect(find.text('COBRAR CUENTA'), findsOneWidget);
 
-    // 4. Tap SOLICITAR CUENTA
-    await tester.tap(find.text('SOLICITAR CUENTA (POR COBRAR)'));
+    // 4. Tap COBRAR CUENTA
+    await tester.tap(find.text('COBRAR CUENTA'));
+    await tester.pumpAndSettle();
+
+    // 4b. Dialog is shown, tap "IMPRIMIR TICKET" to choose Cash (Efectivo) flow
+    expect(find.text('IMPRIMIR TICKET'), findsOneWidget);
+    await tester.tap(find.text('IMPRIMIR TICKET'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 500));
 
     // 5. Verify we are back to floor map
     expect(find.byIcon(Icons.table_bar), findsOneWidget);

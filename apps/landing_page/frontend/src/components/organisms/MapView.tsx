@@ -41,7 +41,7 @@ export const MapView: React.FC<MapViewProps> = ({
     ? [selectedLocation.latitude, selectedLocation.longitude]
     : defaultCenter;
   
-  const mapZoom = selectedLocation ? 14 : 12;
+  const mapZoom = selectedLocation ? 16 : 10;
 
   return (
     <div className="w-full h-full min-h-[300px] md:min-h-[450px] relative z-10">

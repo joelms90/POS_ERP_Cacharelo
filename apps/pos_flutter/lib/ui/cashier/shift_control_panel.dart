@@ -109,14 +109,13 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
     final reportDetails =
         'Caja Activa\nFecha: ${DateTime.now().toLocal()}\nFondo Inicial: \$${widget.state.cashDrawerAmount.toStringAsFixed(2)}\nTotal Ventas Efectivo: \$${(widget.state.cashDrawerAmount - 1000).toStringAsFixed(2)}\nOperador: ${widget.state.currentUserName}';
 
-    widget.state.printJobs.add(
+    widget.state.enqueuePrintJob(
       PrintJob(
         id: 'report_${DateTime.now().millisecondsSinceEpoch}',
         title: reportTitle,
         details: reportDetails,
         target: 'Caja',
         timestamp: DateTime.now(),
-        status: widget.state.isOnline ? 'printed' : 'failed',
       ),
     );
 

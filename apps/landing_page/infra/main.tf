@@ -96,7 +96,7 @@ resource "google_storage_bucket" "frontend_bucket" {
   name                        = var.bucket_name
   location                    = var.region
   uniform_bucket_level_access = true
-  force_destroy               = false
+  force_destroy               = true
 
   website {
     main_page_suffix = "index.html"
@@ -115,7 +115,7 @@ resource "google_storage_bucket_iam_member" "public_rule" {
 
 # 2. Bucket exclusivo para el código de la función
 resource "google_storage_bucket" "function_bucket" {
-  name                        = "${var.bucket_name}-functions"
+  name                        = "${var.project_id}-landing-functions"
   location                    = var.region
   uniform_bucket_level_access = true
   force_destroy               = true

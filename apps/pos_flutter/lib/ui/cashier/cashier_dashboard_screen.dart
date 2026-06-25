@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../common/colors.dart';
 import '../common/app_state.dart';
 import '../widgets/printer_monitor_panel.dart';
+import '../widgets/bluetooth_settings_dialog.dart';
 import '../login_screen.dart';
 import 'shift_control_panel.dart';
 import 'split_checkout_view.dart';
@@ -353,9 +354,36 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                               LoginScreen(state: widget.state),
                         ),
                       );
+                    } else if (value == 'printer') {
+                      showDialog(
+                        context: context,
+                        builder: (context) =>
+                            BluetoothSettingsDialog(state: widget.state),
+                      );
                     }
                   },
                   itemBuilder: (BuildContext context) => [
+                    const PopupMenuItem<String>(
+                      value: 'printer',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.print,
+                            color: EmpireColors.champagneGold,
+                            size: 18,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Configurar Impresora',
+                            style: TextStyle(
+                              color: EmpireColors.textPrimary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(height: 1),
                     // Connection Simulator Switch in dropdown
                     PopupMenuItem<String>(
                       enabled:

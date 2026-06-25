@@ -104,6 +104,29 @@ class SecureStorageService {
     await _secureStorage.delete(key: _usersCacheKey);
   }
 
+  // Save connected printer info
+  Future<void> savePrinter(String mac, String name) async {
+    await _secureStorage.write(key: 'connected_printer_mac', value: mac);
+    await _secureStorage.write(key: 'connected_printer_name', value: name);
+  }
+
+  // Load connected printer info
+  Future<Map<String, String>?> getSavedPrinter() async {
+    final mac = await _secureStorage.read(key: 'connected_printer_mac');
+    final name = await _secureStorage.read(key: 'connected_printer_name');
+    if (mac != null && name != null) {
+      return {'mac': mac, 'name': name};
+    }
+    return null;
+  }
+
+  // Clear connected printer info
+  Future<void> clearSavedPrinter() async {
+    await _secureStorage.delete(key: 'connected_printer_mac');
+    await _secureStorage.delete(key: 'connected_printer_name');
+  }
+
+
   // Utility functions for Hex conversions
   static String bytesToHex(Uint8List bytes) {
     return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
