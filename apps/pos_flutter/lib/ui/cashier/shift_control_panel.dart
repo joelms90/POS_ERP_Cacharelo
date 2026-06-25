@@ -173,7 +173,7 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
                 decimal: true,
               ),
               decoration: const InputDecoration(
-                labelText: 'Monto Inicial (Float)',
+                labelText: 'Monto Inicial',
                 hintText: 'e.g. 1000.00',
                 prefixText: '\$ ',
               ),
@@ -205,13 +205,16 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
               ),
             ),
             const SizedBox(height: 20),
-    
+
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: EmpireColors.charcoalSurface,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: EmpireColors.agedBronzeDark, width: 1),
+                border: Border.all(
+                  color: EmpireColors.agedBronzeDark,
+                  width: 1,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -245,7 +248,7 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
               ),
             ),
             const SizedBox(height: 24),
-    
+
             // Cash Flow Actions
             const Text(
               'MOVIMIENTOS DE CAJA',
@@ -275,9 +278,9 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
                 foregroundColor: Colors.white,
               ),
             ),
-    
+
             const SizedBox(height: 24),
-    
+
             // Z / X Reports
             const Text(
               'CORTES PARCIALES / FINALES',
@@ -297,7 +300,10 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
               onPressed: () => _printCorte('Z'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: EmpireColors.errorRed,
-                side: const BorderSide(color: EmpireColors.errorRed, width: 1.2),
+                side: const BorderSide(
+                  color: EmpireColors.errorRed,
+                  width: 1.2,
+                ),
               ),
               child: const Text('CORTE Z (CIERRE DE CAJA)'),
             ),

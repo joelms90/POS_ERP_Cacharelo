@@ -128,96 +128,93 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
               border: Border.all(color: EmpireColors.agedBronzeDark, width: 1),
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Subtotal Subcuenta',
-                      style: TextStyle(
-                        color: EmpireColors.textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
-                    Text(
-                      '\$${currentSubtotal.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: EmpireColors.textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                // Subtotal
+                const Text(
+                  'SUBTOTAL SUBCUENTA',
+                  style: TextStyle(
+                    color: EmpireColors.textSecondary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  '\$${currentSubtotal.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    color: EmpireColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                
                 if (selectedDiscount > 0) ...[
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Descuento (${selectedDiscount.toInt()}%)',
-                        style: const TextStyle(
-                          color: EmpireColors.textSecondary,
-                          fontSize: 13,
-                        ),
-                      ),
-                      Text(
-                        '-\$${discountAmount.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          color: EmpireColors.errorRed,
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 12),
+                  Text(
+                    'DESCUENTO (${selectedDiscount.toInt()}%)',
+                    style: const TextStyle(
+                      color: EmpireColors.textSecondary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '-\$${discountAmount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: EmpireColors.errorRed,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'IVA (16%)',
-                      style: TextStyle(
-                        color: EmpireColors.textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
-                    Text(
-                      '\$${currentTax.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: EmpireColors.textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                
+                const SizedBox(height: 12),
+                const Text(
+                  'IVA (16%)',
+                  style: TextStyle(
+                    color: EmpireColors.textSecondary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
                 ),
-                const Divider(color: EmpireColors.agedBronzeDark, height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'TOTAL A COBRAR',
-                      style: TextStyle(
-                        color: EmpireColors.textGold,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
+                const SizedBox(height: 4),
+                Text(
+                  '\$${currentTax.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    color: EmpireColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                
+                const Divider(color: EmpireColors.agedBronzeDark, height: 24),
+                
+                const Text(
+                  'TOTAL A COBRAR',
+                  style: TextStyle(
+                    color: EmpireColors.textGold,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '\$${currentTotal.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: EmpireColors.champagneGold,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 28,
                     ),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        '\$${currentTotal.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          color: EmpireColors.champagneGold,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -246,40 +243,33 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Recibido:',
-                        style: TextStyle(color: EmpireColors.textSecondary, fontSize: 11),
-                      ),
-                      Text(
-                        '\$${(double.tryParse(_cashReceivedController.text) ?? 0.0).toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          color: EmpireColors.textPrimary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Recibido',
+                    style: TextStyle(color: EmpireColors.textSecondary, fontSize: 9),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Cambio:',
-                        style: TextStyle(color: EmpireColors.textSecondary, fontSize: 11),
-                      ),
-                      Text(
-                        '\$${cashChange.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          color: EmpireColors.successGreen,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 2),
+                  Text(
+                    '\$${(double.tryParse(_cashReceivedController.text) ?? 0.0).toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: EmpireColors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Cambio',
+                    style: TextStyle(color: EmpireColors.textSecondary, fontSize: 9),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '\$${cashChange.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: EmpireColors.successGreen,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -306,12 +296,18 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Referencia',
+                    style: TextStyle(color: EmpireColors.textSecondary, fontSize: 9),
+                  ),
+                  const SizedBox(height: 2),
                   Text(
-                    'Ref: ${_cardRefController.text}',
+                    _cardRefController.text,
                     style: const TextStyle(
                       color: EmpireColors.textPrimary,
-                      fontSize: 12,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
                       fontFamily: 'monospace',
                     ),
                   ),
