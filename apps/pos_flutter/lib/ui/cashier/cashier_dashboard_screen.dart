@@ -51,52 +51,52 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
 
                     // Main dashboard workspace
                     Expanded(
-                      child: Row(
-                        children: [
-                          // Left Panel: Shift control
-                          Expanded(
-                            flex: 6,
-                            child: Container(
-                              decoration: const BoxDecoration(
-                                border: Border(
-                                  right: BorderSide(
-                                    color: EmpireColors.agedBronzeDark,
-                                    width: 1.5,
+                      child: (selectedTableForCheckout != null && widget.state.isShiftOpen)
+                          ? SplitCheckoutView(
+                              table: selectedTableForCheckout!,
+                              state: widget.state,
+                              onCancel: () {
+                                setState(
+                                  () => selectedTableForCheckout = null,
+                                );
+                              },
+                              onSuccess: () {
+                                setState(
+                                  () => selectedTableForCheckout = null,
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    backgroundColor:
+                                        EmpireColors.successGreen,
+                                    content: Text(
+                                      'Facturación completada con éxito. Mesa liberada.',
+                                    ),
+                                  ),
+                                );
+                              },
+                            )
+                          : Row(
+                              children: [
+                                // Left Panel: Shift control
+                                Expanded(
+                                  flex: 6,
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      border: Border(
+                                        right: BorderSide(
+                                          color: EmpireColors.agedBronzeDark,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                    ),
+                                    child: ShiftControlPanel(state: widget.state),
                                   ),
                                 ),
-                              ),
-                              child: ShiftControlPanel(state: widget.state),
-                            ),
-                          ),
 
-                          // Main Area: Either Active tables grid or Full-screen Checkout (flex 18)
-                          Expanded(
-                            flex: 18,
-                            child: (selectedTableForCheckout != null && widget.state.isShiftOpen)
-                                ? SplitCheckoutView(
-                                    table: selectedTableForCheckout!,
-                                    state: widget.state,
-                                    onCancel: () {
-                                      setState(
-                                        () => selectedTableForCheckout = null,
-                                      );
-                                    },
-                                    onSuccess: () {
-                                      setState(
-                                        () => selectedTableForCheckout = null,
-                                      );
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          backgroundColor:
-                                              EmpireColors.successGreen,
-                                          content: Text(
-                                            'Facturación completada con éxito. Mesa liberada.',
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  )
-                                : Column(
+                                // Main Area: Active tables grid (flex 18)
+                                Expanded(
+                                  flex: 18,
+                                  child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.stretch,
                                     children: [
                                       _buildFilterBar(),
@@ -109,9 +109,9 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                                       ),
                                     ],
                                   ),
-                          ),
-                        ],
-                      ),
+                                ),
+                              ],
+                            ),
                     ),
                   ],
                 ),
