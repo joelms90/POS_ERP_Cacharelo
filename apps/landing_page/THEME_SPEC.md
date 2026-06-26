@@ -752,4 +752,4 @@ This theme specification is proprietary to **Grupo Cacharelo**. Use across all G
 - **Reference Implementation:** `apps/landing_page/frontend/src/index.css`
 - **Component Library:** `apps/landing_page/frontend/src/components/`
 
-For questions or updates, contact: desarrollo@cacharelo.com
+For questions or updates, contact: contacto@cacharelo.com
