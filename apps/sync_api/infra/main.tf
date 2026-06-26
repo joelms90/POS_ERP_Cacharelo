@@ -19,7 +19,8 @@ resource "google_project_service" "services" {
     "run.googleapis.com",
     "sqladmin.googleapis.com",
     "artifactregistry.googleapis.com",
-    "storage.googleapis.com"
+    "storage.googleapis.com",
+    "cloudbuild.googleapis.com"
   ])
   service            = each.key
   disable_on_destroy = false
@@ -150,6 +151,8 @@ resource "google_cloud_run_service" "pos_api" {
         # Connect Cloud SQL socket mapping to container filesystem
         "run.googleapis.com/cloudsql-instances" = google_sql_database_instance.postgres_instance.connection_name
         "run.googleapis.com/client-name"        = "terraform"
+        # Allocate CPU only during request processing (free-tier budget safety)
+        "run.googleapis.com/cpu-throttling"     = "true"
       }
     }
   }
