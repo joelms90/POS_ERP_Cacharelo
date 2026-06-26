@@ -50,7 +50,7 @@ export const users = pgTable('users', {
   name: varchar('name', { length: 100 }).notNull(),
   email: varchar('email', { length: 255 }).unique(),
   passwordHash: varchar('password_hash', { length: 255 }),
-  pin: varchar('pin', { length: 4 }).notNull(), // Checked for uniqueness per business
+  pin: varchar('pin', { length: 255 }).notNull(), // Checked for uniqueness per business
   role: varchar('role', { length: 20 }).notNull(), // waiter, cashier, kitchen, admin
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
