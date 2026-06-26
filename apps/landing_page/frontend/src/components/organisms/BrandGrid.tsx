@@ -54,16 +54,18 @@ export const BrandGrid: React.FC = () => {
     },
   ];
 
-  // Smooth scroll to the details panel when opened
+  // Smooth scroll to the section heading when a brand is clicked
   React.useEffect(() => {
     if (activeBrandId) {
-      const element = document.getElementById('brand-detail-panel');
+      const element = document.getElementById('marcas');
       if (element) {
         setTimeout(() => {
-          if (element && typeof element.scrollIntoView === 'function') {
-            element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          }
-        }, 150);
+          const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
+          window.scrollTo({
+            top: elementPosition,
+            behavior: 'smooth'
+          });
+        }, 300);
       }
     }
   }, [activeBrandId]);
@@ -73,7 +75,7 @@ export const BrandGrid: React.FC = () => {
   return (
     <section className="w-full py-24 px-margin-mobile md:px-margin-desktop bg-[#0B0B0C]" id="marcas">
       <div className="max-w-container-max mx-auto flex flex-col items-center">
-        <Typography variant="h2" className="text-[#d4b038]  mb-16 text-center font-spec-hero">
+        <Typography variant="h2" className="text-[#d4b038]  mb-16 text-center font-spec-hero" id="brands-section-heading">
           NUESTRAS CUATRO MARCAS
         </Typography>
         

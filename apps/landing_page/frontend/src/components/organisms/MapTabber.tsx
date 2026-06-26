@@ -21,6 +21,20 @@ export const MapTabber: React.FC = () => {
     setSelectedLocation(null);
   };
 
+  // Smooth scroll to the section heading when a tab is clicked
+  React.useEffect(() => {
+    const element = document.getElementById('territorios');
+    if (element) {
+      setTimeout(() => {
+        const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
+        window.scrollTo({
+          top: elementPosition,
+          behavior: 'smooth'
+        });
+      }, 300);
+    }
+  }, [activeTab]);
+
   const handleSelectLocation = (location: Location) => {
     setSelectedLocation(location);
   };
@@ -28,7 +42,7 @@ export const MapTabber: React.FC = () => {
   return (
     <section className="w-full py-24 px-margin-mobile md:px-margin-desktop bg-[#0B0B0C]" id="territorios">
       <div className="max-w-container-max mx-auto">
-        <Typography variant="h2" className="mb-12 text-center font-spec-hero text-[#d4b038]">
+        <Typography variant="h2" className="mb-12 text-center font-spec-hero text-[#d4b038]" id="territorios-section-heading">
           LOS TERRITORIOS Y OPERACIONES
         </Typography>
 

@@ -6,11 +6,17 @@ export const Header: React.FC = () => {
   const handleScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
     e.preventDefault();
     setMobileMenuOpen(false);
-    const element = document.getElementById(targetId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    } else if (targetId === 'top') {
+    if (targetId === 'top') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      const element = document.getElementById(targetId);
+      if (element) {
+        const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
+        window.scrollTo({
+          top: elementPosition,
+          behavior: 'smooth'
+        });
+      }
     }
   };
 
@@ -65,7 +71,13 @@ export const Header: React.FC = () => {
           <button
             onClick={() => {
               const element = document.getElementById('contacto');
-              if (element) element.scrollIntoView({ behavior: 'smooth' });
+              if (element) {
+                const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
+                window.scrollTo({
+                  top: elementPosition,
+                  behavior: 'smooth'
+                });
+              }
             }}
             className="bg-primary-container text-on-primary-container px-6 py-2 rounded-[4px] font-sans font-semibold text-xs uppercase hover:shadow-glow-gold hover:bg-[#d4b038] transition-all duration-300 active:scale-95 cursor-pointer"
           >
@@ -124,7 +136,13 @@ export const Header: React.FC = () => {
               onClick={() => {
                 setMobileMenuOpen(false);
                 const element = document.getElementById('contacto');
-                if (element) element.scrollIntoView({ behavior: 'smooth' });
+                if (element) {
+                  const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
+                  window.scrollTo({
+                    top: elementPosition,
+                    behavior: 'smooth'
+                  });
+                }
               }}
               className="w-full bg-primary-container text-on-primary-container py-3 rounded-[4px] font-sans font-semibold text-xs uppercase tracking-widest hover:shadow-glow-gold transition-all duration-300 cursor-pointer"
             >
