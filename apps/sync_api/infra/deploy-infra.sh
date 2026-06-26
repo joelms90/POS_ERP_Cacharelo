@@ -15,9 +15,14 @@ echo "=================================================="
 echo "📦 Step 1: Initializing Terraform..."
 terraform init
 
-# Step 2: Provision Artifact Registry and IAM Policy first (bootstrap)
+# Step 2: Provision Artifact Registry and IAM Policies first (bootstrap)
 echo "📦 Step 2: Bootstrapping Artifact Registry and Cloud Build permissions..."
-terraform apply -target=google_artifact_registry_repository.pos_repo -target=google_project_iam_member.compute_storage_viewer -auto-approve
+terraform apply \
+  -target=google_artifact_registry_repository.pos_repo \
+  -target=google_project_iam_member.compute_storage_viewer \
+  -target=google_project_iam_member.compute_registry_writer \
+  -target=google_project_iam_member.compute_logging_writer \
+  -auto-approve
 
 # Step 3: Build & push container image using Cloud Build (no local Docker required!)
 echo "📦 Step 3: Building container image in the cloud via GCP Cloud Build..."

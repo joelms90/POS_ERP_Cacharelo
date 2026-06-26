@@ -180,3 +180,17 @@ resource "google_project_iam_member" "compute_storage_viewer" {
   role    = "roles/storage.objectViewer"
   member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 }
+
+# Grant Compute service account writer rights to push images to Artifact Registry
+resource "google_project_iam_member" "compute_registry_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
+
+# Grant Compute service account logs writer rights for build logs
+resource "google_project_iam_member" "compute_logging_writer" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
