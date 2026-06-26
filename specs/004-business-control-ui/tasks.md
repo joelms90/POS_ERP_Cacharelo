@@ -50,9 +50,9 @@
 
 ### Implementation for User Story 1
 
-- [ ] T011 [P] [US1] Create LoginForm organism in `apps/business_control_tauri/src/components/organisms/LoginForm.tsx`
-- [ ] T012 [P] [US1] Create LoginPage view component in `apps/business_control_tauri/src/pages/LoginPage.tsx`
-- [ ] T013 [US1] Integrate LoginPage with routing controls and locking middleware in `apps/business_control_tauri/src/main.tsx`
+- [x] T011 [P] [US1] Create LoginForm organism in `apps/business_control_tauri/src/components/organisms/LoginForm.tsx`
+- [x] T012 [P] [US1] Create LoginPage view component in `apps/business_control_tauri/src/pages/LoginPage.tsx`
+- [x] T013 [US1] Integrate LoginPage with routing controls and locking middleware in `apps/business_control_tauri/src/main.tsx`
 
 **Checkpoint**: At this point, User Story 1 is fully functional and testable independently.
 
@@ -66,11 +66,11 @@
 
 ### Implementation for User Story 2
 
-- [ ] T014 [P] [US2] Implement user API endpoints client methods (`getUsers`, `addUser`, `deleteUser`) in `apps/business_control_tauri/src/services/api.ts`
-- [ ] T015 [P] [US2] Create UserForm organism for registering employees in `apps/business_control_tauri/src/components/organisms/UserForm.tsx`
-- [ ] T016 [P] [US2] Create UsersGrid organism for listing employees in `apps/business_control_tauri/src/components/organisms/UsersGrid.tsx`
-- [ ] T017 [US2] Create DashboardPage view component in `apps/business_control_tauri/src/pages/DashboardPage.tsx`
-- [ ] T018 [US2] Integrate UserForm and UsersGrid inside DashboardPage and wire mutations to the API client methods.
+- [x] T014 [P] [US2] Implement user API endpoints client methods (`getUsers`, `addUser`, `deleteUser`) in `apps/business_control_tauri/src/services/api.ts`
+- [x] T015 [P] [US2] Create UserForm organism for registering employees in `apps/business_control_tauri/src/components/organisms/UserForm.tsx`
+- [x] T016 [P] [US2] Create UsersGrid organism for listing employees in `apps/business_control_tauri/src/components/organisms/UsersGrid.tsx`
+- [x] T017 [US2] Create DashboardPage view component in `apps/business_control_tauri/src/pages/DashboardPage.tsx`
+- [x] T018 [US2] Integrate UserForm and UsersGrid inside DashboardPage and wire mutations to the API client methods.
 
 **Checkpoint**: At this point, User Stories 1 and 2 are fully functional together.
 
@@ -84,9 +84,9 @@
 
 ### Implementation for User Story 3
 
-- [ ] T019 [P] [US3] Implement health check query in `apps/business_control_tauri/src/services/api.ts`
-- [ ] T020 [P] [US3] Create StatusIndicator and SystemHealthPanel components in `apps/business_control_tauri/src/components/molecules/StatusIndicator.tsx` and `src/components/organisms/SystemHealthPanel.tsx`
-- [ ] T021 [US3] Add StatusIndicator and SystemHealthPanel to the AdminLayout header/sidebar and poll backend status every 10 seconds.
+- [x] T019 [P] [US3] Implement health check query in `apps/business_control_tauri/src/services/api.ts`
+- [x] T020 [P] [US3] Create StatusIndicator and SystemHealthPanel components in `apps/business_control_tauri/src/components/molecules/StatusIndicator.tsx` and `src/components/organisms/SystemHealthPanel.tsx`
+- [x] T021 [US3] Add StatusIndicator and SystemHealthPanel to the AdminLayout header/sidebar and poll backend status every 10 seconds.
 
 **Checkpoint**: All user stories are independently functional.
 
@@ -96,10 +96,10 @@
 
 **Purpose**: Native window refinements and packaging
 
-- [ ] T022 Configure Tauri window size constraints (min size 1024x768), native decorations, and application name in `apps/business_control_tauri/src-tauri/tauri.conf.json`
-- [ ] T023 Refine visual layout responsive spacing, scrollbars, and hover transitions across all components
-- [ ] T024 Write build instructions, requirements, and quickstart notes in `apps/business_control_tauri/README.md`
-- [ ] T025 Run quickstart.md validation checks and verify overall visual stability
+- [x] T022 Configure Tauri window size constraints (min size 1024x768), native decorations, and application name in `apps/business_control_tauri/src-tauri/tauri.conf.json`
+- [x] T023 Refine visual layout responsive spacing, scrollbars, and hover transitions across all components
+- [x] T024 Write build instructions, requirements, and quickstart notes in `apps/business_control_tauri/README.md`
+- [x] T025 Run quickstart.md validation checks and verify overall visual stability
 
 ---
 
