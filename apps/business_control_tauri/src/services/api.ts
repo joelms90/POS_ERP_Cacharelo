@@ -99,10 +99,13 @@ export const api = {
    * Create a new user profile
    */
   async addUser(employee: Omit<Employee, 'id'>): Promise<{ success: boolean; user: Employee }> {
-    return apiRequest<{ success: boolean; user: Employee }>('/users', {
+    const response = await apiRequest<Employee | Employee[]>('/users', {
       method: 'POST',
       body: JSON.stringify(employee),
     });
+    
+    const user = Array.isArray(response) ? response[0] : response;
+    return { success: true, user };
   },
 
   /**
