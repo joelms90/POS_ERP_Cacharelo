@@ -7,9 +7,20 @@ import { AuthModule } from './modules/auth/auth.module';
 import { SyncModule } from './modules/sync/sync.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { ShiftsModule } from './modules/shifts/shifts.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { KitchenModule } from './modules/kitchen/kitchen.module';
 
 @Module({
-  imports: [DatabaseModule, UsersModule, AuthModule, SyncModule, CatalogModule, ShiftsModule],
+  imports: [
+    DatabaseModule,
+    UsersModule,
+    AuthModule,
+    SyncModule,
+    CatalogModule,
+    ShiftsModule,
+    OrdersModule,
+    KitchenModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

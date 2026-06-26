@@ -186,3 +186,14 @@ export const deviceSyncCheckpoints = pgTable('device_sync_checkpoints', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const kitchenTickets = pgTable('kitchen_tickets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orderId: uuid('order_id').references(() => orders.id).notNull(),
+  status: varchar('status', { length: 20 }).default('pending').notNull(), // pending, preparing, ready, served
+  station: varchar('station', { length: 50 }).notNull(), // cocina, barra
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  readyAt: timestamp('ready_at', { withTimezone: true }),
+  servedAt: timestamp('served_at', { withTimezone: true }),
+});
