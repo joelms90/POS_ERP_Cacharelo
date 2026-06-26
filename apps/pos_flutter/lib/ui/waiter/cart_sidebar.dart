@@ -9,7 +9,7 @@ class CartSidebar extends StatefulWidget {
   final Future<bool> Function() onRemoveGuest;
   final VoidCallback? onBillingRequested;
   final VoidCallback onBackToMenu;
-  final Function(List<OrderItem> finalItems, int guests) onConfirm;
+  final Function(List<OrderItem> finalItems, int guests, bool shouldPrint) onConfirm;
   final VoidCallback onCancel;
 
   const CartSidebar({
@@ -134,7 +134,7 @@ class _CartSidebarState extends State<CartSidebar> {
         .where((i) => !i.isSent)
         .fold<int>(0, (sum, i) => sum + i.quantity);
 
-    final confirm = await showDialog<bool>(
+    final result = await showDialog<String>(
       context: context,
       builder: (context) => Dialog(
         backgroundColor: EmpireColors.obsidian,
@@ -179,32 +179,40 @@ class _CartSidebarState extends State<CartSidebar> {
                 ),
               ),
               const SizedBox(height: 24),
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(
-                          color: EmpireColors.textSecondary,
-                        ),
-                        foregroundColor: EmpireColors.textPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: const Text('CANCELAR'),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop('enviar_e_imprimir'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: EmpireColors.champagneGold,
+                      foregroundColor: EmpireColors.obsidian,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
+                    child: const Text('ENVIAR E IMPRIMIR COMANDA'),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: EmpireColors.champagneGold,
-                        foregroundColor: EmpireColors.obsidian,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: const Text('ENVIAR COMANDA'),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop('enviar_solamente'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: EmpireColors.charcoalSurface,
+                      foregroundColor: EmpireColors.textPrimary,
+                      side: const BorderSide(color: EmpireColors.agedBronze, width: 1),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
+                    child: const Text('ENVIAR COMANDA (SIN IMPRIMIR)'),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(null),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(
+                        color: EmpireColors.textSecondary,
+                      ),
+                      foregroundColor: EmpireColors.textPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('CANCELAR'),
                   ),
                 ],
               ),
@@ -214,8 +222,9 @@ class _CartSidebarState extends State<CartSidebar> {
       ),
     );
 
-    if (confirm == true) {
-      widget.onConfirm(_cartItems, _guests);
+    if (result != null) {
+      final shouldPrint = result == 'enviar_e_imprimir';
+      widget.onConfirm(_cartItems, _guests, shouldPrint);
     }
   }
 

@@ -514,8 +514,9 @@ class AppState extends ChangeNotifier {
     int tableId,
     List<OrderItem> cartItems,
     int guestsCount,
-    List<String> genders,
-  ) {
+    List<String> genders, {
+    bool printComanda = false,
+  }) {
     final index = tables.indexWhere((t) => t.id == tableId);
     if (index != -1) {
       // Filter out only new (unsent) items to print and send to kitchen
@@ -541,39 +542,81 @@ class AppState extends ChangeNotifier {
         );
         final hasBarItems = newItems.any((i) => i.item.category == 'Bebidas');
 
+        final dateStr = DateTime.now().toString().substring(0, 16);
+
         if (hasKitchenItems) {
+          final buffer = StringBuffer();
+          buffer.writeln(formatCenter('=== COMANDA COCINA ==='));
+          buffer.writeln(formatCenter(tables[index].label));
+          buffer.writeln(formatRow('Fecha:', dateStr));
+          buffer.writeln(formatRow('Mesero:', currentUserName));
+          buffer.writeln(formatDivider());
+          
+          final kitchenItems = newItems.where((i) => i.item.category != 'Bebidas');
+          for (final item in kitchenItems) {
+            buffer.writeln('${item.quantity}x ${item.item.name}');
+            if (item.assignedGuest != null) {
+              final guest = item.assignedGuest!;
+              final displayGuest = guest.startsWith('P') ? 'Persona ${guest.substring(1)}' : guest;
+              buffer.writeln('  [$displayGuest]');
+            }
+            if (item.modifiers.isNotEmpty) {
+              buffer.writeln('  + ${item.modifiers.join(', ')}');
+            }
+            if (item.notes.isNotEmpty) {
+              buffer.writeln('  * Nota: ${item.notes}');
+            }
+          }
+          buffer.writeln(formatDivider());
+          buffer.writeln('');
+
           enqueuePrintJob(
             PrintJob(
               id: '${newJobId}_k',
               title: 'Comanda Cocina - ${tables[index].label}',
-              details: newItems
-                  .where((i) => i.item.category != 'Bebidas')
-                  .map(
-                    (i) =>
-                        '${i.quantity}x ${i.item.name} (${i.modifiers.join(', ')}) ${i.notes}',
-                  )
-                  .join('\n'),
+              details: buffer.toString(),
               target: 'Cocina',
               timestamp: DateTime.now(),
             ),
+            forcePhysical: printComanda,
           );
         }
 
         if (hasBarItems) {
+          final buffer = StringBuffer();
+          buffer.writeln(formatCenter('=== COMANDA BARRA ==='));
+          buffer.writeln(formatCenter(tables[index].label));
+          buffer.writeln(formatRow('Fecha:', dateStr));
+          buffer.writeln(formatRow('Mesero:', currentUserName));
+          buffer.writeln(formatDivider());
+          
+          final barItems = newItems.where((i) => i.item.category == 'Bebidas');
+          for (final item in barItems) {
+            buffer.writeln('${item.quantity}x ${item.item.name}');
+            if (item.assignedGuest != null) {
+              final guest = item.assignedGuest!;
+              final displayGuest = guest.startsWith('P') ? 'Persona ${guest.substring(1)}' : guest;
+              buffer.writeln('  [$displayGuest]');
+            }
+            if (item.modifiers.isNotEmpty) {
+              buffer.writeln('  + ${item.modifiers.join(', ')}');
+            }
+            if (item.notes.isNotEmpty) {
+              buffer.writeln('  * Nota: ${item.notes}');
+            }
+          }
+          buffer.writeln(formatDivider());
+          buffer.writeln('');
+
           enqueuePrintJob(
             PrintJob(
               id: '${newJobId}_b',
               title: 'Comanda Barra - ${tables[index].label}',
-              details: newItems
-                  .where((i) => i.item.category == 'Bebidas')
-                  .map(
-                    (i) =>
-                        '${i.quantity}x ${i.item.name} (${i.modifiers.join(', ')}) ${i.notes}',
-                  )
-                  .join('\n'),
+              details: buffer.toString(),
               target: 'Barra',
               timestamp: DateTime.now(),
             ),
+            forcePhysical: printComanda,
           );
         }
 
@@ -825,11 +868,11 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> enqueuePrintJob(PrintJob job) async {
+  Future<void> enqueuePrintJob(PrintJob job, {bool forcePhysical = false}) async {
     printJobs.add(job);
     notifyListeners();
 
-    if (connectedPrinterMac != null && job.target == 'Caja') {
+    if (connectedPrinterMac != null && (job.target == 'Caja' || forcePhysical)) {
       job.status = 'queued';
       notifyListeners();
       final success = await _printToPhysicalPrinter(job.details);

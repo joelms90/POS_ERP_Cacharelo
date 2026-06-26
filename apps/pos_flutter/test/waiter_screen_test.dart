@@ -1,7 +1,60 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:pos_flutter/services/secure_storage_service.dart';
 import 'package:pos_flutter/ui/common/app_state.dart';
 import 'package:pos_flutter/ui/waiter/waiter_ordering_screen.dart';
+
+class FakeSecureStorage implements FlutterSecureStorage {
+  final Map<String, String> _storage = {};
+
+  @override
+  Future<String?> read({
+    required String key,
+    aOptions,
+    iOptions,
+    lOptions,
+    webOptions,
+    mOptions,
+    wOptions,
+  }) async {
+    return _storage[key];
+  }
+
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    aOptions,
+    iOptions,
+    lOptions,
+    webOptions,
+    mOptions,
+    wOptions,
+  }) async {
+    if (value == null) {
+      _storage.remove(key);
+    } else {
+      _storage[key] = value;
+    }
+  }
+
+  @override
+  Future<void> delete({
+    required String key,
+    aOptions,
+    iOptions,
+    lOptions,
+    webOptions,
+    mOptions,
+    wOptions,
+  }) async {
+    _storage.remove(key);
+  }
+
+  @override
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 void main() {
   testWidgets(
@@ -105,8 +158,8 @@ void main() {
 
     // Verify dialog is shown and confirm order
     expect(find.text('Confirmar Envío'), findsOneWidget);
-    expect(find.text('ENVIAR COMANDA'), findsOneWidget);
-    await tester.tap(find.text('ENVIAR COMANDA'));
+    expect(find.text('ENVIAR COMANDA (SIN IMPRIMIR)'), findsOneWidget);
+    await tester.tap(find.text('ENVIAR COMANDA (SIN IMPRIMIR)'));
 
     // Use pump instead of pumpAndSettle to avoid timing out on SnackBar duration
     await tester.pump();
@@ -351,8 +404,8 @@ void main() {
       await tester.tap(find.text('CONFIRMAR PEDIDO'));
       await tester.pumpAndSettle();
       expect(find.text('Confirmar Envío'), findsOneWidget);
-      expect(find.text('ENVIAR COMANDA'), findsOneWidget);
-      await tester.tap(find.text('ENVIAR COMANDA'));
+      expect(find.text('ENVIAR COMANDA (SIN IMPRIMIR)'), findsOneWidget);
+      await tester.tap(find.text('ENVIAR COMANDA (SIN IMPRIMIR)'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -384,8 +437,8 @@ void main() {
       await tester.tap(find.text('CONFIRMAR PEDIDO'));
       await tester.pumpAndSettle();
       expect(find.text('Confirmar Envío'), findsOneWidget);
-      expect(find.text('ENVIAR COMANDA'), findsOneWidget);
-      await tester.tap(find.text('ENVIAR COMANDA'));
+      expect(find.text('ENVIAR COMANDA (SIN IMPRIMIR)'), findsOneWidget);
+      await tester.tap(find.text('ENVIAR COMANDA (SIN IMPRIMIR)'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -398,6 +451,60 @@ void main() {
       );
 
       // Reset view size
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    },
+  );
+
+  testWidgets(
+    'WaiterOrderingScreen Enviar e Imprimir comanda flow test',
+    (WidgetTester tester) async {
+      final fakeStorage = FakeSecureStorage();
+      final secureStorageService = SecureStorageService(secureStorage: fakeStorage);
+      final state = AppState(secureStorageService: secureStorageService);
+      state.currentUserRole = UserRole.waiter;
+      state.currentUserName = 'Juan (Mesero)';
+      await state.connectToPrinter('00:11:22:33:44:55', 'Test Printer');
+
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1.0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(useMaterial3: true),
+          home: WaiterOrderingScreen(state: state),
+        ),
+      );
+
+      // Select Mesa 1
+      await tester.tap(find.text('Mesa 1'));
+      await tester.pumpAndSettle();
+
+      // Add Lasagna Bolognesa
+      await tester.tap(find.text('Lasagna Bolognesa'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('AGREGAR ÍTEM'));
+      await tester.pumpAndSettle();
+
+      // Confirm order with printing
+      await tester.tap(find.textContaining('VER COMANDA'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CONFIRMAR PEDIDO'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Confirmar Envío'), findsOneWidget);
+      expect(find.text('ENVIAR E IMPRIMIR COMANDA'), findsOneWidget);
+      await tester.tap(find.text('ENVIAR E IMPRIMIR COMANDA'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Verify print job is created and marked as printed (since printer is connected and forcePhysical: true)
+      expect(state.printJobs.length, 1);
+      expect(state.printJobs.first.details, contains('Lasagna Bolognesa'));
+      expect(state.printJobs.first.details, contains('Mesa 1'));
+      expect(state.printJobs.first.details, contains('Persona 1'));
+      expect(state.printJobs.first.status, 'printed');
+
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
     },

@@ -112,12 +112,13 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                           onBackToMenu: () => setState(
                                             () => isCartOpen = false,
                                           ),
-                                          onConfirm: (finalItems, guests) {
+                                          onConfirm: (finalItems, guests, shouldPrint) {
                                             widget.state.submitOrder(
                                               activeOrderingTable!.id,
                                               finalItems,
                                               guests,
                                               activeGenders,
+                                              printComanda: shouldPrint,
                                             );
 
                                             ScaffoldMessenger.of(
@@ -127,7 +128,9 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                                 backgroundColor:
                                                     EmpireColors.successGreen,
                                                 content: Text(
-                                                  '¡Pedido confirmado para la ${activeOrderingTable!.label}! Comanda enviada.',
+                                                  shouldPrint
+                                                      ? '¡Pedido confirmado para la ${activeOrderingTable!.label}! Comanda enviada e imprimiendo...'
+                                                      : '¡Pedido confirmado para la ${activeOrderingTable!.label}! Comanda enviada.',
                                                   style: const TextStyle(
                                                     fontWeight: FontWeight.bold,
                                                   ),
