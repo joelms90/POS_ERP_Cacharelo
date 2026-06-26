@@ -18,10 +18,10 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Bootstrap Tauri application at `apps/business_control_tauri` using `pnpm create tauri-app --template react-ts --manager pnpm --yes`
-- [ ] T002 Install Tailwind CSS dependencies (`tailwindcss`, `postcss`, `autoprefixer`) in `apps/business_control_tauri`
-- [ ] T003 Configure Tailwind design tokens (Obsidian, Onyx, Gold, Bronze) in `apps/business_control_tauri/tailwind.config.js`
-- [ ] T004 [P] Configure Vite dev server and target build options in `apps/business_control_tauri/vite.config.ts`
+- [x] T001 Bootstrap Tauri application at `apps/business_control_tauri` using `pnpm create tauri-app --template react-ts --manager pnpm --yes`
+- [x] T002 Install Tailwind CSS dependencies (`tailwindcss`, `postcss`, `autoprefixer`) in `apps/business_control_tauri`
+- [x] T003 Configure Tailwind design tokens (Obsidian, Onyx, Gold, Bronze) in `apps/business_control_tauri/tailwind.config.js`
+- [x] T004 [P] Configure Vite dev server and target build options in `apps/business_control_tauri/vite.config.ts`
 
 ---
 
@@ -31,12 +31,12 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 Setup custom fonts (Inter & Bodoni Moda) and Tailwind directives in `apps/business_control_tauri/src/index.css`
-- [ ] T006 Create basic atom components (Button, Input, Badge, Heading) under `apps/business_control_tauri/src/components/atoms/`
-- [ ] T007 Create molecule components (FormField, ToastNotification) under `apps/business_control_tauri/src/components/molecules/`
-- [ ] T008 [P] Implement base API client fetch configurations and host configurations in `apps/business_control_tauri/src/services/api.ts`
-- [ ] T009 [P] Implement local session storage helper and lock check hook in `apps/business_control_tauri/src/hooks/useAuth.ts`
-- [ ] T010 Implement global layout template (`AdminLayout` with sidebar, header, and main panel) in `apps/business_control_tauri/src/components/templates/AdminLayout.tsx`
+- [x] T005 Setup custom fonts (Inter & Bodoni Moda) and Tailwind directives in `apps/business_control_tauri/src/index.css`
+- [x] T006 Create basic atom components (Button, Input, Badge, Heading) under `apps/business_control_tauri/src/components/atoms/`
+- [x] T007 Create molecule components (FormField, ToastNotification) under `apps/business_control_tauri/src/components/molecules/`
+- [x] T008 [P] Implement base API client fetch configurations and host configurations in `apps/business_control_tauri/src/services/api.ts`
+- [x] T009 [P] Implement local session storage helper and lock check hook in `apps/business_control_tauri/src/hooks/useAuth.ts`
+- [x] T010 Implement global layout template (`AdminLayout` with sidebar, header, and main panel) in `apps/business_control_tauri/src/components/templates/AdminLayout.tsx`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 

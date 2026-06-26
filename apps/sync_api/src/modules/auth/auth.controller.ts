@@ -1,4 +1,4 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, HttpException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { TabletLoginDto } from './dto/tablet-login.dto';
@@ -12,6 +12,19 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  @Post('admin')
+  @HttpCode(HttpStatus.OK)
+  async adminLogin(@Body() body: { password?: string }) {
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    if (body.password === adminPassword) {
+      return { success: true, token: adminPassword };
+    }
+    throw new HttpException(
+      { success: false, error: 'Contraseña de administrador incorrecta' },
+      HttpStatus.UNAUTHORIZED,
+    );
   }
 
   @Post('tablet-login')
