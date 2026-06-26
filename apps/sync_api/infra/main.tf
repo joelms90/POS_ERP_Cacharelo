@@ -37,10 +37,11 @@ resource "google_artifact_registry_repository" "pos_repo" {
 
 # 3. Google Cloud Storage Bucket for Static Web Admin Dashboard
 resource "google_storage_bucket" "admin_bucket" {
-  depends_on    = [google_project_service.services]
-  name          = "empire-pos-admin-dashboard-${var.project_id}"
-  location      = "US" # Multi-regional for CDN caching
-  force_destroy = true
+  depends_on                  = [google_project_service.services]
+  name                        = "empire-pos-admin-dashboard-${var.project_id}"
+  location                    = "US" # Multi-regional for CDN caching
+  force_destroy               = true
+  uniform_bucket_level_access = true
 
   website {
     main_page_suffix = "index.html"
@@ -102,7 +103,7 @@ resource "google_service_account" "cloud_run_sa" {
 resource "google_project_iam_member" "sql_client" {
   project = var.project_id
   role    = "roles/cloudsql.client"
-  member  = "service_account:${google_service_account.cloud_run_sa.email}"
+  member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
 # 6. Cloud Run Service for the Express API
@@ -122,10 +123,6 @@ resource "google_cloud_run_service" "pos_api" {
         # Initial container image pull path (replaces with built version once pushed)
         image = "${var.region}-docker.pkg.dev/${var.project_id}/pos-repo/sync-api:latest"
 
-        env {
-          name  = "PORT"
-          value = "8080"
-        }
         env {
           name  = "ADMIN_PASSWORD"
           value = var.admin_password
