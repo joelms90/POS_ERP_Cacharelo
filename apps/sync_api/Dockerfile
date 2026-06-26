@@ -36,6 +36,7 @@ RUN pnpm install --prod --frozen-lockfile
 
 # Copy built code from builder
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/migrations ./migrations
 
 # Expose port
 EXPOSE 8080
