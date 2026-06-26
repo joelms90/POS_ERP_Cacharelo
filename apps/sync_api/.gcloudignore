@@ -1,0 +1,20 @@
+# Exclude local node_modules
+node_modules/
+
+# Exclude compiled output
+dist/
+build/
+
+# Exclude environment variables and secrets
+.env
+.env.*
+terraform.tfvars
+terraform.tfstate*
+
+# Exclude git repository details
+.git/
+.gitignore
+
+# Exclude OS metadata
+.DS_Store
+Thumbs.db

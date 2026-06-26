@@ -170,3 +170,13 @@ resource "google_cloud_run_service_iam_member" "public_run_access" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+# Fetch project details to retrieve project number dynamically
+data "google_project" "project" {}
+
+# Grant Compute service account viewer rights to read Cloud Build sources in GCS
+resource "google_project_iam_member" "compute_storage_viewer" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
