@@ -1,6 +1,6 @@
 # Makefile for Empire POS-ERP project
 
-.PHONY: help install db-up db-down db-status db-migrate db-seed db-rollback db-reset dev-backend dev-frontend lint test infra-init infra-plan infra-apply infra-destroy landing-install landing-build landing-deploy landing-infra
+.PHONY: help install db-up db-down db-status db-migrate db-seed db-rollback db-reset dev-backend dev-frontend lint test infra-init infra-plan infra-apply infra-destroy landing-install landing-build landing-deploy landing-infra admin-build admin-deploy
 
 # Default target: show help
 help:
@@ -138,4 +138,13 @@ landing-deploy: landing-build
 landing-infra:
 	@echo "Applying landing page Terraform changes..."
 	cd apps/landing_page/infra && terraform apply -auto-approve -lock=false
+
+# Admin Dashboard Targets
+admin-build:
+	@echo "Building static admin dashboard assets..."
+	cd apps/business_control_tauri && VITE_API_URL=https://pos-sync-api-232144991863.us-central1.run.app/api pnpm build
+
+admin-deploy: admin-build
+	@echo "Deploying admin dashboard to Google Cloud Storage..."
+	gsutil rsync -R apps/business_control_tauri/dist gs://empire-pos-admin-dashboard-fresh-sensor-497515-d3
 
