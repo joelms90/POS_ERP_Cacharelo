@@ -172,6 +172,7 @@ class AppState extends ChangeNotifier {
   // Shift controls (Cashier)
   bool isShiftOpen = false;
   double cashDrawerAmount = 0.0;
+  double initialFloat = 0.0;
 
   // Offline & sync states
   bool isOnline = true;
@@ -488,14 +489,16 @@ class AppState extends ChangeNotifier {
   }
 
   // Cashier Session Methods
-  void openShift(double initialFloat) {
+  void openShift(double floatAmount) {
     isShiftOpen = true;
-    cashDrawerAmount = initialFloat;
+    initialFloat = floatAmount;
+    cashDrawerAmount = floatAmount;
     notifyListeners();
   }
 
   void closeShift() {
     isShiftOpen = false;
+    initialFloat = 0.0;
     notifyListeners();
   }
 

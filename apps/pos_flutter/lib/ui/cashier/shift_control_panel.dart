@@ -107,7 +107,7 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
     // Simulate printing X or Z report
     final reportTitle = 'Corte $type - Resumen de Turno';
     final reportDetails =
-        'Caja Activa\nFecha: ${DateTime.now().toLocal()}\nFondo Inicial: \$${widget.state.cashDrawerAmount.toStringAsFixed(2)}\nTotal Ventas Efectivo: \$${(widget.state.cashDrawerAmount - 1000).toStringAsFixed(2)}\nOperador: ${widget.state.currentUserName}';
+        'Caja Activa\nFecha: ${DateTime.now().toLocal()}\nFondo Inicial: \$${widget.state.initialFloat.toStringAsFixed(2)}\nTotal Ventas Efectivo: \$${(widget.state.cashDrawerAmount - widget.state.initialFloat).toStringAsFixed(2)}\nOperador: ${widget.state.currentUserName}';
 
     widget.state.enqueuePrintJob(
       PrintJob(
