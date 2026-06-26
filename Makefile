@@ -147,4 +147,6 @@ admin-build:
 admin-deploy: admin-build
 	@echo "Deploying admin dashboard to Google Cloud Storage..."
 	gsutil rsync -R apps/business_control_tauri/dist gs://empire-pos-admin-dashboard-fresh-sensor-497515-d3
+	@echo "Setting no-cache header on index.html..."
+	gsutil -h "Cache-Control:no-store, no-cache, must-revalidate" cp apps/business_control_tauri/dist/index.html gs://empire-pos-admin-dashboard-fresh-sensor-497515-d3/index.html
 

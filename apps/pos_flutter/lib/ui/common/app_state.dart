@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
@@ -188,12 +189,14 @@ class AppState extends ChangeNotifier {
   String? connectedPrinterMac;
   String? connectedPrinterName;
   bool isConnectingPrinter = false;
+  Future<void>? initializationFuture;
 
   final SecureStorageService _secureStorageService;
 
   AppState({SecureStorageService? secureStorageService})
     : _secureStorageService = secureStorageService ?? SecureStorageService() {
     _initMockData();
+    initializationFuture = loadTablesFromJson();
     _seedDefaultUsersOffline();
     _autoConnectPrinter();
   }
@@ -353,6 +356,94 @@ class AppState extends ChangeNotifier {
         y: 0.45,
       ),
     ];
+  }
+
+  Future<void> loadTablesFromJson() async {
+    try {
+      final jsonString = await rootBundle.loadString('assets/floor_plan_mesa.json');
+      final List<dynamic> data = json.decode(jsonString);
+
+      final Map<int, TableModel> currentTablesMap = {
+        for (var t in tables) t.id: t
+      };
+
+      final List<TableModel> loadedTables = [];
+      for (var item in data) {
+        final int id = item['id'];
+        final String label = item['label'];
+        final String shapeStr = item['shape'];
+        final String zone = item['zone'];
+        final double x = (item['x'] as num).toDouble();
+        final double y = (item['y'] as num).toDouble();
+
+        final TableShape shape = shapeStr == 'circle'
+            ? TableShape.circle
+            : TableShape.square;
+
+        final existing = currentTablesMap[id];
+        if (existing != null) {
+          loadedTables.add(TableModel(
+            id: id,
+            label: label,
+            shape: shape,
+            zone: zone,
+            x: x,
+            y: y,
+            state: existing.state,
+            items: existing.items,
+            guests: existing.guests,
+            discountPercentage: existing.discountPercentage,
+            guestGenders: existing.guestGenders,
+          ));
+        } else {
+          TableState state = TableState.free;
+          int guests = 0;
+          List<OrderItem> items = [];
+          if (id == 5) {
+            state = TableState.occupied;
+            guests = 2;
+            items = [
+              OrderItem(
+                item: menu[0],
+                quantity: 2,
+                modifiers: ['Queso Extra'],
+                isSent: true,
+              ),
+              OrderItem(item: menu[4], quantity: 2, isSent: true),
+            ];
+          } else if (id == 6) {
+            state = TableState.billing;
+            guests = 4;
+            items = [
+              OrderItem(item: menu[1], quantity: 2, isSent: true),
+              OrderItem(
+                item: menu[2],
+                quantity: 2,
+                modifiers: ['Bien Cocido'],
+                isSent: true,
+              ),
+              OrderItem(item: menu[5], quantity: 4, isSent: true),
+            ];
+          }
+          loadedTables.add(TableModel(
+            id: id,
+            label: label,
+            shape: shape,
+            zone: zone,
+            x: x,
+            y: y,
+            state: state,
+            guests: guests,
+            items: items,
+          ));
+        }
+      }
+
+      tables = loadedTables;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading floor plan from JSON: $e');
+    }
   }
 
   // Predefined Menu Items

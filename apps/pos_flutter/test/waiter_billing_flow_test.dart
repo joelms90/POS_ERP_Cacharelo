@@ -7,8 +7,9 @@ void main() {
   late AppState state;
   late TableModel occupiedTable;
 
-  setUp(() {
+  setUp(() async {
     state = AppState();
+    await state.initializationFuture;
     // Use Mesa 5 which has items and occupied state by default in mock data
     occupiedTable = state.tables.firstWhere((t) => t.id == 5);
   });

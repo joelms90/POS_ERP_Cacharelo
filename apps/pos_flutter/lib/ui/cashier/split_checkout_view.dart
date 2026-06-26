@@ -643,75 +643,77 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                         }
                       }
 
-                      return CheckboxListTile(
-                        value: isChecked,
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                item.item.name,
-                                style: const TextStyle(
-                                  color: EmpireColors.textPrimary,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                            if (assignedGuest != null) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 5,
-                                  vertical: 1.5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: EmpireColors.champagneGold.withOpacity(
-                                    0.1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: EmpireColors.champagneGold
-                                        .withOpacity(0.4),
-                                    width: 1,
-                                  ),
-                                ),
+                      return Material(
+                        color: EmpireColors.charcoalSurface,
+                        child: CheckboxListTile(
+                          value: isChecked,
+                          title: Row(
+                            children: [
+                              Expanded(
                                 child: Text(
-                                  '$assignedGuest $guestEmoji',
+                                  item.item.name,
                                   style: const TextStyle(
-                                    color: EmpireColors.champagneGold,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
+                                    color: EmpireColors.textPrimary,
+                                    fontSize: 13,
                                   ),
                                 ),
                               ),
+                              if (assignedGuest != null) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: EmpireColors.champagneGold.withOpacity(
+                                      0.1,
+                                    ),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: EmpireColors.champagneGold
+                                          .withOpacity(0.3),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '$assignedGuest $guestEmoji',
+                                    style: const TextStyle(
+                                      color: EmpireColors.champagneGold,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
-                          ],
-                        ),
-                        subtitle: Text(
-                          'Cantidad: ${item.quantity}',
-                          style: const TextStyle(
-                            color: EmpireColors.textSecondary,
-                            fontSize: 11,
                           ),
-                        ),
-                        secondary: Text(
-                          '\$${item.totalPrice.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            color: EmpireColors.textGold,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
+                          subtitle: Text(
+                            'Cantidad: ${item.quantity}',
+                            style: const TextStyle(
+                              color: EmpireColors.textSecondary,
+                              fontSize: 11,
+                            ),
                           ),
+                          secondary: Text(
+                            '\$${item.totalPrice.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              color: EmpireColors.textGold,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          onChanged: (val) {
+                            setState(() {
+                              if (val == true) {
+                                selectedItemIndexes.add(index);
+                              } else {
+                                selectedItemIndexes.remove(index);
+                              }
+                            });
+                          },
+                          activeColor: EmpireColors.champagneGold,
+                          checkColor: EmpireColors.obsidian,
                         ),
-                        onChanged: (val) {
-                          setState(() {
-                            if (val == true) {
-                              selectedItemIndexes.add(index);
-                            } else {
-                              selectedItemIndexes.remove(index);
-                            }
-                          });
-                        },
-                        activeColor: EmpireColors.champagneGold,
-                        checkColor: EmpireColors.obsidian,
                       );
                     },
                   ),

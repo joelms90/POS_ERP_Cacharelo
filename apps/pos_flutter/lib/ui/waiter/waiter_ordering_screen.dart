@@ -10,6 +10,7 @@ import '../login_screen.dart';
 import 'modifier_dialog.dart';
 import 'cart_sidebar.dart';
 import 'payment_flow_dialog.dart';
+import 'zone_tabs.dart';
 
 class WaiterOrderingScreen extends StatefulWidget {
   final AppState state;
@@ -557,48 +558,14 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
   }
 
   Widget _buildFloorMap(List<TableModel> tables) {
-    final zones = ['Salón Principal', 'Terraza', 'Bar'];
-
     return Column(
       children: [
         // Zone Tabs Bar
-        Container(
-          padding: const EdgeInsets.all(12),
-          color: EmpireColors.obsidian,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: zones.map((zone) {
-              final isSelected = selectedZone == zone;
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: ChoiceChip(
-                  label: Text(zone.toUpperCase()),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    if (selected) {
-                      setState(() => selectedZone = zone);
-                    }
-                  },
-                  selectedColor: EmpireColors.champagneGold,
-                  backgroundColor: EmpireColors.onyxSurface,
-                  labelStyle: TextStyle(
-                    color: isSelected
-                        ? EmpireColors.obsidian
-                        : EmpireColors.textPrimary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    letterSpacing: 0.8,
-                  ),
-                  side: BorderSide(
-                    color: isSelected
-                        ? EmpireColors.champagneGold
-                        : EmpireColors.agedBronzeDark,
-                    width: 1.2,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
+        ZoneTabs(
+          selectedZone: selectedZone,
+          onZoneChanged: (zone) {
+            setState(() => selectedZone = zone);
+          },
         ),
 
         // Floor map coordinates layout (Option B)
