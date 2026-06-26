@@ -15,6 +15,13 @@
       "when": 1782455596421,
       "tag": "0001_aspiring_bloodscream",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782455926059,
+      "tag": "0002_keen_roulette",
+      "breakpoints": true
     }
   ]
 }

@@ -178,3 +178,11 @@ export const cashTransactions = pgTable('cash_transactions', {
   reason: text('reason').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const deviceSyncCheckpoints = pgTable('device_sync_checkpoints', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  deviceId: varchar('device_id', { length: 255 }).notNull(),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
