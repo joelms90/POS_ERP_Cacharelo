@@ -7,9 +7,11 @@ import { Heading } from '../atoms/Heading';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
+  activeTab: 'personal' | 'inventory';
+  onTabChange: (tab: 'personal' | 'inventory') => void;
 }
 
-export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
+export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, onTabChange }) => {
   const { logout } = useAuth();
   
   const [health, setHealth] = useState<SystemHealth>({
@@ -63,12 +65,33 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
           {/* Navigation Links */}
           <nav className="p-4 flex flex-col gap-2">
-            <div className="flex items-center gap-3 px-4 py-3 rounded bg-charcoal-surface border border-champagne-gold/20 text-champagne-gold font-medium">
+            <button
+              onClick={() => onTabChange('personal')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded border text-left transition-all duration-200 ${
+                activeTab === 'personal'
+                  ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
+                  : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-charcoal-surface/50'
+              }`}
+            >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
               <span>Personal (PINs)</span>
-            </div>
+            </button>
+
+            <button
+              onClick={() => onTabChange('inventory')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded border text-left transition-all duration-200 ${
+                activeTab === 'inventory'
+                  ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
+                  : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-charcoal-surface/50'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+              <span>Inventario (Catálogo)</span>
+            </button>
             
             <div className="flex items-center gap-3 px-4 py-3 rounded text-text-secondary hover:text-text-primary hover:bg-charcoal-surface/50 border border-transparent transition-all duration-200 cursor-not-allowed opacity-50">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

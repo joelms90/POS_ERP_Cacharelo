@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { LoginPage } from './pages/LoginPage';
 import { AdminLayout } from './components/templates/AdminLayout';
 import { DashboardPage } from './pages/DashboardPage';
+import { InventoryPage } from './pages/InventoryPage';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
+  const [activeTab, setActiveTab] = useState<'personal' | 'inventory'>('personal');
 
   // Full Screen Loading State
   if (isLoading) {
@@ -28,8 +31,8 @@ function App() {
 
   // Shell Layout when authenticated
   return (
-    <AdminLayout>
-      <DashboardPage />
+    <AdminLayout activeTab={activeTab} onTabChange={setActiveTab}>
+      {activeTab === 'personal' ? <DashboardPage /> : <InventoryPage />}
     </AdminLayout>
   );
 }

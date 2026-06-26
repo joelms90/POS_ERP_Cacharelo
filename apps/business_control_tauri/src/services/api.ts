@@ -12,6 +12,30 @@ export interface SystemHealth {
   activeSessionsCount: number;
 }
 
+export interface Category {
+  id: string;
+  businessId: string;
+  name: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Product {
+  id: string;
+  businessId: string;
+  categoryId: string;
+  name: string;
+  sku?: string;
+  barcode?: string;
+  cost?: string;
+  price?: string;
+  isSellable?: boolean;
+  isIngredient?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 const DEFAULT_API_URL = 'http://localhost:3000/api';
 
 // Retrieve the base URL from env or fallback
@@ -113,6 +137,74 @@ export const api = {
    */
   async deleteUser(id: string): Promise<{ success: boolean; message: string }> {
     return apiRequest<{ success: boolean; message: string }>(`/users/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Get all categories for our business
+   */
+  async getCategories(): Promise<Category[]> {
+    return apiRequest<Category[]>('/categories?businessId=d3b07384-d113-4a0e-a555-e5b12824bf01');
+  },
+
+  /**
+   * Add a new category
+   */
+  async addCategory(category: Omit<Category, 'id' | 'businessId'>): Promise<Category> {
+    return apiRequest<Category>('/categories', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...category,
+        businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01',
+      }),
+    });
+  },
+
+  /**
+   * Delete a category
+   */
+  async deleteCategory(id: string): Promise<{ success: boolean; message: string }> {
+    return apiRequest<{ success: boolean; message: string }>(`/categories/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Get all products for our business
+   */
+  async getProducts(): Promise<Product[]> {
+    return apiRequest<Product[]>('/products?businessId=d3b07384-d113-4a0e-a555-e5b12824bf01');
+  },
+
+  /**
+   * Add a new product
+   */
+  async addProduct(product: Omit<Product, 'id' | 'businessId'>): Promise<Product> {
+    return apiRequest<Product>('/products', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...product,
+        businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01',
+      }),
+    });
+  },
+
+  /**
+   * Update a product
+   */
+  async updateProduct(id: string, productUpdates: Partial<Omit<Product, 'id' | 'businessId'>>): Promise<Product> {
+    return apiRequest<Product>(`/products/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(productUpdates),
+    });
+  },
+
+  /**
+   * Delete a product
+   */
+  async deleteProduct(id: string): Promise<{ success: boolean; message: string }> {
+    return apiRequest<{ success: boolean; message: string }>(`/products/${id}`, {
       method: 'DELETE',
     });
   },
