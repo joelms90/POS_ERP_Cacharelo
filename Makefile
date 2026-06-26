@@ -1,6 +1,6 @@
 # Makefile for Empire POS-ERP project
 
-.PHONY: help install db-up db-down db-status db-migrate db-seed db-rollback db-reset dev-backend dev-frontend lint test infra-init infra-plan infra-apply infra-destroy
+.PHONY: help install db-up db-down db-status db-migrate db-seed db-rollback db-reset dev-backend dev-frontend lint test infra-init infra-plan infra-apply infra-destroy landing-install landing-build landing-deploy landing-infra
 
 # Default target: show help
 help:
@@ -34,6 +34,12 @@ help:
 	@echo "  infra-plan       Generate and show a Terraform execution plan"
 	@echo "  infra-apply      Build or change infrastructure via Terraform"
 	@echo "  infra-destroy    Destroy Terraform-managed infrastructure"
+	@echo ""
+	@echo "Landing Page Targets:"
+	@echo "  landing-install  Install dependencies for landing page (frontend & backend)"
+	@echo "  landing-build    Build static landing page frontend assets"
+	@echo "  landing-deploy   Build and deploy landing page to Firebase Hosting"
+	@echo "  landing-infra    Apply Terraform changes for landing page infrastructure"
 	@echo "======================================================================="
 
 # Setup Targets
@@ -114,3 +120,22 @@ infra-apply:
 infra-destroy:
 	@echo "Destroying Terraform infrastructure..."
 	cd apps/sync_api/infra && terraform destroy
+
+# Landing Page Targets
+landing-install:
+	@echo "Installing landing page dependencies..."
+	cd apps/landing_page/frontend && pnpm install
+	cd apps/landing_page/backend && npm install
+
+landing-build:
+	@echo "Building static landing page assets..."
+	cd apps/landing_page/frontend && pnpm run build
+
+landing-deploy: landing-build
+	@echo "Deploying landing page to Firebase Hosting..."
+	cd apps/landing_page/frontend && firebase deploy --only hosting --project fresh-sensor-497515-d3
+
+landing-infra:
+	@echo "Applying landing page Terraform changes..."
+	cd apps/landing_page/infra && terraform apply -auto-approve -lock=false
+
