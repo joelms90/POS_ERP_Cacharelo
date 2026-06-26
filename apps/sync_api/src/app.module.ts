@@ -6,9 +6,10 @@ import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SyncModule } from './modules/sync/sync.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
+import { ShiftsModule } from './modules/shifts/shifts.module';
 
 @Module({
-  imports: [DatabaseModule, UsersModule, AuthModule, SyncModule, CatalogModule],
+  imports: [DatabaseModule, UsersModule, AuthModule, SyncModule, CatalogModule, ShiftsModule],
   controllers: [AppController],
   providers: [AppService],
 })
