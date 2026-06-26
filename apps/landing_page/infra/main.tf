@@ -19,8 +19,19 @@ resource "google_project_service" "services" {
   disable_on_destroy = false
 }
 
+# 1.1 Provision Firestore Database in Native Mode
+resource "google_firestore_database" "database" {
+  project     = var.project_id
+  name        = "(default)"
+  location_id = var.region
+  type        = "FIRESTORE_NATIVE"
+
+  depends_on = [google_project_service.services]
+}
+
 # Fetch project metadata
 data "google_project" "project" {}
+
 
 # =====================================================================
 # CUENTAS DE SERVICIO PERSONALIZADAS
