@@ -7,11 +7,13 @@ import { Heading } from '../atoms/Heading';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
-  activeTab: 'personal' | 'inventory';
-  onTabChange: (tab: 'personal' | 'inventory') => void;
+  activeTab: 'personal' | 'inventory' | 'providers';
+  onTabChange: (tab: 'personal' | 'inventory' | 'providers') => void;
+  activeBusinessId: string;
+  onBusinessChange: (businessId: string) => void;
 }
 
-export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, onTabChange }) => {
+export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, onTabChange, activeBusinessId, onBusinessChange }) => {
   const { logout } = useAuth();
   
   const [health, setHealth] = useState<SystemHealth>({
@@ -92,6 +94,20 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </svg>
               <span>Inventario (Catálogo)</span>
             </button>
+
+            <button
+              onClick={() => onTabChange('providers')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded border text-left transition-all duration-200 ${
+                activeTab === 'providers'
+                  ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
+                  : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-charcoal-surface/50'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <span>Proveedores</span>
+            </button>
             
             <div className="flex items-center gap-3 px-4 py-3 rounded text-text-secondary hover:text-text-primary hover:bg-charcoal-surface/50 border border-transparent transition-all duration-200 cursor-not-allowed opacity-50">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -132,9 +148,24 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
 
         {/* Global Page Header */}
         <header className="h-20 bg-onyx-surface border-b border-aged-bronze/40 px-8 flex items-center justify-between flex-shrink-0 z-10">
-          <Heading level={3} className="!border-none !pb-0 tracking-wide font-light">
-            Panel de Control
-          </Heading>
+          <div className="flex items-center gap-8">
+            <Heading level={3} className="!border-none !pb-0 tracking-wide font-light">
+              Panel de Control
+            </Heading>
+
+            <div className="flex items-center gap-3 bg-charcoal-surface/60 border border-aged-bronze/35 rounded-md px-3 py-1.5 shadow-sm">
+              <label className="text-[10px] text-text-secondary font-medium uppercase tracking-wider">Negocio:</label>
+              <select
+                value={activeBusinessId}
+                onChange={(e) => onBusinessChange(e.target.value)}
+                className="bg-transparent text-xs text-champagne-gold font-sans font-medium focus:outline-none cursor-pointer hover:text-champagne-gold/80 transition-colors"
+              >
+                <option value="d3b07384-d113-4a0e-a555-e5b12824bf01" className="bg-onyx text-text-primary">Cafetería</option>
+                <option value="d3b07384-d113-4a0e-a555-e5b12824bf03" className="bg-onyx text-text-primary">Empanadas & Tortas</option>
+                <option value="d3b07384-d113-4a0e-a555-e5b12824bf05" className="bg-onyx text-text-primary">Hamburguesas</option>
+              </select>
+            </div>
+          </div>
 
           {/* Right Status Actions */}
           <div className="flex items-center gap-6">

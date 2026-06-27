@@ -9,6 +9,7 @@ import { CatalogModule } from './modules/catalog/catalog.module';
 import { ShiftsModule } from './modules/shifts/shifts.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { KitchenModule } from './modules/kitchen/kitchen.module';
+import { ProvidersModule } from './modules/providers/providers.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { KitchenModule } from './modules/kitchen/kitchen.module';
     ShiftsModule,
     OrdersModule,
     KitchenModule,
+    ProvidersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

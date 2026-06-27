@@ -2,12 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ProductsService } from './products.service';
 import { ProductsRepository } from './repositories/products.repository';
 import { CategoriesRepository } from './repositories/categories.repository';
+import { ProvidersRepository } from '../providers/repositories/providers.repository';
 import { NotFoundException } from '@nestjs/common';
 
 describe('ProductsService', () => {
   let service: ProductsService;
   let productsRepository: ProductsRepository;
   let categoriesRepository: CategoriesRepository;
+  let providersRepository: ProvidersRepository;
 
   const mockProductsRepository = {
     findAll: jest.fn(),
@@ -18,6 +20,10 @@ describe('ProductsService', () => {
   };
 
   const mockCategoriesRepository = {
+    findById: jest.fn(),
+  };
+
+  const mockProvidersRepository = {
     findById: jest.fn(),
   };
 
@@ -33,12 +39,17 @@ describe('ProductsService', () => {
           provide: CategoriesRepository,
           useValue: mockCategoriesRepository,
         },
+        {
+          provide: ProvidersRepository,
+          useValue: mockProvidersRepository,
+        },
       ],
     }).compile();
 
     service = module.get<ProductsService>(ProductsService);
     productsRepository = module.get<ProductsRepository>(ProductsRepository);
     categoriesRepository = module.get<CategoriesRepository>(CategoriesRepository);
+    providersRepository = module.get<ProvidersRepository>(ProvidersRepository);
   });
 
   afterEach(() => {

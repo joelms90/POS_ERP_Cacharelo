@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ProductsRepository } from './repositories/products.repository';
 import { CategoriesRepository } from './repositories/categories.repository';
+import { ProvidersRepository } from '../providers/repositories/providers.repository';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 
@@ -9,6 +10,7 @@ export class ProductsService {
   constructor(
     private readonly productsRepository: ProductsRepository,
     private readonly categoriesRepository: CategoriesRepository,
+    private readonly providersRepository: ProvidersRepository,
   ) {}
 
   async findAll(businessId?: string, categoryId?: string) {
@@ -29,10 +31,18 @@ export class ProductsService {
       throw new NotFoundException(`Category with ID ${createProductDto.categoryId} not found`);
     }
 
+    if (createProductDto.providerId) {
+      const provider = await this.providersRepository.findById(createProductDto.providerId);
+      if (!provider) {
+        throw new NotFoundException(`Provider with ID ${createProductDto.providerId} not found`);
+      }
+    }
+
     return this.productsRepository.create({
       ...createProductDto,
       sku: createProductDto.sku || null,
       barcode: createProductDto.barcode || null,
+      providerId: createProductDto.providerId || null,
       cost: createProductDto.cost || '0.00',
       price: createProductDto.price || '0.00',
       isSellable: createProductDto.isSellable ?? true,
@@ -50,6 +60,13 @@ export class ProductsService {
       const category = await this.categoriesRepository.findById(updateProductDto.categoryId);
       if (!category) {
         throw new NotFoundException(`Category with ID ${updateProductDto.categoryId} not found`);
+      }
+    }
+
+    if (updateProductDto.providerId) {
+      const provider = await this.providersRepository.findById(updateProductDto.providerId);
+      if (!provider) {
+        throw new NotFoundException(`Provider with ID ${updateProductDto.providerId} not found`);
       }
     }
 

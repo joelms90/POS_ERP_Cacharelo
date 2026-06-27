@@ -97,10 +97,25 @@ export const categories = pgTable('categories', {
   version: integer('version').default(1).notNull(),
 });
 
+export const providers = pgTable('providers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  businessId: uuid('business_id').references(() => businesses.id).notNull(),
+  name: varchar('name', { length: 100 }).notNull(),
+  contactName: varchar('contact_name', { length: 100 }),
+  phone: varchar('phone', { length: 20 }),
+  email: varchar('email', { length: 255 }),
+  address: text('address'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  version: integer('version').default(1).notNull(),
+});
+
 export const products = pgTable('products', {
   id: uuid('id').primaryKey().defaultRandom(),
   businessId: uuid('business_id').references(() => businesses.id).notNull(),
   categoryId: uuid('category_id').references(() => categories.id).notNull(),
+  providerId: uuid('provider_id').references(() => providers.id),
   name: varchar('name', { length: 150 }).notNull(),
   sku: varchar('sku', { length: 50 }),
   barcode: varchar('barcode', { length: 50 }),

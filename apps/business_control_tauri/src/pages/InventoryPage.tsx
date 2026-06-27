@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { api, Category, Product } from '../services/api';
+import { api, Category, Product, Provider } from '../services/api';
 import { Button } from '../components/atoms/Button';
 import { Input } from '../components/atoms/Input';
 import { Badge } from '../components/atoms/Badge';
 import { Heading } from '../components/atoms/Heading';
 import { ToastContainer } from '../components/molecules/ToastNotification';
 
-export const InventoryPage: React.FC = () => {
+interface InventoryPageProps {
+  businessId: string;
+}
+
+export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
   // Search & Filter state
@@ -40,18 +45,20 @@ export const InventoryPage: React.FC = () => {
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true);
     try {
-      const [catsData, prodsData] = await Promise.all([
-        api.getCategories(),
-        api.getProducts(),
+      const [catsData, prodsData, provsData] = await Promise.all([
+        api.getCategories(businessId),
+        api.getProducts(businessId),
+        api.getProviders(businessId).catch(() => [] as Provider[]),
       ]);
       setCategories(catsData);
       setProducts(prodsData);
+      setProviders(provsData);
     } catch (error: any) {
       showToast(error.message || 'Error al sincronizar catálogo de inventario.', 'error');
     } finally {
       if (!silent) setIsLoading(false);
     }
-  }, [showToast]);
+  }, [businessId, showToast]);
 
   useEffect(() => {
     fetchData();
@@ -70,7 +77,7 @@ export const InventoryPage: React.FC = () => {
       const savedCategory = await api.addCategory({
         name: newCategoryName.trim(),
         description: newCategoryDescription.trim() || undefined,
-      });
+      }, businessId);
       setCategories((prev) => [...prev, savedCategory]);
       showToast(`Categoría "${savedCategory.name}" registrada.`, 'success');
       setNewCategoryName('');
@@ -143,6 +150,7 @@ export const InventoryPage: React.FC = () => {
         name: editingProduct.name.trim(),
         sku: editingProduct.sku?.trim() || undefined,
         barcode: editingProduct.barcode?.trim() || undefined,
+        providerId: editingProduct.providerId || undefined,
         cost: costVal.toFixed(2),
         price: priceVal.toFixed(2),
         isSellable: editingProduct.isSellable ?? true,
@@ -156,7 +164,7 @@ export const InventoryPage: React.FC = () => {
         showToast(`Producto "${updated.name}" actualizado con éxito.`, 'success');
       } else {
         // Create product
-        const created = await api.addProduct(payload);
+        const created = await api.addProduct(payload, businessId);
         setProducts((prev) => [...prev, created]);
         showToast(`Producto "${created.name}" registrado con éxito.`, 'success');
       }
@@ -532,6 +540,28 @@ export const InventoryPage: React.FC = () => {
                       </label>
                     </div>
 
+                    {/* Provider Selector for Ingredients */}
+                    {(editingProduct.isIngredient ?? false) && (
+                      <div className="flex flex-col gap-1.5 mt-2">
+                        <label className="text-xs text-text-secondary font-medium tracking-wide">
+                          Proveedor Principal
+                        </label>
+                        <select
+                          value={editingProduct.providerId || ''}
+                          onChange={(e) => setEditingProduct(prev => ({ ...prev, providerId: e.target.value || undefined }))}
+                          disabled={isSavingProduct}
+                          className="bg-charcoal-surface border border-aged-bronze focus:border-champagne-gold text-text-primary rounded-md p-3 font-sans text-xs focus:outline-none transition-all cursor-pointer"
+                        >
+                          <option value="">-- Sin Proveedor --</option>
+                          {providers.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
                     {/* Actions Row */}
                     <div className="flex gap-4 items-center justify-end mt-4">
                       <Button
@@ -625,7 +655,12 @@ export const InventoryPage: React.FC = () => {
                                   <div className="flex flex-col gap-0.5">
                                     {p.sku && <span>SKU: {p.sku}</span>}
                                     {p.barcode && <span>EAN: {p.barcode}</span>}
-                                    {!p.sku && !p.barcode && <span className="text-[10px] italic">-</span>}
+                                    {p.providerId && (
+                                      <span className="text-[10px] text-champagne-gold/75 mt-0.5 font-sans">
+                                        Prov: {providers.find(prov => prov.id === p.providerId)?.name || 'Cargando...'}
+                                      </span>
+                                    )}
+                                    {!p.sku && !p.barcode && !p.providerId && <span className="text-[10px] italic">-</span>}
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 text-right font-mono text-xs text-text-secondary">

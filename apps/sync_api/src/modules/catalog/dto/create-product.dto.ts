@@ -22,6 +22,10 @@ export class CreateProductDto {
   @IsOptional()
   barcode?: string;
 
+  @IsUUID()
+  @IsOptional()
+  providerId?: string;
+
   @IsNumberString()
   @IsOptional()
   cost?: string;

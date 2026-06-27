@@ -5,8 +5,10 @@ import { CategoriesRepository } from './repositories/categories.repository';
 import { ProductsController } from './products.controller';
 import { ProductsService } from './products.service';
 import { ProductsRepository } from './repositories/products.repository';
+import { ProvidersModule } from '../providers/providers.module';
 
 @Module({
+  imports: [ProvidersModule],
   controllers: [CategoriesController, ProductsController],
   providers: [
     CategoriesService,

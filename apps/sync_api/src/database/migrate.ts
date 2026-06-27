@@ -15,45 +15,64 @@ export async function runMigrations() {
     console.log('✅ Migrations completed successfully.');
 
     // Ensure specific default business and branch exist
-    const businessId = 'd3b07384-d113-4a0e-a555-e5b12824bf01';
-    const branchId = 'c4f07384-d113-4a0e-a555-e5b12824bf02';
+    const businessLines = [
+      {
+        id: 'd3b07384-d113-4a0e-a555-e5b12824bf01',
+        name: 'Cafetería Cacharelo',
+        branchId: 'c4f07384-d113-4a0e-a555-e5b12824bf02',
+        branchName: 'Cacharelo Centro',
+      },
+      {
+        id: 'd3b07384-d113-4a0e-a555-e5b12824bf03',
+        name: 'Empanadas & Tortas',
+        branchId: 'c4f07384-d113-4a0e-a555-e5b12824bf04',
+        branchName: 'Sucursal Empanadas',
+      },
+      {
+        id: 'd3b07384-d113-4a0e-a555-e5b12824bf05',
+        name: 'Hamburguesas',
+        branchId: 'c4f07384-d113-4a0e-a555-e5b12824bf06',
+        branchName: 'Sucursal Hamburguesas',
+      },
+    ];
 
-    const matchBusiness = await db
-      .select()
-      .from(schema.businesses)
-      .where(eq(schema.businesses.id, businessId))
-      .limit(1);
+    for (const b of businessLines) {
+      const matchBusiness = await db
+        .select()
+        .from(schema.businesses)
+        .where(eq(schema.businesses.id, b.id))
+        .limit(1);
 
-    if (matchBusiness.length === 0) {
-      console.log('🌱 Seeding specific default business ID...');
-      await db.insert(schema.businesses).values({
-        id: businessId,
-        name: 'Cacharelo',
-        taxId: 'MX123456789',
-        isActive: true,
-        version: 1,
-      });
-      console.log('✅ Specific default business seeded.');
+      if (matchBusiness.length === 0) {
+        console.log(`🌱 Seeding business line: ${b.name}...`);
+        await db.insert(schema.businesses).values({
+          id: b.id,
+          name: b.name,
+          taxId: 'MX123456789',
+          isActive: true,
+          version: 1,
+        });
+      }
+
+      const matchBranch = await db
+        .select()
+        .from(schema.branches)
+        .where(eq(schema.branches.id, b.branchId))
+        .limit(1);
+
+      if (matchBranch.length === 0) {
+        console.log(`🌱 Seeding branch: ${b.branchName}...`);
+        await db.insert(schema.branches).values({
+          id: b.branchId,
+          businessId: b.id,
+          name: b.branchName,
+          address: 'Av. Principal 123',
+          phone: '555-1234',
+          version: 1,
+        });
+      }
     }
-
-    const matchBranch = await db
-      .select()
-      .from(schema.branches)
-      .where(eq(schema.branches.id, branchId))
-      .limit(1);
-
-    if (matchBranch.length === 0) {
-      console.log('🌱 Seeding specific default branch ID...');
-      await db.insert(schema.branches).values({
-        id: branchId,
-        businessId: businessId,
-        name: 'Sucursal Principal',
-        address: 'Av. Principal 123',
-        phone: '555-1234',
-        version: 1,
-      });
-      console.log('✅ Specific default branch seeded.');
-    }
+    console.log('✅ Specific default business lines and branches seeded.');
   } catch (error) {
     console.error('❌ Migration failed:', error);
     // Do not block app boot in development if database is not reachable,

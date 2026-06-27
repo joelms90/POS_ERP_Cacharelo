@@ -25,6 +25,7 @@ export interface Product {
   id: string;
   businessId: string;
   categoryId: string;
+  providerId?: string;
   name: string;
   sku?: string;
   barcode?: string;
@@ -32,6 +33,18 @@ export interface Product {
   price?: string;
   isSellable?: boolean;
   isIngredient?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Provider {
+  id: string;
+  businessId: string;
+  name: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -142,21 +155,21 @@ export const api = {
   },
 
   /**
-   * Get all categories for our business
+   * Get all categories for a business
    */
-  async getCategories(): Promise<Category[]> {
-    return apiRequest<Category[]>('/categories?businessId=d3b07384-d113-4a0e-a555-e5b12824bf01');
+  async getCategories(businessId: string): Promise<Category[]> {
+    return apiRequest<Category[]>(`/categories?businessId=${businessId}`);
   },
 
   /**
-   * Add a new category
+   * Add a new category for a business
    */
-  async addCategory(category: Omit<Category, 'id' | 'businessId'>): Promise<Category> {
+  async addCategory(category: Omit<Category, 'id' | 'businessId'>, businessId: string): Promise<Category> {
     return apiRequest<Category>('/categories', {
       method: 'POST',
       body: JSON.stringify({
         ...category,
-        businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01',
+        businessId,
       }),
     });
   },
@@ -171,21 +184,21 @@ export const api = {
   },
 
   /**
-   * Get all products for our business
+   * Get all products for a business
    */
-  async getProducts(): Promise<Product[]> {
-    return apiRequest<Product[]>('/products?businessId=d3b07384-d113-4a0e-a555-e5b12824bf01');
+  async getProducts(businessId: string): Promise<Product[]> {
+    return apiRequest<Product[]>(`/products?businessId=${businessId}`);
   },
 
   /**
-   * Add a new product
+   * Add a new product for a business
    */
-  async addProduct(product: Omit<Product, 'id' | 'businessId'>): Promise<Product> {
+  async addProduct(product: Omit<Product, 'id' | 'businessId'>, businessId: string): Promise<Product> {
     return apiRequest<Product>('/products', {
       method: 'POST',
       body: JSON.stringify({
         ...product,
-        businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01',
+        businessId,
       }),
     });
   },
@@ -205,6 +218,45 @@ export const api = {
    */
   async deleteProduct(id: string): Promise<{ success: boolean; message: string }> {
     return apiRequest<{ success: boolean; message: string }>(`/products/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Get all providers for a business
+   */
+  async getProviders(businessId: string): Promise<Provider[]> {
+    return apiRequest<Provider[]>(`/providers?businessId=${businessId}`);
+  },
+
+  /**
+   * Add a new provider for a business
+   */
+  async addProvider(provider: Omit<Provider, 'id' | 'businessId'>, businessId: string): Promise<Provider> {
+    return apiRequest<Provider>('/providers', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...provider,
+        businessId,
+      }),
+    });
+  },
+
+  /**
+   * Update a provider
+   */
+  async updateProvider(id: string, providerUpdates: Partial<Omit<Provider, 'id' | 'businessId'>>): Promise<Provider> {
+    return apiRequest<Provider>(`/providers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(providerUpdates),
+    });
+  },
+
+  /**
+   * Delete a provider
+   */
+  async deleteProvider(id: string): Promise<{ success: boolean; message: string }> {
+    return apiRequest<{ success: boolean; message: string }>(`/providers/${id}`, {
       method: 'DELETE',
     });
   },

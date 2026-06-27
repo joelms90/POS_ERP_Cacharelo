@@ -4,10 +4,12 @@ import { LoginPage } from './pages/LoginPage';
 import { AdminLayout } from './components/templates/AdminLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { InventoryPage } from './pages/InventoryPage';
+import { ProvidersPage } from './pages/ProvidersPage';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'personal' | 'inventory'>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'inventory' | 'providers'>('personal');
+  const [activeBusinessId, setActiveBusinessId] = useState<string>('d3b07384-d113-4a0e-a555-e5b12824bf01');
 
   // Full Screen Loading State
   if (isLoading) {
@@ -31,8 +33,15 @@ function App() {
 
   // Shell Layout when authenticated
   return (
-    <AdminLayout activeTab={activeTab} onTabChange={setActiveTab}>
-      {activeTab === 'personal' ? <DashboardPage /> : <InventoryPage />}
+    <AdminLayout 
+      activeTab={activeTab} 
+      onTabChange={setActiveTab}
+      activeBusinessId={activeBusinessId}
+      onBusinessChange={setActiveBusinessId}
+    >
+      {activeTab === 'personal' && <DashboardPage />}
+      {activeTab === 'inventory' && <InventoryPage businessId={activeBusinessId} />}
+      {activeTab === 'providers' && <ProvidersPage businessId={activeBusinessId} />}
     </AdminLayout>
   );
 }
