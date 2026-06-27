@@ -2,6 +2,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { db } from './connection';
 import * as path from 'path';
 import * as schema from './schema';
+import { eq } from 'drizzle-orm';
 
 export async function runMigrations() {
   console.log('⏳ Running database migrations...');
@@ -13,13 +14,18 @@ export async function runMigrations() {
     });
     console.log('✅ Migrations completed successfully.');
 
-    // Ensure default business and branch exist
-    const existingBusinesses = await db.select().from(schema.businesses).limit(1);
-    if (existingBusinesses.length === 0) {
-      console.log('🌱 Seeding default business and branch...');
-      const businessId = 'd3b07384-d113-4a0e-a555-e5b12824bf01';
-      const branchId = 'c4f07384-d113-4a0e-a555-e5b12824bf02';
+    // Ensure specific default business and branch exist
+    const businessId = 'd3b07384-d113-4a0e-a555-e5b12824bf01';
+    const branchId = 'c4f07384-d113-4a0e-a555-e5b12824bf02';
 
+    const matchBusiness = await db
+      .select()
+      .from(schema.businesses)
+      .where(eq(schema.businesses.id, businessId))
+      .limit(1);
+
+    if (matchBusiness.length === 0) {
+      console.log('🌱 Seeding specific default business ID...');
       await db.insert(schema.businesses).values({
         id: businessId,
         name: 'Cacharelo',
@@ -27,7 +33,17 @@ export async function runMigrations() {
         isActive: true,
         version: 1,
       });
+      console.log('✅ Specific default business seeded.');
+    }
 
+    const matchBranch = await db
+      .select()
+      .from(schema.branches)
+      .where(eq(schema.branches.id, branchId))
+      .limit(1);
+
+    if (matchBranch.length === 0) {
+      console.log('🌱 Seeding specific default branch ID...');
       await db.insert(schema.branches).values({
         id: branchId,
         businessId: businessId,
@@ -36,7 +52,7 @@ export async function runMigrations() {
         phone: '555-1234',
         version: 1,
       });
-      console.log('✅ Default business and branch seeded.');
+      console.log('✅ Specific default branch seeded.');
     }
   } catch (error) {
     console.error('❌ Migration failed:', error);
