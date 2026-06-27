@@ -25,9 +25,15 @@ export async function runMigrations() {
       },
       {
         id: 'd3b07384-d113-4a0e-a555-e5b12824bf03',
-        name: 'Empanadas & Tortas',
+        name: 'Empanadas',
         branchId: 'c4f07384-d113-4a0e-a555-e5b12824bf04',
         branchName: 'Sucursal Empanadas',
+      },
+      {
+        id: 'd3b07384-d113-4a0e-a555-e5b12824bf07',
+        name: 'Tortas',
+        branchId: 'c4f07384-d113-4a0e-a555-e5b12824bf08',
+        branchName: 'Sucursal Tortas',
       },
       {
         id: 'd3b07384-d113-4a0e-a555-e5b12824bf05',
@@ -53,6 +59,10 @@ export async function runMigrations() {
           isActive: true,
           version: 1,
         });
+      } else {
+        await db.update(schema.businesses)
+          .set({ name: b.name })
+          .where(eq(schema.businesses.id, b.id));
       }
 
       const matchBranch = await db
@@ -71,6 +81,10 @@ export async function runMigrations() {
           phone: '555-1234',
           version: 1,
         });
+      } else {
+        await db.update(schema.branches)
+          .set({ name: b.branchName })
+          .where(eq(schema.branches.id, b.branchId));
       }
     }
     console.log('✅ Specific default business lines and branches seeded.');

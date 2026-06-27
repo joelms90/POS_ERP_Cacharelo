@@ -161,7 +161,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
                 className="bg-transparent text-xs text-champagne-gold font-sans font-medium focus:outline-none cursor-pointer hover:text-champagne-gold/80 transition-colors"
               >
                 <option value="d3b07384-d113-4a0e-a555-e5b12824bf01" className="bg-onyx text-text-primary">Cafetería</option>
-                <option value="d3b07384-d113-4a0e-a555-e5b12824bf03" className="bg-onyx text-text-primary">Empanadas & Tortas</option>
+                <option value="d3b07384-d113-4a0e-a555-e5b12824bf03" className="bg-onyx text-text-primary">Empanadas</option>
+                <option value="d3b07384-d113-4a0e-a555-e5b12824bf07" className="bg-onyx text-text-primary">Tortas</option>
                 <option value="d3b07384-d113-4a0e-a555-e5b12824bf05" className="bg-onyx text-text-primary">Hamburguesas</option>
               </select>
             </div>
