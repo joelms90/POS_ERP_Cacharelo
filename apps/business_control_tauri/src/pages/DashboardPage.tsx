@@ -5,7 +5,11 @@ import { UsersGrid } from '../components/organisms/UsersGrid';
 import { ToastContainer } from '../components/molecules/ToastNotification';
 import { Heading } from '../components/atoms/Heading';
 
-export const DashboardPage: React.FC = () => {
+interface DashboardPageProps {
+  businessId: string;
+}
+
+export const DashboardPage: React.FC<DashboardPageProps> = ({ businessId }) => {
   const [users, setUsers] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
@@ -23,14 +27,14 @@ export const DashboardPage: React.FC = () => {
   const fetchUsers = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true);
     try {
-      const data = await api.getUsers();
+      const data = await api.getUsers(businessId);
       setUsers(data);
     } catch (error: any) {
       showToast(error.message || 'Error al cargar el roster de personal.', 'error');
     } finally {
       if (!silent) setIsLoading(false);
     }
-  }, [showToast]);
+  }, [businessId, showToast]);
 
   useEffect(() => {
     fetchUsers();
@@ -99,7 +103,7 @@ export const DashboardPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           {/* Create User Form Block */}
           <div className="lg:col-span-1">
-            <UserForm onSuccess={handleAddUserSuccess} onErrorToast={(msg) => showToast(msg, 'error')} />
+            <UserForm onSuccess={handleAddUserSuccess} onErrorToast={(msg) => showToast(msg, 'error')} businessId={businessId} />
           </div>
 
           {/* Users Grid Table Block */}

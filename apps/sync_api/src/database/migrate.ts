@@ -3,6 +3,7 @@ import { db } from './connection';
 import * as path from 'path';
 import * as schema from './schema';
 import { eq } from 'drizzle-orm';
+import * as bcrypt from 'bcrypt';
 
 export async function runMigrations() {
   console.log('⏳ Running database migrations...');
@@ -73,6 +74,44 @@ export async function runMigrations() {
       }
     }
     console.log('✅ Specific default business lines and branches seeded.');
+
+    // Clear and seed fresh employees for Cafetería only
+    console.log('🧹 Clearing old users/employees...');
+    await db.delete(schema.users);
+
+    console.log('🌱 Seeding fresh employees for Cafetería...');
+    const waiterPin = await bcrypt.hash('1111', 10);
+    const cashierPin = await bcrypt.hash('2222', 10);
+    const kitchenPin = await bcrypt.hash('3333', 10);
+
+    await db.insert(schema.users).values([
+      {
+        id: '81a6df6c-5bcb-4d0b-8e75-02f18f399041',
+        businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01', // Cafeteria
+        name: 'Juan (Mesero)',
+        pin: waiterPin,
+        role: 'waiter',
+        version: 1,
+      },
+      {
+        id: '81a6df6c-5bcb-4d0b-8e75-02f18f399042',
+        businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01', // Cafeteria
+        name: 'Sofia (Cajero)',
+        pin: cashierPin,
+        role: 'cashier',
+        version: 1,
+      },
+      {
+        id: '81a6df6c-5bcb-4d0b-8e75-02f18f399043',
+        businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01', // Cafeteria
+        name: 'Carlos (Cocina)',
+        pin: kitchenPin,
+        role: 'kitchen',
+        version: 1,
+      },
+    ]);
+    console.log('✅ Fresh Cafetería employees seeded.');
+
   } catch (error) {
     console.error('❌ Migration failed:', error);
     // Do not block app boot in development if database is not reachable,

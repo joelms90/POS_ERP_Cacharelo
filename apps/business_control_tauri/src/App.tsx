@@ -39,7 +39,7 @@ function App() {
       activeBusinessId={activeBusinessId}
       onBusinessChange={setActiveBusinessId}
     >
-      {activeTab === 'personal' && <DashboardPage />}
+      {activeTab === 'personal' && <DashboardPage businessId={activeBusinessId} />}
       {activeTab === 'inventory' && <InventoryPage businessId={activeBusinessId} />}
       {activeTab === 'providers' && <ProvidersPage businessId={activeBusinessId} />}
     </AdminLayout>

@@ -7,9 +7,10 @@ import { FormField } from '../molecules/FormField';
 interface UserFormProps {
   onSuccess: (newUser: Employee) => void;
   onErrorToast: (message: string) => void;
+  businessId: string;
 }
 
-export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast }) => {
+export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, businessId }) => {
   const [name, setName] = useState('');
   const [pin, setPin] = useState('');
   const [role, setRole] = useState<'waiter' | 'cashier' | 'kitchen'>('waiter');
@@ -57,7 +58,7 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast }) =
         name: name.trim(),
         pin,
         role,
-      });
+      }, businessId);
 
       if (response.success && response.user) {
         onSuccess(response.user);

@@ -126,19 +126,22 @@ export const api = {
   },
 
   /**
-   * Get all registered users
+   * Get all registered users for a business
    */
-  async getUsers(): Promise<Employee[]> {
-    return apiRequest<Employee[]>('/users');
+  async getUsers(businessId: string): Promise<Employee[]> {
+    return apiRequest<Employee[]>(`/users?businessId=${businessId}`);
   },
 
   /**
-   * Create a new user profile
+   * Create a new user profile for a business
    */
-  async addUser(employee: Omit<Employee, 'id'>): Promise<{ success: boolean; user: Employee }> {
+  async addUser(employee: Omit<Employee, 'id'>, businessId: string): Promise<{ success: boolean; user: Employee }> {
     const response = await apiRequest<Employee | Employee[]>('/users', {
       method: 'POST',
-      body: JSON.stringify(employee),
+      body: JSON.stringify({
+        ...employee,
+        businessId,
+      }),
     });
     
     const user = Array.isArray(response) ? response[0] : response;
