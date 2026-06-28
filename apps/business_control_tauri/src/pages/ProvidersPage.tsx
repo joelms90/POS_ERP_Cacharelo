@@ -112,8 +112,8 @@ export const ProvidersPage: React.FC<ProvidersPageProps> = ({ businessId }) => {
   );
 
   return (
-    <div className="w-full h-full bg-obsidian p-2 lg:p-6 font-sans">
-      <div className="flex flex-col lg:flex-row gap-6 h-full max-w-7xl mx-auto w-full">
+    <div className="w-full lg:h-full min-h-full bg-obsidian p-2 lg:p-6 font-sans overflow-y-auto lg:overflow-hidden">
+      <div className="flex flex-col lg:flex-row gap-6 min-h-fit lg:h-full max-w-7xl mx-auto w-full">
         {/* Left Side: Suppliers List Table / Cards */}
         <div className="flex-1 bg-onyx-surface border border-aged-bronze/40 rounded-lg p-4 lg:p-6 flex flex-col lg:h-full overflow-hidden shadow-xl">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">

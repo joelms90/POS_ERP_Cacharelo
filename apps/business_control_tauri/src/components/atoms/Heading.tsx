@@ -15,7 +15,7 @@ export const Heading: React.FC<HeadingProps> = ({
 }) => {
   const Tag = `h${level}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
   
-  const baseStyles = 'font-semibold tracking-tight text-text-primary';
+  const baseStyles = 'font-semibold tracking-tight text-text-primary leading-normal';
   
   const levels = {
     1: 'text-3xl md:text-4xl font-light',
