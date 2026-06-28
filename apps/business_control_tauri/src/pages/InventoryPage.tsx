@@ -23,11 +23,6 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
   // Toast notifications state
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
   
-  // Forms state
-  const [newCategoryName, setNewCategoryName] = useState<string>('');
-  const [newCategoryDescription, setNewCategoryDescription] = useState<string>('');
-  const [isSavingCategory, setIsSavingCategory] = useState<boolean>(false);
-  
   // Edit/Create Product State
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [isSavingProduct, setIsSavingProduct] = useState<boolean>(false);
@@ -64,55 +59,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
     fetchData();
   }, [fetchData]);
 
-  // Handle Category Submit
-  const handleCreateCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCategoryName.trim() || newCategoryName.trim().length < 2) {
-      showToast('El nombre de la categoría debe tener al menos 2 caracteres.', 'error');
-      return;
-    }
-    
-    setIsSavingCategory(true);
-    try {
-      const savedCategory = await api.addCategory({
-        name: newCategoryName.trim(),
-        description: newCategoryDescription.trim() || undefined,
-      }, businessId);
-      setCategories((prev) => [...prev, savedCategory]);
-      showToast(`Categoría "${savedCategory.name}" registrada.`, 'success');
-      setNewCategoryName('');
-      setNewCategoryDescription('');
-    } catch (error: any) {
-      showToast(error.message || 'No se pudo crear la categoría.', 'error');
-    } finally {
-      setIsSavingCategory(false);
-    }
-  };
 
-  // Handle Category Delete
-  const handleDeleteCategory = async (id: string, name: string) => {
-    // Check if products exist in this category
-    const productsInCat = products.filter(p => p.categoryId === id);
-    if (productsInCat.length > 0) {
-      showToast(`No se puede eliminar la categoría "${name}" porque contiene ${productsInCat.length} producto(s).`, 'error');
-      return;
-    }
-
-    if (!window.confirm(`¿Está seguro de eliminar la categoría "${name}"?`)) {
-      return;
-    }
-
-    try {
-      await api.deleteCategory(id);
-      setCategories((prev) => prev.filter((c) => c.id !== id));
-      showToast(`Categoría "${name}" eliminada.`, 'warning');
-      if (selectedCategoryFilter === id) {
-        setSelectedCategoryFilter('all');
-      }
-    } catch (error: any) {
-      showToast(error.message || 'No se pudo eliminar la categoría.', 'error');
-    }
-  };
 
   // Handle Product Save (Create or Update)
   const handleSaveProduct = async (e: React.FormEvent) => {
@@ -271,101 +218,8 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
           </span>
         </div>
       ) : (
-        /* Main Layout Grid Split */
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-          
-          {/* LEFT SIDEBAR: Categories Control (Span 1) */}
-          <div className="lg:col-span-1 flex flex-col gap-6">
-            
-            {/* New Category Form Card */}
-            <div className="bg-onyx-surface border border-aged-bronze/40 rounded p-5 flex flex-col gap-4 shadow-md shadow-black/20">
-              <span className="text-sm font-semibold text-champagne-gold uppercase tracking-wider">
-                Nueva Categoría
-              </span>
-              
-              <form onSubmit={handleCreateCategory} className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-text-secondary">Nombre *</label>
-                  <Input
-                    type="text"
-                    placeholder="Ej. Bebidas, Entradas"
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    disabled={isSavingCategory}
-                    required
-                  />
-                </div>
-                
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-text-secondary">Descripción</label>
-                  <textarea
-                    rows={2}
-                    placeholder="Detalle opcional..."
-                    value={newCategoryDescription}
-                    onChange={(e) => setNewCategoryDescription(e.target.value)}
-                    disabled={isSavingCategory}
-                    className="w-full px-4 py-2 bg-onyx-surface text-text-primary border border-aged-bronze focus:border-champagne-gold focus:ring-champagne-gold/50 rounded font-sans placeholder-text-secondary transition-all duration-300 focus:outline-none focus:ring-2 text-sm disabled:opacity-50"
-                  />
-                </div>
-
-                <Button type="submit" variant="secondary" size="sm" fullWidth disabled={isSavingCategory}>
-                  {isSavingCategory ? 'Registrando...' : 'Registrar'}
-                </Button>
-              </form>
-            </div>
-
-            {/* Categories Roster Panel */}
-            <div className="bg-onyx-surface border border-aged-bronze/40 rounded p-5 flex flex-col gap-4 shadow-md shadow-black/20">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold text-champagne-gold uppercase tracking-wider">
-                  Categorías ({categories.length})
-                </span>
-              </div>
-
-              {categories.length === 0 ? (
-                <div className="text-center py-4 border border-dashed border-aged-bronze/20 rounded">
-                  <span className="text-xs text-text-secondary italic">Sin categorías registradas</span>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-1.5 max-h-[300px] overflow-y-auto pr-1">
-                  {categories.map((cat) => (
-                    <div
-                      key={cat.id}
-                      className={`flex items-center justify-between p-2.5 rounded transition-all duration-200 ${
-                        selectedCategoryFilter === cat.id
-                          ? 'bg-charcoal-surface border border-champagne-gold/20 text-champagne-gold'
-                          : 'bg-charcoal-surface/30 border border-transparent text-text-primary hover:bg-charcoal-surface/60'
-                      }`}
-                    >
-                      <button
-                        onClick={() => setSelectedCategoryFilter(selectedCategoryFilter === cat.id ? 'all' : cat.id)}
-                        className="flex-1 text-left text-sm font-medium focus:outline-none truncate"
-                        title={cat.description}
-                      >
-                        {cat.name}
-                      </button>
-                      
-                      <button
-                        onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                        className="p-1 hover:text-error-red text-text-secondary transition-colors focus:outline-none"
-                        title="Eliminar categoría"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-          </div>
-
-          {/* RIGHT CONTENT WORKSPACE: Product Catalog or Form (Span 3) */}
-          <div className="lg:col-span-3 flex flex-col gap-6">
-
-            {editingProduct ? (
+        <div className="w-full flex flex-col gap-6">
+          {editingProduct ? (
               /* Product Edit/Create Form View */
               <div className="bg-onyx-surface border border-aged-bronze/40 rounded p-6 shadow-md shadow-black/20 animate-fade-in">
                 <div className="flex items-center justify-between border-b border-aged-bronze/20 pb-4 mb-6">
@@ -725,8 +579,6 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
 
               </div>
             )}
-
-          </div>
 
         </div>
       )}
