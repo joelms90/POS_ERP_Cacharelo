@@ -2,43 +2,44 @@
 
 ## 1. Header & Metadata
 - **Project Name**: `/Users/joelmorales/web/POS-ERP`
-- **Date & Time**: 2026-06-28T11:50:00-06:00
+- **Date & Time**: 2026-06-28T11:58:00-06:00
 - **Last Agent**: Antigravity (Google DeepMind)
 
 ---
 
 ## 2. Executive Summary
-In this session, we successfully designed the technical plan and implemented:
-1. The PostgreSQL schemas and Drizzle migrations for warehouses, recipes, stock levels, receipts, and production assembly runs.
-2. The NestJS backend REST controller `/api/warehouses` mapped to Drizzle operations.
-3. The React Admin UI dashboard panel **"Bodegas (Almacén)"** to list, create, and delete warehouses scoped under the active business line.
+In this session, we successfully designed and implemented the full transactional inventory receiving flow, covering:
+1. **Firestore Permissions Fix**: Resolved the 500 error on `/api/admin/inquiries` by granting the Cloud Run Service Account the `roles/datastore.user` IAM role in Google Cloud.
+2. **NestJS Inventory Module**: Built `/api/inventory` endpoints to query current stock levels, list purchase history, and record new supplier receipts.
+3. **Database Transaction blocks**: Receipts and stock level additions are processed under a single ACID transaction block in Cloud SQL.
+4. **React Admin UI Receipts Dashboard**: Created [ReceiptsPage.tsx](./apps/business_control_tauri/src/pages/ReceiptsPage.tsx) to log incoming purchases, add line items with decimal support, and view live warehouse/branch stock levels.
 
-All updates are live in production.
+All features are compiled, tested, and live in production.
 
 ---
 
 ## 3. Current Status & Progress
 
 ### Completed Tasks
-1. **Drizzle Schema & Cloud Migration**:
-   - Added Drizzle tables `warehouses`, `stock_levels`, `recipes`, `inventory_receipts`, `inventory_receipt_items`, `production_runs`, `stock_transfers`, and `stock_transfer_items`.
-   - Generated Drizzle migration `migrations/0005_violet_dreaming_celestial.sql`.
-2. **NestJS Warehouses Module**:
-   - Implemented DTO input validations, repository layer, service level, and mapped REST handlers under `/api/warehouses`.
-   - Registered the module in [app.module.ts](./apps/sync_api/src/app.module.ts) and redeployed the service to Cloud Run (`pos-sync-api-00009-5xw`).
-3. **Tauri React Control Panel**:
-   - Created [WarehousesPage.tsx](./apps/business_control_tauri/src/pages/WarehousesPage.tsx) styling a high-density, premium Onyx & Champagne Gold warehouse dashboard layout.
-   - Refactored sidebar navigation in [AdminLayout.tsx](./apps/business_control_tauri/src/components/templates/AdminLayout.tsx) and conditional tabs rendering in [App.tsx](./apps/business_control_tauri/src/App.tsx) to mount the new module.
-   - Re-compiled the Vite application and successfully pushed static assets to GCS (`make admin-deploy`).
+1. **Firestore IAM Bindings**:
+   - Added Datastore User permissions for the Cloud Run service account in [main.tf](./apps/sync_api/infra/main.tf). Redeployed infrastructure to Cloud SQL/Firestore. Confirmed `/api/admin/inquiries` is 100% operational.
+2. **Transactional Inventory backend**:
+   - Added DTO validation schema [create-receipt.dto.ts](./apps/sync_api/src/modules/inventory/dto/create-receipt.dto.ts).
+   - Created [inventory.service.ts](./apps/sync_api/src/modules/inventory/inventory.service.ts) and [inventory.repository.ts](./apps/sync_api/src/modules/inventory/repositories/inventory.repository.ts) querying database stock levels and receipts logs. Registered in [app.module.ts](./apps/sync_api/src/app.module.ts).
+   - Confirmed cloud deployment on revision `pos-sync-api-00011-g5x`.
+3. **Receipts & Stock UI Dashboard**:
+   - Developed [ReceiptsPage.tsx](./apps/business_control_tauri/src/pages/ReceiptsPage.tsx) allowing interactive multi-item purchase logging and real-time stock balances grids.
+   - Refactored sidebar in [AdminLayout.tsx](./apps/business_control_tauri/src/components/templates/AdminLayout.tsx) to append the **Entradas (Insumos)** navigation option.
+   - Uploaded static React Tauri assets to Google Cloud Storage (`make admin-deploy`).
 
 ---
 
 ## 4. Remaining Tasks & Next Steps
 
-1. **Implement Recipes & Stock Transaction Endpoints**:
-   - Build REST controllers for setting up recipes, logging supplier receipts, and executing production assembly runs (decrementing component stocks and incrementing finished product stock inside a warehouse).
-2. **Build Receipts & Production UI forms**:
-   - Create the frontend receipt logger (multi-item purchase record) and assembly runs panels inside the admin panel.
+1. **Implement Recipes & Production Run Endpoints**:
+   - Build `/api/inventory/production` to specify product recipes (BOM) and assemble precooked dishes in warehouses (decrementing ingredient stock and incrementing finished stock).
+2. **Build Recipes & Assembly UI forms**:
+   - Integrate recipes and assembly execution screens in the admin panel.
 3. **Connect Flutter POS client menu**:
    - Update the Flutter POS client menu to dynamically load catalog data from the synced database.
 
