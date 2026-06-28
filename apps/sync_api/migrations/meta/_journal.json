@@ -43,6 +43,13 @@
       "when": 1782667818167,
       "tag": "0005_violet_dreaming_celestial",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782671683194,
+      "tag": "0006_loose_beyonder",
+      "breakpoints": true
     }
   ]
 }

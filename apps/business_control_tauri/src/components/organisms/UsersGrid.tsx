@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { Employee, api } from '../../services/api';
+import { Employee, api, Branch } from '../../services/api';
 import { Badge } from '../atoms/Badge';
 
 interface UsersGridProps {
   users: Employee[];
+  branches: Branch[];
   onDeleteSuccess: (id: string) => void;
   onErrorToast: (message: string) => void;
 }
 
 export const UsersGrid: React.FC<UsersGridProps> = ({
   users,
+  branches,
   onDeleteSuccess,
   onErrorToast,
 }) => {
@@ -72,6 +74,7 @@ export const UsersGrid: React.FC<UsersGridProps> = ({
           <thead>
             <tr className="bg-charcoal-surface/60 border-b border-aged-bronze/20 text-xs font-semibold tracking-wider text-text-secondary uppercase select-none">
               <th className="px-6 py-4">Nombre</th>
+              <th className="px-6 py-4">Sucursal</th>
               <th className="px-6 py-4">Rol / Puesto</th>
               <th className="px-6 py-4">PIN de Ingreso</th>
               <th className="px-6 py-4 text-right">Acciones</th>
@@ -79,14 +82,21 @@ export const UsersGrid: React.FC<UsersGridProps> = ({
           </thead>
           <tbody className="divide-y divide-aged-bronze/10 text-sm">
             {users.map((user) => {
-              const roleInfo = roleLabels[user.role] || { text: user.role, variant: 'info' as const };
+              const roleInfo = (roleLabels as any)[user.role] || { text: user.role, variant: 'info' as const };
               const isConfirmingDelete = deletingId === user.id;
+              const branch = branches.find((b) => b.id === user.branchId);
+              const branchName = branch ? branch.name : 'Todas (General)';
 
               return (
                 <tr key={user.id} className="hover:bg-charcoal-surface/20 transition-colors duration-200">
                   {/* Name */}
                   <td className="px-6 py-4 font-semibold text-text-primary whitespace-nowrap">
                     {user.name}
+                  </td>
+
+                  {/* Branch */}
+                  <td className="px-6 py-4 whitespace-nowrap text-text-secondary">
+                    {branchName}
                   </td>
 
                   {/* Role */}

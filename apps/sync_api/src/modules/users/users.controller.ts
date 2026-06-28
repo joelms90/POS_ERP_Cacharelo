@@ -10,8 +10,11 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  async findAll(@Query('businessId') businessId?: string) {
-    return this.usersService.findAll(businessId);
+  async findAll(
+    @Query('businessId') businessId?: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.usersService.findAll(businessId, branchId);
   }
 
   @Get(':id')

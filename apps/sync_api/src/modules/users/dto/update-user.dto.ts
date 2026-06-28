@@ -1,6 +1,10 @@
-import { IsString, IsEmail, IsOptional, Length, IsEnum, Matches } from 'class-validator';
+import { IsString, IsEmail, IsOptional, Length, IsEnum, Matches, IsUUID } from 'class-validator';
 
 export class UpdateUserDto {
+  @IsUUID()
+  @IsOptional()
+  branchId?: string;
+
   @IsString()
   @IsOptional()
   @Length(2, 100)

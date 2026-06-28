@@ -11,22 +11,18 @@ export class UsersRepository {
     private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
-  async findAll(businessId?: string) {
+  async findAll(businessId?: string, branchId?: string) {
+    const conditions: any[] = [isNull(schema.users.deletedAt)];
     if (businessId) {
-      return this.db
-        .select()
-        .from(schema.users)
-        .where(
-          and(
-            eq(schema.users.businessId, businessId),
-            isNull(schema.users.deletedAt),
-          ),
-        );
+      conditions.push(eq(schema.users.businessId, businessId));
+    }
+    if (branchId) {
+      conditions.push(eq(schema.users.branchId, branchId));
     }
     return this.db
       .select()
       .from(schema.users)
-      .where(isNull(schema.users.deletedAt));
+      .where(and(...conditions));
   }
 
   async findById(id: string) {

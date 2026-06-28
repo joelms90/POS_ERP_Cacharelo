@@ -8,8 +8,8 @@ import * as bcrypt from 'bcrypt';
 export class UsersService {
   constructor(private readonly usersRepository: UsersRepository) {}
 
-  async findAll(businessId?: string) {
-    const users = await this.usersRepository.findAll(businessId);
+  async findAll(businessId?: string, branchId?: string) {
+    const users = await this.usersRepository.findAll(businessId, branchId);
     return users.map((user) => this.sanitizeUser(user));
   }
 
@@ -22,7 +22,7 @@ export class UsersService {
   }
 
   async create(createUserDto: CreateUserDto) {
-    const { businessId, pin, email, password, ...rest } = createUserDto;
+    const { businessId, branchId, pin, email, password, ...rest } = createUserDto;
 
     // Enforce unique email if provided
     if (email) {
@@ -53,6 +53,7 @@ export class UsersService {
     const newUser = await this.usersRepository.create({
       ...rest,
       businessId: businessId || null,
+      branchId: branchId || null,
       email: email || null,
       pin: pinHash,
       passwordHash: passwordHash || null,
@@ -67,8 +68,12 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    const { pin, email, password, ...rest } = updateUserDto;
+    const { branchId, pin, email, password, ...rest } = updateUserDto;
     const updates: any = { ...rest };
+
+    if (branchId !== undefined) {
+      updates.branchId = branchId || null;
+    }
 
     // Handle email updates uniqueness
     if (email && email !== user.email) {

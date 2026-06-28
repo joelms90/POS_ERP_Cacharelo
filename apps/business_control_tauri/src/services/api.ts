@@ -1,8 +1,10 @@
 export interface Employee {
   id: string;
+  businessId?: string;
+  branchId?: string;
   name: string;
   pin: string;
-  role: 'waiter' | 'cashier' | 'kitchen';
+  role: 'waiter' | 'cashier' | 'kitchen' | 'admin';
 }
 
 export interface Warehouse {
@@ -158,11 +160,12 @@ export const api = {
     return data;
   },
 
-  /**
-   * Get all registered users for a business
-   */
-  async getUsers(businessId: string): Promise<Employee[]> {
-    return apiRequest<Employee[]>(`/users?businessId=${businessId}`);
+  async getUsers(businessId: string, branchId?: string): Promise<Employee[]> {
+    let url = `/users?businessId=${businessId}`;
+    if (branchId) {
+      url += `&branchId=${branchId}`;
+    }
+    return apiRequest<Employee[]>(url);
   },
 
   /**

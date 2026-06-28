@@ -47,6 +47,7 @@ export const branchTables = pgTable('branch_tables', {
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   businessId: uuid('business_id').references(() => businesses.id), // Nullable for system-wide admins
+  branchId: uuid('branch_id').references(() => branches.id),
   name: varchar('name', { length: 100 }).notNull(),
   email: varchar('email', { length: 255 }).unique(),
   passwordHash: varchar('password_hash', { length: 255 }),

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { api, Employee } from '../services/api';
+import { api, Employee, Branch } from '../services/api';
 import { UserForm } from '../components/organisms/UserForm';
 import { UsersGrid } from '../components/organisms/UsersGrid';
 import { ToastContainer } from '../components/molecules/ToastNotification';
@@ -11,6 +11,8 @@ interface DashboardPageProps {
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ businessId }) => {
   const [users, setUsers] = useState<Employee[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
 
@@ -23,18 +25,32 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ businessId }) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  // Fetch branches list
+  const fetchBranches = useCallback(async () => {
+    try {
+      const data = await api.getBranches(businessId);
+      setBranches(data);
+    } catch (error) {
+      console.error('Error al cargar sucursales:', error);
+    }
+  }, [businessId]);
+
   // Fetch users from API
   const fetchUsers = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true);
     try {
-      const data = await api.getUsers(businessId);
+      const data = await api.getUsers(businessId, selectedBranchId || undefined);
       setUsers(data);
     } catch (error: any) {
       showToast(error.message || 'Error al cargar el roster de personal.', 'error');
     } finally {
       if (!silent) setIsLoading(false);
     }
-  }, [businessId, showToast]);
+  }, [businessId, selectedBranchId, showToast]);
+
+  useEffect(() => {
+    fetchBranches();
+  }, [fetchBranches]);
 
   useEffect(() => {
     fetchUsers();
@@ -70,21 +86,38 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ businessId }) => {
           </p>
         </div>
 
-        <button
-          onClick={() => fetchUsers()}
-          disabled={isLoading}
-          className="inline-flex items-center gap-2 px-4 py-2 border border-aged-bronze/40 hover:border-champagne-gold/60 bg-onyx-surface hover:bg-charcoal-surface/60 rounded text-sm text-text-secondary hover:text-champagne-gold font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed select-none active:scale-98"
-        >
-          <svg
-            className={`w-4 h-4 ${isLoading ? 'animate-spin text-champagne-gold' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          {/* Branch filter selection */}
+          <select
+            value={selectedBranchId}
+            onChange={(e) => setSelectedBranchId(e.target.value)}
+            disabled={isLoading}
+            className="px-3 py-1.5 bg-onyx-surface text-text-primary border border-aged-bronze/40 focus:border-champagne-gold rounded text-xs font-sans focus:outline-none transition-all cursor-pointer min-w-[180px]"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 3v2m-2.837 5.828l-2.83-2.829m0 0l-3.07 3.07M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span>Sincronizar Lista</span>
-        </button>
+            <option value="">Todas las Sucursales</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            onClick={() => fetchUsers()}
+            disabled={isLoading}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-aged-bronze/40 hover:border-champagne-gold/60 bg-onyx-surface hover:bg-charcoal-surface/60 rounded text-sm text-text-secondary hover:text-champagne-gold font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed select-none active:scale-98"
+          >
+            <svg
+              className={`w-4 h-4 ${isLoading ? 'animate-spin text-champagne-gold' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 3v2m-2.837 5.828l-2.83-2.829m0 0l-3.07 3.07M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Sincronizar Lista</span>
+          </button>
+        </div>
       </div>
 
       {isLoading && users.length === 0 ? (
@@ -103,7 +136,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ businessId }) => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           {/* Create User Form Block */}
           <div className="lg:col-span-1">
-            <UserForm onSuccess={handleAddUserSuccess} onErrorToast={(msg) => showToast(msg, 'error')} businessId={businessId} />
+            <UserForm 
+              onSuccess={handleAddUserSuccess} 
+              onErrorToast={(msg) => showToast(msg, 'error')} 
+              businessId={businessId} 
+              branches={branches}
+            />
           </div>
 
           {/* Users Grid Table Block */}
@@ -114,6 +152,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ businessId }) => {
             </div>
             <UsersGrid
               users={users}
+              branches={branches}
               onDeleteSuccess={handleDeleteUserSuccess}
               onErrorToast={(msg) => showToast(msg, 'error')}
             />

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { api, Employee } from '../../services/api';
+import { api, Employee, Branch } from '../../services/api';
 import { Button } from '../atoms/Button';
 import { Input } from '../atoms/Input';
 import { FormField } from '../molecules/FormField';
@@ -8,12 +8,14 @@ interface UserFormProps {
   onSuccess: (newUser: Employee) => void;
   onErrorToast: (message: string) => void;
   businessId: string;
+  branches: Branch[];
 }
 
-export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, businessId }) => {
+export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, businessId, branches }) => {
   const [name, setName] = useState('');
   const [pin, setPin] = useState('');
   const [role, setRole] = useState<'waiter' | 'cashier' | 'kitchen'>('waiter');
+  const [branchId, setBranchId] = useState('');
   
   const [nameError, setNameError] = useState<string | null>(null);
   const [pinError, setPinError] = useState<string | null>(null);
@@ -58,6 +60,7 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
         name: name.trim(),
         pin,
         role,
+        branchId: branchId || undefined,
       }, businessId);
 
       if (response.success && response.user) {
@@ -66,6 +69,7 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
         setName('');
         setPin('');
         setRole('waiter');
+        setBranchId('');
       } else {
         onErrorToast('No se pudo registrar el usuario.');
       }
@@ -137,6 +141,26 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
             <option value="kitchen">Pantalla Cocina (Kitchen)</option>
           </select>
         </div>
+      </div>
+
+      {/* Branch Selection */}
+      <div className="flex flex-col gap-1.5 w-full">
+        <label className="text-sm font-semibold tracking-wide text-text-secondary">
+          Sucursal (Punto de Venta)
+        </label>
+        <select
+          value={branchId}
+          onChange={(e) => setBranchId(e.target.value)}
+          disabled={isLoading}
+          className="w-full px-4 py-2 bg-onyx-surface text-text-primary border border-aged-bronze focus:border-champagne-gold focus:ring-champagne-gold/50 rounded font-sans focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        >
+          <option value="">Todas las Sucursales (Acceso General)</option>
+          {branches.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <Button type="submit" disabled={isLoading} className="mt-2 flex items-center justify-center gap-2">

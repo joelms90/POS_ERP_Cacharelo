@@ -5,6 +5,10 @@ export class CreateUserDto {
   @IsOptional() // Nullable for system admins
   businessId?: string;
 
+  @IsUUID()
+  @IsOptional()
+  branchId?: string;
+
   @IsString()
   @Length(2, 100)
   name: string;
