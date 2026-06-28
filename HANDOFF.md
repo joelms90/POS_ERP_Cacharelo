@@ -2,35 +2,32 @@
 
 ## 1. Header & Metadata
 - **Project Name**: `/Users/joelmorales/web/POS-ERP`
-- **Date & Time**: 2026-06-28T12:32:00-06:00
+- **Date & Time**: 2026-06-28T12:47:00-06:00
 - **Last Agent**: Antigravity (Google DeepMind)
 
 ---
 
 ## 2. Executive Summary
-In this session, we completed two core layout corrections and a major CRUD feature:
-1. **Firestore Index & Inquiries**: Configured the composite index (`status` ASC, `createdAt` DESC) inside [main.tf](./apps/sync_api/infra/main.tf). Filtered inquiries `/api/admin/inquiries?status=resolved` are 100% operational.
-2. **Mobile Sidebar Drawer & Spacing**: Restructured [AdminLayout.tsx](./apps/business_control_tauri/src/components/templates/AdminLayout.tsx) to hide the sidebar behind a hamburger menu toggle on mobile and adjusted line heights/font sizes to prevent visual text clipping.
-3. **Status Icons**: Refactored the text badges in [StatusIndicator.tsx](./apps/business_control_tauri/src/components/molecules/StatusIndicator.tsx) to color-coded Cloud (Sync server) and Stack (Database connection) icons.
-4. **Branches CRUD Management**: Designed a complete CRUD module for **Sucursales** (points of sale) inside [BranchesPage.tsx](./apps/business_control_tauri/src/pages/BranchesPage.tsx) and registered the REST backend `/api/branches` module. Branch deletions are blocked if associated records (mesas, pedidos, inventories, stock) exist.
+In this session, we completed the integration of **Sucursales** with **Personal (PINs)**:
+1. **Schema Migration**: Added the `branch_id` foreign key reference to the `users` table schema in [schema.ts](./apps/sync_api/src/database/schema.ts) and generated the Drizzle migration script (`0006_loose_beyonder.sql`).
+2. **Backend Controllers & DTOs**: Updated user controller, service, repository, and create/update validation DTOs to support optional `branchId` mapping and dynamic DB querying filters.
+3. **Frontend Roster & Dropdowns**:
+   - Added a sucursal selection filter dropdown inside [DashboardPage.tsx](./apps/business_control_tauri/src/pages/DashboardPage.tsx).
+   - Added the sucursal dropdown selector inside [UserForm.tsx](./apps/business_control_tauri/src/components/organisms/UserForm.tsx) to register new employees under a specific branch.
+   - Updated the table inside [UsersGrid.tsx](./apps/business_control_tauri/src/components/organisms/UsersGrid.tsx) to map and display the friendly sucursal name for each employee.
 
-All features are compiled, tested, and live in production.
+All updates are compiled, verified via integration tests, and deployed to Cloud Run and GCS.
 
 ---
 
 ## 3. Current Status & Progress
 
 ### Completed Tasks
-1. **Layout Responsiveness Guidelines**:
-   - Documented mobile responsiveness standards (scrolling layout heights, typography scaling, adaptive grid splits) in [AGENTS.md](./AGENTS.md).
-2. **Branches Module (Backend)**:
-   - Added DTO validation schema for branches ([create-branch.dto.ts](./apps/sync_api/src/modules/branches/dto/create-branch.dto.ts)).
-   - Implemented relational presence checks in [branches.repository.ts](./apps/sync_api/src/modules/branches/repositories/branches.repository.ts) querying tables, orders, stock levels, receipts, and transfers.
-   - Deployed sync-api container to Cloud Run (revision `pos-sync-api-00013-n24`).
-3. **Branches CRUD Panel (Frontend)**:
-   - Developed [BranchesPage.tsx](./apps/business_control_tauri/src/pages/BranchesPage.tsx) with list card grids, forms, search filters, and responsive styling.
-   - Mounted it to `App.tsx` and sidebar in `AdminLayout.tsx` using a map-pin icon.
-   - Uploaded static client assets to GCS using `make admin-deploy`.
+1. **Database Schema Update**:
+   - Registered `branch_id` in Drizzle and executed SQL migration on startup on the cloud database.
+2. **Roster Filtering & Creation (Tauri Web App)**:
+   - Fetched sucursal list dynamically in `DashboardPage` and passed it down to `UserForm` and `UsersGrid` properties.
+   - Verified that filters apply correctly to retrieve branch-specific user lists.
 
 ---
 
