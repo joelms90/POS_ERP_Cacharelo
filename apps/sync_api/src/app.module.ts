@@ -10,6 +10,7 @@ import { ShiftsModule } from './modules/shifts/shifts.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { KitchenModule } from './modules/kitchen/kitchen.module';
 import { ProvidersModule } from './modules/providers/providers.module';
+import { InquiriesModule } from './modules/inquiries/inquiries.module';
 
 @Module({
   imports: [
@@ -22,8 +23,10 @@ import { ProvidersModule } from './modules/providers/providers.module';
     OrdersModule,
     KitchenModule,
     ProvidersModule,
+    InquiriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
+

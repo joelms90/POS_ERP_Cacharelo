@@ -12,6 +12,19 @@ export interface SystemHealth {
   activeSessionsCount: number;
 }
 
+export interface Inquiry {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  subject: string;
+  message: string;
+  inquiryType: string;
+  status: string;
+  createdAt: string;
+}
+
+
 export interface Category {
   id: string;
   businessId: string;
@@ -297,4 +310,23 @@ export const api = {
       };
     }
   },
+
+  /**
+   * Get all contact form inquiries
+   */
+  async getInquiries(status?: string): Promise<Inquiry[]> {
+    const url = status ? `/admin/inquiries?status=${status}` : '/admin/inquiries';
+    return apiRequest<Inquiry[]>(url);
+  },
+
+  /**
+   * Update the status of an inquiry (e.g. resolve it)
+   */
+  async updateInquiryStatus(id: string, status: string): Promise<Inquiry> {
+    return apiRequest<Inquiry>(`/admin/inquiries/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  },
 };
+

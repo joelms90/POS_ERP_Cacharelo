@@ -212,3 +212,84 @@ export const kitchenTickets = pgTable('kitchen_tickets', {
   readyAt: timestamp('ready_at', { withTimezone: true }),
   servedAt: timestamp('served_at', { withTimezone: true }),
 });
+
+export const warehouses = pgTable('warehouses', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  businessId: uuid('business_id').references(() => businesses.id).notNull(),
+  name: varchar('name', { length: 100 }).notNull(),
+  code: varchar('code', { length: 30 }),
+  address: text('address'),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  version: integer('version').default(1).notNull(),
+});
+
+export const stockLevels = pgTable('stock_levels', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  productId: uuid('product_id').references(() => products.id).notNull(),
+  branchId: uuid('branch_id').references(() => branches.id),
+  warehouseId: uuid('warehouse_id').references(() => warehouses.id),
+  quantity: decimal('quantity', { precision: 12, scale: 3 }).default('0.000').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const recipes = pgTable('recipes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  parentProductId: uuid('parent_product_id').references(() => products.id).notNull(),
+  ingredientProductId: uuid('ingredient_product_id').references(() => products.id).notNull(),
+  quantityNeeded: decimal('quantity_needed', { precision: 12, scale: 3 }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const inventoryReceipts = pgTable('inventory_receipts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  businessId: uuid('business_id').references(() => businesses.id).notNull(),
+  providerId: uuid('provider_id').references(() => providers.id).notNull(),
+  branchId: uuid('branch_id').references(() => branches.id),
+  warehouseId: uuid('warehouse_id').references(() => warehouses.id),
+  documentNumber: varchar('document_number', { length: 50 }),
+  receivedAt: timestamp('received_at', { withTimezone: true }).defaultNow().notNull(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const inventoryReceiptItems = pgTable('inventory_receipt_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  receiptId: uuid('receipt_id').references(() => inventoryReceipts.id).notNull(),
+  productId: uuid('product_id').references(() => products.id).notNull(),
+  quantity: decimal('quantity', { precision: 12, scale: 3 }).notNull(),
+  unitCost: decimal('unit_cost', { precision: 10, scale: 2 }).notNull(),
+  totalCost: decimal('total_cost', { precision: 10, scale: 2 }).notNull(),
+});
+
+export const productionRuns = pgTable('production_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  warehouseId: uuid('warehouse_id').references(() => warehouses.id).notNull(),
+  productId: uuid('product_id').references(() => products.id).notNull(),
+  quantityProduced: decimal('quantity_produced', { precision: 12, scale: 3 }).notNull(),
+  assembledAt: timestamp('assembled_at', { withTimezone: true }).defaultNow().notNull(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const stockTransfers = pgTable('stock_transfers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  businessId: uuid('business_id').references(() => businesses.id).notNull(),
+  fromWarehouseId: uuid('from_warehouse_id').references(() => warehouses.id),
+  fromBranchId: uuid('from_branch_id').references(() => branches.id),
+  toWarehouseId: uuid('to_warehouse_id').references(() => warehouses.id),
+  toBranchId: uuid('to_branch_id').references(() => branches.id),
+  transferredAt: timestamp('transferred_at', { withTimezone: true }).defaultNow().notNull(),
+  status: varchar('status', { length: 20 }).default('completed').notNull(),
+  notes: text('notes'),
+});
+
+export const stockTransferItems = pgTable('stock_transfer_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  transferId: uuid('transfer_id').references(() => stockTransfers.id).notNull(),
+  productId: uuid('product_id').references(() => products.id).notNull(),
+  quantity: decimal('quantity', { precision: 12, scale: 3 }).notNull(),
+});
