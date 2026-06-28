@@ -5,10 +5,12 @@ import { AdminLayout } from './components/templates/AdminLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { ProvidersPage } from './pages/ProvidersPage';
+import { InquiriesPage } from './pages/InquiriesPage';
+import { WarehousesPage } from './pages/WarehousesPage';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'personal' | 'inventory' | 'providers'>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses'>('personal');
   const [activeBusinessId, setActiveBusinessId] = useState<string>('d3b07384-d113-4a0e-a555-e5b12824bf01');
 
   // Full Screen Loading State
@@ -42,8 +44,11 @@ function App() {
       {activeTab === 'personal' && <DashboardPage businessId={activeBusinessId} />}
       {activeTab === 'inventory' && <InventoryPage businessId={activeBusinessId} />}
       {activeTab === 'providers' && <ProvidersPage businessId={activeBusinessId} />}
+      {activeTab === 'inquiries' && <InquiriesPage />}
+      {activeTab === 'warehouses' && <WarehousesPage businessId={activeBusinessId} />}
     </AdminLayout>
   );
 }
+
 
 export default App;

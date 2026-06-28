@@ -5,6 +5,16 @@ export interface Employee {
   role: 'waiter' | 'cashier' | 'kitchen';
 }
 
+export interface Warehouse {
+  id: string;
+  businessId: string;
+  name: string;
+  code?: string;
+  address?: string;
+  isActive: boolean;
+  createdAt?: string;
+}
+
 export interface SystemHealth {
   apiOnline: boolean;
   databaseConnected: boolean;
@@ -326,6 +336,35 @@ export const api = {
     return apiRequest<Inquiry>(`/admin/inquiries/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
+    });
+  },
+
+  /**
+   * Get all warehouses for a business
+   */
+  async getWarehouses(businessId: string): Promise<Warehouse[]> {
+    return apiRequest<Warehouse[]>(`/warehouses?businessId=${businessId}`);
+  },
+
+  /**
+   * Create a new warehouse
+   */
+  async addWarehouse(warehouse: Omit<Warehouse, 'id' | 'isActive' | 'businessId'>, businessId: string): Promise<Warehouse> {
+    return apiRequest<Warehouse>('/warehouses', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...warehouse,
+        businessId,
+      }),
+    });
+  },
+
+  /**
+   * Delete a warehouse (soft delete)
+   */
+  async deleteWarehouse(id: string): Promise<{ success: boolean; message: string }> {
+    return apiRequest<{ success: boolean; message: string }>(`/warehouses/${id}`, {
+      method: 'DELETE',
     });
   },
 };

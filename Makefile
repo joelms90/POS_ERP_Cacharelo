@@ -142,7 +142,8 @@ landing-infra:
 # Admin Dashboard Targets
 admin-build:
 	@echo "Building static admin dashboard assets..."
-	cd apps/business_control_tauri && VITE_API_URL=https://pos-sync-api-232144991863.us-central1.run.app/api pnpm build
+	cd apps/business_control_tauri && VITE_API_URL=https://pos-sync-api-umqpitkpoa-uc.a.run.app/api pnpm build
+
 
 admin-deploy: admin-build
 	@echo "Deploying admin dashboard to Google Cloud Storage..."

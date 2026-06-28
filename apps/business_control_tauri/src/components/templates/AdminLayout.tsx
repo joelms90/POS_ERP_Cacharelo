@@ -7,8 +7,8 @@ import { Heading } from '../atoms/Heading';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
-  activeTab: 'personal' | 'inventory' | 'providers';
-  onTabChange: (tab: 'personal' | 'inventory' | 'providers') => void;
+  activeTab: 'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses';
+  onTabChange: (tab: 'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses') => void;
   activeBusinessId: string;
   onBusinessChange: (businessId: string) => void;
 }
@@ -108,6 +108,35 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </svg>
               <span>Proveedores</span>
             </button>
+
+            <button
+              onClick={() => onTabChange('warehouses')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded border text-left transition-all duration-200 ${
+                activeTab === 'warehouses'
+                  ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
+                  : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-charcoal-surface/50'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              <span>Bodegas (Almacén)</span>
+            </button>
+
+            <button
+              onClick={() => onTabChange('inquiries')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded border text-left transition-all duration-200 ${
+                activeTab === 'inquiries'
+                  ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
+                  : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-charcoal-surface/50'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              <span>Consultas Web</span>
+            </button>
+
             
             <div className="flex items-center gap-3 px-4 py-3 rounded text-text-secondary hover:text-text-primary hover:bg-charcoal-surface/50 border border-transparent transition-all duration-200 cursor-not-allowed opacity-50">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
