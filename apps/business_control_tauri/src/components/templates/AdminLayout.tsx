@@ -43,11 +43,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
     }
   };
 
-  // Run health check on mount and poll every 10 seconds
+  // Run health check only on start if needed we can renable it every 10 seconds or so to keep the status updated
   useEffect(() => {
     fetchHealth();
-    const interval = setInterval(fetchHealth, 10000);
-    return () => clearInterval(interval);
+    // const interval = setInterval(fetchHealth, 10000);
+    // return () => clearInterval(interval);
   }, []);
 
   return (

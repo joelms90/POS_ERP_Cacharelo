@@ -198,3 +198,20 @@ resource "google_project_iam_member" "compute_logging_writer" {
   role    = "roles/logging.logWriter"
   member  = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 }
+
+# Create Firestore composite index for inquiries queries
+resource "google_firestore_index" "inquiries_composite_index" {
+  project    = var.project_id
+  database   = "(default)"
+  collection = "contact_inquiries"
+
+  fields {
+    field_path = "status"
+    order      = "ASCENDING"
+  }
+
+  fields {
+    field_path = "createdAt"
+    order      = "DESCENDING"
+  }
+}
