@@ -106,6 +106,13 @@ resource "google_project_iam_member" "sql_client" {
   member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
+# Grant Firestore Access (Datastore User) to the Service Account
+resource "google_project_iam_member" "firestore_user" {
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+}
+
 # 6. Cloud Run Service for the Express API
 resource "google_cloud_run_service" "pos_api" {
   depends_on = [

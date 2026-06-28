@@ -367,5 +367,45 @@ export const api = {
       method: 'DELETE',
     });
   },
+
+  /**
+   * Get stock levels for a business
+   */
+  async getStockLevels(businessId: string, warehouseId?: string, branchId?: string): Promise<any[]> {
+    let url = `/inventory/stock?businessId=${businessId}`;
+    if (warehouseId) url += `&warehouseId=${warehouseId}`;
+    if (branchId) url += `&branchId=${branchId}`;
+    return apiRequest<any[]>(url);
+  },
+
+  /**
+   * Get purchase receipts history
+   */
+  async getReceipts(businessId: string): Promise<any[]> {
+    return apiRequest<any[]>(`/inventory/receipts?businessId=${businessId}`);
+  },
+
+  /**
+   * Record a new inventory receipt from a provider
+   */
+  async recordReceipt(
+    payload: {
+      providerId: string;
+      warehouseId?: string;
+      branchId?: string;
+      documentNumber?: string;
+      notes?: string;
+      items: Array<{ productId: string; quantity: number; unitCost: number }>;
+    },
+    businessId: string
+  ): Promise<{ success: boolean; receiptId: string }> {
+    return apiRequest<{ success: boolean; receiptId: string }>('/inventory/receipts', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...payload,
+        businessId,
+      }),
+    });
+  },
 };
 

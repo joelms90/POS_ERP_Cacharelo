@@ -12,6 +12,7 @@ import { KitchenModule } from './modules/kitchen/kitchen.module';
 import { ProvidersModule } from './modules/providers/providers.module';
 import { InquiriesModule } from './modules/inquiries/inquiries.module';
 import { WarehousesModule } from './modules/warehouses/warehouses.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { WarehousesModule } from './modules/warehouses/warehouses.module';
     ProvidersModule,
     InquiriesModule,
     WarehousesModule,
+    InventoryModule,
   ],
   controllers: [AppController],
   providers: [AppService],
