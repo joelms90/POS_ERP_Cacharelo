@@ -8,10 +8,11 @@ import { ProvidersPage } from './pages/ProvidersPage';
 import { InquiriesPage } from './pages/InquiriesPage';
 import { WarehousesPage } from './pages/WarehousesPage';
 import { ReceiptsPage } from './pages/ReceiptsPage';
+import { BranchesPage } from './pages/BranchesPage';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts'>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches'>('personal');
   const [activeBusinessId, setActiveBusinessId] = useState<string>('d3b07384-d113-4a0e-a555-e5b12824bf01');
 
   // Full Screen Loading State
@@ -38,7 +39,7 @@ function App() {
   return (
     <AdminLayout 
       activeTab={activeTab} 
-      onTabChange={setActiveTab}
+      onTabChange={setActiveTab as any}
       activeBusinessId={activeBusinessId}
       onBusinessChange={setActiveBusinessId}
     >
@@ -48,6 +49,7 @@ function App() {
       {activeTab === 'inquiries' && <InquiriesPage />}
       {activeTab === 'warehouses' && <WarehousesPage businessId={activeBusinessId} />}
       {activeTab === 'receipts' && <ReceiptsPage businessId={activeBusinessId} />}
+      {activeTab === 'branches' && <BranchesPage businessId={activeBusinessId} />}
     </AdminLayout>
   );
 }

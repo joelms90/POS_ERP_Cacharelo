@@ -15,6 +15,16 @@ export interface Warehouse {
   createdAt?: string;
 }
 
+export interface Branch {
+  id: string;
+  businessId: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  createdAt?: string;
+  version?: number;
+}
+
 export interface SystemHealth {
   apiOnline: boolean;
   databaseConnected: boolean;
@@ -364,6 +374,45 @@ export const api = {
    */
   async deleteWarehouse(id: string): Promise<{ success: boolean; message: string }> {
     return apiRequest<{ success: boolean; message: string }>(`/warehouses/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Get all branches for a business
+   */
+  async getBranches(businessId: string): Promise<Branch[]> {
+    return apiRequest<Branch[]>(`/branches?businessId=${businessId}`);
+  },
+
+  /**
+   * Create a new branch
+   */
+  async addBranch(branch: Omit<Branch, 'id' | 'businessId' | 'version'>, businessId: string): Promise<Branch> {
+    return apiRequest<Branch>('/branches', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...branch,
+        businessId,
+      }),
+    });
+  },
+
+  /**
+   * Update a branch
+   */
+  async updateBranch(id: string, updates: Partial<Omit<Branch, 'id' | 'businessId' | 'version'>>): Promise<Branch> {
+    return apiRequest<Branch>(`/branches/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  },
+
+  /**
+   * Delete a branch (soft delete)
+   */
+  async deleteBranch(id: string): Promise<{ success: boolean; message: string }> {
+    return apiRequest<{ success: boolean; message: string }>(`/branches/${id}`, {
       method: 'DELETE',
     });
   },
