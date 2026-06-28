@@ -117,7 +117,7 @@ export const ProvidersPage: React.FC<ProvidersPageProps> = ({ businessId }) => {
         {/* Left Side: Suppliers List Table / Cards */}
         <div className="flex-1 bg-onyx-surface border border-aged-bronze/40 rounded-lg p-4 lg:p-6 flex flex-col lg:h-full overflow-hidden shadow-xl">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <Heading level={2} className="!border-none !pb-0 text-champagne-gold tracking-wide font-light">
+            <Heading level={2} className="!text-lg sm:!text-2xl !border-none !pb-0 text-champagne-gold tracking-wide font-light">
               Proveedores de Insumos
             </Heading>
             <div className="w-full sm:w-64">
