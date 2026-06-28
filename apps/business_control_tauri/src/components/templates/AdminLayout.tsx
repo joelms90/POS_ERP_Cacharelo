@@ -24,6 +24,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
   });
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Poll system health function
   const fetchHealth = async () => {
@@ -43,32 +44,55 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
     }
   };
 
-  // Run health check only on start if needed we can renable it every 10 seconds or so to keep the status updated
   useEffect(() => {
     fetchHealth();
-    // const interval = setInterval(fetchHealth, 10000);
-    // return () => clearInterval(interval);
   }, []);
 
+  const handleTabClick = (tab: typeof activeTab) => {
+    onTabChange(tab);
+    setIsMobileMenuOpen(false);
+  };
+
   return (
-    <div className="flex h-screen w-screen bg-obsidian text-text-primary overflow-hidden font-sans select-none">
+    <div className="flex h-screen w-screen bg-obsidian text-text-primary overflow-hidden font-sans select-none relative">
+      
+      {/* Backdrop overlay for mobile drawer */}
+      {isMobileMenuOpen && (
+        <div 
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden transition-opacity duration-300"
+        />
+      )}
+
       {/* Sidebar Panel */}
-      <aside className="w-64 bg-onyx-surface border-r border-aged-bronze/40 flex flex-col justify-between h-full">
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-onyx-surface border-r border-aged-bronze/40 flex flex-col justify-between h-full transform transition-transform duration-300 ease-in-out ${
+        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      }`}>
         <div>
           {/* Logo Brand Header */}
-          <div className="p-6 border-b border-aged-bronze/20 flex flex-col items-center gap-1">
+          <div className="p-6 border-b border-aged-bronze/20 flex flex-col items-center gap-1 relative">
             <span className="font-display text-2xl tracking-widest text-champagne-gold uppercase">
               Cacharelo
             </span>
             <span className="text-[10px] tracking-widest text-text-secondary uppercase">
               Business Control
             </span>
-          </div>
-
-          {/* Navigation Links */}
-          <nav className="p-4 flex flex-col gap-2">
+            
+            {/* Close button inside mobile menu */}
             <button
-              onClick={() => onTabChange('personal')}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="lg:hidden absolute top-4 right-4 p-1 text-text-secondary hover:text-champagne-gold"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+ 
+          {/* Navigation Links */}
+          <nav className="p-4 flex flex-col gap-2 overflow-y-auto max-h-[calc(100vh-160px)]">
+            <button
+              onClick={() => handleTabClick('personal')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded border text-left transition-all duration-200 ${
                 activeTab === 'personal'
                   ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
@@ -82,7 +106,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
             </button>
 
             <button
-              onClick={() => onTabChange('inventory')}
+              onClick={() => handleTabClick('inventory')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded border text-left transition-all duration-200 ${
                 activeTab === 'inventory'
                   ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
@@ -96,7 +120,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
             </button>
 
             <button
-              onClick={() => onTabChange('providers')}
+              onClick={() => handleTabClick('providers')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded border text-left transition-all duration-200 ${
                 activeTab === 'providers'
                   ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
@@ -110,7 +134,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
             </button>
 
             <button
-              onClick={() => onTabChange('warehouses')}
+              onClick={() => handleTabClick('warehouses')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded border text-left transition-all duration-200 ${
                 activeTab === 'warehouses'
                   ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
@@ -124,7 +148,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
             </button>
 
             <button
-              onClick={() => onTabChange('receipts')}
+              onClick={() => handleTabClick('receipts')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded border text-left transition-all duration-200 ${
                 activeTab === 'receipts'
                   ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
@@ -138,7 +162,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
             </button>
 
             <button
-              onClick={() => onTabChange('inquiries')}
+              onClick={() => handleTabClick('inquiries')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded border text-left transition-all duration-200 ${
                 activeTab === 'inquiries'
                   ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
@@ -151,7 +175,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               <span>Consultas Web</span>
             </button>
 
-            
             <div className="flex items-center gap-3 px-4 py-3 rounded text-text-secondary hover:text-text-primary hover:bg-charcoal-surface/50 border border-transparent transition-all duration-200 cursor-not-allowed opacity-50">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
@@ -190,14 +213,25 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
         )}
 
         {/* Global Page Header */}
-        <header className="h-20 bg-onyx-surface border-b border-aged-bronze/40 px-8 flex items-center justify-between flex-shrink-0 z-10">
-          <div className="flex items-center gap-8">
-            <Heading level={3} className="!border-none !pb-0 tracking-wide font-light">
+        <header className="h-20 bg-onyx-surface border-b border-aged-bronze/40 px-4 lg:px-8 flex items-center justify-between flex-shrink-0 z-10">
+          <div className="flex items-center gap-3 lg:gap-8">
+            
+            {/* Hamburger Menu Toggle for Mobile */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="lg:hidden p-2 rounded border border-aged-bronze/30 text-text-secondary hover:text-champagne-gold hover:bg-charcoal/20 transition-all active:scale-95 duration-100"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+
+            <Heading level={3} className="!border-none !pb-0 tracking-wide font-light hidden sm:block">
               Panel de Control
             </Heading>
 
-            <div className="flex items-center gap-3 bg-charcoal-surface/60 border border-aged-bronze/35 rounded-md px-3 py-1.5 shadow-sm">
-              <label className="text-[10px] text-text-secondary font-medium uppercase tracking-wider">Negocio:</label>
+            <div className="flex items-center gap-2 bg-charcoal-surface/60 border border-aged-bronze/35 rounded-md px-2 py-1 lg:px-3 lg:py-1.5 shadow-sm">
+              <label className="text-[9px] lg:text-[10px] text-text-secondary font-medium uppercase tracking-wider">Negocio:</label>
               <select
                 value={activeBusinessId}
                 onChange={(e) => onBusinessChange(e.target.value)}
@@ -212,7 +246,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
           </div>
 
           {/* Right Status Actions */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 lg:gap-6">
             <StatusIndicator
               apiOnline={health.apiOnline}
               databaseConnected={health.databaseConnected}
@@ -238,7 +272,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 bg-obsidian overflow-y-auto p-8 relative">
+        <main className="flex-1 bg-obsidian overflow-y-auto p-4 lg:p-8 relative">
           <div className="max-w-6xl mx-auto h-full flex flex-col">
             {children}
           </div>
