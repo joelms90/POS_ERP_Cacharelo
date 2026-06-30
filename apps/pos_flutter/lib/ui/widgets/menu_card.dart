@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../common/colors.dart';
 import '../common/app_state.dart';
 
@@ -24,7 +25,7 @@ class MenuCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Icon representation by category
+              // Icon or Image representation
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
@@ -35,12 +36,29 @@ class MenuCard extends StatelessWidget {
                       width: 1,
                     ),
                   ),
-                  child: Center(
-                    child: Icon(
-                      _getCategoryIcon(item.category),
-                      color: EmpireColors.champagneGold,
-                      size: 28,
-                    ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: item.imagePath.isNotEmpty
+                        ? Image.memory(
+                            base64Decode(item.imagePath.split(',').last),
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Center(
+                                child: Icon(
+                                  _getCategoryIcon(item.category),
+                                  color: EmpireColors.champagneGold,
+                                  size: 28,
+                                ),
+                              );
+                            },
+                          )
+                        : Center(
+                            child: Icon(
+                              _getCategoryIcon(item.category),
+                              color: EmpireColors.champagneGold,
+                              size: 28,
+                            ),
+                          ),
                   ),
                 ),
               ),

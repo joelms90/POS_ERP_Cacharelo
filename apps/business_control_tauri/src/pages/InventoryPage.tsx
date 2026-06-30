@@ -102,6 +102,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
         price: priceVal.toFixed(2),
         isSellable: editingProduct.isSellable ?? true,
         isIngredient: editingProduct.isIngredient ?? false,
+        imageUrl: editingProduct.imageUrl || undefined,
       };
 
       if (editingProduct.id) {
@@ -192,6 +193,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                 price: '0.00',
                 isSellable: true,
                 isIngredient: false,
+                imageUrl: '',
               })}
               disabled={categories.length === 0}
               className="flex items-center gap-2"
@@ -294,6 +296,80 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                           onChange={(e) => setEditingProduct(prev => ({ ...prev, barcode: e.target.value }))}
                           disabled={isSavingProduct}
                         />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5 mt-2">
+                      <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Imagen del Producto</label>
+                      <div className="flex items-center gap-4">
+                        {editingProduct.imageUrl && (
+                          <div className="w-16 h-16 rounded overflow-hidden border border-aged-bronze bg-charcoal-surface flex items-center justify-center flex-shrink-0">
+                            <img
+                              src={editingProduct.imageUrl}
+                              alt="preview"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <label className="flex-1 flex flex-col items-center justify-center h-16 border border-dashed border-aged-bronze/40 hover:border-champagne-gold/60 rounded cursor-pointer bg-charcoal-surface transition-all">
+                          <div className="flex flex-col items-center justify-center text-center px-2">
+                            <svg className="w-5 h-5 text-text-gold mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            <p className="text-[10px] text-text-secondary">Subir imagen (redimensionado automático)</p>
+                          </div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                const dataUrl = event.target?.result as string;
+                                const img = new Image();
+                                img.onload = () => {
+                                  const maxDim = 400;
+                                  let targetW = img.width;
+                                  let targetH = img.height;
+                                  if (targetW > maxDim || targetH > maxDim) {
+                                    if (targetW > targetH) {
+                                      targetH = Math.round((targetH / targetW) * maxDim);
+                                      targetW = maxDim;
+                                    } else {
+                                      targetW = Math.round((targetW / targetH) * maxDim);
+                                      targetH = maxDim;
+                                    }
+                                  }
+
+                                  const canvas = document.createElement('canvas');
+                                  canvas.width = targetW;
+                                  canvas.height = targetH;
+                                  const ctx = canvas.getContext('2d');
+                                  if (ctx) {
+                                    ctx.drawImage(img, 0, 0, targetW, targetH);
+                                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                                    setEditingProduct(prev => prev ? ({ ...prev, imageUrl: compressedDataUrl }) : null);
+                                  } else {
+                                    setEditingProduct(prev => prev ? ({ ...prev, imageUrl: dataUrl }) : null);
+                                  }
+                                };
+                                img.src = dataUrl;
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                          />
+                        </label>
+                        {editingProduct.imageUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingProduct(prev => prev ? ({ ...prev, imageUrl: undefined }) : null)}
+                            className="text-xs text-red-400 hover:text-red-300 font-semibold"
+                          >
+                            Eliminar
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -500,7 +576,20 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                             return (
                               <tr key={p.id} className="hover:bg-charcoal-surface/20 transition-colors">
                                 <td className="px-6 py-4 font-medium text-text-primary">
-                                  {p.name}
+                                  <div className="flex items-center gap-3">
+                                    {p.imageUrl ? (
+                                      <img
+                                        src={p.imageUrl}
+                                        alt={p.name}
+                                        className="w-8 h-8 rounded object-cover border border-aged-bronze/35 bg-charcoal-surface flex-shrink-0"
+                                      />
+                                    ) : (
+                                      <div className="w-8 h-8 rounded border border-dashed border-aged-bronze/30 bg-charcoal-surface flex items-center justify-center text-text-secondary text-[9px] flex-shrink-0">
+                                        N/A
+                                      </div>
+                                    )}
+                                    <span>{p.name}</span>
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4 text-text-secondary text-xs">
                                   <Badge variant="charcoal">{catName}</Badge>

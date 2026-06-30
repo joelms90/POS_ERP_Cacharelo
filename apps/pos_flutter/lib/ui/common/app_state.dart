@@ -840,6 +840,7 @@ class AppState extends ChangeNotifier {
               name: prod['name'],
               price: double.tryParse(prod['price']?.toString() ?? '0.0') ?? 0.0,
               category: catMap[prod['categoryId']] ?? 'Otros',
+              imagePath: prod['imageUrl'] ?? '',
             ));
           }
         }

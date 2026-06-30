@@ -64,6 +64,13 @@
       "when": 1782839603358,
       "tag": "0008_simple_cable",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1782843915373,
+      "tag": "0009_acoustic_millenium_guard",
+      "breakpoints": true
     }
   ]
 }

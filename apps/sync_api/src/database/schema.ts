@@ -128,6 +128,7 @@ export const products = pgTable('products', {
   price: decimal('price', { precision: 10, scale: 2 }).default('0.00').notNull(),
   isSellable: boolean('is_sellable').default(true).notNull(),
   isIngredient: boolean('is_ingredient').default(false).notNull(),
+  imageUrl: text('image_url'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

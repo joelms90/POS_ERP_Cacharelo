@@ -69,6 +69,7 @@ export interface Product {
   price?: string;
   isSellable?: boolean;
   isIngredient?: boolean;
+  imageUrl?: string;
   createdAt?: string;
   updatedAt?: string;
 }
