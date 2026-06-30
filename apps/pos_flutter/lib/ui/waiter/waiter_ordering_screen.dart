@@ -296,6 +296,60 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
           // Left Side: Context & Action
           Row(
             children: [
+              if (activeOrderingTable == null) ...[
+                PopupMenuButton<String>(
+                  offset: const Offset(0, 40),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: EmpireColors.charcoalSurface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: EmpireColors.agedBronze, width: 1.2),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.place, color: EmpireColors.champagneGold, size: 14),
+                        const SizedBox(width: 6),
+                        Text(
+                          selectedZone,
+                          style: const TextStyle(
+                            color: EmpireColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.arrow_drop_down, color: EmpireColors.champagneGold, size: 16),
+                      ],
+                    ),
+                  ),
+                  onSelected: (String zone) {
+                    setState(() {
+                      selectedZone = zone;
+                    });
+                  },
+                  itemBuilder: (BuildContext context) {
+                    final zones = widget.state.tables.isNotEmpty
+                        ? widget.state.tables.map((t) => t.zone).toSet().toList()
+                        : const ['Salón Principal', 'Terraza', 'Bar'];
+                    return zones.map((String zone) {
+                      return PopupMenuItem<String>(
+                        value: zone,
+                        child: Text(
+                          zone,
+                          style: TextStyle(
+                            color: zone == selectedZone
+                                ? EmpireColors.champagneGold
+                                : EmpireColors.textPrimary,
+                            fontWeight: zone == selectedZone ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      );
+                    }).toList();
+                  },
+                ),
+              ],
               if (activeOrderingTable != null) ...[
                 // Back arrow - context-dependent back navigation (comes first)
                 IconButton(
