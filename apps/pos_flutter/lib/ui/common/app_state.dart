@@ -299,21 +299,30 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> syncOperators() async {
-    if (!isTerminalConfigured) return false;
+    if (!isTerminalConfigured) {
+      debugPrint('SyncOperators skipped: Terminal is not configured.');
+      return false;
+    }
     try {
       final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
       final String bId = terminalBusinessId ?? 'd3b07384-d113-4a0e-a555-e5b12824bf01';
       final String brId = terminalBranchId ?? '';
 
-      final response = await http.get(Uri.parse('$baseUrl/auth/operators?businessId=$bId&branchId=$brId'))
-          .timeout(const Duration(seconds: 4));
+      final url = '$baseUrl/auth/operators?businessId=$bId&branchId=$brId';
+      debugPrint('Syncing operators from: $url');
+      final response = await http.get(Uri.parse(url))
+          .timeout(const Duration(seconds: 10));
 
+      debugPrint('SyncOperators response status: ${response.statusCode}');
       if (response.statusCode == 200) {
         final List<dynamic> operators = jsonDecode(response.body);
+        debugPrint('SyncOperators loaded ${operators.length} operators.');
         if (operators.isNotEmpty) {
           await _secureStorageService.cacheOperatorsOffline(operators);
         }
         return true;
+      } else {
+        debugPrint('SyncOperators server returned error status: ${response.statusCode}, body: ${response.body}');
       }
     } catch (e) {
       debugPrint('Error syncing operators: $e');
@@ -328,25 +337,31 @@ class AppState extends ChangeNotifier {
       try {
         await fetchMenuDynamic();
       } catch (e) {
+        debugPrint('syncAllData: fetchMenuDynamic failed with error: $e');
         success = false;
       }
     }
 
     if (currentUserRole == UserRole.none) {
       final opsSync = await syncOperators();
-      if (!opsSync) success = false;
+      if (!opsSync) {
+        debugPrint('syncAllData: syncOperators returned false');
+        success = false;
+      }
     }
 
     if (currentUserRole == UserRole.waiter) {
       try {
         await loadTablesFromJson();
       } catch (e) {
+        debugPrint('syncAllData: loadTablesFromJson failed with error: $e');
         success = false;
       }
     } else if (currentUserRole == UserRole.cashier) {
       try {
         syncOfflineTransactions();
       } catch (e) {
+        debugPrint('syncAllData: syncOfflineTransactions failed with error: $e');
         success = false;
       }
     }
