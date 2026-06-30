@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:bcrypt/bcrypt.dart';
 
 class SecureStorageService {
   final FlutterSecureStorage _secureStorage;
@@ -77,6 +79,37 @@ class SecureStorageService {
     await _secureStorage.write(key: _usersCacheKey, value: jsonEncode(users));
   }
 
+  // Overwrite operators cache from dynamic sync
+  Future<void> cacheOperatorsOffline(List<dynamic> operators) async {
+    final usersJson = await _secureStorage.read(key: _usersCacheKey);
+    List<dynamic> users = [];
+    if (usersJson != null) {
+      try {
+        users = jsonDecode(usersJson);
+      } catch (e) {
+        users = [];
+      }
+    }
+
+    for (var op in operators) {
+      final String name = op['name'] ?? '';
+      final String role = op['role'] ?? '';
+      final String pinHash = op['pinHash'] ?? ''; // BCrypt hash from backend
+
+      if (name.isNotEmpty && pinHash.isNotEmpty) {
+        users.removeWhere((u) => u['name'] == name);
+        users.add({
+          'name': name,
+          'pinHash': pinHash,
+          'role': role,
+          'isBcrypt': true,
+        });
+      }
+    }
+
+    await _secureStorage.write(key: _usersCacheKey, value: jsonEncode(users));
+  }
+
   // Verify a PIN offline by hashing it and checking it against the secure storage cache
   Future<Map<String, String>?> verifyOfflineCredentials(String pin) async {
     final hashedPin = await hashPin(pin);
@@ -86,7 +119,21 @@ class SecureStorageService {
     try {
       final List<dynamic> users = jsonDecode(usersJson);
       for (final user in users) {
-        if (user['pinHash'] == hashedPin) {
+        final bool isBcrypt = user['isBcrypt'] == true;
+        final String cachedHash = user['pinHash'] as String;
+
+        bool pinMatches = false;
+        if (isBcrypt) {
+          try {
+            pinMatches = BCrypt.checkpw(pin, cachedHash);
+          } catch (e) {
+            debugPrint('Bcrypt local check error: $e');
+          }
+        } else {
+          pinMatches = (cachedHash == hashedPin);
+        }
+
+        if (pinMatches) {
           return {
             'name': user['name'] as String,
             'role': user['role'] as String,

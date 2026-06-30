@@ -138,4 +138,8 @@ export class AuthService {
   private hashToken(token: string): string {
     return crypto.createHash('sha256').update(token).digest('hex');
   }
+
+  async getOperators(businessId: string, branchId?: string) {
+    return this.usersRepository.findAll(businessId, branchId);
+  }
 }

@@ -12,6 +12,44 @@ class OfflineStatusBar extends StatelessWidget {
     this.onOpenPrinterQueue,
   });
 
+  void _triggerSync(BuildContext context) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: EmpireColors.obsidian),
+            ),
+            SizedBox(width: 12),
+            Text('Sincronizando datos con el servidor...', style: TextStyle(color: EmpireColors.obsidian, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        backgroundColor: EmpireColors.champagneGold,
+        duration: Duration(milliseconds: 1500),
+      ),
+    );
+
+    final bool success = await state.syncAllData();
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success 
+              ? 'Sincronización completa con éxito.'
+              : 'Sincronización incompleta. Revise su conexión de red.',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: success ? EmpireColors.successGreen : EmpireColors.errorRed,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasFailedPrinters = state.printJobs.any(
@@ -140,6 +178,15 @@ class OfflineStatusBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 16),
               ],
+              // Sync Button
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(Icons.sync, color: EmpireColors.textGold, size: 20),
+                onPressed: () => _triggerSync(context),
+                tooltip: 'Sincronizar Datos',
+              ),
+              const SizedBox(width: 12),
 
               // Simulator Mode Switch
               Container(

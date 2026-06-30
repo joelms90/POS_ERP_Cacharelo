@@ -385,13 +385,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _simulateBiometrics() {
-    setState(() {
-      hasError = false;
-      pin = "1111"; // Simulate waiter login with biometric cached credential
-    });
-    _processLogin();
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -499,9 +493,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ),
                                         child: _buildKeypadGrid(),
                                       ),
-
-                                      const SizedBox(height: 20),
-                                      _buildMockCredentialCheatSheet(),
 
                                       const SizedBox(height: 30),
                                       TextButton(
@@ -738,88 +729,6 @@ class _LoginScreenState extends State<LoginScreen> {
         color: EmpireColors.textPrimary,
         fontWeight: FontWeight.bold,
         fontSize: 24,
-      ),
-    );
-  }
-
-  Widget _buildMockCredentialCheatSheet() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: EmpireColors.onyxSurface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: EmpireColors.agedBronzeDark, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              const Text(
-                'PINs de Acceso Rápido:',
-                style: TextStyle(
-                  color: EmpireColors.champagneGold,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              GestureDetector(
-                onTap: _simulateBiometrics,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.fingerprint,
-                      color: EmpireColors.champagneGold,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Biometría',
-                      style: TextStyle(
-                        color: EmpireColors.champagneGold.withOpacity(0.9),
-                        fontSize: 10,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 12,
-            runSpacing: 6,
-            children: const [
-              Text(
-                'Mesero: 1111',
-                style: TextStyle(
-                  color: EmpireColors.textSecondary,
-                  fontSize: 11,
-                ),
-              ),
-              Text(
-                'Cajero: 2222',
-                style: TextStyle(
-                  color: EmpireColors.textSecondary,
-                  fontSize: 11,
-                ),
-              ),
-              Text(
-                'Cocina: 3333',
-                style: TextStyle(
-                  color: EmpireColors.textSecondary,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

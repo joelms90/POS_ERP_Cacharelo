@@ -305,6 +305,63 @@ class AppState extends ChangeNotifier {
     return false;
   }
 
+  Future<bool> syncOperators() async {
+    if (!isTerminalConfigured) return false;
+    try {
+      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+      final String bId = terminalBusinessId ?? 'd3b07384-d113-4a0e-a555-e5b12824bf01';
+      final String brId = terminalBranchId ?? '';
+
+      final response = await http.get(Uri.parse('$baseUrl/auth/operators?businessId=$bId&branchId=$brId'))
+          .timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> operators = jsonDecode(response.body);
+        if (operators.isNotEmpty) {
+          await _secureStorageService.cacheOperatorsOffline(operators);
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error syncing operators: $e');
+    }
+    return false;
+  }
+
+  Future<bool> syncAllData() async {
+    bool success = true;
+    
+    if (isTerminalConfigured) {
+      try {
+        await fetchMenuDynamic();
+      } catch (e) {
+        success = false;
+      }
+    }
+
+    if (currentUserRole == UserRole.none) {
+      final opsSync = await syncOperators();
+      if (!opsSync) success = false;
+    }
+
+    if (currentUserRole == UserRole.waiter) {
+      try {
+        await loadTablesFromJson();
+      } catch (e) {
+        success = false;
+      }
+    } else if (currentUserRole == UserRole.cashier) {
+      try {
+        await syncOfflineTransactions();
+      } catch (e) {
+        success = false;
+      }
+    }
+    
+    notifyListeners();
+    return success;
+  }
+
   Future<void> _seedDefaultUsersOffline() async {
     try {
       final cached = await _secureStorageService.verifyOfflineCredentials(

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, HttpException } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, HttpException, Get, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { TabletLoginDto } from './dto/tablet-login.dto';
@@ -43,5 +43,23 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async logout(@Body() body: { refreshToken: string }) {
     return this.authService.logout(body.refreshToken);
+  }
+
+  @Get('operators')
+  @HttpCode(HttpStatus.OK)
+  async getOperators(
+    @Query('businessId') businessId?: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    if (!businessId) {
+      throw new HttpException('businessId is required', HttpStatus.BAD_REQUEST);
+    }
+    const operators = await this.authService.getOperators(businessId, branchId);
+    return operators.map((u) => ({
+      id: u.id,
+      name: u.name,
+      role: u.role,
+      pinHash: u.pin, // Hashed PIN (bcrypt)
+    }));
   }
 }
