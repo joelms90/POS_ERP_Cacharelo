@@ -352,7 +352,7 @@ class AppState extends ChangeNotifier {
       }
     } else if (currentUserRole == UserRole.cashier) {
       try {
-        await syncOfflineTransactions();
+        syncOfflineTransactions();
       } catch (e) {
         success = false;
       }
