@@ -126,6 +126,49 @@ class SecureStorageService {
     await _secureStorage.delete(key: 'connected_printer_name');
   }
 
+  // Save terminal config
+  Future<void> saveTerminalConfig({
+    required String businessId,
+    required String branchId,
+    required String businessName,
+    required String branchName,
+    required String apiUrl,
+  }) async {
+    await _secureStorage.write(key: 'terminal_business_id', value: businessId);
+    await _secureStorage.write(key: 'terminal_branch_id', value: branchId);
+    await _secureStorage.write(key: 'terminal_business_name', value: businessName);
+    await _secureStorage.write(key: 'terminal_branch_name', value: branchName);
+    await _secureStorage.write(key: 'terminal_api_url', value: apiUrl);
+  }
+
+  // Load terminal config
+  Future<Map<String, String>?> getTerminalConfig() async {
+    final businessId = await _secureStorage.read(key: 'terminal_business_id');
+    final branchId = await _secureStorage.read(key: 'terminal_branch_id');
+    final businessName = await _secureStorage.read(key: 'terminal_business_name');
+    final branchName = await _secureStorage.read(key: 'terminal_branch_name');
+    final apiUrl = await _secureStorage.read(key: 'terminal_api_url');
+
+    if (businessId != null && branchId != null && apiUrl != null) {
+      return {
+        'businessId': businessId,
+        'branchId': branchId,
+        'businessName': businessName ?? '',
+        'branchName': branchName ?? '',
+        'apiUrl': apiUrl,
+      };
+    }
+    return null;
+  }
+
+  // Clear terminal config
+  Future<void> clearTerminalConfig() async {
+    await _secureStorage.delete(key: 'terminal_business_id');
+    await _secureStorage.delete(key: 'terminal_branch_id');
+    await _secureStorage.delete(key: 'terminal_business_name');
+    await _secureStorage.delete(key: 'terminal_branch_name');
+    await _secureStorage.delete(key: 'terminal_api_url');
+  }
 
   // Utility functions for Hex conversions
   static String bytesToHex(Uint8List bytes) {

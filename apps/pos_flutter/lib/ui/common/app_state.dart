@@ -185,6 +185,14 @@ class AppState extends ChangeNotifier {
   // Active table selected in Waiter / Cashier views
   TableModel? selectedTable;
 
+  // Terminal Configuration States
+  String? terminalBusinessId;
+  String? terminalBranchId;
+  String? terminalBusinessName;
+  String? terminalBranchName;
+  String? terminalApiUrl;
+  bool isTerminalConfigured = false;
+
   // Bluetooth printer connection state
   String? connectedPrinterMac;
   String? connectedPrinterName;
@@ -196,10 +204,68 @@ class AppState extends ChangeNotifier {
   AppState({SecureStorageService? secureStorageService})
     : _secureStorageService = secureStorageService ?? SecureStorageService() {
     _initMockData();
-    initializationFuture = loadTablesFromJson();
+    initializationFuture = () async {
+      await loadTablesFromJson();
+      await loadTerminalConfig();
+      if (isTerminalConfigured) {
+        await fetchMenuDynamic();
+      }
+    }();
     _seedDefaultUsersOffline();
     _autoConnectPrinter();
-    fetchMenuDynamic();
+  }
+
+  Future<void> loadTerminalConfig() async {
+    final config = await _secureStorageService.getTerminalConfig();
+    if (config != null) {
+      terminalBusinessId = config['businessId'];
+      terminalBranchId = config['branchId'];
+      terminalBusinessName = config['businessName'];
+      terminalBranchName = config['branchName'];
+      terminalApiUrl = config['apiUrl'];
+      isTerminalConfigured = true;
+    } else {
+      isTerminalConfigured = false;
+    }
+    notifyListeners();
+  }
+
+  Future<void> configureTerminal({
+    required String businessId,
+    required String branchId,
+    required String businessName,
+    required String branchName,
+    required String apiUrl,
+  }) async {
+    terminalBusinessId = businessId;
+    terminalBranchId = branchId;
+    terminalBusinessName = businessName;
+    terminalBranchName = branchName;
+    terminalApiUrl = apiUrl;
+    isTerminalConfigured = true;
+
+    await _secureStorageService.saveTerminalConfig(
+      businessId: businessId,
+      branchId: branchId,
+      businessName: businessName,
+      branchName: branchName,
+      apiUrl: apiUrl,
+    );
+
+    await fetchMenuDynamic();
+    notifyListeners();
+  }
+
+  Future<void> deconfigureTerminal() async {
+    terminalBusinessId = null;
+    terminalBranchId = null;
+    terminalBusinessName = null;
+    terminalBranchName = null;
+    terminalApiUrl = null;
+    isTerminalConfigured = false;
+
+    await _secureStorageService.clearTerminalConfig();
+    notifyListeners();
   }
 
   Future<void> _seedDefaultUsersOffline() async {
@@ -448,13 +514,14 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> fetchMenuDynamic() async {
+    if (!isTerminalConfigured) return;
     try {
       final String host = Platform.isAndroid ? '10.0.2.2' : 'localhost';
-      String baseUrl = 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+      String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
       
       http.Response catResponse;
       http.Response prodResponse;
-      const String bId = 'd3b07384-d113-4a0e-a555-e5b12824bf01';
+      final String bId = terminalBusinessId ?? 'd3b07384-d113-4a0e-a555-e5b12824bf01';
       
       try {
         catResponse = await http.get(Uri.parse('$baseUrl/categories?businessId=$bId'))
@@ -558,30 +625,43 @@ class AppState extends ChangeNotifier {
   // Auth Operations (Query backend, fallback to offline local cache)
   Future<bool> login(String pin) async {
     try {
+      final String bId = terminalBusinessId ?? 'd3b07384-d113-4a0e-a555-e5b12824bf01';
+      final String? brId = terminalBranchId;
+      
+      final Map<String, dynamic> payload = {
+        'businessId': bId,
+        'pin': pin,
+        'deviceId': 'tablet-pos-1',
+      };
+      if (brId != null && brId.isNotEmpty) {
+        payload['branchId'] = brId;
+      }
+
       http.Response response;
+      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
       try {
         response = await http
             .post(
-              Uri.parse('https://pos-sync-api-umqpitkpoa-uc.a.run.app/api/auth/login'),
+              Uri.parse('$baseUrl/auth/tablet-login'),
               headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({'pin': pin}),
+              body: jsonEncode(payload),
             )
             .timeout(const Duration(seconds: 3));
       } catch (e) {
-        debugPrint('Hosted login failed, trying local: $e');
+        debugPrint('Hosted tablet-login failed, trying local: $e');
         final String host = Platform.isAndroid ? '10.0.2.2' : 'localhost';
         response = await http
             .post(
-              Uri.parse('http://$host:3000/api/auth/login'),
+              Uri.parse('http://$host:3000/api/auth/tablet-login'),
               headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({'pin': pin}),
+              body: jsonEncode(payload),
             )
             .timeout(const Duration(seconds: 3));
       }
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['success'] == true) {
+        if (data['success'] == true || data['user'] != null) {
           final userData = data['user'];
           currentUserName = userData['name'];
           currentUserRole = _parseRole(userData['role']);

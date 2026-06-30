@@ -23,6 +23,7 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
 
   // Search/Filter State
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [linkingBranch, setLinkingBranch] = useState<Branch | null>(null);
 
   const fetchBranches = async () => {
     try {
@@ -161,6 +162,15 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
                       {/* Action buttons */}
                       <div className="absolute top-4 right-4 flex gap-1">
                         <button
+                          onClick={() => setLinkingBranch(b)}
+                          className="text-champagne-gold hover:text-champagne-gold/80 transition-colors p-1"
+                          title="Vincular Terminal POS"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m0 8v1M4 8h.01M4 12h.01M4 16h.01M20 8h.01M20 12h.01M20 16h.01M8 4h.01M8 20h.01M16 4h.01M16 20h.01M9 9h6v6H9V9z" />
+                          </svg>
+                        </button>
+                        <button
                           onClick={() => handleEdit(b)}
                           className="text-champagne-gold hover:text-champagne-gold/80 transition-colors p-1"
                           title="Editar"
@@ -212,6 +222,15 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
                         </td>
                         <td className="p-4 text-right">
                           <div className="inline-flex gap-2">
+                            <button
+                              onClick={() => setLinkingBranch(b)}
+                              className="text-champagne-gold hover:text-champagne-gold/80 transition-colors p-1"
+                              title="Vincular Terminal POS"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m0 8v1M4 8h.01M4 12h.01M4 16h.01M20 8h.01M20 12h.01M20 16h.01M8 4h.01M8 20h.01M16 4h.01M16 20h.01M9 9h6v6H9V9z" />
+                              </svg>
+                            </button>
                             <button
                               onClick={() => handleEdit(b)}
                               className="text-champagne-gold hover:text-champagne-gold/80 transition-colors p-1"
@@ -288,6 +307,57 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
           </form>
         </div>
       </div>
+
+      {linkingBranch && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-onyx-surface border border-aged-bronze/50 rounded-lg p-6 max-w-sm w-full flex flex-col items-center text-center shadow-2xl relative">
+            <button
+              onClick={() => setLinkingBranch(null)}
+              className="absolute top-4 right-4 text-text-secondary hover:text-text-primary transition-colors p-1"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <Heading level={3} className="!border-none !pb-0 text-champagne-gold tracking-wide font-light mb-2">
+              Vincular Terminal POS
+            </Heading>
+            <p className="text-xs text-text-secondary mb-6">
+              Escanee este código QR desde el lector de la terminal POS para vincularla a la sucursal <strong>{linkingBranch.name}</strong>.
+            </p>
+
+            <div className="bg-white p-4 rounded-lg shadow-inner border border-aged-bronze/20 mb-6">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                  JSON.stringify({
+                    businessId,
+                    branchId: linkingBranch.id,
+                    businessName: "Empire POS",
+                    branchName: linkingBranch.name,
+                    apiUrl: "https://pos-sync-api-umqpitkpoa-uc.a.run.app/api"
+                  })
+                )}`}
+                alt="Activation QR Code"
+                className="w-48 h-48"
+              />
+            </div>
+
+            <div className="w-full text-left bg-charcoal-surface/40 border border-aged-bronze/20 rounded p-3 text-[10px] font-mono text-text-secondary overflow-x-auto select-all max-h-24">
+              {JSON.stringify({
+                businessId,
+                branchId: linkingBranch.id,
+                businessName: "Empire POS",
+                branchName: linkingBranch.name,
+                apiUrl: "https://pos-sync-api-umqpitkpoa-uc.a.run.app/api"
+              })}
+            </div>
+            <span className="text-[9px] text-text-secondary mt-1.5 self-start">
+              * Si no tiene cámara, puede copiar y pegar el código JSON anterior en la terminal.
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

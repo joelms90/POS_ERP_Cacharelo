@@ -1,8 +1,12 @@
-import { IsString, Length, Matches, IsUUID } from 'class-validator';
+import { IsString, Length, Matches, IsUUID, IsOptional } from 'class-validator';
 
 export class TabletLoginDto {
   @IsUUID()
   businessId: string;
+
+  @IsUUID()
+  @IsOptional()
+  branchId?: string;
 
   @IsString()
   @Length(4, 4)

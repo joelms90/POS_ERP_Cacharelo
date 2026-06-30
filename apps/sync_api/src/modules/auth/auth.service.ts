@@ -33,10 +33,10 @@ export class AuthService {
   }
 
   async tabletLogin(tabletLoginDto: TabletLoginDto) {
-    const { businessId, pin, deviceId } = tabletLoginDto;
+    const { businessId, branchId, pin, deviceId } = tabletLoginDto;
     
-    // Fetch all active operators for the business
-    const activeUsers = await this.usersRepository.findAll(businessId);
+    // Fetch active operators for the business (and specific branch if configured)
+    const activeUsers = await this.usersRepository.findAll(businessId, branchId);
     let matchedUser = null;
 
     for (const u of activeUsers) {

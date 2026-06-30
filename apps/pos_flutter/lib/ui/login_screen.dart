@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'common/colors.dart';
 import 'common/app_state.dart';
@@ -19,6 +20,259 @@ class _LoginScreenState extends State<LoginScreen> {
   String pin = "";
   bool hasError = false;
   String errorMessage = "";
+
+  // Terminal Activation Controllers
+  final TextEditingController _jsonController = TextEditingController();
+  final TextEditingController _businessIdController = TextEditingController(text: 'd3b07384-d113-4a0e-a555-e5b12824bf01');
+  final TextEditingController _branchIdController = TextEditingController();
+  final TextEditingController _businessNameController = TextEditingController(text: 'Empire POS');
+  final TextEditingController _branchNameController = TextEditingController(text: 'Sucursal Centro');
+  final TextEditingController _apiUrlController = TextEditingController(text: 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api');
+
+  bool _showManualConfig = false;
+  String _activationError = "";
+
+  @override
+  void dispose() {
+    _jsonController.dispose();
+    _businessIdController.dispose();
+    _branchIdController.dispose();
+    _businessNameController.dispose();
+    _branchNameController.dispose();
+    _apiUrlController.dispose();
+    super.dispose();
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: EmpireColors.textGold, fontSize: 13),
+      filled: true,
+      fillColor: EmpireColors.charcoalSurface,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: EmpireColors.agedBronze, width: 1.5),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: EmpireColors.agedBronzeDark, width: 1.5),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: EmpireColors.champagneGold, width: 1.5),
+      ),
+    );
+  }
+
+  Widget _buildActivationView() {
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 450),
+        padding: const EdgeInsets.all(32.0),
+        margin: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: EmpireColors.onyxSurface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: EmpireColors.agedBronze, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.5),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Icon(Icons.qr_code_scanner, size: 48, color: EmpireColors.textGold),
+              const SizedBox(height: 16),
+              const Text(
+                'VINCULAR DISPOSITIVO POS',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: EmpireColors.textGold,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Configure el dispositivo ingresando el JSON de activación generado desde el panel de control de Sucursales.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+              const SizedBox(height: 24),
+              
+              if (_activationError.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: EmpireColors.errorRed.withOpacity(0.1),
+                    border: Border.all(color: EmpireColors.errorRed.withOpacity(0.3)),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    _activationError,
+                    style: const TextStyle(color: EmpireColors.errorRed, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              if (!_showManualConfig) ...[
+                TextField(
+                  controller: _jsonController,
+                  maxLines: 4,
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontFamily: 'monospace'),
+                  decoration: _inputDecoration('JSON de Activación / Payload de QR'),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: _processJsonActivation,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: EmpireColors.champagneGold,
+                    foregroundColor: EmpireColors.obsidian,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('VINCULAR CON QR JSON', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ] else ...[
+                TextField(
+                  controller: _businessIdController,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                  decoration: _inputDecoration('ID de Negocio (businessId)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _branchIdController,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                  decoration: _inputDecoration('ID de Sucursal (branchId)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _businessNameController,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                  decoration: _inputDecoration('Nombre del Negocio'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _branchNameController,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                  decoration: _inputDecoration('Nombre de la Sucursal'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _apiUrlController,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                  decoration: _inputDecoration('API URL Base'),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: _processManualActivation,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: EmpireColors.champagneGold,
+                    foregroundColor: EmpireColors.obsidian,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('GUARDAR CONFIGURACIÓN', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _showManualConfig = !_showManualConfig;
+                    _activationError = "";
+                  });
+                },
+                child: Text(
+                  _showManualConfig ? 'Volver a Activación por QR/JSON' : 'Configuración Manual',
+                  style: const TextStyle(color: EmpireColors.textGold, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _processJsonActivation() async {
+    final String content = _jsonController.text.trim();
+    if (content.isEmpty) {
+      setState(() {
+        _activationError = "El código JSON de activación no puede estar vacío.";
+      });
+      return;
+    }
+
+    try {
+      final Map<String, dynamic> data = jsonDecode(content);
+      final String? businessId = data['businessId'];
+      final String? branchId = data['branchId'];
+      final String? businessName = data['businessName'];
+      final String? branchName = data['branchName'];
+      final String? apiUrl = data['apiUrl'];
+
+      if (businessId == null || branchId == null || apiUrl == null) {
+        setState(() {
+          _activationError = "El JSON provisto no es válido. Debe contener 'businessId', 'branchId' y 'apiUrl'.";
+        });
+        return;
+      }
+
+      await widget.state.configureTerminal(
+        businessId: businessId,
+        branchId: branchId,
+        businessName: businessName ?? "Empire POS",
+        branchName: branchName ?? "Sucursal Centro",
+        apiUrl: apiUrl,
+      );
+      
+      setState(() {
+        _activationError = "";
+        _jsonController.clear();
+      });
+    } catch (e) {
+      setState(() {
+        _activationError = "Error al decodificar el JSON: $e";
+      });
+    }
+  }
+
+  void _processManualActivation() async {
+    final String bId = _businessIdController.text.trim();
+    final String brId = _branchIdController.text.trim();
+    final String bName = _businessNameController.text.trim();
+    final String brName = _branchNameController.text.trim();
+    final String url = _apiUrlController.text.trim();
+
+    if (bId.isEmpty || brId.isEmpty || url.isEmpty) {
+      setState(() {
+        _activationError = "Los campos de ID de Negocio, ID de Sucursal y URL Base son obligatorios.";
+      });
+      return;
+    }
+
+    await widget.state.configureTerminal(
+      businessId: bId,
+      branchId: brId,
+      businessName: bName.isNotEmpty ? bName : "Empire POS",
+      branchName: brName.isNotEmpty ? brName : "Sucursal",
+      apiUrl: url,
+    );
+
+    setState(() {
+      _activationError = "";
+    });
+  }
 
   void _handleKeyPress(String value) {
     if (pin.length >= 4) return;
@@ -132,90 +386,127 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
 
             Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isLandscape = constraints.maxWidth > 700;
-                  return Row(
-                    children: [
-                      // Left branding side (takes full width if portrait)
-                      if (isLandscape)
-                        Expanded(flex: 12, child: _buildBrandingPanel()),
+              child: ListenableBuilder(
+                listenable: widget.state,
+                builder: (context, _) {
+                  if (!widget.state.isTerminalConfigured) {
+                    return _buildActivationView();
+                  }
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isLandscape = constraints.maxWidth > 700;
+                      return Row(
+                        children: [
+                          // Left branding side (takes full width if portrait)
+                          if (isLandscape)
+                            Expanded(flex: 12, child: _buildBrandingPanel()),
 
-                      // Right Keypad side
-                      Expanded(
-                        flex: 10,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 40,
-                            vertical: 20,
-                          ),
-                          decoration: BoxDecoration(
-                            border: isLandscape
-                                ? const Border(
-                                    left: BorderSide(
-                                      color: EmpireColors.agedBronzeDark,
-                                      width: 1.5,
-                                    ),
-                                  )
-                                : null,
-                          ),
-                          child: Center(
-                            child: SingleChildScrollView(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    'INGRESAR CREDENCIAL',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: EmpireColors.textGold,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 1.5,
-                                          fontSize: 11,
+                          // Right Keypad side
+                          Expanded(
+                            flex: 10,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 40,
+                                vertical: 20,
+                              ),
+                              decoration: BoxDecoration(
+                                border: isLandscape
+                                    ? const Border(
+                                        left: BorderSide(
+                                          color: EmpireColors.agedBronzeDark,
+                                          width: 1.5,
                                         ),
-                                  ),
-                                  const SizedBox(height: 30),
-
-                                  // PIN Code indicators
-                                  _buildPinIndicators(),
-
-                                  const SizedBox(height: 20),
-
-                                  if (hasError)
-                                    Text(
-                                      errorMessage,
-                                      style: const TextStyle(
-                                        color: EmpireColors.errorRed,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
+                                      )
+                                    : null,
+                              ),
+                              child: Center(
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '${widget.state.terminalBusinessName} - ${widget.state.terminalBranchName}'.toUpperCase(),
+                                        textAlign: TextAlign.center,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              color: EmpireColors.textGold,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 1.2,
+                                              fontSize: 14,
+                                            ),
                                       ),
-                                    )
-                                  else
-                                    const SizedBox(height: 18),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'INGRESAR CREDENCIAL',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              color: Colors.white54,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 1.5,
+                                              fontSize: 10,
+                                              ),
+                                      ),
+                                      const SizedBox(height: 30),
 
-                                  const SizedBox(height: 30),
+                                      // PIN Code indicators
+                                      _buildPinIndicators(),
 
-                                  // Numeric Keyboard
-                                  Container(
-                                    constraints: const BoxConstraints(
-                                      maxWidth: 320,
-                                    ),
-                                    child: _buildKeypadGrid(),
+                                      const SizedBox(height: 20),
+
+                                      if (hasError)
+                                        Text(
+                                          errorMessage,
+                                          style: const TextStyle(
+                                            color: EmpireColors.errorRed,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                      else
+                                        const SizedBox(height: 18),
+
+                                      const SizedBox(height: 30),
+
+                                      // Numeric Keyboard
+                                      Container(
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 320,
+                                        ),
+                                        child: _buildKeypadGrid(),
+                                      ),
+
+                                      const SizedBox(height: 20),
+                                      _buildMockCredentialCheatSheet(),
+
+                                      const SizedBox(height: 30),
+                                      TextButton(
+                                        onPressed: () {
+                                          widget.state.deconfigureTerminal();
+                                        },
+                                        child: const Text(
+                                          'Vincular a otra Sucursal',
+                                          style: TextStyle(
+                                            color: Colors.white38,
+                                            fontSize: 11,
+                                            decoration: TextDecoration.underline,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-
-                                  const SizedBox(height: 20),
-                                  _buildMockCredentialCheatSheet(),
-                                ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                    ],
+                        ],
+                      );
+                    },
                   );
-                },
+                }
               ),
             ),
           ],
