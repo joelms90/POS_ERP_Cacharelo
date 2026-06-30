@@ -268,6 +268,43 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> configureTerminalWithCode(String branchId) async {
+    try {
+      final String host = Platform.isAndroid ? '10.0.2.2' : 'localhost';
+      String baseUrl = 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+      
+      http.Response response;
+      try {
+        response = await http.get(Uri.parse('$baseUrl/branches/$branchId'))
+            .timeout(const Duration(seconds: 4));
+      } catch (e) {
+        debugPrint('Hosted branch check failed, trying local: $e');
+        baseUrl = 'http://$host:3000/api';
+        response = await http.get(Uri.parse('$baseUrl/branches/$branchId'));
+      }
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> branch = jsonDecode(response.body);
+        final String? bId = branch['businessId'];
+        final String? name = branch['name'];
+
+        if (bId != null && name != null) {
+          await configureTerminal(
+            businessId: bId,
+            branchId: branchId,
+            businessName: 'Empire POS',
+            branchName: name,
+            apiUrl: baseUrl,
+          );
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error configuring terminal with code: $e');
+    }
+    return false;
+  }
+
   Future<void> _seedDefaultUsersOffline() async {
     try {
       final cached = await _secureStorageService.verifyOfflineCredentials(

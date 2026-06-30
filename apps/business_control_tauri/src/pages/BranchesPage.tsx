@@ -324,36 +324,37 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
               Vincular Terminal POS
             </Heading>
             <p className="text-xs text-text-secondary mb-6">
-              Escanee este código QR desde el lector de la terminal POS para vincularla a la sucursal <strong>{linkingBranch.name}</strong>.
+              Escanee cualquiera de los códigos de activación desde la terminal POS para vincularla a la sucursal <strong>{linkingBranch.name}</strong>.
             </p>
 
-            <div className="bg-white p-4 rounded-lg shadow-inner border border-aged-bronze/20 mb-6">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-                  JSON.stringify({
-                    businessId,
-                    branchId: linkingBranch.id,
-                    businessName: "Empire POS",
-                    branchName: linkingBranch.name,
-                    apiUrl: "https://pos-sync-api-umqpitkpoa-uc.a.run.app/api"
-                  })
-                )}`}
-                alt="Activation QR Code"
-                className="w-48 h-48"
-              />
+            <div className="flex gap-4 mb-6">
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] text-text-secondary mb-1">Código QR</span>
+                <div className="bg-white p-2 rounded border border-aged-bronze/20">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${linkingBranch.id}`}
+                    alt="Activation QR"
+                    className="w-28 h-28"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] text-text-secondary mb-1">Data Matrix</span>
+                <div className="bg-white p-2 rounded border border-aged-bronze/20">
+                  <img
+                    src={`https://barcode.tec-it.com/barcode.ashx?data=${linkingBranch.id}&code=DataMatrix`}
+                    alt="Activation DataMatrix"
+                    className="w-28 h-28"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="w-full text-left bg-charcoal-surface/40 border border-aged-bronze/20 rounded p-3 text-[10px] font-mono text-text-secondary overflow-x-auto select-all max-h-24">
-              {JSON.stringify({
-                businessId,
-                branchId: linkingBranch.id,
-                businessName: "Empire POS",
-                branchName: linkingBranch.name,
-                apiUrl: "https://pos-sync-api-umqpitkpoa-uc.a.run.app/api"
-              })}
+            <div className="w-full text-center bg-charcoal-surface/40 border border-aged-bronze/20 rounded p-2 text-xs font-mono text-text-primary select-all">
+              {linkingBranch.id}
             </div>
             <span className="text-[9px] text-text-secondary mt-1.5 self-start">
-              * Si no tiene cámara, puede copiar y pegar el código JSON anterior en la terminal.
+              * Si la cámara no responde o es de baja calidad, escriba el código UUID anterior en la terminal.
             </span>
           </div>
         </div>

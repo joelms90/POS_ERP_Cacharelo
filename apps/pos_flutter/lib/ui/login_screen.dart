@@ -102,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Configure el dispositivo ingresando el JSON de activación generado desde el panel de control de Sucursales.',
+                'Configure el dispositivo escaneando el código de activación o ingresando el UUID de la sucursal.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
@@ -127,9 +127,9 @@ class _LoginScreenState extends State<LoginScreen> {
               if (!_showManualConfig) ...[
                 TextField(
                   controller: _jsonController,
-                  maxLines: 4,
+                  maxLines: 1,
                   style: const TextStyle(color: Colors.white, fontSize: 12, fontFamily: 'monospace'),
-                  decoration: _inputDecoration('JSON de Activación / Payload de QR'),
+                  decoration: _inputDecoration('Código de Activación (UUID)'),
                 ),
                 const SizedBox(height: 20),
                 Row(
@@ -150,8 +150,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: _processJsonActivation,
-                        child: const Text('VINCULAR CON JSON', style: TextStyle(fontWeight: FontWeight.bold)),
+                        onPressed: _processCodeActivation,
+                        child: const Text('VINCULAR CÓDIGO', style: TextStyle(fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: EmpireColors.charcoalSurface,
                           foregroundColor: EmpireColors.textGold,
@@ -226,45 +226,31 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _processJsonActivation() async {
-    final String content = _jsonController.text.trim();
-    if (content.isEmpty) {
+  void _processCodeActivation() async {
+    final String code = _jsonController.text.trim();
+    if (code.isEmpty) {
       setState(() {
-        _activationError = "El código JSON de activación no puede estar vacío.";
+        _activationError = "El código de activación no puede estar vacío.";
       });
       return;
     }
 
-    try {
-      final Map<String, dynamic> data = jsonDecode(content);
-      final String? businessId = data['businessId'];
-      final String? branchId = data['branchId'];
-      final String? businessName = data['businessName'];
-      final String? branchName = data['branchName'];
-      final String? apiUrl = data['apiUrl'];
+    final RegExp uuidRegex = RegExp(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}');
+    final Match? match = uuidRegex.firstMatch(code);
+    final String cleanCode = match != null ? match.group(0)! : code;
 
-      if (businessId == null || branchId == null || apiUrl == null) {
-        setState(() {
-          _activationError = "El JSON provisto no es válido. Debe contener 'businessId', 'branchId' y 'apiUrl'.";
-        });
-        return;
-      }
+    setState(() {
+      _activationError = "";
+    });
 
-      await widget.state.configureTerminal(
-        businessId: businessId,
-        branchId: branchId,
-        businessName: businessName ?? "Empire POS",
-        branchName: branchName ?? "Sucursal Centro",
-        apiUrl: apiUrl,
-      );
-      
+    final success = await widget.state.configureTerminalWithCode(cleanCode);
+    if (success) {
       setState(() {
-        _activationError = "";
         _jsonController.clear();
       });
-    } catch (e) {
+    } else {
       setState(() {
-        _activationError = "Error al decodificar el JSON: $e";
+        _activationError = "No se pudo vincular la terminal. Verifique que el código UUID sea correcto y que el servidor de sincronización esté activo.";
       });
     }
   }
@@ -305,7 +291,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (scannedValue != null && scannedValue.isNotEmpty) {
       _jsonController.text = scannedValue;
-      _processJsonActivation();
+      _processCodeActivation();
     }
   }
 
