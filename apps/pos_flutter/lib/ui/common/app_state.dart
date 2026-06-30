@@ -273,15 +273,8 @@ class AppState extends ChangeNotifier {
       final String host = Platform.isAndroid ? '10.0.2.2' : 'localhost';
       String baseUrl = 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
       
-      http.Response response;
-      try {
-        response = await http.get(Uri.parse('$baseUrl/branches/$branchId'))
-            .timeout(const Duration(seconds: 4));
-      } catch (e) {
-        debugPrint('Hosted branch check failed, trying local: $e');
-        baseUrl = 'http://$host:3000/api';
-        response = await http.get(Uri.parse('$baseUrl/branches/$branchId'));
-      }
+      http.Response response = await http.get(Uri.parse('$baseUrl/branches/$branchId'))
+          .timeout(const Duration(seconds: 12));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> branch = jsonDecode(response.body);
