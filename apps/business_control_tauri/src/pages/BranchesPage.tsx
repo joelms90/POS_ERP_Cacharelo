@@ -144,7 +144,7 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
         setCanvasDimensions({ width, height });
 
         // Downscale image to low-res for base64 saving
-        const maxDim = 1024;
+        const maxDim = 800;
         let targetW = img.width;
         let targetH = img.height;
         if (targetW > maxDim || targetH > maxDim) {
@@ -163,7 +163,7 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, targetW, targetH);
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.45);
           setFloorPlanImage(compressedDataUrl);
         } else {
           setFloorPlanImage(dataUrl);

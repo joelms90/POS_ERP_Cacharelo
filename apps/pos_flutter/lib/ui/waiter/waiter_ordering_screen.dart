@@ -616,7 +616,6 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
   }
 
   Widget _buildFloorMap(List<TableModel> tables) {
-    final double maxTableY = tables.isEmpty
     final config = widget.state.roomConfigs[selectedZone] ?? {};
     final String? base64Image = config['image'] as String?;
     final double zoom = (config['zoom'] ?? 1.0).toDouble();
