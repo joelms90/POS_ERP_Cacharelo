@@ -319,8 +319,8 @@ class AppState extends ChangeNotifier {
         final List<dynamic> operators = jsonDecode(response.body);
         if (operators.isNotEmpty) {
           await _secureStorageService.cacheOperatorsOffline(operators);
-          return true;
         }
+        return true;
       }
     } catch (e) {
       debugPrint('Error syncing operators: $e');
@@ -610,8 +610,8 @@ class AppState extends ChangeNotifier {
   Future<void> fetchMenuDynamic() async {
     if (!isTerminalConfigured) return;
     try {
-      final String host = Platform.isAndroid ? '10.0.2.2' : 'localhost';
-      String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+      final bool isLocalConfig = baseUrl.contains('localhost') || baseUrl.contains('10.0.2.2') || baseUrl.contains('127.0.0.1');
       
       http.Response catResponse;
       http.Response prodResponse;
@@ -619,14 +619,17 @@ class AppState extends ChangeNotifier {
       
       try {
         catResponse = await http.get(Uri.parse('$baseUrl/categories?businessId=$bId'))
-            .timeout(const Duration(seconds: 3));
+            .timeout(const Duration(seconds: 10));
         prodResponse = await http.get(Uri.parse('$baseUrl/products?businessId=$bId'))
-            .timeout(const Duration(seconds: 3));
+            .timeout(const Duration(seconds: 10));
       } catch (e) {
-        debugPrint('Hosted API failed, falling back to local: $e');
-        baseUrl = 'http://$host:3000/api';
-        catResponse = await http.get(Uri.parse('$baseUrl/categories?businessId=$bId'));
-        prodResponse = await http.get(Uri.parse('$baseUrl/products?businessId=$bId'));
+        debugPrint('API request failed: $e');
+        if (isLocalConfig) {
+          // If local config failed, we can try to switch address helper or rethrow
+          rethrow;
+        } else {
+          rethrow;
+        }
       }
 
       if (catResponse.statusCode == 200 && prodResponse.statusCode == 200) {

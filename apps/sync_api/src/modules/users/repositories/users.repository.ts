@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, or } from 'drizzle-orm';
 
 @Injectable()
 export class UsersRepository {
@@ -17,7 +17,12 @@ export class UsersRepository {
       conditions.push(eq(schema.users.businessId, businessId));
     }
     if (branchId) {
-      conditions.push(eq(schema.users.branchId, branchId));
+      conditions.push(
+        or(
+          eq(schema.users.branchId, branchId),
+          isNull(schema.users.branchId),
+        ),
+      );
     }
     return this.db
       .select()
