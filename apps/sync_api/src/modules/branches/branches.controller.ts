@@ -31,4 +31,30 @@ export class BranchesController {
   async remove(@Param('id') id: string) {
     return this.branchesService.remove(id);
   }
+
+  @Get(':id/tables')
+  async getTables(@Param('id') branchId: string) {
+    return this.branchesService.findTables(branchId);
+  }
+
+  @Post(':id/tables')
+  async createTable(
+    @Param('id') branchId: string,
+    @Body() body: { label: string; capacity?: number; room?: string },
+  ) {
+    return this.branchesService.createTable(branchId, body);
+  }
+
+  @Delete(':id/tables/:tableId')
+  async removeTable(@Param('id') branchId: string, @Param('tableId') tableId: string) {
+    return this.branchesService.removeTable(tableId);
+  }
+
+  @Post(':id/tables/generate')
+  async generateTables(
+    @Param('id') branchId: string,
+    @Body() body: { mode: 'cafeteria' | 'mostrador' },
+  ) {
+    return this.branchesService.generateTables(branchId, body.mode);
+  }
 }

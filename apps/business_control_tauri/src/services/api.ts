@@ -421,6 +421,42 @@ export const api = {
   },
 
   /**
+   * Get all tables for a branch
+   */
+  async getBranchTables(branchId: string): Promise<any[]> {
+    return apiRequest<any[]>(`/branches/${branchId}/tables`);
+  },
+
+  /**
+   * Create a new table in a branch
+   */
+  async addBranchTable(branchId: string, table: { label: string; capacity?: number; room?: string }): Promise<any> {
+    return apiRequest<any>(`/branches/${branchId}/tables`, {
+      method: 'POST',
+      body: JSON.stringify(table),
+    });
+  },
+
+  /**
+   * Delete a table from a branch
+   */
+  async deleteBranchTable(branchId: string, tableId: string): Promise<any> {
+    return apiRequest<any>(`/branches/${branchId}/tables/${tableId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Autogenerate layout tables
+   */
+  async generateBranchTables(branchId: string, mode: 'cafeteria' | 'mostrador'): Promise<any[]> {
+    return apiRequest<any[]>(`/branches/${branchId}/tables/generate`, {
+      method: 'POST',
+      body: JSON.stringify({ mode }),
+    });
+  },
+
+  /**
    * Get stock levels for a business
    */
   async getStockLevels(businessId: string, warehouseId?: string, branchId?: string): Promise<any[]> {

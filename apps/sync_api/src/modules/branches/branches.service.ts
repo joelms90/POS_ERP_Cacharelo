@@ -53,4 +53,27 @@ export class BranchesService {
     await this.branchesRepository.softDelete(id);
     return { success: true, message: 'Sucursal eliminada con éxito' };
   }
+
+  async findTables(branchId: string) {
+    return this.branchesRepository.findTables(branchId);
+  }
+
+  async createTable(branchId: string, data: any) {
+    return this.branchesRepository.createTable({
+      branchId,
+      label: data.label,
+      capacity: data.capacity || 4,
+      room: data.room || 'General',
+      state: 'free',
+      version: 1,
+    });
+  }
+
+  async removeTable(tableId: string) {
+    return this.branchesRepository.removeTable(tableId);
+  }
+
+  async generateTables(branchId: string, mode: 'cafeteria' | 'mostrador') {
+    return this.branchesRepository.generateTables(branchId, mode);
+  }
 }

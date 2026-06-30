@@ -24,6 +24,76 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
   // Search/Filter State
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [linkingBranch, setLinkingBranch] = useState<Branch | null>(null);
+  const [configuringTablesBranch, setConfiguringTablesBranch] = useState<Branch | null>(null);
+  const [tables, setTables] = useState<any[]>([]);
+  const [tablesLoading, setTablesLoading] = useState<boolean>(false);
+  const [newTableLabel, setNewTableLabel] = useState<string>('');
+  const [newTableCapacity, setNewTableCapacity] = useState<number>(4);
+  const [newTableRoom, setNewTableRoom] = useState<string>('Salón Principal');
+
+  const fetchTables = async () => {
+    if (!configuringTablesBranch) return;
+    try {
+      setTablesLoading(true);
+      const data = await api.getBranchTables(configuringTablesBranch.id);
+      setTables(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTablesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (configuringTablesBranch) {
+      fetchTables();
+    }
+  }, [configuringTablesBranch]);
+
+  const handleAddTable = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!configuringTablesBranch || !newTableLabel.trim()) return;
+    try {
+      await api.addBranchTable(configuringTablesBranch.id, {
+        label: newTableLabel,
+        capacity: newTableCapacity,
+        room: newTableRoom,
+      });
+      setNewTableLabel('');
+      fetchTables();
+    } catch (err: any) {
+      alert(err.message || 'Error al agregar mesa');
+    }
+  };
+
+  const handleDeleteTable = async (tableId: string) => {
+    if (!configuringTablesBranch) return;
+    try {
+      await api.deleteBranchTable(configuringTablesBranch.id, tableId);
+      fetchTables();
+    } catch (err: any) {
+      alert(err.message || 'Error al eliminar mesa');
+    }
+  };
+
+  const handleGenerateLayout = async (mode: 'cafeteria' | 'mostrador') => {
+    if (!configuringTablesBranch) return;
+    const msg = mode === 'cafeteria'
+      ? 'Esto eliminará todas las mesas actuales y generará un layout de Cafetería de 16 mesas (Salón General, Terraza y Barra). ¿Desea continuar?'
+      : 'Esto eliminará todas las mesas actuales y configurará el Modo Mostrador (una sola mesa virtual de cobro directo). ¿Desea continuar?';
+    
+    if (confirm(msg)) {
+      try {
+        setTablesLoading(true);
+        await api.generateBranchTables(configuringTablesBranch.id, mode);
+        await fetchTables();
+      } catch (err: any) {
+        alert(err.message || 'Error al generar layout');
+      } finally {
+        setTablesLoading(false);
+      }
+    }
+  };
 
   const fetchBranches = async () => {
     try {
@@ -171,6 +241,15 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
                           </svg>
                         </button>
                         <button
+                          onClick={() => setConfiguringTablesBranch(b)}
+                          className="text-champagne-gold hover:text-champagne-gold/80 transition-colors p-1"
+                          title="Configurar Mesas / Layout"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                          </svg>
+                        </button>
+                        <button
                           onClick={() => handleEdit(b)}
                           className="text-champagne-gold hover:text-champagne-gold/80 transition-colors p-1"
                           title="Editar"
@@ -229,6 +308,15 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
                             >
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m0 8v1M4 8h.01M4 12h.01M4 16h.01M20 8h.01M20 12h.01M20 16h.01M8 4h.01M8 20h.01M16 4h.01M16 20h.01M9 9h6v6H9V9z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => setConfiguringTablesBranch(b)}
+                              className="text-champagne-gold hover:text-champagne-gold/80 transition-colors p-1"
+                              title="Configurar Mesas / Layout"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                               </svg>
                             </button>
                             <button
@@ -356,6 +444,125 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
             <span className="text-[9px] text-text-secondary mt-1.5 self-start">
               * Si la cámara no responde o es de baja calidad, escriba el código UUID anterior en la terminal.
             </span>
+          </div>
+        </div>
+      )}
+
+      {configuringTablesBranch && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-onyx-surface border border-aged-bronze/50 rounded-lg p-6 max-w-4xl w-full flex flex-col shadow-2xl relative max-h-[90vh] overflow-hidden">
+            <button
+              onClick={() => setConfiguringTablesBranch(null)}
+              className="absolute top-4 right-4 text-text-secondary hover:text-text-primary transition-colors p-1"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <Heading level={3} className="!border-none !pb-2 text-champagne-gold tracking-wide font-light">
+              Mesas y Layout: {configuringTablesBranch.name}
+            </Heading>
+            
+            {/* Quick Actions / Presets */}
+            <div className="flex flex-wrap gap-3 mb-6 bg-charcoal/20 border border-aged-bronze/10 rounded p-3">
+              <span className="text-xs text-text-secondary self-center mr-2">Autogenerar Layout:</span>
+              <Button 
+                type="button" 
+                variant="secondary" 
+                size="sm" 
+                onClick={() => handleGenerateLayout('cafeteria')}
+                className="!text-[10px] border border-champagne-gold/30 hover:border-champagne-gold"
+              >
+                Layout Cafetería (16 mesas)
+              </Button>
+              <Button 
+                type="button" 
+                variant="secondary" 
+                size="sm" 
+                onClick={() => handleGenerateLayout('mostrador')}
+                className="!text-[10px] border border-error-red/30 hover:border-error-red !text-error-red hover:bg-error-red/5"
+              >
+                Modo Mostrador (Caja Única)
+              </Button>
+            </div>
+
+            {/* Split Panel View */}
+            <div className="flex flex-col lg:flex-row gap-6 overflow-hidden flex-1">
+              
+              {/* Left Panel: Table Grid */}
+              <div className="flex-1 flex flex-col min-h-0">
+                <span className="text-xs font-semibold text-text-primary mb-3">Mesas Configuradas ({tables.length})</span>
+                {tablesLoading ? (
+                  <div className="flex-1 flex items-center justify-center text-xs text-text-secondary">Cargando mesas...</div>
+                ) : tables.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-aged-bronze/20 rounded p-6 text-center">
+                    <svg className="w-8 h-8 text-text-secondary mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <span className="text-xs text-text-secondary">No hay mesas configuradas en esta sucursal.</span>
+                    <span className="text-[10px] text-text-secondary/60 mt-1">Utilice los presets rápidos arriba para autogenerar o agregue una a la derecha.</span>
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[40vh] lg:max-h-none">
+                    {tables.map((t) => (
+                      <div key={t.id} className="bg-charcoal/30 border border-aged-bronze/10 rounded p-3 flex justify-between items-center group">
+                        <div>
+                          <span className="text-xs font-medium text-text-primary block">{t.label}</span>
+                          <span className="text-[10px] text-text-secondary block mt-0.5">Cap: {t.capacity} • {t.room}</span>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteTable(t.id)}
+                          className="text-text-secondary hover:text-error-red p-1 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
+                          title="Eliminar Mesa"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Right Panel: Creation Form */}
+              <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-aged-bronze/10 pt-6 lg:pt-0 lg:pl-6">
+                <span className="text-xs font-semibold text-text-primary block mb-4">Agregar Nueva Mesa</span>
+                <form onSubmit={handleAddTable} className="flex flex-col gap-4">
+                  <FormField label="Identificador / Etiqueta" required>
+                    <Input
+                      type="text"
+                      placeholder="Ej. Mesa 1"
+                      value={newTableLabel}
+                      onChange={(e) => setNewTableLabel(e.target.value)}
+                      required
+                    />
+                  </FormField>
+                  <FormField label="Capacidad (Personas)">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={newTableCapacity}
+                      onChange={(e) => setNewTableCapacity(parseInt(e.target.value) || 4)}
+                    />
+                  </FormField>
+                  <FormField label="Salón / Área">
+                    <Input
+                      type="text"
+                      placeholder="Ej. Terraza, Barra, Salón Principal"
+                      value={newTableRoom}
+                      onChange={(e) => setNewTableRoom(e.target.value)}
+                    />
+                  </FormField>
+                  <Button type="submit" variant="primary" className="w-full mt-2">
+                    Crear Mesa
+                  </Button>
+                </form>
+              </div>
+
+            </div>
           </div>
         </div>
       )}

@@ -27,8 +27,8 @@ export class CreateUserDto {
   @Matches(/^\d{4}$/, { message: 'PIN must consist of exactly 4 digits' })
   pin: string;
 
-  @IsEnum(['waiter', 'cashier', 'kitchen', 'admin'], {
-    message: 'Role must be one of: waiter, cashier, kitchen, admin',
+  @IsEnum(['waiter', 'cashier', 'kitchen', 'admin', 'vendedor'], {
+    message: 'Role must be one of: waiter, cashier, kitchen, admin, vendedor',
   })
-  role: 'waiter' | 'cashier' | 'kitchen' | 'admin';
+  role: 'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor';
 }
