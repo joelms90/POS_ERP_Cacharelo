@@ -135,13 +135,39 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
     const reader = new FileReader();
     reader.onload = (event) => {
       const dataUrl = event.target?.result as string;
-      setFloorPlanImage(dataUrl);
 
       const img = new Image();
       img.onload = () => {
+        // Proportional canvas mapping
         const width = 900;
         const height = Math.round((img.height / img.width) * width);
         setCanvasDimensions({ width, height });
+
+        // Downscale image to low-res for base64 saving
+        const maxDim = 1024;
+        let targetW = img.width;
+        let targetH = img.height;
+        if (targetW > maxDim || targetH > maxDim) {
+          if (targetW > targetH) {
+            targetH = Math.round((targetH / targetW) * maxDim);
+            targetW = maxDim;
+          } else {
+            targetW = Math.round((targetW / targetH) * maxDim);
+            targetH = maxDim;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, targetW, targetH);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+          setFloorPlanImage(compressedDataUrl);
+        } else {
+          setFloorPlanImage(dataUrl);
+        }
       };
       img.src = dataUrl;
     };
