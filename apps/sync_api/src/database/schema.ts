@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, integer, timestamp, boolean, decimal, text } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, integer, timestamp, boolean, decimal, text, doublePrecision } from 'drizzle-orm/pg-core';
 
 // ==========================================
 // 1. Tenants & Catalog Entities
@@ -34,6 +34,9 @@ export const branchTables = pgTable('branch_tables', {
   capacity: integer('capacity').default(4).notNull(),
   room: varchar('room', { length: 50 }).default('General').notNull(), // e.g. "Terraza", "Salon"
   state: varchar('state', { length: 20 }).default('free').notNull(), // free, occupied, billing, cleaning
+  x: doublePrecision('x'),
+  y: doublePrecision('y'),
+  shape: varchar('shape', { length: 20 }).default('square').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

@@ -30,6 +30,8 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
   const [newTableLabel, setNewTableLabel] = useState<string>('');
   const [newTableCapacity, setNewTableCapacity] = useState<number>(4);
   const [newTableRoom, setNewTableRoom] = useState<string>('Salón Principal');
+  const [modalTab, setModalTab] = useState<'list' | 'map'>('list');
+  const [floorPlanImage, setFloorPlanImage] = useState<string | null>(null);
 
   const fetchTables = async () => {
     if (!configuringTablesBranch) return;
@@ -94,7 +96,65 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
       }
     }
   };
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setFloorPlanImage(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
+  const handleTableMouseDown = (e: React.MouseEvent, table: any) => {
+    e.preventDefault();
+    const rect = e.currentTarget.parentElement?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const newX = (moveEvent.clientX - rect.left - 24) / (rect.width - 48);
+      const newY = (moveEvent.clientY - rect.top - 24) / (rect.height - 48);
+      
+      const clampedX = Math.max(0.01, Math.min(0.99, newX));
+      const clampedY = Math.max(0.01, Math.min(1.99, newY));
+
+      setTables(prev => prev.map(t => t.id === table.id ? { ...t, x: clampedX, y: clampedY } : t));
+    };
+
+    const handleMouseUp = async (upEvent: MouseEvent) => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+
+      const finalX = (upEvent.clientX - rect.left - 24) / (rect.width - 48);
+      const finalY = (upEvent.clientY - rect.top - 24) / (rect.height - 48);
+      const clampedX = Math.max(0.01, Math.min(0.99, finalX));
+      const clampedY = Math.max(0.01, Math.min(1.99, finalY));
+
+      try {
+        await api.updateBranchTable(configuringTablesBranch!.id, table.id, {
+          x: clampedX,
+          y: clampedY,
+        });
+      } catch (err) {
+        console.error('Error updating table coordinate:', err);
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleToggleShape = async (table: any) => {
+    const newShape = table.shape === 'circle' ? 'square' : 'circle';
+    try {
+      setTables(prev => prev.map(t => t.id === table.id ? { ...t, shape: newShape } : t));
+      await api.updateBranchTable(configuringTablesBranch!.id, table.id, {
+        shape: newShape,
+      });
+    } catch (err) {
+      console.error('Error updating table shape:', err);
+    }
+  };
   const fetchBranches = async () => {
     try {
       setLoading(true);
@@ -487,82 +547,193 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
               </Button>
             </div>
 
-            {/* Split Panel View */}
-            <div className="flex flex-col lg:flex-row gap-6 overflow-hidden flex-1">
-              
-              {/* Left Panel: Table Grid */}
-              <div className="flex-1 flex flex-col min-h-0">
-                <span className="text-xs font-semibold text-text-primary mb-3">Mesas Configuradas ({tables.length})</span>
-                {tablesLoading ? (
-                  <div className="flex-1 flex items-center justify-center text-xs text-text-secondary">Cargando mesas...</div>
-                ) : tables.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-aged-bronze/20 rounded p-6 text-center">
-                    <svg className="w-8 h-8 text-text-secondary mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                    <span className="text-xs text-text-secondary">No hay mesas configuradas en esta sucursal.</span>
-                    <span className="text-[10px] text-text-secondary/60 mt-1">Utilice los presets rápidos arriba para autogenerar o agregue una a la derecha.</span>
-                  </div>
-                ) : (
-                  <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[40vh] lg:max-h-none">
-                    {tables.map((t) => (
-                      <div key={t.id} className="bg-charcoal/30 border border-aged-bronze/10 rounded p-3 flex justify-between items-center group">
-                        <div>
-                          <span className="text-xs font-medium text-text-primary block">{t.label}</span>
-                          <span className="text-[10px] text-text-secondary block mt-0.5">Cap: {t.capacity} • {t.room}</span>
-                        </div>
-                        <button
-                          onClick={() => handleDeleteTable(t.id)}
-                          className="text-text-secondary hover:text-error-red p-1 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
-                          title="Eliminar Mesa"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Right Panel: Creation Form */}
-              <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-aged-bronze/10 pt-6 lg:pt-0 lg:pl-6">
-                <span className="text-xs font-semibold text-text-primary block mb-4">Agregar Nueva Mesa</span>
-                <form onSubmit={handleAddTable} className="flex flex-col gap-4">
-                  <FormField label="Identificador / Etiqueta" required>
-                    <Input
-                      type="text"
-                      placeholder="Ej. Mesa 1"
-                      value={newTableLabel}
-                      onChange={(e) => setNewTableLabel(e.target.value)}
-                      required
-                    />
-                  </FormField>
-                  <FormField label="Capacidad (Personas)">
-                    <Input
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={newTableCapacity}
-                      onChange={(e) => setNewTableCapacity(parseInt(e.target.value) || 4)}
-                    />
-                  </FormField>
-                  <FormField label="Salón / Área">
-                    <Input
-                      type="text"
-                      placeholder="Ej. Terraza, Barra, Salón Principal"
-                      value={newTableRoom}
-                      onChange={(e) => setNewTableRoom(e.target.value)}
-                    />
-                  </FormField>
-                  <Button type="submit" variant="primary" className="w-full mt-2">
-                    Crear Mesa
-                  </Button>
-                </form>
-              </div>
-
+            {/* Modal Tabs */}
+            <div className="flex border-b border-aged-bronze/35 mb-4">
+              <button
+                type="button"
+                onClick={() => setModalTab('list')}
+                className={`px-4 py-2 text-xs font-semibold tracking-wider transition-colors border-b-2 ${
+                  modalTab === 'list'
+                    ? 'border-champagne-gold text-champagne-gold'
+                    : 'border-transparent text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                LISTA DE MESAS
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalTab('map')}
+                className={`px-4 py-2 text-xs font-semibold tracking-wider transition-colors border-b-2 ${
+                  modalTab === 'map'
+                    ? 'border-champagne-gold text-champagne-gold'
+                    : 'border-transparent text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                MAPA DE DISTRIBUCIÓN (EDITOR VISUAL)
+              </button>
             </div>
+
+            {modalTab === 'list' ? (
+              /* Split Panel View */
+              <div className="flex flex-col lg:flex-row gap-6 overflow-hidden flex-1">
+                
+                {/* Left Panel: Table Grid */}
+                <div className="flex-1 flex flex-col min-h-0">
+                  <span className="text-xs font-semibold text-text-primary mb-3">Mesas Configuradas ({tables.length})</span>
+                  {tablesLoading ? (
+                    <div className="flex-1 flex items-center justify-center text-xs text-text-secondary">Cargando mesas...</div>
+                  ) : tables.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-aged-bronze/20 rounded p-6 text-center">
+                      <svg className="w-8 h-8 text-text-secondary mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                      <span className="text-xs text-text-secondary">No hay mesas configuradas en esta sucursal.</span>
+                      <span className="text-[10px] text-text-secondary/60 mt-1">Utilice los presets rápidos arriba para autogenerar o agregue una a la derecha.</span>
+                    </div>
+                  ) : (
+                    <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[40vh] lg:max-h-none">
+                      {tables.map((t) => (
+                        <div key={t.id} className="bg-charcoal/30 border border-aged-bronze/10 rounded p-3 flex justify-between items-center group">
+                          <div>
+                            <span className="text-xs font-medium text-text-primary block">{t.label}</span>
+                            <span className="text-[10px] text-text-secondary block mt-0.5">Cap: {t.capacity} • {t.room}</span>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteTable(t.id)}
+                            className="text-text-secondary hover:text-error-red p-1 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
+                            title="Eliminar Mesa"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Panel: Creation Form */}
+                <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-aged-bronze/10 pt-6 lg:pt-0 lg:pl-6">
+                  <span className="text-xs font-semibold text-text-primary block mb-4">Agregar Nueva Mesa</span>
+                  <form onSubmit={handleAddTable} className="flex flex-col gap-4">
+                    <FormField label="Identificador / Etiqueta" required>
+                      <Input
+                        type="text"
+                        placeholder="Ej. Mesa 1"
+                        value={newTableLabel}
+                        onChange={(e) => setNewTableLabel(e.target.value)}
+                        required
+                      />
+                    </FormField>
+                    <FormField label="Capacidad (Personas)">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={newTableCapacity}
+                        onChange={(e) => setNewTableCapacity(parseInt(e.target.value) || 4)}
+                      />
+                    </FormField>
+                    <FormField label="Salón / Área">
+                      <Input
+                        type="text"
+                        placeholder="Ej. Terraza, Barra, Salón Principal"
+                        value={newTableRoom}
+                        onChange={(e) => setNewTableRoom(e.target.value)}
+                      />
+                    </FormField>
+                    <Button type="submit" variant="primary" className="w-full mt-2">
+                      Crear Mesa
+                    </Button>
+                  </form>
+                </div>
+              </div>
+            ) : (
+              /* Visual Layout Editor Canvas */
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                <div className="flex justify-between items-center mb-4 bg-charcoal/30 border border-aged-bronze/20 rounded p-3 text-xs">
+                  <div className="flex items-center gap-3">
+                    <label className="bg-charcoal-surface border border-aged-bronze text-text-primary px-3 py-1.5 rounded cursor-pointer hover:border-champagne-gold transition-colors text-[10px] uppercase font-bold tracking-wider">
+                      Subir Imagen de Referencia
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    {floorPlanImage ? (
+                      <button
+                        type="button"
+                        onClick={() => setFloorPlanImage(null)}
+                        className="text-error-red hover:underline text-[10px] uppercase font-bold"
+                      >
+                        Quitar Imagen
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-text-secondary">Sube un plano de planta como fondo</span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-text-secondary italic">
+                    * Arrastre las mesas para ubicarlas. Doble clic para alternar forma (círculo / cuadrado).
+                  </span>
+                </div>
+
+                <div className="flex-1 overflow-auto border border-aged-bronze/30 rounded-md bg-black/40">
+                  <div
+                    style={{
+                      width: '900px',
+                      height: `${Math.max(900, Math.max(0.01, ...tables.map(t => t.y || 0)) * 1000) + 120}px`,
+                      position: 'relative',
+                      backgroundImage: 'linear-gradient(to right, rgba(163, 137, 89, 0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(163, 137, 89, 0.04) 1px, transparent 1px)',
+                      backgroundSize: '40px 40px',
+                    }}
+                    className="overflow-hidden"
+                  >
+                    {floorPlanImage && (
+                      <img
+                        src={floorPlanImage}
+                        alt="Floor plan reference"
+                        className="absolute inset-0 w-full h-full object-cover opacity-30 select-none pointer-events-none"
+                      />
+                    )}
+
+                    {tables.map(t => {
+                      const isCircle = t.shape === 'circle';
+                      const canvasHeight = Math.max(900, Math.max(0.01, ...tables.map(tbl => tbl.y || 0)) * 1000) + 120;
+                      return (
+                        <div
+                          key={t.id}
+                          onMouseDown={(e) => handleTableMouseDown(e, t)}
+                          onDoubleClick={() => handleToggleShape(t)}
+                          style={{
+                            position: 'absolute',
+                            left: `${(t.x || 0) * (900 - 60)}px`,
+                            top: `${(t.y || 0) * (canvasHeight - 60)}px`,
+                            width: '60px',
+                            height: '60px',
+                          }}
+                          className={`flex flex-col items-center justify-center cursor-grab active:cursor-grabbing select-none text-[9px] font-bold border transition-colors shadow-lg z-10 ${
+                            isCircle ? 'rounded-full' : 'rounded-md'
+                          } ${
+                            t.state === 'occupied'
+                              ? 'bg-success-green/20 border-success-green text-success-green'
+                              : t.state === 'billing'
+                              ? 'bg-champagne-gold/20 border-champagne-gold text-champagne-gold'
+                              : 'bg-charcoal-surface border-aged-bronze/40 text-text-primary hover:border-champagne-gold'
+                          }`}
+                          title={`${t.label} (Área: ${t.room})`}
+                        >
+                          <span className="truncate max-w-[50px]">{t.label}</span>
+                          <span className="text-[8px] opacity-75 mt-0.5">Cap: {t.capacity}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

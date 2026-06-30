@@ -50,6 +50,15 @@ export class BranchesController {
     return this.branchesService.removeTable(tableId);
   }
 
+  @Patch(':id/tables/:tableId')
+  async updateTable(
+    @Param('id') branchId: string,
+    @Param('tableId') tableId: string,
+    @Body() body: { label?: string; capacity?: number; room?: string; x?: number; y?: number; shape?: string },
+  ) {
+    return this.branchesService.updateTable(tableId, body);
+  }
+
   @Post(':id/tables/generate')
   async generateTables(
     @Param('id') branchId: string,

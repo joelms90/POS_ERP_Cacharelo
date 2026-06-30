@@ -457,6 +457,20 @@ export const api = {
   },
 
   /**
+   * Update details of an existing table
+   */
+  async updateBranchTable(
+    branchId: string,
+    tableId: string,
+    updates: { label?: string; capacity?: number; room?: string; x?: number; y?: number; shape?: string },
+  ): Promise<any> {
+    return apiRequest<any>(`/branches/${branchId}/tables/${tableId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  },
+
+  /**
    * Get stock levels for a business
    */
   async getStockLevels(businessId: string, warehouseId?: string, branchId?: string): Promise<any[]> {

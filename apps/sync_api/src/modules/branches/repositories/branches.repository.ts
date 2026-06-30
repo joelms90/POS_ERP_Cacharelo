@@ -148,6 +148,18 @@ export class BranchesRepository {
     return results[0];
   }
 
+  async updateTable(tableId: string, data: Partial<typeof schema.branchTables.$inferInsert>) {
+    const results = await this.db
+      .update(schema.branchTables)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.branchTables.id, tableId))
+      .returning();
+    return results[0];
+  }
+
   async removeTable(tableId: string) {
     const orders = await this.db
       .select({ id: schema.orders.id })
@@ -206,28 +218,55 @@ export class BranchesRepository {
 
     const newTables: any[] = [];
     if (mode === 'cafeteria') {
+      const salonCoords = [
+        { x: 0.15, y: 0.25, shape: 'circle' },
+        { x: 0.45, y: 0.25, shape: 'square' },
+        { x: 0.75, y: 0.25, shape: 'circle' },
+        { x: 0.15, y: 0.65, shape: 'square' },
+        { x: 0.45, y: 0.65, shape: 'circle' },
+        { x: 0.75, y: 0.65, shape: 'square' },
+        { x: 0.15, y: 0.95, shape: 'circle' },
+        { x: 0.45, y: 0.95, shape: 'square' },
+      ];
       for (let i = 1; i <= 8; i++) {
         newTables.push({
           branchId,
           label: `Mesa ${i}`,
           capacity: 4,
           room: 'Salón Principal',
+          ...salonCoords[i - 1],
         });
       }
+
+      const terrazaCoords = [
+        { x: 0.2, y: 0.3, shape: 'square' },
+        { x: 0.5, y: 0.3, shape: 'circle' },
+        { x: 0.8, y: 0.3, shape: 'square' },
+        { x: 0.35, y: 0.7, shape: 'circle' },
+      ];
       for (let i = 9; i <= 12; i++) {
         newTables.push({
           branchId,
           label: `Mesa ${i}`,
           capacity: 2,
           room: 'Terraza',
+          ...terrazaCoords[i - 9],
         });
       }
+
+      const barraCoords = [
+        { x: 0.25, y: 0.45, shape: 'circle' },
+        { x: 0.75, y: 0.45, shape: 'circle' },
+        { x: 0.25, y: 0.85, shape: 'circle' },
+        { x: 0.75, y: 0.85, shape: 'circle' },
+      ];
       for (let i = 13; i <= 16; i++) {
         newTables.push({
           branchId,
           label: `Barra ${i - 12}`,
           capacity: 1,
           room: 'Barra',
+          ...barraCoords[i - 13],
         });
       }
     } else {
@@ -236,6 +275,9 @@ export class BranchesRepository {
         label: 'Mostrador',
         capacity: 99,
         room: 'Mostrador',
+        x: 0.45,
+        y: 0.45,
+        shape: 'circle',
       });
     }
 

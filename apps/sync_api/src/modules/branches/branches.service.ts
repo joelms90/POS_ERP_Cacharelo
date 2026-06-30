@@ -65,12 +65,19 @@ export class BranchesService {
       capacity: data.capacity || 4,
       room: data.room || 'General',
       state: 'free',
+      x: data.x,
+      y: data.y,
+      shape: data.shape || 'square',
       version: 1,
     });
   }
 
   async removeTable(tableId: string) {
     return this.branchesRepository.removeTable(tableId);
+  }
+
+  async updateTable(tableId: string, data: any) {
+    return this.branchesRepository.updateTable(tableId, data);
   }
 
   async generateTables(branchId: string, mode: 'cafeteria' | 'mostrador') {
