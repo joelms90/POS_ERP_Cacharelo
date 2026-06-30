@@ -91,6 +91,7 @@ export async function runMigrations() {
 
     // Clear and seed fresh employees for Cafetería only
     console.log('🧹 Clearing old users/employees...');
+    await db.delete(schema.refreshTokens);
     await db.delete(schema.users);
 
     console.log('🌱 Seeding fresh employees for Cafetería...');

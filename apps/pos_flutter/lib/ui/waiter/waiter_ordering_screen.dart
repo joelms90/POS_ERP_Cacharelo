@@ -33,6 +33,44 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
   List<String> activeGenders = ['M'];
   int selectedGuestIndex = 0;
 
+  void _triggerSync(BuildContext context) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: EmpireColors.obsidian),
+            ),
+            SizedBox(width: 12),
+            Text('Sincronizando datos con el servidor...', style: TextStyle(color: EmpireColors.obsidian, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        backgroundColor: EmpireColors.champagneGold,
+        duration: Duration(milliseconds: 1500),
+      ),
+    );
+
+    final bool success = await widget.state.syncAllData();
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success 
+              ? 'Sincronización completa con éxito.'
+              : 'Sincronización incompleta. Revise su conexión de red.',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: success ? EmpireColors.successGreen : EmpireColors.errorRed,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   String _getGenderEmoji(String gender) {
     switch (gender) {
       case 'F':
@@ -361,6 +399,14 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                     ? EmpireColors.successGreen
                     : EmpireColors.warningOrange,
                 size: 20,
+              ),
+              const SizedBox(width: 12),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(Icons.sync, color: EmpireColors.textGold, size: 20),
+                tooltip: 'Sincronizar Datos',
+                onPressed: () => _triggerSync(context),
               ),
               if (!widget.state.isOnline) ...[
                 const SizedBox(width: 8),
