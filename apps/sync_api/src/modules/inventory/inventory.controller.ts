@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Param } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { CreateReceiptDto } from './dto/create-receipt.dto';
 import { CreateProductionRunDto } from './dto/create-production-run.dto';
+import { CreateTransferDto } from './dto/create-transfer.dto';
 
 @Controller('inventory')
 export class InventoryController {
@@ -34,5 +35,34 @@ export class InventoryController {
   @Post('production')
   async assembleProduct(@Body() createProductionRunDto: CreateProductionRunDto) {
     return this.inventoryService.assembleProduct(createProductionRunDto);
+  }
+
+  @Get('transfers')
+  async getTransfers(@Query('businessId') businessId: string) {
+    return this.inventoryService.getTransfers(businessId);
+  }
+
+  @Post('transfers')
+  async recordTransfer(@Body() createTransferDto: CreateTransferDto) {
+    return this.inventoryService.recordTransfer(createTransferDto);
+  }
+
+  @Get('reports/transfers-summary')
+  async getTransfersSummaryReport(
+    @Query('businessId') businessId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.inventoryService.getTransfersSummaryReport(businessId, startDate, endDate);
+  }
+
+  @Get('reports/transfers-detailed')
+  async getTransfersDetailedReport(
+    @Query('businessId') businessId: string,
+    @Query('branchId') branchId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.inventoryService.getTransfersDetailedReport(businessId, branchId, startDate, endDate);
   }
 }

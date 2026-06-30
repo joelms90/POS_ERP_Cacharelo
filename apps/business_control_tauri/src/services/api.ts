@@ -70,6 +70,11 @@ export interface Product {
   isSellable?: boolean;
   isIngredient?: boolean;
   imageUrl?: string;
+  internalCode?: string;
+  priceWholesale?: string;
+  minStock?: string;
+  maxStock?: string;
+  saleType?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -553,6 +558,77 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+
+  /**
+   * Supplier product mappings
+   */
+  async getSupplierProducts(businessId: string, productId?: string, providerId?: string): Promise<SupplierProduct[]> {
+    let url = `/supplier-products?businessId=${businessId}`;
+    if (productId) url += `&productId=${productId}`;
+    if (providerId) url += `&providerId=${providerId}`;
+    return apiRequest<SupplierProduct[]>(url);
+  },
+
+  async addSupplierProduct(payload: Omit<SupplierProduct, 'id' | 'createdAt' | 'updatedAt'>): Promise<SupplierProduct> {
+    return apiRequest<SupplierProduct>('/supplier-products', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateSupplierProduct(id: string, payload: Partial<SupplierProduct>): Promise<SupplierProduct> {
+    return apiRequest<SupplierProduct>(`/supplier-products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteSupplierProduct(id: string): Promise<{ success: boolean }> {
+    return apiRequest<{ success: boolean }>(`/supplier-products/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Stock transfers
+   */
+  async getTransfers(businessId: string): Promise<any[]> {
+    return apiRequest<any[]>(`/inventory/transfers?businessId=${businessId}`);
+  },
+
+  async recordTransfer(payload: {
+    fromWarehouseId?: string;
+    fromBranchId?: string;
+    toWarehouseId?: string;
+    toBranchId?: string;
+    notes?: string;
+    items: Array<{ productId: string; quantity: number }>;
+  }, businessId: string): Promise<{ success: boolean; transferId: string }> {
+    return apiRequest<{ success: boolean; transferId: string }>('/inventory/transfers', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...payload,
+        businessId,
+      }),
+    });
+  },
+
+  /**
+   * Reports
+   */
+  async getTransfersSummaryReport(businessId: string, startDate?: string, endDate?: string): Promise<any[]> {
+    let url = `/inventory/reports/transfers-summary?businessId=${businessId}`;
+    if (startDate) url += `&startDate=${startDate}`;
+    if (endDate) url += `&endDate=${endDate}`;
+    return apiRequest<any[]>(url);
+  },
+
+  async getTransfersDetailedReport(businessId: string, branchId: string, startDate?: string, endDate?: string): Promise<any[]> {
+    let url = `/inventory/reports/transfers-detailed?businessId=${businessId}&branchId=${branchId}`;
+    if (startDate) url += `&startDate=${startDate}`;
+    if (endDate) url += `&endDate=${endDate}`;
+    return apiRequest<any[]>(url);
+  },
 };
 
 export interface RecipeItem {
@@ -571,6 +647,19 @@ export interface ProductionRun {
   quantityProduced: string;
   assembledAt: string;
   notes?: string;
+}
+
+export interface SupplierProduct {
+  id: string;
+  businessId: string;
+  productId: string;
+  providerId: string;
+  providerProductName: string;
+  providerSku?: string;
+  cost: string;
+  conversionFactor: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 

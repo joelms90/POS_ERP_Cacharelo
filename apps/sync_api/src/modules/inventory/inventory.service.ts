@@ -3,7 +3,7 @@ import { InventoryRepository } from './repositories/inventory.repository';
 import { CreateReceiptDto } from './dto/create-receipt.dto';
 import { CreateProductionRunDto } from './dto/create-production-run.dto';
 import * as schema from '../../database/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, gte, lte, sql, desc, inArray } from 'drizzle-orm';
 
 @Injectable()
 export class InventoryService {
@@ -244,6 +244,289 @@ export class InventoryService {
       return {
         success: true,
         productionRunId: run.id,
+      };
+    });
+  }
+
+  async getTransfers(businessId: string) {
+    const db = this.inventoryRepository.getDb();
+    
+    const transfers = await db
+      .select()
+      .from(schema.stockTransfers)
+      .where(eq(schema.stockTransfers.businessId, businessId))
+      .orderBy(desc(schema.stockTransfers.transferredAt));
+
+    const warehouses = await db
+      .select()
+      .from(schema.warehouses)
+      .where(eq(schema.warehouses.businessId, businessId));
+
+    const branches = await db
+      .select()
+      .from(schema.branches)
+      .where(eq(schema.branches.businessId, businessId));
+
+    const whMap = new Map(warehouses.map(w => [w.id, w.name]));
+    const brMap = new Map(branches.map(b => [b.id, b.name]));
+
+    return transfers.map(t => ({
+      ...t,
+      fromWarehouseName: t.fromWarehouseId ? whMap.get(t.fromWarehouseId) : null,
+      fromBranchName: t.fromBranchId ? brMap.get(t.fromBranchId) : null,
+      toWarehouseName: t.toWarehouseId ? whMap.get(t.toWarehouseId) : null,
+      toBranchName: t.toBranchId ? brMap.get(t.toBranchId) : null,
+    }));
+  }
+
+  async recordTransfer(dto: any) {
+    const { businessId, fromWarehouseId, fromBranchId, toWarehouseId, toBranchId, notes, items } = dto;
+
+    if (!fromWarehouseId && !fromBranchId) {
+      throw new BadRequestException('Debe especificar un origen (Bodega o Sucursal).');
+    }
+    if (!toWarehouseId && !toBranchId) {
+      throw new BadRequestException('Debe especificar un destino (Bodega o Sucursal).');
+    }
+
+    const db = this.inventoryRepository.getDb();
+
+    return db.transaction(async (tx) => {
+      // 1. Create the transfer record
+      const [transfer] = await tx
+        .insert(schema.stockTransfers)
+        .values({
+          businessId,
+          fromWarehouseId: fromWarehouseId || null,
+          fromBranchId: fromBranchId || null,
+          toWarehouseId: toWarehouseId || null,
+          toBranchId: toBranchId || null,
+          notes: notes || null,
+          status: 'completed',
+        })
+        .returning();
+
+      // 2. Process items
+      for (const item of items) {
+        // Find product to get the current cost
+        const [product] = await tx
+          .select()
+          .from(schema.products)
+          .where(eq(schema.products.id, item.productId))
+          .limit(1);
+
+        if (!product) {
+          throw new NotFoundException(`Producto con ID ${item.productId} no encontrado`);
+        }
+
+        const unitCost = product.cost;
+        const totalCost = (parseFloat(unitCost) * item.quantity).toFixed(2);
+
+        // A. Decrement stock from source
+        const sourceCond = [eq(schema.stockLevels.productId, item.productId)];
+        if (fromWarehouseId) {
+          sourceCond.push(eq(schema.stockLevels.warehouseId, fromWarehouseId));
+        } else {
+          sourceCond.push(eq(schema.stockLevels.branchId, fromBranchId));
+        }
+
+        const [sourceStock] = await tx
+          .select()
+          .from(schema.stockLevels)
+          .where(and(...sourceCond))
+          .limit(1);
+
+        if (!sourceStock || parseFloat(sourceStock.quantity) < item.quantity) {
+          throw new BadRequestException(`Stock insuficiente en origen para el producto ${product.name}`);
+        }
+
+        const newSourceQty = (parseFloat(sourceStock.quantity) - item.quantity).toString();
+        await tx
+          .update(schema.stockLevels)
+          .set({
+            quantity: newSourceQty,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.stockLevels.id, sourceStock.id));
+
+        // B. Increment stock at destination
+        const destCond = [eq(schema.stockLevels.productId, item.productId)];
+        if (toWarehouseId) {
+          destCond.push(eq(schema.stockLevels.warehouseId, toWarehouseId));
+        } else {
+          destCond.push(eq(schema.stockLevels.branchId, toBranchId));
+        }
+
+        const [destStock] = await tx
+          .select()
+          .from(schema.stockLevels)
+          .where(and(...destCond))
+          .limit(1);
+
+        if (destStock) {
+          const newDestQty = (parseFloat(destStock.quantity) + item.quantity).toString();
+          await tx
+            .update(schema.stockLevels)
+            .set({
+              quantity: newDestQty,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.stockLevels.id, destStock.id));
+        } else {
+          await tx
+            .insert(schema.stockLevels)
+            .values({
+              productId: item.productId,
+              warehouseId: toWarehouseId || null,
+              branchId: toBranchId || null,
+              quantity: item.quantity.toString(),
+              updatedAt: new Date(),
+            });
+        }
+
+        // C. Record transfer item details
+        await tx
+          .insert(schema.stockTransferItems)
+          .values({
+            transferId: transfer.id,
+            productId: item.productId,
+            quantity: item.quantity.toString(),
+            unitCost,
+            totalCost,
+          });
+      }
+
+      return {
+        success: true,
+        transferId: transfer.id,
+      };
+    });
+  }
+
+  async getTransfersSummaryReport(businessId: string, startDate?: string, endDate?: string) {
+    const db = this.inventoryRepository.getDb();
+    
+    const conditions = [
+      eq(schema.stockTransfers.businessId, businessId),
+      sql`${schema.stockTransfers.toBranchId} is not null`
+    ];
+
+    if (startDate) {
+      conditions.push(gte(schema.stockTransfers.transferredAt, new Date(startDate)));
+    }
+    if (endDate) {
+      conditions.push(lte(schema.stockTransfers.transferredAt, new Date(endDate)));
+    }
+
+    const transfers = await db
+      .select({
+        id: schema.stockTransfers.id,
+        toBranchId: schema.stockTransfers.toBranchId,
+      })
+      .from(schema.stockTransfers)
+      .where(and(...conditions));
+
+    if (transfers.length === 0) {
+      return [];
+    }
+
+    const transferIds = transfers.map(t => t.id);
+
+    // Sum costs of transfer items
+    const items = await db
+      .select({
+        transferId: schema.stockTransferItems.transferId,
+        totalCost: schema.stockTransferItems.totalCost,
+      })
+      .from(schema.stockTransferItems)
+      .where(inArray(schema.stockTransferItems.transferId, transferIds));
+
+    // Map branch names
+    const branches = await db
+      .select()
+      .from(schema.branches)
+      .where(eq(schema.branches.businessId, businessId));
+    const brMap = new Map(branches.map(b => [b.id, b.name]));
+
+    // Group and sum
+    const branchTotals = new Map<string, number>();
+    for (const t of transfers) {
+      const branchId = t.toBranchId!;
+      const branchItems = items.filter(i => i.transferId === t.id);
+      const sum = branchItems.reduce((acc, curr) => acc + parseFloat(curr.totalCost), 0);
+      branchTotals.set(branchId, (branchTotals.get(branchId) || 0) + sum);
+    }
+
+    return Array.from(branchTotals.entries()).map(([branchId, totalCost]) => ({
+      branchId,
+      branchName: brMap.get(branchId) || 'Sucursal Desconocida',
+      totalCost: totalCost.toFixed(2),
+    }));
+  }
+
+  async getTransfersDetailedReport(businessId: string, branchId: string, startDate?: string, endDate?: string) {
+    const db = this.inventoryRepository.getDb();
+
+    const conditions = [
+      eq(schema.stockTransfers.businessId, businessId),
+      eq(schema.stockTransfers.toBranchId, branchId),
+    ];
+
+    if (startDate) {
+      conditions.push(gte(schema.stockTransfers.transferredAt, new Date(startDate)));
+    }
+    if (endDate) {
+      conditions.push(lte(schema.stockTransfers.transferredAt, new Date(endDate)));
+    }
+
+    const transfers = await db
+      .select({
+        id: schema.stockTransfers.id,
+      })
+      .from(schema.stockTransfers)
+      .where(and(...conditions));
+
+    if (transfers.length === 0) {
+      return [];
+    }
+
+    const transferIds = transfers.map(t => t.id);
+
+    // Get item totals grouped by product
+    const items = await db
+      .select({
+        productId: schema.stockTransferItems.productId,
+        quantity: schema.stockTransferItems.quantity,
+        totalCost: schema.stockTransferItems.totalCost,
+      })
+      .from(schema.stockTransferItems)
+      .where(inArray(schema.stockTransferItems.transferId, transferIds));
+
+    // Join with product names
+    const products = await db
+      .select()
+      .from(schema.products)
+      .where(eq(schema.products.businessId, businessId));
+    const prodMap = new Map(products.map(p => [p.id, p]));
+
+    const productTotals = new Map<string, { quantity: number; totalCost: number }>();
+    for (const item of items) {
+      const current = productTotals.get(item.productId) || { quantity: 0, totalCost: 0 };
+      productTotals.set(item.productId, {
+        quantity: current.quantity + parseFloat(item.quantity),
+        totalCost: current.totalCost + parseFloat(item.totalCost),
+      });
+    }
+
+    return Array.from(productTotals.entries()).map(([productId, totals]) => {
+      const p = prodMap.get(productId);
+      return {
+        productId,
+        productName: p ? p.name : 'Producto Desconocido',
+        sku: p ? p.sku : null,
+        internalCode: p ? p.internalCode : null,
+        totalQuantity: totals.quantity,
+        totalCost: totals.totalCost.toFixed(2),
       };
     });
   }

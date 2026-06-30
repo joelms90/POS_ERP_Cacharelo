@@ -79,6 +79,9 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
     // Validate and format numbers
     const priceVal = editingProduct.price ? parseFloat(editingProduct.price) : 0;
     const costVal = editingProduct.cost ? parseFloat(editingProduct.cost) : 0;
+    const priceWholesaleVal = editingProduct.priceWholesale ? parseFloat(editingProduct.priceWholesale) : 0;
+    const minStockVal = editingProduct.minStock ? parseFloat(editingProduct.minStock) : 0;
+    const maxStockVal = editingProduct.maxStock ? parseFloat(editingProduct.maxStock) : 0;
 
     if (isNaN(priceVal) || priceVal < 0) {
       showToast('El precio debe ser un número positivo.', 'error');
@@ -90,6 +93,21 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
       return;
     }
 
+    if (isNaN(priceWholesaleVal) || priceWholesaleVal < 0) {
+      showToast('El precio de mayoreo debe ser un número positivo o cero.', 'error');
+      return;
+    }
+
+    if (isNaN(minStockVal) || minStockVal < 0) {
+      showToast('El inventario mínimo debe ser un número positivo o cero.', 'error');
+      return;
+    }
+
+    if (isNaN(maxStockVal) || maxStockVal < 0) {
+      showToast('El inventario máximo debe ser un número positivo o cero.', 'error');
+      return;
+    }
+
     setIsSavingProduct(true);
     try {
       const payload = {
@@ -97,9 +115,14 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
         name: editingProduct.name.trim(),
         sku: editingProduct.sku?.trim() || undefined,
         barcode: editingProduct.barcode?.trim() || undefined,
+        internalCode: editingProduct.internalCode?.trim() || undefined,
         providerId: editingProduct.providerId || undefined,
         cost: costVal.toFixed(2),
         price: priceVal.toFixed(2),
+        priceWholesale: priceWholesaleVal.toFixed(2),
+        minStock: minStockVal.toFixed(3),
+        maxStock: maxStockVal.toFixed(3),
+        saleType: editingProduct.saleType || 'pieza',
         isSellable: editingProduct.isSellable ?? true,
         isIngredient: editingProduct.isIngredient ?? false,
         imageUrl: editingProduct.imageUrl || undefined,
@@ -189,8 +212,13 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                 name: '',
                 sku: '',
                 barcode: '',
+                internalCode: '',
                 cost: '0.00',
                 price: '0.00',
+                priceWholesale: '0.00',
+                minStock: '0.000',
+                maxStock: '0.000',
+                saleType: 'pieza',
                 isSellable: true,
                 isIngredient: false,
                 imageUrl: '',
@@ -299,6 +327,31 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-4 mt-2">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-text-secondary">Código Interno</label>
+                        <Input
+                          type="text"
+                          placeholder="OPCIONAL"
+                          value={editingProduct.internalCode || ''}
+                          onChange={(e) => setEditingProduct(prev => ({ ...prev, internalCode: e.target.value }))}
+                          disabled={isSavingProduct}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-text-secondary">Tipo de Venta</label>
+                        <select
+                          value={editingProduct.saleType || 'pieza'}
+                          onChange={(e) => setEditingProduct(prev => ({ ...prev, saleType: e.target.value }))}
+                          disabled={isSavingProduct}
+                          className="w-full px-4 py-2 bg-charcoal-surface border border-aged-bronze focus:border-champagne-gold focus:ring-champagne-gold/50 rounded font-sans text-text-primary transition-all duration-300 focus:outline-none focus:ring-2 text-xs"
+                        >
+                          <option value="pieza">Por Pieza (Unidad)</option>
+                          <option value="granel">A Granel (Granel)</option>
+                        </select>
+                      </div>
+                    </div>
+
                     <div className="flex flex-col gap-1.5 mt-2">
                       <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Imagen del Producto</label>
                       <div className="flex items-center gap-4">
@@ -376,9 +429,9 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
 
                   {/* Right Column Fields */}
                   <div className="flex flex-col justify-between gap-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-medium text-text-secondary">Precio de Venta ($) *</label>
+                        <label className="text-xs font-medium text-text-secondary">Precio Venta ($) *</label>
                         <Input
                           type="number"
                           step="0.01"
@@ -391,7 +444,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-medium text-text-secondary">Costo de Insumo ($)</label>
+                        <label className="text-xs font-medium text-text-secondary">Costo Insumo ($)</label>
                         <Input
                           type="number"
                           step="0.01"
@@ -399,6 +452,45 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                           placeholder="0.00"
                           value={editingProduct.cost || ''}
                           onChange={(e) => setEditingProduct(prev => ({ ...prev, cost: e.target.value }))}
+                          disabled={isSavingProduct}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-text-secondary">Precio Mayoreo ($)</label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={editingProduct.priceWholesale || ''}
+                          onChange={(e) => setEditingProduct(prev => ({ ...prev, priceWholesale: e.target.value }))}
+                          disabled={isSavingProduct}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mt-2">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-text-secondary">Inventario Mínimo</label>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          placeholder="0.000"
+                          value={editingProduct.minStock || ''}
+                          onChange={(e) => setEditingProduct(prev => ({ ...prev, minStock: e.target.value }))}
+                          disabled={isSavingProduct}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-text-secondary">Inventario Máximo</label>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          placeholder="0.000"
+                          value={editingProduct.maxStock || ''}
+                          onChange={(e) => setEditingProduct(prev => ({ ...prev, maxStock: e.target.value }))}
                           disabled={isSavingProduct}
                         />
                       </div>
@@ -598,19 +690,27 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                                   <div className="flex flex-col gap-0.5">
                                     {p.sku && <span>SKU: {p.sku}</span>}
                                     {p.barcode && <span>EAN: {p.barcode}</span>}
+                                    {p.internalCode && <span>Int: {p.internalCode}</span>}
                                     {p.providerId && (
                                       <span className="text-[10px] text-champagne-gold/75 mt-0.5 font-sans">
                                         Prov: {providers.find(prov => prov.id === p.providerId)?.name || 'Cargando...'}
                                       </span>
                                     )}
-                                    {!p.sku && !p.barcode && !p.providerId && <span className="text-[10px] italic">-</span>}
+                                    {!p.sku && !p.barcode && !p.internalCode && !p.providerId && <span className="text-[10px] italic">-</span>}
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 text-right font-mono text-xs text-text-secondary">
                                   ${p.cost || '0.00'}
                                 </td>
-                                <td className="px-6 py-4 text-right font-semibold font-mono text-champagne-gold">
-                                  ${p.price || '0.00'}
+                                <td className="px-6 py-4 text-right font-mono text-xs text-text-secondary">
+                                  <div className="flex flex-col items-end">
+                                    <span className="font-semibold text-champagne-gold">${p.price || '0.00'}</span>
+                                    {p.priceWholesale && parseFloat(p.priceWholesale) > 0 && (
+                                      <span className="text-[10px] text-text-secondary font-normal font-sans">
+                                        Mayoreo: ${p.priceWholesale}
+                                      </span>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4 text-xs">
                                   <div className="flex flex-wrap gap-1.5">

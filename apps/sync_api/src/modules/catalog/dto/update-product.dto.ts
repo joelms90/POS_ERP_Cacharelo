@@ -41,4 +41,24 @@ export class UpdateProductDto {
   @IsString()
   @IsOptional()
   imageUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  internalCode?: string;
+
+  @IsNumberString()
+  @IsOptional()
+  priceWholesale?: string;
+
+  @IsNumberString()
+  @IsOptional()
+  minStock?: string;
+
+  @IsNumberString()
+  @IsOptional()
+  maxStock?: string;
+
+  @IsString()
+  @IsOptional()
+  saleType?: string;
 }
