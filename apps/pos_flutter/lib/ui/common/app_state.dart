@@ -680,14 +680,31 @@ class AppState extends ChangeNotifier {
             y = coords['y'];
             shape = coords['shape'] == 'circle' ? TableShape.circle : TableShape.square;
           } else {
-            // Generate grid placement
+            // Generate grid placement starting below pre-configured ones to avoid overlap
+            double startY = 0.25;
+            switch (zone) {
+              case 'Salón Principal':
+                startY = 0.95;
+                break;
+              case 'Terraza':
+                startY = 1.05;
+                break;
+              case 'Bar':
+              case 'Barra':
+                startY = 0.80;
+                break;
+              default:
+                startY = 0.25;
+                break;
+            }
+
             final int count = zoneCounters[zone] ?? 0;
             zoneCounters[zone] = count + 1;
             
             final int col = count % 3;
             final int row = count ~/ 3;
             x = 0.15 + col * 0.30;
-            y = 0.25 + row * 0.35;
+            y = startY + row * 0.30;
             
             if (normLabel.contains('barra') || normLabel.contains('bar') || normLabel.contains('mostrador')) {
               shape = TableShape.circle;

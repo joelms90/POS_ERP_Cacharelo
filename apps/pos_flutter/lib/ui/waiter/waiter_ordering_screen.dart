@@ -615,6 +615,13 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
   }
 
   Widget _buildFloorMap(List<TableModel> tables) {
+    final double maxTableY = tables.isEmpty
+        ? 1.0
+        : tables.map((t) => t.y).reduce((a, b) => a > b ? a : b);
+    
+    final double canvasHeight = (maxTableY * 1000.0).clamp(900.0, 3000.0) + 120.0;
+    const double canvasWidth = 900.0;
+
     return Column(
       children: [
         // Zone Tabs Bar
@@ -640,59 +647,68 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                 width: 1.5,
               ),
             ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return Stack(
-                  children: [
-                    // Grid background lines for premium design
-                    Positioned.fill(
-                      child: GridPaper(
-                        color: EmpireColors.agedBronzeDark.withOpacity(0.08),
-                        divisions: 2,
-                        subdivisions: 1,
-                        interval: 100,
-                      ),
-                    ),
-
-                    // Render tables
-                    ...tables.map((table) {
-                      return Positioned(
-                        left: table.x * (constraints.maxWidth - 100),
-                        top: table.y * (constraints.maxHeight - 100),
-                        child: TableNode(
-                          table: table,
-                          onTap: () {
-                            if (table.state == TableState.cleaning) {
-                              // If cleaning, waiter can mark as free
-                              widget.state.finishCleaning(table.id);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  backgroundColor: EmpireColors.successGreen,
-                                  content: Text(
-                                    '¡${table.label} disponible para nuevos clientes!',
-                                  ),
-                                ),
-                              );
-                            } else {
-                              setState(() {
-                                activeOrderingTable = table;
-                                currentCart = List.from(table.items);
-                                isCartOpen = false;
-                                activeGenders = List.from(
-                                  table.guestGenders.isEmpty
-                                      ? ['M']
-                                      : table.guestGenders,
-                                );
-                                selectedGuestIndex = 0;
-                              });
-                            }
-                          },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.vertical,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Container(
+                    width: canvasWidth,
+                    height: canvasHeight,
+                    child: Stack(
+                      children: [
+                        // Grid background lines for premium design
+                        Positioned.fill(
+                          child: GridPaper(
+                            color: EmpireColors.agedBronzeDark.withOpacity(0.08),
+                            divisions: 2,
+                            subdivisions: 1,
+                            interval: 100,
+                          ),
                         ),
-                      );
-                    }),
-                  ],
-                );
-              },
+
+                        // Render tables
+                        ...tables.map((table) {
+                          return Positioned(
+                            left: table.x * (canvasWidth - 100),
+                            top: table.y * (canvasHeight - 120),
+                            child: TableNode(
+                              table: table,
+                              onTap: () {
+                                if (table.state == TableState.cleaning) {
+                                  // If cleaning, waiter can mark as free
+                                  widget.state.finishCleaning(table.id);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      backgroundColor: EmpireColors.successGreen,
+                                      content: Text(
+                                        '¡${table.label} disponible para nuevos clientes!',
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  setState(() {
+                                    activeOrderingTable = table;
+                                    currentCart = List.from(table.items);
+                                    isCartOpen = false;
+                                    activeGenders = List.from(
+                                      table.guestGenders.isEmpty
+                                          ? ['M']
+                                          : table.guestGenders,
+                                    );
+                                    selectedGuestIndex = 0;
+                                  });
+                                }
+                              },
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
