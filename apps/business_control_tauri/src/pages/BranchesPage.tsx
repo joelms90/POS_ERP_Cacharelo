@@ -32,6 +32,9 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
   const [newTableRoom, setNewTableRoom] = useState<string>('Salón Principal');
   const [modalTab, setModalTab] = useState<'list' | 'map'>('list');
   const [floorPlanImage, setFloorPlanImage] = useState<string | null>(null);
+  const [zoom, setZoom] = useState<number>(1.0);
+  const [canvasDimensions, setCanvasDimensions] = useState({ width: 900, height: 900 });
+  const [selectedRoom, setSelectedRoom] = useState<string>('General');
 
   const fetchTables = async () => {
     if (!configuringTablesBranch) return;
@@ -51,6 +54,36 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
       fetchTables();
     }
   }, [configuringTablesBranch]);
+
+  useEffect(() => {
+    if (tables.length > 0 && !floorPlanImage) {
+      const maxTableY = Math.max(0.01, ...tables.map(t => t.y || 0));
+      const calculatedHeight = Math.max(900, Math.round(maxTableY * 1000) + 120);
+      setCanvasDimensions({ width: 900, height: calculatedHeight });
+    }
+  }, [tables, floorPlanImage]);
+
+  useEffect(() => {
+    if (!configuringTablesBranch) return;
+    let configs: Record<string, any> = {};
+    try {
+      configs = configuringTablesBranch.roomConfigs ? JSON.parse(configuringTablesBranch.roomConfigs) : {};
+    } catch (e) {}
+
+    const roomConfig = configs[selectedRoom] || { image: null, zoom: 1.0, canvasHeight: 900 };
+    setFloorPlanImage(roomConfig.image || null);
+    setZoom(roomConfig.zoom || 1.0);
+    setCanvasDimensions({ width: 900, height: roomConfig.canvasHeight || 900 });
+  }, [selectedRoom, configuringTablesBranch]);
+
+  useEffect(() => {
+    if (tables.length > 0) {
+      const distinctRooms = Array.from(new Set(tables.map(t => t.room || 'General')));
+      if (distinctRooms.length > 0 && !distinctRooms.includes(selectedRoom)) {
+        setSelectedRoom(distinctRooms[0]);
+      }
+    }
+  }, [tables]);
 
   const handleAddTable = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,7 +134,16 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
-      setFloorPlanImage(event.target?.result as string);
+      const dataUrl = event.target?.result as string;
+      setFloorPlanImage(dataUrl);
+
+      const img = new Image();
+      img.onload = () => {
+        const width = 900;
+        const height = Math.round((img.height / img.width) * width);
+        setCanvasDimensions({ width, height });
+      };
+      img.src = dataUrl;
     };
     reader.readAsDataURL(file);
   };
@@ -155,6 +197,31 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
       console.error('Error updating table shape:', err);
     }
   };
+  const handleSaveLayout = async () => {
+    if (!configuringTablesBranch) return;
+    try {
+      let currentConfigs: Record<string, any> = {};
+      try {
+        currentConfigs = configuringTablesBranch.roomConfigs ? JSON.parse(configuringTablesBranch.roomConfigs) : {};
+      } catch (e) {}
+
+      currentConfigs[selectedRoom] = {
+        image: floorPlanImage,
+        zoom: zoom,
+        canvasHeight: canvasDimensions.height
+      };
+
+      const updatedBranch = await api.updateBranch(configuringTablesBranch.id, {
+        roomConfigs: JSON.stringify(currentConfigs)
+      });
+      
+      setConfiguringTablesBranch(updatedBranch);
+      alert('¡Layout, imagen de fondo y escala de zoom guardados exitosamente!');
+    } catch (err: any) {
+      alert('Error al guardar layout: ' + (err.message || err));
+    }
+  };
+
   const fetchBranches = async () => {
     try {
       setLoading(true);
@@ -652,84 +719,158 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
             ) : (
               /* Visual Layout Editor Canvas */
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                <div className="flex justify-between items-center mb-4 bg-charcoal/30 border border-aged-bronze/20 rounded p-3 text-xs">
+                <div className="flex flex-wrap justify-between items-center gap-3 mb-4 bg-charcoal/30 border border-aged-bronze/20 rounded p-3 text-xs">
+                  <div className="flex flex-wrap items-center gap-4">
+                    {/* Area selector */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wide">Área:</span>
+                      <select
+                        value={selectedRoom}
+                        onChange={(e) => setSelectedRoom(e.target.value)}
+                        className="bg-charcoal-surface border border-aged-bronze/45 rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-champagne-gold"
+                      >
+                        {Array.from(new Set(tables.map(t => t.room || 'General'))).concat(tables.length === 0 ? ['General'] : []).map(rm => (
+                          <option key={rm} value={rm}>{rm}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Reference image selector */}
+                    <div className="flex items-center gap-2">
+                      <label className="bg-charcoal-surface border border-aged-bronze text-text-primary px-3 py-1.5 rounded cursor-pointer hover:border-champagne-gold transition-colors text-[10px] uppercase font-bold tracking-wider">
+                        Subir Imagen de Referencia
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      {floorPlanImage ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFloorPlanImage(null);
+                            const maxTableY = Math.max(0.01, ...tables.filter(t => (t.room || 'General') === selectedRoom).map(t => t.y || 0));
+                            const calculatedHeight = Math.max(900, Math.round(maxTableY * 1000) + 120);
+                            setCanvasDimensions({ width: 900, height: calculatedHeight });
+                          }}
+                          className="text-error-red hover:underline text-[10px] uppercase font-bold"
+                        >
+                          Quitar Imagen
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-text-secondary">Sube un plano como fondo</span>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="flex items-center gap-3">
-                    <label className="bg-charcoal-surface border border-aged-bronze text-text-primary px-3 py-1.5 rounded cursor-pointer hover:border-champagne-gold transition-colors text-[10px] uppercase font-bold tracking-wider">
-                      Subir Imagen de Referencia
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                      />
-                    </label>
-                    {floorPlanImage ? (
+                    {/* Zoom Controls */}
+                    <div className="flex items-center gap-2 bg-charcoal-surface border border-aged-bronze/20 rounded px-2.5 py-1">
+                      <span className="text-[10px] text-text-secondary mr-1 uppercase font-bold tracking-wide">Zoom:</span>
                       <button
                         type="button"
-                        onClick={() => setFloorPlanImage(null)}
-                        className="text-error-red hover:underline text-[10px] uppercase font-bold"
+                        onClick={() => setZoom(prev => Math.max(0.25, prev - 0.25))}
+                        className="text-text-secondary hover:text-champagne-gold px-1 font-bold text-xs"
+                        title="Zoom Out"
                       >
-                        Quitar Imagen
+                        -
                       </button>
-                    ) : (
-                      <span className="text-[10px] text-text-secondary">Sube un plano de planta como fondo</span>
-                    )}
+                      <span className="text-[10px] text-text-primary font-mono w-9 text-center">
+                        {Math.round(zoom * 100)}%
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setZoom(prev => Math.min(3.0, prev + 0.25))}
+                        className="text-text-secondary hover:text-champagne-gold px-1 font-bold text-xs"
+                        title="Zoom In"
+                      >
+                        +
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setZoom(1.0)}
+                        className="text-[9px] text-champagne-gold hover:underline ml-1 uppercase font-bold"
+                      >
+                        Reset
+                      </button>
+                    </div>
+
+                    {/* Save Button */}
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      onClick={handleSaveLayout}
+                      className="!py-1.5 shadow-md bg-champagne-gold hover:bg-champagne-gold/90 text-charcoal"
+                    >
+                      Guardar Cambios
+                    </Button>
                   </div>
-                  <span className="text-[10px] text-text-secondary italic">
-                    * Arrastre las mesas para ubicarlas. Doble clic para alternar forma (círculo / cuadrado).
-                  </span>
                 </div>
 
-                <div className="flex-1 overflow-auto border border-aged-bronze/30 rounded-md bg-black/40">
+                <div className="flex-1 overflow-auto border border-aged-bronze/30 rounded-md bg-black/40 relative">
                   <div
                     style={{
-                      width: '900px',
-                      height: `${Math.max(900, Math.max(0.01, ...tables.map(t => t.y || 0)) * 1000) + 120}px`,
+                      width: `${canvasDimensions.width * zoom}px`,
+                      height: `${canvasDimensions.height * zoom}px`,
+                      overflow: 'hidden',
                       position: 'relative',
-                      backgroundImage: 'linear-gradient(to right, rgba(163, 137, 89, 0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(163, 137, 89, 0.04) 1px, transparent 1px)',
-                      backgroundSize: '40px 40px',
                     }}
-                    className="overflow-hidden"
                   >
-                    {floorPlanImage && (
-                      <img
-                        src={floorPlanImage}
-                        alt="Floor plan reference"
-                        className="absolute inset-0 w-full h-full object-cover opacity-30 select-none pointer-events-none"
-                      />
-                    )}
+                    <div
+                      style={{
+                        width: `${canvasDimensions.width}px`,
+                        height: `${canvasDimensions.height}px`,
+                        transform: `scale(${zoom})`,
+                        transformOrigin: 'top left',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        backgroundImage: 'linear-gradient(to right, rgba(163, 137, 89, 0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(163, 137, 89, 0.04) 1px, transparent 1px)',
+                        backgroundSize: '40px 40px',
+                      }}
+                    >
+                      {floorPlanImage && (
+                        <img
+                          src={floorPlanImage}
+                          alt="Floor plan reference"
+                          className="absolute inset-0 w-full h-full object-cover opacity-30 select-none pointer-events-none"
+                        />
+                      )}
 
-                    {tables.map(t => {
-                      const isCircle = t.shape === 'circle';
-                      const canvasHeight = Math.max(900, Math.max(0.01, ...tables.map(tbl => tbl.y || 0)) * 1000) + 120;
-                      return (
-                        <div
-                          key={t.id}
-                          onMouseDown={(e) => handleTableMouseDown(e, t)}
-                          onDoubleClick={() => handleToggleShape(t)}
-                          style={{
-                            position: 'absolute',
-                            left: `${(t.x || 0) * (900 - 60)}px`,
-                            top: `${(t.y || 0) * (canvasHeight - 60)}px`,
-                            width: '60px',
-                            height: '60px',
-                          }}
-                          className={`flex flex-col items-center justify-center cursor-grab active:cursor-grabbing select-none text-[9px] font-bold border transition-colors shadow-lg z-10 ${
-                            isCircle ? 'rounded-full' : 'rounded-md'
-                          } ${
-                            t.state === 'occupied'
-                              ? 'bg-success-green/20 border-success-green text-success-green'
-                              : t.state === 'billing'
-                              ? 'bg-champagne-gold/20 border-champagne-gold text-champagne-gold'
-                              : 'bg-charcoal-surface border-aged-bronze/40 text-text-primary hover:border-champagne-gold'
-                          }`}
-                          title={`${t.label} (Área: ${t.room})`}
-                        >
-                          <span className="truncate max-w-[50px]">{t.label}</span>
-                          <span className="text-[8px] opacity-75 mt-0.5">Cap: {t.capacity}</span>
-                        </div>
-                      );
-                    })}
+                      {tables.filter(t => (t.room || 'General') === selectedRoom).map(t => {
+                        const isCircle = t.shape === 'circle';
+                        return (
+                          <div
+                            key={t.id}
+                            onMouseDown={(e) => handleTableMouseDown(e, t)}
+                            onDoubleClick={() => handleToggleShape(t)}
+                            style={{
+                              position: 'absolute',
+                              left: `${(t.x || 0) * (canvasDimensions.width - 60)}px`,
+                              top: `${(t.y || 0) * (canvasDimensions.height - 60)}px`,
+                              width: '60px',
+                              height: '60px',
+                            }}
+                            className={`flex flex-col items-center justify-center cursor-grab active:cursor-grabbing select-none text-[9px] font-bold border transition-colors shadow-lg z-10 ${
+                              isCircle ? 'rounded-full' : 'rounded-md'
+                            } ${
+                              t.state === 'occupied'
+                                ? 'bg-success-green/20 border-success-green text-success-green'
+                                : t.state === 'billing'
+                                ? 'bg-champagne-gold/20 border-champagne-gold text-champagne-gold'
+                                : 'bg-charcoal-surface border-aged-bronze/40 text-text-primary hover:border-champagne-gold'
+                            }`}
+                            title={`${t.label} (Área: ${t.room})`}
+                          >
+                            <span className="truncate max-w-[50px]">{t.label}</span>
+                            <span className="text-[8px] opacity-75 mt-0.5">Cap: {t.capacity}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../common/colors.dart';
 import '../common/app_state.dart';
 import '../widgets/table_node.dart';
@@ -616,10 +617,15 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
 
   Widget _buildFloorMap(List<TableModel> tables) {
     final double maxTableY = tables.isEmpty
+    final config = widget.state.roomConfigs[selectedZone] ?? {};
+    final String? base64Image = config['image'] as String?;
+    final double zoom = (config['zoom'] ?? 1.0).toDouble();
+
+    final double maxTableY = tables.isEmpty
         ? 1.0
         : tables.map((t) => t.y).reduce((a, b) => a > b ? a : b);
     
-    final double canvasHeight = (maxTableY * 1000.0).clamp(900.0, 3000.0) + 120.0;
+    final double canvasHeight = (config['canvasHeight'] ?? ((maxTableY * 1000.0).clamp(900.0, 3000.0) + 120.0)).toDouble();
     const double canvasWidth = 900.0;
 
     return Column(
@@ -654,56 +660,85 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Container(
-                    width: canvasWidth,
-                    height: canvasHeight,
+                    width: canvasWidth * zoom,
+                    height: canvasHeight * zoom,
                     child: Stack(
                       children: [
-                        // Grid background lines for premium design
                         Positioned.fill(
-                          child: GridPaper(
-                            color: EmpireColors.agedBronzeDark.withOpacity(0.08),
-                            divisions: 2,
-                            subdivisions: 1,
-                            interval: 100,
-                          ),
-                        ),
-
-                        // Render tables
-                        ...tables.map((table) {
-                          return Positioned(
-                            left: table.x * (canvasWidth - 100),
-                            top: table.y * (canvasHeight - 120),
-                            child: TableNode(
-                              table: table,
-                              onTap: () {
-                                if (table.state == TableState.cleaning) {
-                                  // If cleaning, waiter can mark as free
-                                  widget.state.finishCleaning(table.id);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      backgroundColor: EmpireColors.successGreen,
-                                      content: Text(
-                                        '¡${table.label} disponible para nuevos clientes!',
+                          child: Transform.scale(
+                            scale: zoom,
+                            alignment: Alignment.topLeft,
+                            child: Container(
+                              width: canvasWidth,
+                              height: canvasHeight,
+                              child: Stack(
+                                children: [
+                                  // Background reference floor plan image if set
+                                  if (base64Image != null && base64Image.isNotEmpty)
+                                    Positioned.fill(
+                                      child: Opacity(
+                                        opacity: 0.35,
+                                        child: Image.memory(
+                                          base64Decode(base64Image.split(',').last),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Container();
+                                          },
+                                        ),
                                       ),
                                     ),
-                                  );
-                                } else {
-                                  setState(() {
-                                    activeOrderingTable = table;
-                                    currentCart = List.from(table.items);
-                                    isCartOpen = false;
-                                    activeGenders = List.from(
-                                      table.guestGenders.isEmpty
-                                          ? ['M']
-                                          : table.guestGenders,
+
+                                  // Grid background lines for premium design
+                                  Positioned.fill(
+                                    child: GridPaper(
+                                      color: EmpireColors.agedBronzeDark.withOpacity(0.08),
+                                      divisions: 2,
+                                      subdivisions: 1,
+                                      interval: 100,
+                                    ),
+                                  ),
+
+                                  // Render tables
+                                  ...tables.map((table) {
+                                    return Positioned(
+                                      left: table.x * (canvasWidth - 100),
+                                      top: table.y * (canvasHeight - 120),
+                                      child: TableNode(
+                                        table: table,
+                                        onTap: () {
+                                          if (table.state == TableState.cleaning) {
+                                            // If cleaning, waiter can mark as free
+                                            widget.state.finishCleaning(table.id);
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                backgroundColor: EmpireColors.successGreen,
+                                                content: Text(
+                                                  '¡${table.label} disponible para nuevos clientes!',
+                                                ),
+                                              ),
+                                            );
+                                          } else {
+                                            setState(() {
+                                              activeOrderingTable = table;
+                                              currentCart = List.from(table.items);
+                                              isCartOpen = false;
+                                              activeGenders = List.from(
+                                                table.guestGenders.isEmpty
+                                                    ? ['M']
+                                                    : table.guestGenders,
+                                              );
+                                              selectedGuestIndex = 0;
+                                            });
+                                          }
+                                        },
+                                      ),
                                     );
-                                    selectedGuestIndex = 0;
-                                  });
-                                }
-                              },
+                                  }),
+                                ],
+                              ),
                             ),
-                          );
-                        }),
+                          ),
+                        ),
                       ],
                     ),
                   ),

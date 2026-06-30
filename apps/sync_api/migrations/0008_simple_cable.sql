@@ -1,0 +1,1 @@
+ALTER TABLE "branches" ADD COLUMN "room_configs" text;

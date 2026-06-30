@@ -21,6 +21,7 @@ export const branches = pgTable('branches', {
   name: varchar('name', { length: 100 }).notNull(),
   address: text('address'),
   phone: varchar('phone', { length: 20 }),
+  roomConfigs: text('room_configs'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

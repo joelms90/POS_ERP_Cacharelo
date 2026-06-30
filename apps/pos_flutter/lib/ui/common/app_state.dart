@@ -192,6 +192,7 @@ class AppState extends ChangeNotifier {
   String? terminalBranchName;
   String? terminalApiUrl;
   bool isTerminalConfigured = false;
+  Map<String, Map<String, dynamic>> roomConfigs = {};
 
   // Bluetooth printer connection state
   String? connectedPrinterMac;
@@ -626,6 +627,24 @@ class AppState extends ChangeNotifier {
     try {
       final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
       final String brId = terminalBranchId!;
+
+      // Fetch branch configs dynamically (room configs, zoom, images)
+      try {
+        final branchResponse = await http.get(
+          Uri.parse('$baseUrl/branches/$brId'),
+        ).timeout(const Duration(seconds: 10));
+
+        if (branchResponse.statusCode == 200) {
+          final Map<String, dynamic> branchData = jsonDecode(branchResponse.body);
+          final String? roomConfigsStr = branchData['roomConfigs'];
+          if (roomConfigsStr != null) {
+            final Map<String, dynamic> parsed = jsonDecode(roomConfigsStr);
+            roomConfigs = parsed.map((key, value) => MapEntry(key, Map<String, dynamic>.from(value)));
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching branch roomConfigs: $e');
+      }
       
       final response = await http.get(
         Uri.parse('$baseUrl/branches/$brId/tables'),
@@ -673,14 +692,21 @@ class AppState extends ChangeNotifier {
           double y = 0.25;
           TableShape shape = TableShape.square;
 
-          // Try matching by label
-          if (layoutCoords.containsKey(normLabel)) {
+          // 1. Check if database coordinates are available
+          if (item['x'] != null && item['y'] != null) {
+            x = (item['x'] as num).toDouble();
+            y = (item['y'] as num).toDouble();
+            shape = item['shape'] == 'circle' ? TableShape.circle : TableShape.square;
+          }
+          // 2. Fallback to asset template coordinates
+          else if (layoutCoords.containsKey(normLabel)) {
             final coords = layoutCoords[normLabel]!;
             x = coords['x'];
             y = coords['y'];
             shape = coords['shape'] == 'circle' ? TableShape.circle : TableShape.square;
-          } else {
-            // Generate grid placement starting below pre-configured ones to avoid overlap
+          }
+          // 3. Dynamic grid mapping fallback
+          else {
             double startY = 0.25;
             switch (zone) {
               case 'Salón Principal':

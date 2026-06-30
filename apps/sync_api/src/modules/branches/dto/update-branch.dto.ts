@@ -14,4 +14,8 @@ export class UpdateBranchDto {
   @IsOptional()
   @Length(5, 20)
   phone?: string;
+
+  @IsString()
+  @IsOptional()
+  roomConfigs?: string;
 }

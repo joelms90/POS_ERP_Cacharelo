@@ -23,6 +23,7 @@ export interface Branch {
   name: string;
   address?: string;
   phone?: string;
+  roomConfigs?: string;
   createdAt?: string;
   version?: number;
 }
