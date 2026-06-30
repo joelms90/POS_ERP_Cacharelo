@@ -30,6 +30,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
 
   bool isPrinterQueueOpen = false;
   bool isCartOpen = false;
+  bool isInfoSidebarOpen = false;
 
   List<String> activeGenders = ['M'];
   int selectedGuestIndex = 0;
@@ -124,7 +125,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                         children: [
                           // Left side: Floor map OR Menu selection OR Full-screen Cart
                           Expanded(
-                            flex: 3,
+                            flex: (activeOrderingTable == null && isInfoSidebarOpen) ? 3 : 4,
                             child: activeOrderingTable == null
                                 ? _buildFloorMap(tablesInZone)
                                 : (isCartOpen
@@ -206,8 +207,8 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                       : _buildMenuSection(categories)),
                           ),
 
-                          // Right side: Info sidebar (only when no table is selected and cart is closed)
-                          if (activeOrderingTable == null)
+                          // Right side: Info sidebar (only when no table is selected and toggled open)
+                          if (activeOrderingTable == null && isInfoSidebarOpen)
                             Expanded(flex: 1, child: _buildInfoSidebar()),
                         ],
                       ),
@@ -377,6 +378,23 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                         });
                       },
               ),
+              if (activeOrderingTable == null) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: Icon(
+                    Icons.help_outline,
+                    color: isInfoSidebarOpen
+                        ? EmpireColors.champagneGold
+                        : EmpireColors.textSecondary,
+                  ),
+                  tooltip: 'Estado de Sala / Ayuda',
+                  onPressed: () {
+                    setState(() {
+                      isInfoSidebarOpen = !isInfoSidebarOpen;
+                    });
+                  },
+                ),
+              ],
               if (activeOrderingTable != null) ...[
                 const SizedBox(width: 8),
                 IconButton(
