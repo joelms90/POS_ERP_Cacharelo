@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'common/colors.dart';
 import 'common/app_state.dart';
 import 'waiter/waiter_ordering_screen.dart';
@@ -131,15 +132,36 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: _inputDecoration('JSON de Activación / Payload de QR'),
                 ),
                 const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: _processJsonActivation,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: EmpireColors.champagneGold,
-                    foregroundColor: EmpireColors.obsidian,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: const Text('VINCULAR CON QR JSON', style: TextStyle(fontWeight: FontWeight.bold)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _startCameraScan,
+                        icon: const Icon(Icons.camera_alt),
+                        label: const Text('ESCANEAR QR', style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: EmpireColors.champagneGold,
+                          foregroundColor: EmpireColors.obsidian,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _processJsonActivation,
+                        child: const Text('VINCULAR CON JSON', style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: EmpireColors.charcoalSurface,
+                          foregroundColor: EmpireColors.textGold,
+                          side: const BorderSide(color: EmpireColors.agedBronze),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ] else ...[
                 TextField(
@@ -272,6 +294,19 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _activationError = "";
     });
+  }
+
+  void _startCameraScan() async {
+    final String? scannedValue = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (context) => const QrScannerDialog(),
+      ),
+    );
+
+    if (scannedValue != null && scannedValue.isNotEmpty) {
+      _jsonController.text = scannedValue;
+      _processJsonActivation();
+    }
   }
 
   void _handleKeyPress(String value) {
@@ -799,6 +834,47 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class QrScannerDialog extends StatefulWidget {
+  const QrScannerDialog({super.key});
+
+  @override
+  State<QrScannerDialog> createState() => _QrScannerDialogState();
+}
+
+class _QrScannerDialogState extends State<QrScannerDialog> {
+  final MobileScannerController controller = MobileScannerController();
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Escanee el Código QR', style: TextStyle(color: EmpireColors.textGold, fontSize: 16)),
+        backgroundColor: EmpireColors.obsidian,
+        iconTheme: const IconThemeData(color: EmpireColors.textGold),
+      ),
+      backgroundColor: Colors.black,
+      body: MobileScanner(
+        controller: controller,
+        onDetect: (capture) {
+          final List<Barcode> barcodes = capture.barcodes;
+          for (final barcode in barcodes) {
+            if (barcode.rawValue != null) {
+              Navigator.of(context).pop(barcode.rawValue);
+              break;
+            }
+          }
+        },
       ),
     );
   }

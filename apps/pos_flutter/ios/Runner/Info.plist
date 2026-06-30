@@ -70,5 +70,7 @@
 	<string>Bluetooth access to connect 58mm or 80mm thermal printers</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>Bluetooth access to interact with thermal printers</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera access is required to scan terminal activation QR codes.</string>
 </dict>
 </plist>
