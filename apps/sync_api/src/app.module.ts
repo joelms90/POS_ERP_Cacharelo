@@ -14,6 +14,7 @@ import { InquiriesModule } from './modules/inquiries/inquiries.module';
 import { WarehousesModule } from './modules/warehouses/warehouses.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { BranchesModule } from './modules/branches/branches.module';
+import { RecipesModule } from './modules/recipes/recipes.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { BranchesModule } from './modules/branches/branches.module';
     WarehousesModule,
     InventoryModule,
     BranchesModule,
+    RecipesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

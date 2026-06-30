@@ -459,5 +459,66 @@ export const api = {
       }),
     });
   },
+
+  /**
+   * Get recipe components for an assembled product
+   */
+  async getRecipe(productId: string): Promise<RecipeItem[]> {
+    return apiRequest<RecipeItem[]>(`/recipes?productId=${productId}`);
+  },
+
+  /**
+   * Configure/set recipe components for a product
+   */
+  async setRecipe(payload: {
+    parentProductId: string;
+    items: Array<{ ingredientProductId: string; quantityNeeded: number }>;
+  }): Promise<{ success: boolean }> {
+    return apiRequest<{ success: boolean }>('/recipes', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
+   * Get production runs history for a business
+   */
+  async getProductionRuns(businessId: string): Promise<ProductionRun[]> {
+    return apiRequest<ProductionRun[]>(`/inventory/production?businessId=${businessId}`);
+  },
+
+  /**
+   * Execute a production run assembly
+   */
+  async assembleProduct(payload: {
+    warehouseId: string;
+    productId: string;
+    quantityProduced: number;
+    notes?: string;
+  }): Promise<{ success: boolean; productionRunId: string }> {
+    return apiRequest<{ success: boolean; productionRunId: string }>('/inventory/production', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
 };
+
+export interface RecipeItem {
+  id?: string;
+  parentProductId: string;
+  ingredientProductId: string;
+  quantityNeeded: string | number;
+  ingredientName?: string;
+  ingredientSku?: string;
+}
+
+export interface ProductionRun {
+  id: string;
+  warehouseName: string;
+  productName: string;
+  quantityProduced: string;
+  assembledAt: string;
+  notes?: string;
+}
+
 

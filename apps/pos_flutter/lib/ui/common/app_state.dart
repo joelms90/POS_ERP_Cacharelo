@@ -199,6 +199,7 @@ class AppState extends ChangeNotifier {
     initializationFuture = loadTablesFromJson();
     _seedDefaultUsersOffline();
     _autoConnectPrinter();
+    fetchMenuDynamic();
   }
 
   Future<void> _seedDefaultUsersOffline() async {
@@ -446,8 +447,64 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<void> fetchMenuDynamic() async {
+    try {
+      final String host = Platform.isAndroid ? '10.0.2.2' : 'localhost';
+      String baseUrl = 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+      
+      http.Response catResponse;
+      http.Response prodResponse;
+      const String bId = 'd3b07384-d113-4a0e-a555-e5b12824bf01';
+      
+      try {
+        catResponse = await http.get(Uri.parse('$baseUrl/categories?businessId=$bId'))
+            .timeout(const Duration(seconds: 3));
+        prodResponse = await http.get(Uri.parse('$baseUrl/products?businessId=$bId'))
+            .timeout(const Duration(seconds: 3));
+      } catch (e) {
+        debugPrint('Hosted API failed, falling back to local: $e');
+        baseUrl = 'http://$host:3000/api';
+        catResponse = await http.get(Uri.parse('$baseUrl/categories?businessId=$bId'));
+        prodResponse = await http.get(Uri.parse('$baseUrl/products?businessId=$bId'));
+      }
+
+      if (catResponse.statusCode == 200 && prodResponse.statusCode == 200) {
+        final List<dynamic> catData = jsonDecode(catResponse.body);
+        final List<dynamic> prodData = jsonDecode(prodResponse.body);
+
+        final Map<String, String> catMap = {};
+        for (var cat in catData) {
+          catMap[cat['id']] = cat['name'];
+        }
+
+        final List<MenuItem> loadedMenu = [];
+        for (var prod in prodData) {
+          if (prod['isSellable'] != false && prod['isIngredient'] != true) {
+            loadedMenu.add(MenuItem(
+              id: prod['id'],
+              name: prod['name'],
+              price: double.tryParse(prod['price']?.toString() ?? '0.0') ?? 0.0,
+              category: catMap[prod['categoryId']] ?? 'Otros',
+            ));
+          }
+        }
+
+        if (loadedMenu.isNotEmpty) {
+          menu.clear();
+          menu.addAll(loadedMenu);
+          isOnline = true;
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching menu dynamically: $e');
+      isOnline = false;
+      notifyListeners();
+    }
+  }
+
   // Predefined Menu Items
-  static const List<MenuItem> menu = [
+  static final List<MenuItem> menu = [
     MenuItem(
       id: '1',
       name: 'Lasagna Bolognesa',
@@ -525,6 +582,7 @@ class AppState extends ChangeNotifier {
             role: userData['role'],
           );
 
+          fetchMenuDynamic();
           notifyListeners();
           return true;
         }

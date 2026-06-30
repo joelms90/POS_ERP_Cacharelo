@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, desc } from 'drizzle-orm';
 
 @Injectable()
 export class InventoryRepository {
@@ -61,5 +61,22 @@ export class InventoryRepository {
       .leftJoin(schema.warehouses, eq(schema.inventoryReceipts.warehouseId, schema.warehouses.id))
       .leftJoin(schema.branches, eq(schema.inventoryReceipts.branchId, schema.branches.id))
       .where(eq(schema.inventoryReceipts.businessId, businessId));
+  }
+
+  async getProductionRuns(businessId: string) {
+    return this.db
+      .select({
+        id: schema.productionRuns.id,
+        warehouseName: schema.warehouses.name,
+        productName: schema.products.name,
+        quantityProduced: schema.productionRuns.quantityProduced,
+        assembledAt: schema.productionRuns.assembledAt,
+        notes: schema.productionRuns.notes,
+      })
+      .from(schema.productionRuns)
+      .innerJoin(schema.warehouses, eq(schema.productionRuns.warehouseId, schema.warehouses.id))
+      .innerJoin(schema.products, eq(schema.productionRuns.productId, schema.products.id))
+      .where(eq(schema.warehouses.businessId, businessId))
+      .orderBy(desc(schema.productionRuns.assembledAt));
   }
 }

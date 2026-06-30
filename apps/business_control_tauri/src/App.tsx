@@ -10,10 +10,11 @@ import { WarehousesPage } from './pages/WarehousesPage';
 import { ReceiptsPage } from './pages/ReceiptsPage';
 import { BranchesPage } from './pages/BranchesPage';
 import { CategoriesPage } from './pages/CategoriesPage';
+import { AssemblyPage } from './pages/AssemblyPage';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories'>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly'>('personal');
   const [activeBusinessId, setActiveBusinessId] = useState<string>('d3b07384-d113-4a0e-a555-e5b12824bf01');
 
   // Full Screen Loading State
@@ -52,9 +53,9 @@ function App() {
       {activeTab === 'receipts' && <ReceiptsPage businessId={activeBusinessId} />}
       {activeTab === 'branches' && <BranchesPage businessId={activeBusinessId} />}
       {activeTab === 'categories' && <CategoriesPage businessId={activeBusinessId} />}
+      {activeTab === 'assembly' && <AssemblyPage businessId={activeBusinessId} />}
     </AdminLayout>
   );
 }
-
 
 export default App;
