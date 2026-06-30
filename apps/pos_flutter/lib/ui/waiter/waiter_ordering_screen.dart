@@ -91,6 +91,17 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
         child: ListenableBuilder(
           listenable: widget.state,
           builder: (context, _) {
+            final zones = widget.state.tables.map((t) => t.zone).toSet().toList();
+            if (zones.isNotEmpty && !zones.contains(selectedZone)) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  setState(() {
+                    selectedZone = zones.first;
+                  });
+                }
+              });
+            }
+
             final tablesInZone = widget.state.tables
                 .where((t) => t.zone == selectedZone)
                 .toList();
@@ -609,6 +620,9 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
         // Zone Tabs Bar
         ZoneTabs(
           selectedZone: selectedZone,
+          zones: widget.state.tables.isNotEmpty
+              ? widget.state.tables.map((t) => t.zone).toSet().toList()
+              : const ['Salón Principal', 'Terraza', 'Bar'],
           onZoneChanged: (zone) {
             setState(() => selectedZone = zone);
           },

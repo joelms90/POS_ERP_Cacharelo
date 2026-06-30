@@ -205,10 +205,12 @@ class AppState extends ChangeNotifier {
     : _secureStorageService = secureStorageService ?? SecureStorageService() {
     _initMockData();
     initializationFuture = () async {
-      await loadTablesFromJson();
       await loadTerminalConfig();
       if (isTerminalConfigured) {
         await fetchMenuDynamic();
+        await fetchTablesDynamic();
+      } else {
+        await loadTablesFromJson();
       }
     }();
     _seedDefaultUsersOffline();
@@ -352,9 +354,9 @@ class AppState extends ChangeNotifier {
 
     if (currentUserRole == UserRole.waiter) {
       try {
-        await loadTablesFromJson();
+        await fetchTablesDynamic();
       } catch (e) {
-        debugPrint('syncAllData: loadTablesFromJson failed with error: $e');
+        debugPrint('syncAllData: fetchTablesDynamic failed with error: $e');
         success = false;
       }
     } else if (currentUserRole == UserRole.cashier) {
@@ -612,6 +614,144 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading floor plan from JSON: $e');
+    }
+  }
+
+  Future<void> fetchTablesDynamic() async {
+    if (!isTerminalConfigured || terminalBranchId == null) {
+      await loadTablesFromJson();
+      return;
+    }
+
+    try {
+      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+      final String brId = terminalBranchId!;
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/branches/$brId/tables'),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> dbData = jsonDecode(response.body);
+        
+        // 1. Load layout coordinates from assets for placement reference
+        Map<String, Map<String, dynamic>> layoutCoords = {};
+        try {
+          final jsonString = await rootBundle.loadString('assets/floor_plan_mesa.json');
+          final List<dynamic> refList = json.decode(jsonString);
+          for (var ref in refList) {
+            final String normLabel = (ref['label'] as String).trim().toLowerCase();
+            layoutCoords[normLabel] = {
+              'x': (ref['x'] as num).toDouble(),
+              'y': (ref['y'] as num).toDouble(),
+              'shape': ref['shape'] as String,
+            };
+          }
+        } catch (e) {
+          debugPrint('Error loading layout references: $e');
+        }
+
+        // Keep current orders state so we don't clear active carts/orders on table sync
+        final Map<int, TableModel> currentTablesMap = {
+          for (var t in tables) t.id: t
+        };
+
+        final List<TableModel> loadedTables = [];
+        final Map<String, int> zoneCounters = {};
+
+        for (var item in dbData) {
+          final String dbIdStr = item['id'] ?? '';
+          final String label = item['label'] ?? '';
+          final String zone = item['room'] ?? 'General';
+          final String stateStr = item['state'] ?? 'free';
+          final int capacity = item['capacity'] ?? 4;
+
+          final int localId = dbIdStr.hashCode;
+          final String normLabel = label.trim().toLowerCase();
+          
+          double x = 0.15;
+          double y = 0.25;
+          TableShape shape = TableShape.square;
+
+          // Try matching by label
+          if (layoutCoords.containsKey(normLabel)) {
+            final coords = layoutCoords[normLabel]!;
+            x = coords['x'];
+            y = coords['y'];
+            shape = coords['shape'] == 'circle' ? TableShape.circle : TableShape.square;
+          } else {
+            // Generate grid placement
+            final int count = zoneCounters[zone] ?? 0;
+            zoneCounters[zone] = count + 1;
+            
+            final int col = count % 3;
+            final int row = count ~/ 3;
+            x = 0.15 + col * 0.30;
+            y = 0.25 + row * 0.35;
+            
+            if (normLabel.contains('barra') || normLabel.contains('bar') || normLabel.contains('mostrador')) {
+              shape = TableShape.circle;
+            }
+          }
+
+          // Map TableState
+          TableState state = TableState.free;
+          switch (stateStr) {
+            case 'occupied':
+              state = TableState.occupied;
+              break;
+            case 'billing':
+              state = TableState.billing;
+              break;
+            case 'cleaning':
+              state = TableState.cleaning;
+              break;
+            case 'free':
+            default:
+              state = TableState.free;
+              break;
+          }
+
+          final existing = currentTablesMap[localId];
+          if (existing != null) {
+            loadedTables.add(TableModel(
+              id: localId,
+              label: label,
+              shape: shape,
+              zone: zone,
+              x: x,
+              y: y,
+              state: existing.state,
+              items: existing.items,
+              guests: existing.guests,
+              discountPercentage: existing.discountPercentage,
+              guestGenders: existing.guestGenders,
+            ));
+          } else {
+            loadedTables.add(TableModel(
+              id: localId,
+              label: label,
+              shape: shape,
+              zone: zone,
+              x: x,
+              y: y,
+              state: state,
+              items: const [],
+              guests: 0,
+              guestGenders: const ['M'],
+            ));
+          }
+        }
+
+        tables = loadedTables;
+        notifyListeners();
+      } else {
+        debugPrint('fetchTablesDynamic status error: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error fetching dynamic tables: $e');
+      // Fail-safe: fall back to local JSON
+      await loadTablesFromJson();
     }
   }
 
