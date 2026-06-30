@@ -645,126 +645,108 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
     final double canvasHeight = (config['canvasHeight'] ?? ((maxTableY * 1000.0).clamp(900.0, 3000.0) + 120.0)).toDouble();
     const double canvasWidth = 900.0;
 
-    return Column(
-      children: [
-        // Zone Tabs Bar
-        ZoneTabs(
-          selectedZone: selectedZone,
-          zones: widget.state.tables.isNotEmpty
-              ? widget.state.tables.map((t) => t.zone).toSet().toList()
-              : const ['Salón Principal', 'Terraza', 'Bar'],
-          onZoneChanged: (zone) {
-            setState(() => selectedZone = zone);
-          },
+    return Container(
+      margin: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: EmpireColors.onyxSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: EmpireColors.agedBronzeDark,
+          width: 1.5,
         ),
-
-        // Floor map coordinates layout (Option B)
-        Expanded(
-          child: Container(
-            margin: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: EmpireColors.onyxSurface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: EmpireColors.agedBronzeDark,
-                width: 1.5,
-              ),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.vertical,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Container(
-                    width: canvasWidth * zoom,
-                    height: canvasHeight * zoom,
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: Transform.scale(
-                            scale: zoom,
-                            alignment: Alignment.topLeft,
-                            child: Container(
-                              width: canvasWidth,
-                              height: canvasHeight,
-                              child: Stack(
-                                children: [
-                                  // Background reference floor plan image if set
-                                  if (base64Image != null && base64Image.isNotEmpty)
-                                    Positioned.fill(
-                                      child: Opacity(
-                                        opacity: 0.35,
-                                        child: Image.memory(
-                                          base64Decode(base64Image.split(',').last),
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return Container();
-                                          },
-                                        ),
-                                      ),
-                                    ),
-
-                                  // Grid background lines for premium design
-                                  Positioned.fill(
-                                    child: GridPaper(
-                                      color: EmpireColors.agedBronzeDark.withOpacity(0.08),
-                                      divisions: 2,
-                                      subdivisions: 1,
-                                      interval: 100,
-                                    ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.vertical,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Container(
+              width: canvasWidth * zoom,
+              height: canvasHeight * zoom,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Transform.scale(
+                      scale: zoom,
+                      alignment: Alignment.topLeft,
+                      child: Container(
+                        width: canvasWidth,
+                        height: canvasHeight,
+                        child: Stack(
+                          children: [
+                            // Background reference floor plan image if set
+                            if (base64Image != null && base64Image.isNotEmpty)
+                              Positioned.fill(
+                                child: Opacity(
+                                  opacity: 0.35,
+                                  child: Image.memory(
+                                    base64Decode(base64Image.split(',').last),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container();
+                                    },
                                   ),
+                                ),
+                              ),
 
-                                  // Render tables
-                                  ...tables.map((table) {
-                                    return Positioned(
-                                      left: table.x * (canvasWidth - 100),
-                                      top: table.y * (canvasHeight - 120),
-                                      child: TableNode(
-                                        table: table,
-                                        onTap: () {
-                                          if (table.state == TableState.cleaning) {
-                                            // If cleaning, waiter can mark as free
-                                            widget.state.finishCleaning(table.id);
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                backgroundColor: EmpireColors.successGreen,
-                                                content: Text(
-                                                  '¡${table.label} disponible para nuevos clientes!',
-                                                ),
-                                              ),
-                                            );
-                                          } else {
-                                            setState(() {
-                                              activeOrderingTable = table;
-                                              currentCart = List.from(table.items);
-                                              isCartOpen = false;
-                                              activeGenders = List.from(
-                                                table.guestGenders.isEmpty
-                                                    ? ['M']
-                                                    : table.guestGenders,
-                                              );
-                                              selectedGuestIndex = 0;
-                                            });
-                                          }
-                                        },
-                                      ),
-                                    );
-                                  }),
-                                ],
+                            // Grid background lines for premium design
+                            Positioned.fill(
+                              child: GridPaper(
+                                color: EmpireColors.agedBronzeDark.withOpacity(0.08),
+                                divisions: 2,
+                                subdivisions: 1,
+                                interval: 100,
                               ),
                             ),
-                          ),
+
+                            // Render tables
+                            ...tables.map((table) {
+                              return Positioned(
+                                left: table.x * (canvasWidth - 100),
+                                top: table.y * (canvasHeight - 120),
+                                child: TableNode(
+                                  table: table,
+                                  onTap: () {
+                                    if (table.state == TableState.cleaning) {
+                                      // If cleaning, waiter can mark as free
+                                      widget.state.finishCleaning(table.id);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          backgroundColor: EmpireColors.successGreen,
+                                          content: Text(
+                                            '¡${table.label} disponible para nuevos clientes!',
+                                          ),
+                                        ),
+                                      );
+                                    } else {
+                                      setState(() {
+                                        activeOrderingTable = table;
+                                        currentCart = List.from(table.items);
+                                        isCartOpen = false;
+                                        activeGenders = List.from(
+                                          table.guestGenders.isEmpty
+                                              ? ['M']
+                                              : table.guestGenders,
+                                        );
+                                        selectedGuestIndex = 0;
+                                      });
+                                    }
+                                  },
+                                ),
+                              );
+                            }),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 
