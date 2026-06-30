@@ -558,15 +558,26 @@ class AppState extends ChangeNotifier {
   // Auth Operations (Query backend, fallback to offline local cache)
   Future<bool> login(String pin) async {
     try {
-      // Android emulators use 10.0.2.2 to access the host machine's localhost
-      final String host = Platform.isAndroid ? '10.0.2.2' : 'localhost';
-      final response = await http
-          .post(
-            Uri.parse('http://$host:3000/api/auth/login'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'pin': pin}),
-          )
-          .timeout(const Duration(seconds: 2));
+      http.Response response;
+      try {
+        response = await http
+            .post(
+              Uri.parse('https://pos-sync-api-umqpitkpoa-uc.a.run.app/api/auth/login'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'pin': pin}),
+            )
+            .timeout(const Duration(seconds: 3));
+      } catch (e) {
+        debugPrint('Hosted login failed, trying local: $e');
+        final String host = Platform.isAndroid ? '10.0.2.2' : 'localhost';
+        response = await http
+            .post(
+              Uri.parse('http://$host:3000/api/auth/login'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'pin': pin}),
+            )
+            .timeout(const Duration(seconds: 3));
+      }
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
