@@ -11,6 +11,10 @@ export class ProductsRepository {
     private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
+  getDb() {
+    return this.db;
+  }
+
   async findAll(businessId?: string, categoryId?: string) {
     const conditions = [isNull(schema.products.deletedAt)];
     if (businessId) {

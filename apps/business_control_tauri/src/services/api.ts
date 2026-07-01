@@ -625,6 +625,20 @@ export const api = {
     });
   },
 
+  async validateProductImport(businessId: string, rows: any[]): Promise<any[]> {
+    return apiRequest<any[]>('/products/validate-import', {
+      method: 'POST',
+      body: JSON.stringify({ businessId, rows }),
+    });
+  },
+
+  async bulkImportProducts(businessId: string, rows: any[]): Promise<{ success: boolean; successCount: number; errorCount: number }> {
+    return apiRequest<{ success: boolean; successCount: number; errorCount: number }>('/products/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ businessId, rows }),
+    });
+  },
+
   /**
    * Reports
    */

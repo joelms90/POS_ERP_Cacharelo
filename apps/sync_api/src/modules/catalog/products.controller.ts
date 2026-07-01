@@ -34,4 +34,14 @@ export class ProductsController {
   async remove(@Param('id') id: string) {
     return this.productsService.remove(id);
   }
+
+  @Post('validate-import')
+  async validateImport(@Body() body: { businessId: string; rows: any[] }) {
+    return this.productsService.validateImport(body.businessId, body.rows);
+  }
+
+  @Post('bulk')
+  async bulkImport(@Body() body: { businessId: string; rows: any[] }) {
+    return this.productsService.bulkImport(body.businessId, body.rows);
+  }
 }

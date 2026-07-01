@@ -27,19 +27,9 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
   // Edit/Create Product State
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [isSavingProduct, setIsSavingProduct] = useState<boolean>(false);
-  const [warehouses, setWarehouses] = useState<any[]>([]);
-
   // Import Preview Modal states
   const [importPreview, setImportPreview] = useState<any[] | null>(null);
   const [isImporting, setIsImporting] = useState<boolean>(false);
-
-  const cleanNumberString = (val: any): string => {
-    if (val === undefined || val === null) return '0.00';
-    const str = val.toString().trim();
-    const cleaned = str.replace(/[$\s,]/g, '');
-    const parsed = parseFloat(cleaned);
-    return isNaN(parsed) ? '0.00' : parsed.toString();
-  };
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -54,16 +44,14 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true);
     try {
-      const [catsData, prodsData, provsData, whsData] = await Promise.all([
+      const [catsData, prodsData, provsData] = await Promise.all([
         api.getCategories(businessId),
         api.getProducts(businessId),
         api.getProviders(businessId).catch(() => [] as Provider[]),
-        api.getWarehouses(businessId).catch(() => [] as any[]),
       ]);
       setCategories(catsData);
       setProducts(prodsData);
       setProviders(provsData);
-      setWarehouses(whsData);
     } catch (error: any) {
       showToast(error.message || 'Error al sincronizar catálogo de inventario.', 'error');
     } finally {
@@ -259,66 +247,12 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
           return;
         }
 
-        showToast('Validando registros...', 'warning');
+        showToast('Validando registros en el servidor...', 'warning');
 
-        // Validate and build preview
-        const validatedRows = importedRows.map((row, idx) => {
-          const name = row['Nombre del Producto']?.toString().trim() || '';
-          const catName = row['Categoría']?.toString().trim() || '';
-          const cost = cleanNumberString(row['Costo']);
-          const price = cleanNumberString(row['Precio Venta']);
-          const priceWholesale = cleanNumberString(row['Precio Mayoreo']);
-          const minStock = cleanNumberString(row['Inv Mínimo']);
-          const maxStock = cleanNumberString(row['Inv Máximo']);
-          const saleType = (row['Tipo de Venta']?.toString().trim() || 'pieza').toLowerCase() === 'granel' ? 'granel' : 'pieza';
-          const sku = row['SKU']?.toString().trim() || '';
-          const barcode = row['Código Barras']?.toString().trim() || '';
-          const internalCode = row['Código Interno']?.toString().trim() || '';
-          const existence = parseFloat(cleanNumberString(row['Existencia']));
-          const providerName = row['Proveedor']?.toString().trim() || '';
-
-          const errors: string[] = [];
-          const warnings: string[] = [];
-
-          if (!name) errors.push('Falta el nombre del producto.');
-          if (!catName) errors.push('Falta la categoría.');
-
-          // Check if category exists (safeguarded against null values/objects)
-          const catExists = (categories || []).some(c => c && c.name && c.name.toString().toLowerCase() === catName.toLowerCase());
-          if (catName && !catExists) {
-            warnings.push(`Creará nueva categoría: "${catName}"`);
-          }
-
-          // Check if provider exists (safeguarded against null values/objects)
-          if (providerName) {
-            const provExists = (providers || []).some(p => p && p.name && p.name.toString().toLowerCase() === providerName.toLowerCase());
-            if (!provExists) {
-              warnings.push(`Creará nuevo proveedor: "${providerName}"`);
-            }
-          }
-
-          return {
-            rowNumber: idx + 2, // 1-indexed header is row 1
-            name,
-            catName,
-            cost,
-            price,
-            priceWholesale,
-            minStock,
-            maxStock,
-            saleType,
-            sku,
-            barcode,
-            internalCode,
-            existence,
-            providerName,
-            errors,
-            warnings,
-            isValid: errors.length === 0,
-          };
-        });
-
+        // Call backend validation API
+        const validatedRows = await api.validateProductImport(businessId, importedRows);
         setImportPreview(validatedRows);
+        showToast('Validación completada con éxito.', 'success');
       } catch (xlsxErr: any) {
         showToast('Error al leer el archivo Excel: ' + xlsxErr.message, 'error');
       }
@@ -328,7 +262,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
     e.target.value = '';
   };
 
-  // Perform actual import and database submission
+  // Perform actual import and database submission on the backend
   const executeImport = async () => {
     if (!importPreview) return;
     
@@ -339,85 +273,25 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
     }
 
     setIsImporting(true);
-    let successCount = 0;
-    let errorCount = 0;
+    showToast('Subiendo productos al servidor...', 'warning');
 
-    let activeCategories = [...categories];
-    let activeProviders = [...providers];
-    let activeWarehouses = [...warehouses];
+    try {
+      const response = await api.bulkImportProducts(businessId, validRows);
+      
+      setIsImporting(false);
+      setImportPreview(null);
 
-    for (const row of validRows) {
-      try {
-        // 1. Resolve Category
-        let category = activeCategories.find(c => c.name.toLowerCase() === row.catName.toLowerCase());
-        if (!category) {
-          category = await api.addCategory({ name: row.catName, description: 'Creada por importación masiva' }, businessId);
-          activeCategories.push(category);
-          setCategories(prev => [...prev, category!]);
-        }
-
-        // 2. Resolve Provider
-        let providerId: string | undefined = undefined;
-        if (row.providerName) {
-          const provider = activeProviders.find(p => p.name.toLowerCase() === row.providerName.toLowerCase());
-          if (provider) {
-            providerId = provider.id;
-          } else {
-            const newProv = await api.addProvider({ name: row.providerName }, businessId);
-            activeProviders.push(newProv);
-            setProviders(prev => [...prev, newProv]);
-            providerId = newProv.id;
-          }
-        }
-
-        // 3. Register Product
-        const payload = {
-          categoryId: category.id,
-          name: row.name,
-          sku: row.sku || undefined,
-          barcode: row.barcode || undefined,
-          internalCode: row.internalCode || undefined,
-          providerId,
-          cost: parseFloat(row.cost).toFixed(2),
-          price: parseFloat(row.price).toFixed(2),
-          priceWholesale: parseFloat(row.priceWholesale).toFixed(2),
-          minStock: parseFloat(row.minStock).toFixed(3),
-          maxStock: parseFloat(row.maxStock).toFixed(3),
-          saleType: row.saleType,
-          isSellable: true,
-          isIngredient: providerId ? true : false,
-        };
-
-        const created = await api.addProduct(payload, businessId);
-        setProducts(prev => [...prev, created]);
-
-        // Handle initial stock level import
-        if (!isNaN(row.existence) && row.existence > 0) {
-          let targetWhId = activeWarehouses[0]?.id;
-          if (!targetWhId) {
-            const newWh = await api.addWarehouse({ name: 'Bodega Central', code: 'BC' }, businessId);
-            activeWarehouses.push(newWh);
-            setWarehouses(prev => [...prev, newWh]);
-            targetWhId = newWh.id;
-          }
-
-          await api.adjustStock({
-            productId: created.id,
-            warehouseId: targetWhId,
-            quantity: row.existence,
-          });
-        }
-
-        successCount++;
-      } catch (err) {
-        console.error('Error importing row:', row, err);
-        errorCount++;
+      if (response.success) {
+        showToast(`Importación completa: ${response.successCount} agregados con éxito, ${response.errorCount} fallaron.`, 'success');
+        // Refresh catalog data silently to fetch all newly created products, categories, and warehouses
+        fetchData(true);
+      } else {
+        showToast('La importación falló en el servidor.', 'error');
       }
+    } catch (err: any) {
+      setIsImporting(false);
+      showToast('Error durante la importación masiva: ' + (err.message || err), 'error');
     }
-
-    setIsImporting(false);
-    setImportPreview(null);
-    showToast(`Importación completa: ${successCount} agregados con éxito, ${errorCount} fallaron.`, successCount > 0 ? 'success' : 'error');
   };
 
   // Filter products based on search and category
