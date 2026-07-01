@@ -12,6 +12,7 @@ import { BranchesPage } from './pages/BranchesPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { AssemblyPage } from './pages/AssemblyPage';
 import { TransfersPage } from './pages/TransfersPage';
+import { api } from './services/api';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -21,11 +22,16 @@ function App() {
 
   useEffect(() => {
     const handleError = (e: ErrorEvent) => {
-      setGlobalError(`${e.message} (en ${e.filename}:${e.lineno}:${e.colno})`);
+      const msg = `${e.message} (en ${e.filename}:${e.lineno}:${e.colno})`;
+      setGlobalError(msg);
+      api.logError(msg, e.error?.stack || 'no-stack');
     };
     const handleRejection = (e: PromiseRejectionEvent) => {
       const reason = e.reason instanceof Error ? e.reason.message : String(e.reason);
-      setGlobalError(`Promesa rechazada: ${reason}`);
+      const stack = e.reason instanceof Error ? e.reason.stack : undefined;
+      const msg = `Promesa rechazada: ${reason}`;
+      setGlobalError(msg);
+      api.logError(msg, stack);
     };
     window.addEventListener('error', handleError);
     window.addEventListener('unhandledrejection', handleRejection);

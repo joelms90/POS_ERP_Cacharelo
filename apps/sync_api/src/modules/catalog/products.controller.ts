@@ -44,4 +44,10 @@ export class ProductsController {
   async bulkImport(@Body() body: { businessId: string; rows: any[] }) {
     return this.productsService.bulkImport(body.businessId, body.rows);
   }
+
+  @Post('log-error')
+  async logError(@Body() body: { message: string; stack?: string }) {
+    console.error('[BROWSER CLIENT ERROR]:', body.message, body.stack);
+    return { success: true };
+  }
 }

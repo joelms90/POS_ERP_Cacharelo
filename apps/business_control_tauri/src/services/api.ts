@@ -639,6 +639,18 @@ export const api = {
     });
   },
 
+  async logError(message: string, stack?: string): Promise<void> {
+    try {
+      await fetch(`${getApiBaseUrl()}/products/log-error`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, stack }),
+      });
+    } catch {
+      // ignore
+    }
+  },
+
   /**
    * Reports
    */
