@@ -29,6 +29,10 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
   const [isSavingProduct, setIsSavingProduct] = useState<boolean>(false);
   const [warehouses, setWarehouses] = useState<any[]>([]);
 
+  // Import Preview Modal states
+  const [importPreview, setImportPreview] = useState<any[] | null>(null);
+  const [isImporting, setIsImporting] = useState<boolean>(false);
+
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { id, message, type }]);
@@ -233,97 +237,64 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
           return;
         }
 
-        showToast(`Procesando importación de ${importedRows.length} productos...`, 'warning');
+        // Validate and build preview
+        const validatedRows = importedRows.map((row, idx) => {
+          const name = row['Nombre del Producto']?.toString().trim() || '';
+          const catName = row['Categoría']?.toString().trim() || '';
+          const cost = row['Costo']?.toString().trim() || '0.00';
+          const price = row['Precio Venta']?.toString().trim() || '0.00';
+          const priceWholesale = row['Precio Mayoreo']?.toString().trim() || '0.00';
+          const minStock = row['Inv Mínimo']?.toString().trim() || '0.000';
+          const maxStock = row['Inv Máximo']?.toString().trim() || '0.000';
+          const saleType = (row['Tipo de Venta']?.toString().trim() || 'pieza').toLowerCase() === 'granel' ? 'granel' : 'pieza';
+          const sku = row['SKU']?.toString().trim() || '';
+          const barcode = row['Código Barras']?.toString().trim() || '';
+          const internalCode = row['Código Interno']?.toString().trim() || '';
+          const existence = parseFloat(row['Existencia']?.toString().trim() || '0');
+          const providerName = row['Proveedor']?.toString().trim() || '';
 
-        let successCount = 0;
-        let errorCount = 0;
+          const errors: string[] = [];
+          const warnings: string[] = [];
 
-        for (const row of importedRows) {
-          try {
-            const name = row['Nombre del Producto']?.toString().trim();
-            const catName = row['Categoría']?.toString().trim();
-            const cost = row['Costo']?.toString().trim() || '0.00';
-            const price = row['Precio Venta']?.toString().trim() || '0.00';
-            const priceWholesale = row['Precio Mayoreo']?.toString().trim() || '0.00';
-            const minStock = row['Inv Mínimo']?.toString().trim() || '0.000';
-            const maxStock = row['Inv Máximo']?.toString().trim() || '0.000';
-            const saleType = (row['Tipo de Venta']?.toString().trim() || 'pieza').toLowerCase() === 'granel' ? 'granel' : 'pieza';
-            const sku = row['SKU']?.toString().trim() || undefined;
-            const barcode = row['Código Barras']?.toString().trim() || undefined;
-            const internalCode = row['Código Interno']?.toString().trim() || undefined;
-            const existence = parseFloat(row['Existencia']?.toString().trim() || '0');
-            const providerName = row['Proveedor']?.toString().trim();
+          if (!name) errors.push('Falta el nombre del producto.');
+          if (!catName) errors.push('Falta la categoría.');
 
-            if (!name || !catName) {
-              errorCount++;
-              continue;
-            }
-
-            // 1. Resolve Category
-            let category = categories.find(c => c.name.toLowerCase() === catName.toLowerCase());
-            if (!category) {
-              category = await api.addCategory({ name: catName, description: 'Creada por importación masiva' }, businessId);
-              setCategories(prev => [...prev, category!]);
-            }
-
-            // 2. Resolve Provider
-            let providerId: string | undefined = undefined;
-            if (providerName) {
-              const provider = providers.find(p => p.name.toLowerCase() === providerName.toLowerCase());
-              if (provider) {
-                providerId = provider.id;
-              } else {
-                const newProv = await api.addProvider({ name: providerName }, businessId);
-                setProviders(prev => [...prev, newProv]);
-                providerId = newProv.id;
-              }
-            }
-
-            // 3. Register Product
-            const payload = {
-              categoryId: category.id,
-              name,
-              sku,
-              barcode,
-              internalCode,
-              providerId,
-              cost: parseFloat(cost).toFixed(2),
-              price: parseFloat(price).toFixed(2),
-              priceWholesale: parseFloat(priceWholesale).toFixed(2),
-              minStock: parseFloat(minStock).toFixed(3),
-              maxStock: parseFloat(maxStock).toFixed(3),
-              saleType,
-              isSellable: true,
-              isIngredient: providerId ? true : false,
-            };
-
-            const created = await api.addProduct(payload, businessId);
-            setProducts(prev => [...prev, created]);
-
-            // Handle initial stock level import
-            if (!isNaN(existence) && existence > 0) {
-              let targetWhId = warehouses[0]?.id;
-              if (!targetWhId) {
-                const newWh = await api.addWarehouse({ name: 'Bodega Central', code: 'BC' }, businessId);
-                setWarehouses(prev => [...prev, newWh]);
-                targetWhId = newWh.id;
-              }
-
-              await api.adjustStock({
-                productId: created.id,
-                warehouseId: targetWhId,
-                quantity: existence,
-              });
-            }
-
-            successCount++;
-          } catch (err) {
-            console.error('Error importing row:', row, err);
-            errorCount++;
+          // Check if category exists
+          const catExists = categories.some(c => c.name.toLowerCase() === catName.toLowerCase());
+          if (catName && !catExists) {
+            warnings.push(`Creará nueva categoría: "${catName}"`);
           }
-        }
 
-        showToast(`Importación completa: ${successCount} agregados con éxito, ${errorCount} fallaron.`, successCount > 0 ? 'success' : 'error');
+          // Check if provider exists
+          if (providerName) {
+            const provExists = providers.some(p => p.name.toLowerCase() === providerName.toLowerCase());
+            if (!provExists) {
+              warnings.push(`Creará nuevo proveedor: "${providerName}"`);
+            }
+          }
+
+          return {
+            rowNumber: idx + 2, // 1-indexed header is row 1
+            name,
+            catName,
+            cost,
+            price,
+            priceWholesale,
+            minStock,
+            maxStock,
+            saleType,
+            sku,
+            barcode,
+            internalCode,
+            existence,
+            providerName,
+            errors,
+            warnings,
+            isValid: errors.length === 0,
+          };
+        });
+
+        setImportPreview(validatedRows);
       } catch (xlsxErr: any) {
         showToast('Error al leer el archivo Excel: ' + xlsxErr.message, 'error');
       }
@@ -331,6 +302,98 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
 
     reader.readAsArrayBuffer(file);
     e.target.value = '';
+  };
+
+  // Perform actual import and database submission
+  const executeImport = async () => {
+    if (!importPreview) return;
+    
+    const validRows = importPreview.filter(r => r.isValid);
+    if (validRows.length === 0) {
+      showToast('No hay filas válidas para importar.', 'error');
+      return;
+    }
+
+    setIsImporting(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    let activeCategories = [...categories];
+    let activeProviders = [...providers];
+    let activeWarehouses = [...warehouses];
+
+    for (const row of validRows) {
+      try {
+        // 1. Resolve Category
+        let category = activeCategories.find(c => c.name.toLowerCase() === row.catName.toLowerCase());
+        if (!category) {
+          category = await api.addCategory({ name: row.catName, description: 'Creada por importación masiva' }, businessId);
+          activeCategories.push(category);
+          setCategories(prev => [...prev, category!]);
+        }
+
+        // 2. Resolve Provider
+        let providerId: string | undefined = undefined;
+        if (row.providerName) {
+          const provider = activeProviders.find(p => p.name.toLowerCase() === row.providerName.toLowerCase());
+          if (provider) {
+            providerId = provider.id;
+          } else {
+            const newProv = await api.addProvider({ name: row.providerName }, businessId);
+            activeProviders.push(newProv);
+            setProviders(prev => [...prev, newProv]);
+            providerId = newProv.id;
+          }
+        }
+
+        // 3. Register Product
+        const payload = {
+          categoryId: category.id,
+          name: row.name,
+          sku: row.sku || undefined,
+          barcode: row.barcode || undefined,
+          internalCode: row.internalCode || undefined,
+          providerId,
+          cost: parseFloat(row.cost).toFixed(2),
+          price: parseFloat(row.price).toFixed(2),
+          priceWholesale: parseFloat(row.priceWholesale).toFixed(2),
+          minStock: parseFloat(row.minStock).toFixed(3),
+          maxStock: parseFloat(row.maxStock).toFixed(3),
+          saleType: row.saleType,
+          isSellable: true,
+          isIngredient: providerId ? true : false,
+        };
+
+        const created = await api.addProduct(payload, businessId);
+        setProducts(prev => [...prev, created]);
+
+        // Handle initial stock level import
+        if (!isNaN(row.existence) && row.existence > 0) {
+          let targetWhId = activeWarehouses[0]?.id;
+          if (!targetWhId) {
+            const newWh = await api.addWarehouse({ name: 'Bodega Central', code: 'BC' }, businessId);
+            activeWarehouses.push(newWh);
+            setWarehouses(prev => [...prev, newWh]);
+            targetWhId = newWh.id;
+          }
+
+          await api.adjustStock({
+            productId: created.id,
+            warehouseId: targetWhId,
+            quantity: row.existence,
+          });
+        }
+
+        successCount++;
+      } catch (err) {
+        console.error('Error importing row:', row, err);
+        errorCount++;
+      }
+    }
+
+    setIsImporting(false);
+    setImportPreview(null);
+    showToast(`Importación completa: ${successCount} agregados con éxito, ${errorCount} fallaron.`, successCount > 0 ? 'success' : 'error');
   };
 
   // Filter products based on search and category
@@ -976,6 +1039,147 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
 
       {/* Toast Notifications Queue */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
+
+      {/* Bulk Import Preview Validation Modal */}
+      {importPreview && (
+        <div className="fixed inset-0 bg-obsidian/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-onyx-surface border border-aged-bronze/35 rounded-xl max-w-5xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-aged-bronze/25 flex items-center justify-between">
+              <div>
+                <Heading level={2} className="!text-champagne-gold !border-none !pb-0 font-light">Confirmar Importación de Productos</Heading>
+                <p className="text-xs text-text-secondary mt-1 font-sans">
+                  Revise las validaciones y advertencias antes de guardar los productos en la base de datos.
+                </p>
+              </div>
+              <button 
+                onClick={() => setImportPreview(null)}
+                className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                disabled={isImporting}
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Metrics Summaries */}
+            <div className="px-6 py-4 bg-charcoal-surface/30 border-b border-aged-bronze/10 grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-charcoal-surface/50 border border-aged-bronze/10 rounded-lg p-3 text-center">
+                <span className="text-[10px] text-text-secondary uppercase tracking-widest block font-medium">Total de Filas</span>
+                <span className="text-xl font-bold font-mono text-champagne-gold">{importPreview.length}</span>
+              </div>
+              <div className="bg-success-green/10 border border-success-green/20 rounded-lg p-3 text-center">
+                <span className="text-[10px] text-success-green uppercase tracking-widest block font-medium">Listos para Subir</span>
+                <span className="text-xl font-bold font-mono text-success-green">
+                  {importPreview.filter(r => r.isValid && r.warnings.length === 0).length}
+                </span>
+              </div>
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-center">
+                <span className="text-[10px] text-yellow-500 uppercase tracking-widest block font-medium">Con Advertencia</span>
+                <span className="text-xl font-bold font-mono text-yellow-400">
+                  {importPreview.filter(r => r.isValid && r.warnings.length > 0).length}
+                </span>
+              </div>
+              <div className="bg-error-red/10 border border-error-red/20 rounded-lg p-3 text-center">
+                <span className="text-[10px] text-error-red uppercase tracking-widest block font-medium">Filas Inválidas</span>
+                <span className="text-xl font-bold font-mono text-error-red">
+                  {importPreview.filter(r => !r.isValid).length}
+                </span>
+              </div>
+            </div>
+
+            {/* Items Preview Table */}
+            <div className="p-6 overflow-y-auto flex-1 max-h-[50vh]">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-aged-bronze/25 text-text-secondary font-semibold uppercase tracking-wider">
+                    <th className="py-2.5 px-3">Fila</th>
+                    <th className="py-2.5 px-3">Código</th>
+                    <th className="py-2.5 px-3">Nombre</th>
+                    <th className="py-2.5 px-3">Categoría</th>
+                    <th className="py-2.5 px-3 text-right">Existencia</th>
+                    <th className="py-2.5 px-3 text-right">Costo</th>
+                    <th className="py-2.5 px-3 text-right">Venta</th>
+                    <th className="py-2.5 px-3">Estado / Observaciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-aged-bronze/10">
+                  {importPreview.map((row) => (
+                    <tr key={row.rowNumber} className={`hover:bg-charcoal-surface/20 transition-all ${!row.isValid ? 'bg-error-red/5' : ''}`}>
+                      <td className="py-2 px-3 font-mono text-text-secondary">#{row.rowNumber}</td>
+                      <td className="py-2 px-3 font-mono text-text-primary">{row.internalCode || '-'}</td>
+                      <td className="py-2 px-3 font-medium text-text-primary">{row.name || <span className="text-error-red italic">Vacío</span>}</td>
+                      <td className="py-2 px-3 text-text-primary">{row.catName || <span className="text-error-red italic">Vacío</span>}</td>
+                      <td className="py-2 px-3 text-right font-mono text-text-secondary">{row.existence}</td>
+                      <td className="py-2 px-3 text-right font-mono text-text-secondary">${parseFloat(row.cost || '0').toFixed(2)}</td>
+                      <td className="py-2 px-3 text-right font-mono text-champagne-gold">${parseFloat(row.price || '0').toFixed(2)}</td>
+                      <td className="py-2 px-3">
+                        <div className="flex flex-col gap-1">
+                          {row.errors.map((err: string, i: number) => (
+                            <span key={i} className="inline-flex items-center gap-1 text-[10px] text-error-red font-medium">
+                              ❌ {err}
+                            </span>
+                          ))}
+                          {row.warnings.map((warn: string, i: number) => (
+                            <span key={i} className="inline-flex items-center gap-1 text-[10px] text-yellow-400 font-medium">
+                              ⚠️ {warn}
+                            </span>
+                          ))}
+                          {row.isValid && row.warnings.length === 0 && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-success-green font-medium">
+                              ✅ Listo
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-6 border-t border-aged-bronze/25 bg-charcoal-surface/20 flex items-center justify-between">
+              <span className="text-xs text-text-secondary">
+                {importPreview.filter(r => !r.isValid).length > 0 && (
+                  <span className="text-error-red font-medium">
+                    ⚠️ Se omitirán las {importPreview.filter(r => !r.isValid).length} filas inválidas.
+                  </span>
+                )}
+              </span>
+
+              <div className="flex items-center gap-4">
+                <Button 
+                  variant="secondary"
+                  onClick={() => setImportPreview(null)}
+                  disabled={isImporting}
+                  className="cursor-pointer"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={executeImport}
+                  disabled={isImporting || importPreview.filter(r => r.isValid).length === 0}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  {isImporting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-obsidian" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <span>Confirmar y Subir ({importPreview.filter(r => r.isValid).length})</span>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
