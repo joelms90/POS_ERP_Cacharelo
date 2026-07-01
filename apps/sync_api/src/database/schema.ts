@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, integer, timestamp, boolean, decimal, text, doublePrecision } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, integer, timestamp, boolean, decimal, text, doublePrecision, jsonb } from 'drizzle-orm/pg-core';
 
 // ==========================================
 // 1. Tenants & Catalog Entities
@@ -320,4 +320,17 @@ export const supplierProducts = pgTable('supplier_products', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   version: integer('version').default(1).notNull(),
+});
+
+export const bulkImports = pgTable('bulk_imports', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  businessId: uuid('business_id').references(() => businesses.id).notNull(),
+  filename: varchar('filename', { length: 255 }).notNull(),
+  status: varchar('status', { length: 20 }).default('pending').notNull(), // pending, processing, completed, failed
+  successCount: integer('success_count').default(0).notNull(),
+  errorCount: integer('error_count').default(0).notNull(),
+  totalRows: integer('total_rows').default(0).notNull(),
+  errorDetails: jsonb('error_details'), // array of { rowNumber, error, field } etc
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

@@ -26,9 +26,11 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
   // Edit/Create Product State
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [isSavingProduct, setIsSavingProduct] = useState<boolean>(false);
-  // Import Preview Modal states
-  const [importPreview, setImportPreview] = useState<any[] | null>(null);
-  const [isImporting, setIsImporting] = useState<boolean>(false);
+  // Import History states
+  const [activeSubTab, setActiveSubTab] = useState<'products' | 'bulk'>('products');
+  const [importHistory, setImportHistory] = useState<any[]>([]);
+  const [selectedImportDetails, setSelectedImportDetails] = useState<any | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
@@ -59,9 +61,37 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
     }
   }, [businessId, showToast]);
 
+  const fetchHistory = useCallback(async () => {
+    try {
+      const history = await api.getBulkImportHistory(businessId);
+      setImportHistory(history);
+    } catch (err: any) {
+      console.error('Error fetching import history:', err);
+    }
+  }, [businessId]);
+
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    fetchHistory();
+  }, [fetchData, fetchHistory]);
+
+  useEffect(() => {
+    if (activeSubTab === 'bulk') {
+      fetchHistory();
+    }
+  }, [activeSubTab, fetchHistory]);
+
+  // Polling loop for active background uploads
+  useEffect(() => {
+    const hasActiveImport = importHistory.some(h => h.status === 'pending' || h.status === 'processing');
+    if (!hasActiveImport) return;
+
+    const timer = setInterval(() => {
+      fetchHistory();
+    }, 3000);
+
+    return () => clearInterval(timer);
+  }, [importHistory, fetchHistory]);
 
 
 
@@ -217,86 +247,18 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      showToast('Leyendo archivo...', 'warning');
-      try {
-        const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        
-        const XLSX = (window as any).XLSX;
-        if (!XLSX) {
-          showToast('Error: Biblioteca de lectura de archivos no cargada.', 'error');
-          return;
-        }
-
-        let workbook;
-        try {
-          workbook = XLSX.read(data, { type: 'array' });
-        } catch (readErr: any) {
-          showToast('Error al procesar estructura del archivo Excel: ' + readErr.message, 'error');
-          return;
-        }
-        
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        
-        let importedRows;
-        try {
-          importedRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' }) as Record<string, any>[];
-        } catch (jsonErr: any) {
-          showToast('Error al procesar contenido de la hoja Excel: ' + jsonErr.message, 'error');
-          return;
-        }
-        
-        if (!importedRows || importedRows.length === 0) {
-          showToast('El archivo está vacío o no contiene filas de datos.', 'error');
-          return;
-        }
-
-        showToast('Validando registros en el servidor...', 'warning');
-
-        // Call backend validation API
-        const validatedRows = await api.validateProductImport(businessId, importedRows);
-        setImportPreview(validatedRows);
-        showToast('Validación completada con éxito.', 'success');
-      } catch (xlsxErr: any) {
-        showToast('Error al leer el archivo Excel: ' + xlsxErr.message, 'error');
-      }
-    };
-
-    reader.readAsArrayBuffer(file);
-    e.target.value = '';
-  };
-
-  // Perform actual import and database submission on the backend
-  const executeImport = async () => {
-    if (!importPreview) return;
-    
-    const validRows = importPreview.filter(r => r.isValid);
-    if (validRows.length === 0) {
-      showToast('No hay filas válidas para importar.', 'error');
-      return;
-    }
-
-    setIsImporting(true);
-    showToast('Subiendo productos al servidor...', 'warning');
-
+    setIsUploading(true);
+    showToast('Subiendo archivo al servidor...', 'warning');
     try {
-      const response = await api.bulkImportProducts(businessId, validRows);
-      
-      setIsImporting(false);
-      setImportPreview(null);
-
-      if (response.success) {
-        showToast(`Importación completa: ${response.successCount} agregados con éxito, ${response.errorCount} fallaron.`, 'success');
-        // Refresh catalog data silently to fetch all newly created products, categories, and warehouses
-        fetchData(true);
-      } else {
-        showToast('La importación falló en el servidor.', 'error');
-      }
+      await api.uploadBulkFile(businessId, file);
+      showToast('Archivo subido con éxito. Procesando en segundo plano...', 'success');
+      setActiveSubTab('bulk'); // automatically switch to history tab so they can see progress!
+      fetchHistory();
     } catch (err: any) {
-      setIsImporting(false);
-      showToast('Error durante la importación masiva: ' + (err.message || err), 'error');
+      showToast('Error al subir archivo: ' + err.message, 'error');
+    } finally {
+      setIsUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -421,7 +383,155 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
         </div>
       ) : (
         <div className="w-full flex flex-col gap-6">
-          {editingProduct ? (
+          {/* Sub tabs navigation */}
+          {!editingProduct && (
+            <div className="flex border-b border-aged-bronze/25 gap-6 mb-2">
+              <button
+                onClick={() => setActiveSubTab('products')}
+                className={`pb-3 text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer ${
+                  activeSubTab === 'products'
+                    ? 'border-champagne-gold text-champagne-gold font-semibold'
+                    : 'border-transparent text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Artículos y Catálogo
+              </button>
+              <button
+                onClick={() => setActiveSubTab('bulk')}
+                className={`pb-3 text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer ${
+                  activeSubTab === 'bulk'
+                    ? 'border-champagne-gold text-champagne-gold font-semibold'
+                    : 'border-transparent text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Cargas Masivas (Excel/CSV)
+              </button>
+            </div>
+          )}
+
+          {activeSubTab === 'bulk' && !editingProduct ? (
+            <div className="flex flex-col gap-6 font-sans">
+              {/* Upload card */}
+              <div className="bg-onyx-surface border border-aged-bronze/40 rounded p-6 shadow-md shadow-black/10 flex flex-col md:flex-row justify-between items-center gap-6">
+                <div>
+                  <Heading level={3} className="!text-champagne-gold !border-none !pb-0 font-light font-sans text-base">Subir Plantilla de Artículos</Heading>
+                  <p className="text-xs text-text-secondary mt-1 font-sans">
+                    Selecciona tu archivo de Excel (.xlsx, .xls) o CSV (.csv) para procesar el catálogo en segundo plano.
+                  </p>
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={downloadCSVTemplate}
+                    className="flex items-center gap-2 px-4 py-2 bg-charcoal-surface border border-aged-bronze/40 hover:border-champagne-gold/60 rounded text-xs text-text-secondary hover:text-text-primary transition-all cursor-pointer font-sans"
+                  >
+                    Descargar Plantilla
+                  </button>
+                  
+                  <button
+                    type="button"
+                    disabled={isUploading}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 px-4 py-2 bg-champagne-gold hover:bg-champagne-gold/90 disabled:opacity-50 text-onyx font-semibold rounded text-xs transition-all cursor-pointer shadow-lg font-sans"
+                  >
+                    {isUploading ? 'Subiendo...' : 'Seleccionar Archivo'}
+                  </button>
+                </div>
+              </div>
+
+              {/* History log list card */}
+              <div className="bg-onyx-surface border border-aged-bronze/40 rounded shadow-md shadow-black/20 overflow-hidden">
+                <div className="p-6 border-b border-aged-bronze/25 flex items-center justify-between">
+                  <Heading level={3} className="!text-champagne-gold !border-none !pb-0 font-light font-sans text-base">Historial de Importaciones</Heading>
+                  <button onClick={fetchHistory} className="text-xs text-text-secondary hover:text-champagne-gold transition-colors font-sans cursor-pointer">
+                    Actualizar Lista
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-charcoal-surface/60 border-b border-aged-bronze/35 text-[11px] font-semibold text-text-secondary uppercase tracking-wider">
+                        <th className="px-6 py-4">Fecha</th>
+                        <th className="px-6 py-4">Archivo</th>
+                        <th className="px-6 py-4">Estado</th>
+                        <th className="px-6 py-4 text-right font-sans">Filas Totales</th>
+                        <th className="px-6 py-4 text-right font-sans">Agregados</th>
+                        <th className="px-6 py-4 text-right font-sans">Errores</th>
+                        <th className="px-6 py-4 text-right font-sans">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-aged-bronze/10 text-xs">
+                      {importHistory.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-8 text-center text-text-secondary italic font-sans">
+                            No hay historial de importaciones registradas.
+                          </td>
+                        </tr>
+                      ) : (
+                        importHistory.map((history) => {
+                          let statusBadge = (
+                            <Badge variant="charcoal">{history.status}</Badge>
+                          );
+                          if (history.status === 'pending') {
+                            statusBadge = <Badge variant="charcoal" className="bg-gray-500/20 text-gray-400 font-sans">Pendiente</Badge>;
+                          } else if (history.status === 'processing') {
+                            statusBadge = <Badge variant="warning" className="animate-pulse font-sans">Procesando</Badge>;
+                          } else if (history.status === 'completed') {
+                            statusBadge = (
+                              <Badge variant="success" className="font-sans">
+                                {history.errorCount > 0 ? 'Con observaciones' : 'Completado'}
+                              </Badge>
+                            );
+                          } else if (history.status === 'failed') {
+                            statusBadge = <Badge variant="error" className="font-sans">Fallado</Badge>;
+                          }
+
+                          return (
+                            <tr key={history.id} className="hover:bg-charcoal-surface/20 transition-all font-sans">
+                              <td className="px-6 py-4 text-text-secondary whitespace-nowrap">
+                                {new Date(history.createdAt).toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 text-text-primary font-medium font-mono">
+                                {history.filename}
+                              </td>
+                              <td className="px-6 py-4">
+                                {statusBadge}
+                              </td>
+                              <td className="px-6 py-4 text-right font-mono text-text-primary">
+                                {history.totalRows}
+                              </td>
+                              <td className="px-6 py-4 text-right font-mono text-success-green font-semibold">
+                                {history.successCount}
+                              </td>
+                              <td className="px-6 py-4 text-right font-mono text-error-red font-semibold">
+                                {history.errorCount}
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const details = await api.getBulkImportDetails(history.id);
+                                      setSelectedImportDetails(details);
+                                    } catch (err: any) {
+                                      showToast('Error al cargar detalles: ' + err.message, 'error');
+                                    }
+                                  }}
+                                  className="px-3 py-1 bg-charcoal-surface border border-aged-bronze/40 hover:border-champagne-gold/60 text-text-secondary hover:text-text-primary rounded text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer font-sans"
+                                >
+                                  Detalles
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ) : editingProduct ? (
               /* Product Edit/Create Form View */
               <div className="bg-onyx-surface border border-aged-bronze/40 rounded p-6 shadow-md shadow-black/20 animate-fade-in">
                 <div className="flex items-center justify-between border-b border-aged-bronze/20 pb-4 mb-6">
@@ -940,29 +1050,27 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
 
               </div>
             )}
-
         </div>
       )}
 
       {/* Toast Notifications Queue */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
 
-      {/* Bulk Import Preview Validation Modal */}
-      {importPreview && (
-        <div className="fixed inset-0 bg-obsidian/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-onyx-surface border border-aged-bronze/35 rounded-xl max-w-5xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-            {/* Modal Header */}
+      {/* Selected Import Details Modal */}
+      {selectedImportDetails && (
+        <div className="fixed inset-0 bg-obsidian/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in font-sans">
+          <div className="bg-onyx-surface border border-aged-bronze/35 rounded-xl max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Header */}
             <div className="p-6 border-b border-aged-bronze/25 flex items-center justify-between">
               <div>
-                <Heading level={2} className="!text-champagne-gold !border-none !pb-0 font-light">Confirmar Importación de Productos</Heading>
-                <p className="text-xs text-text-secondary mt-1 font-sans">
-                  Revise las validaciones y advertencias antes de guardar los productos en la base de datos.
-                </p>
+                <Heading level={2} className="!text-champagne-gold !border-none !pb-0 font-light font-sans text-lg">
+                  Reporte de Importación
+                </Heading>
+                <p className="text-xs text-text-secondary mt-1 font-mono">{selectedImportDetails.filename}</p>
               </div>
               <button 
-                onClick={() => setImportPreview(null)}
+                onClick={() => setSelectedImportDetails(null)}
                 className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
-                disabled={isImporting}
               >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -970,119 +1078,47 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
               </button>
             </div>
 
-            {/* Metrics Summaries */}
-            <div className="px-6 py-4 bg-charcoal-surface/30 border-b border-aged-bronze/10 grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-charcoal-surface/50 border border-aged-bronze/10 rounded-lg p-3 text-center">
-                <span className="text-[10px] text-text-secondary uppercase tracking-widest block font-medium">Total de Filas</span>
-                <span className="text-xl font-bold font-mono text-champagne-gold">{importPreview.length}</span>
+            {/* Metrics */}
+            <div className="px-6 py-4 bg-charcoal-surface/30 border-b border-aged-bronze/10 grid grid-cols-3 gap-4 text-center">
+              <div className="p-2 border border-aged-bronze/10 rounded">
+                <span className="text-[10px] text-text-secondary uppercase block font-sans">Leídos</span>
+                <span className="text-lg font-bold font-mono text-champagne-gold">{selectedImportDetails.totalRows}</span>
               </div>
-              <div className="bg-success-green/10 border border-success-green/20 rounded-lg p-3 text-center">
-                <span className="text-[10px] text-success-green uppercase tracking-widest block font-medium">Listos para Subir</span>
-                <span className="text-xl font-bold font-mono text-success-green">
-                  {importPreview.filter(r => r.isValid && r.warnings.length === 0).length}
-                </span>
+              <div className="p-2 border border-success-green/20 bg-success-green/5 rounded">
+                <span className="text-[10px] text-success-green uppercase block font-sans">Guardados</span>
+                <span className="text-lg font-bold font-mono text-success-green">{selectedImportDetails.successCount}</span>
               </div>
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-center">
-                <span className="text-[10px] text-yellow-500 uppercase tracking-widest block font-medium">Con Advertencia</span>
-                <span className="text-xl font-bold font-mono text-yellow-400">
-                  {importPreview.filter(r => r.isValid && r.warnings.length > 0).length}
-                </span>
-              </div>
-              <div className="bg-error-red/10 border border-error-red/20 rounded-lg p-3 text-center">
-                <span className="text-[10px] text-error-red uppercase tracking-widest block font-medium">Filas Inválidas</span>
-                <span className="text-xl font-bold font-mono text-error-red">
-                  {importPreview.filter(r => !r.isValid).length}
-                </span>
+              <div className="p-2 border border-error-red/20 bg-error-red/5 rounded">
+                <span className="text-[10px] text-error-red uppercase block font-sans">Errores</span>
+                <span className="text-lg font-bold font-mono text-error-red">{selectedImportDetails.errorCount}</span>
               </div>
             </div>
 
-            {/* Items Preview Table */}
-            <div className="p-6 overflow-y-auto flex-1 max-h-[50vh]">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-aged-bronze/25 text-text-secondary font-semibold uppercase tracking-wider">
-                    <th className="py-2.5 px-3">Fila</th>
-                    <th className="py-2.5 px-3">Código</th>
-                    <th className="py-2.5 px-3">Nombre</th>
-                    <th className="py-2.5 px-3">Categoría</th>
-                    <th className="py-2.5 px-3 text-right">Existencia</th>
-                    <th className="py-2.5 px-3 text-right">Costo</th>
-                    <th className="py-2.5 px-3 text-right">Venta</th>
-                    <th className="py-2.5 px-3">Estado / Observaciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-aged-bronze/10">
-                  {importPreview.map((row) => (
-                    <tr key={row.rowNumber} className={`hover:bg-charcoal-surface/20 transition-all ${!row.isValid ? 'bg-error-red/5' : ''}`}>
-                      <td className="py-2 px-3 font-mono text-text-secondary">#{row.rowNumber}</td>
-                      <td className="py-2 px-3 font-mono text-text-primary">{row.internalCode || '-'}</td>
-                      <td className="py-2 px-3 font-medium text-text-primary">{row.name || <span className="text-error-red italic">Vacío</span>}</td>
-                      <td className="py-2 px-3 text-text-primary">{row.catName || <span className="text-error-red italic">Vacío</span>}</td>
-                      <td className="py-2 px-3 text-right font-mono text-text-secondary">{row.existence}</td>
-                      <td className="py-2 px-3 text-right font-mono text-text-secondary">${parseFloat(row.cost || '0').toFixed(2)}</td>
-                      <td className="py-2 px-3 text-right font-mono text-champagne-gold">${parseFloat(row.price || '0').toFixed(2)}</td>
-                      <td className="py-2 px-3">
-                        <div className="flex flex-col gap-1">
-                          {row.errors.map((err: string, i: number) => (
-                            <span key={i} className="inline-flex items-center gap-1 text-[10px] text-error-red font-medium">
-                              ❌ {err}
-                            </span>
-                          ))}
-                          {row.warnings.map((warn: string, i: number) => (
-                            <span key={i} className="inline-flex items-center gap-1 text-[10px] text-yellow-400 font-medium">
-                              ⚠️ {warn}
-                            </span>
-                          ))}
-                          {row.isValid && row.warnings.length === 0 && (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-success-green font-medium">
-                              ✅ Listo
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+            {/* Errors List */}
+            <div className="p-6 overflow-y-auto flex-1 text-xs">
+              <Heading level={3} className="!text-text-primary !border-none !pb-2 font-normal font-sans text-sm">Bitácora de Observaciones</Heading>
+              
+              {!selectedImportDetails.errorDetails || selectedImportDetails.errorDetails.length === 0 ? (
+                <div className="p-4 bg-success-green/10 border border-success-green/20 rounded text-success-green flex items-center gap-2 font-sans">
+                  <span>✓</span> Todos los artículos se importaron correctamente sin observaciones.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {selectedImportDetails.errorDetails.map((detail: any, i: number) => (
+                    <div key={i} className="p-2 bg-charcoal-surface border-l-2 border-error-red flex gap-3 text-text-primary font-sans text-xs">
+                      <span className="font-mono text-text-secondary font-bold whitespace-nowrap">Fila {detail.rowNumber || '-'}:</span>
+                      <span>{detail.error || String(detail)}</span>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              )}
             </div>
 
-            {/* Modal Actions */}
-            <div className="p-6 border-t border-aged-bronze/25 bg-charcoal-surface/20 flex items-center justify-between">
-              <span className="text-xs text-text-secondary">
-                {importPreview.filter(r => !r.isValid).length > 0 && (
-                  <span className="text-error-red font-medium">
-                    ⚠️ Se omitirán las {importPreview.filter(r => !r.isValid).length} filas inválidas.
-                  </span>
-                )}
-              </span>
-
-              <div className="flex items-center gap-4">
-                <Button 
-                  variant="secondary"
-                  onClick={() => setImportPreview(null)}
-                  disabled={isImporting}
-                  className="cursor-pointer"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={executeImport}
-                  disabled={isImporting || importPreview.filter(r => r.isValid).length === 0}
-                  className="flex items-center gap-2 cursor-pointer"
-                >
-                  {isImporting ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4 text-obsidian" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>Guardando...</span>
-                    </>
-                  ) : (
-                    <span>Confirmar y Subir ({importPreview.filter(r => r.isValid).length})</span>
-                  )}
-                </Button>
-              </div>
+            {/* Footer */}
+            <div className="p-6 border-t border-aged-bronze/25 flex justify-end">
+              <Button onClick={() => setSelectedImportDetails(null)} className="font-sans text-xs">
+                Cerrar Reporte
+              </Button>
             </div>
           </div>
         </div>

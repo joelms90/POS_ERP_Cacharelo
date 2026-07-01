@@ -651,6 +651,47 @@ export const api = {
     }
   },
 
+  async uploadBulkFile(businessId: string, file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('businessId', businessId);
+
+    const baseUrl = getApiBaseUrl();
+    const token = getAdminToken();
+    
+    const headers = new Headers();
+    if (token) {
+      headers.set('X-Admin-Token', token);
+    }
+
+    const response = await fetch(`${baseUrl}/products/bulk/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+      try {
+        const errorJson = await response.json();
+        errorMessage = errorJson.error || errorJson.message || errorMessage;
+      } catch {
+        // ignore
+      }
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  },
+
+  async getBulkImportHistory(businessId: string): Promise<any[]> {
+    return apiRequest<any[]>(`/products/bulk/history?businessId=${businessId}`);
+  },
+
+  async getBulkImportDetails(id: string): Promise<any> {
+    return apiRequest<any>(`/products/bulk/history/${id}`);
+  },
+
   /**
    * Reports
    */

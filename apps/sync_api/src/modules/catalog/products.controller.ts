@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -49,5 +50,24 @@ export class ProductsController {
   async logError(@Body() body: { message: string; stack?: string }) {
     console.error('[BROWSER CLIENT ERROR]:', body.message, body.stack);
     return { success: true };
+  }
+
+  @Post('bulk/upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadBulkFile(
+    @UploadedFile() file: any,
+    @Body('businessId') businessId: string,
+  ) {
+    return this.productsService.startBulkImport(businessId, file);
+  }
+
+  @Get('bulk/history')
+  async getBulkHistory(@Query('businessId') businessId: string) {
+    return this.productsService.getBulkHistory(businessId);
+  }
+
+  @Get('bulk/history/:id')
+  async getBulkImportDetails(@Param('id') id: string) {
+    return this.productsService.getBulkImportDetails(id);
   }
 }
