@@ -10,15 +10,6 @@ interface TransfersPageProps {
   businessId: string;
 }
 
-const BUSINESS_BRANCH_MAP: Record<string, { id: string; name: string }[]> = {
-  'd3b07384-d113-4a0e-a555-e5b12824bf01': [
-    { id: 'c4f07384-d113-4a0e-a555-e5b12824bf02', name: 'Sucursal Cacharelo Centro' },
-    { id: 'c4f07384-d113-4a0e-a555-e5b12824bf04', name: 'Sucursal Empanadas' },
-    { id: 'c4f07384-d113-4a0e-a555-e5b12824bf08', name: 'Sucursal Tortas' },
-    { id: 'c4f07384-d113-4a0e-a555-e5b12824bf06', name: 'Sucursal Hamburguesas' },
-  ],
-};
-
 export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
   const [activeTab, setActiveTab] = useState<'create' | 'history' | 'report-summary' | 'report-detailed'>('create');
   
@@ -67,26 +58,25 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const branchList = BUSINESS_BRANCH_MAP[businessId] || [];
-
   const loadInitialData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [whData, prodData, transData] = await Promise.all([
+      const [whData, prodData, transData, branchData] = await Promise.all([
         api.getWarehouses(businessId),
         api.getProducts(businessId),
         api.getTransfers(businessId),
+        api.getBranches(businessId),
       ]);
       
       setWarehouses(whData);
       setProducts(prodData);
       setTransfers(transData);
-      setBranches(branchList);
+      setBranches(branchData);
 
       if (whData.length > 0) setFromWarehouseId(whData[0].id);
-      if (branchList.length > 0) {
-        setToBranchId(branchList[0].id);
-        setSelectedReportBranchId(branchList[0].id);
+      if (branchData.length > 0) {
+        setToBranchId(branchData[0].id);
+        setSelectedReportBranchId(branchData[0].id);
       }
       if (prodData.length > 0) setSelectedProductId(prodData[0].id);
     } catch (err: any) {
