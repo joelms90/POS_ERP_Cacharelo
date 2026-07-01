@@ -336,6 +336,33 @@ export class ProductsService {
   async processBulkImportBackground(businessId: string, importId: string, buffer: Buffer) {
     const db = this.productsRepository.getDb();
 
+    // Helper to find a value by key case-insensitively and diacritic-insensitively
+    const normalizeKey = (str: string): string => {
+      return str
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // remove accents
+        .replace(/\s+/g, ''); // remove spaces
+    };
+
+    const getRowValue = (rowObj: Record<string, any>, targetKey: string): string => {
+      const keys = Object.keys(rowObj);
+      const normTarget = normalizeKey(targetKey);
+      
+      // 1. Exact normalized match
+      let foundKey = keys.find(k => normalizeKey(k) === normTarget);
+      
+      // 2. Fuzzy prefix match fallback
+      if (!foundKey) {
+        foundKey = keys.find(k => {
+          const normK = normalizeKey(k);
+          return normK.startsWith(normTarget) || normTarget.startsWith(normK);
+        });
+      }
+      
+      return foundKey ? rowObj[foundKey]?.toString().trim() || '' : '';
+    };
+
     // Helper to clean numeric values
     const cleanNumber = (val: any): string => {
       if (val === undefined || val === null) return '0.00';
@@ -395,19 +422,19 @@ export class ProductsService {
           const row = rows[idx];
           const rowNumber = idx + 2; // header is row 1
           
-          const name = row['Nombre del Producto']?.toString().trim() || '';
-          const catName = row['Categoría']?.toString().trim() || '';
-          const cost = cleanNumber(row['Costo']);
-          const price = cleanNumber(row['Precio Venta']);
-          const priceWholesale = cleanNumber(row['Precio Mayoreo']);
-          const minStock = cleanNumber(row['Inv Mínimo']);
-          const maxStock = cleanNumber(row['Inv Máximo']);
-          const saleType = (row['Tipo de Venta']?.toString().trim() || 'pieza').toLowerCase() === 'granel' ? 'granel' : 'pieza';
-          const sku = row['SKU']?.toString().trim() || '';
-          const barcode = row['Código Barras']?.toString().trim() || '';
-          const internalCode = row['Código Interno']?.toString().trim() || '';
-          const existence = parseFloat(cleanNumber(row['Existencia']));
-          const providerName = row['Proveedor']?.toString().trim() || '';
+          const name = getRowValue(row, 'Nombre del Producto') || getRowValue(row, 'Nombre');
+          const catName = getRowValue(row, 'Categoría') || getRowValue(row, 'Categoria');
+          const cost = cleanNumber(getRowValue(row, 'Costo'));
+          const price = cleanNumber(getRowValue(row, 'Precio Venta') || getRowValue(row, 'Precio'));
+          const priceWholesale = cleanNumber(getRowValue(row, 'Precio Mayoreo') || getRowValue(row, 'Mayoreo'));
+          const minStock = cleanNumber(getRowValue(row, 'Inv Mínimo') || getRowValue(row, 'Minimo') || getRowValue(row, 'Stock Minimo'));
+          const maxStock = cleanNumber(getRowValue(row, 'Inv Máximo') || getRowValue(row, 'Maximo') || getRowValue(row, 'Stock Maximo'));
+          const saleType = (getRowValue(row, 'Tipo de Venta') || 'pieza').toLowerCase() === 'granel' ? 'granel' : 'pieza';
+          const sku = getRowValue(row, 'SKU');
+          const barcode = getRowValue(row, 'Código Barras') || getRowValue(row, 'Codigo Barras') || getRowValue(row, 'Codigo de Barras') || getRowValue(row, 'Barcode');
+          const internalCode = getRowValue(row, 'Código Interno') || getRowValue(row, 'Codigo Interno') || getRowValue(row, 'Codigo');
+          const existence = parseFloat(cleanNumber(getRowValue(row, 'Existencia') || getRowValue(row, 'Existencias') || getRowValue(row, 'Cantidad') || getRowValue(row, 'Stock')));
+          const providerName = getRowValue(row, 'Proveedor') || getRowValue(row, 'Proveedores');
 
           if (!name) {
             errorCount++;

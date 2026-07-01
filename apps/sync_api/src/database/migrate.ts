@@ -2,7 +2,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { db } from './connection';
 import * as path from 'path';
 import * as schema from './schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 
 export async function runMigrations() {
@@ -126,6 +126,18 @@ export async function runMigrations() {
       },
     ]);
     console.log('✅ Fresh Cafetería employees seeded.');
+
+    // Cleanup any bulk imports left in 'pending' or 'processing' states due to server restarts
+    console.log('🧹 Cleaning up interrupted bulk imports...');
+    await db
+      .update(schema.bulkImports)
+      .set({
+        status: 'failed',
+        errorDetails: [{ error: 'La importación fue interrumpida por un reinicio o apagado del servidor.' }],
+        updatedAt: new Date(),
+      })
+      .where(inArray(schema.bulkImports.status, ['pending', 'processing']));
+    console.log('✅ Interrupted bulk imports cleaned up.');
 
   } catch (error) {
     console.error('❌ Migration failed:', error);
