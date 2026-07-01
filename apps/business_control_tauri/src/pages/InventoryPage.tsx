@@ -162,6 +162,164 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
     }
   };
 
+  // Download CSV template for spreadsheet import
+  const downloadCSVTemplate = () => {
+    const headers = [
+      'Código Interno',
+      'Nombre del Producto',
+      'Categoría',
+      'Costo',
+      'Precio Venta',
+      'Precio Mayoreo',
+      'Inv Mínimo',
+      'Inv Máximo',
+      'Tipo de Venta',
+      'SKU',
+      'Código Barras',
+      'Proveedor'
+    ];
+    const row = [
+      '1',
+      'Paste Arroz c/Leche',
+      'PASTES',
+      '15.00',
+      '15.00',
+      '0.00',
+      '10',
+      '100',
+      'granel',
+      'SKU-ARROZ',
+      '123456789',
+      'PLANTA PRODUCCION'
+    ];
+    
+    // Include BOM character for proper Spanish characters opening in Excel
+    const csvContent = '\uFEFF' + [headers.join(','), row.join(',')].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'plantilla_inventario.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Import spreadsheet products mapping categories and providers
+  const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      
+      const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+      if (lines.length <= 1) {
+        showToast('El archivo está vacío o no contiene filas de datos.', 'error');
+        return;
+      }
+
+      const headers = lines[0].replace(/^\uFEFF/, '').split(',').map(h => h.trim());
+      
+      const importedProducts = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+        if (values.length < headers.length) continue;
+
+        const rowData: Record<string, string> = {};
+        headers.forEach((header, index) => {
+          rowData[header] = values[index];
+        });
+
+        importedProducts.push(rowData);
+      }
+
+      if (importedProducts.length === 0) {
+        showToast('No se encontraron filas válidas para importar.', 'warning');
+        return;
+      }
+
+      showToast(`Procesando importación de ${importedProducts.length} productos...`, 'warning');
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const row of importedProducts) {
+        try {
+          const name = row['Nombre del Producto'];
+          const catName = row['Categoría'];
+          const cost = row['Costo'] || '0.00';
+          const price = row['Precio Venta'] || '0.00';
+          const priceWholesale = row['Precio Mayoreo'] || '0.00';
+          const minStock = row['Inv Mínimo'] || '0.000';
+          const maxStock = row['Inv Máximo'] || '0.000';
+          const saleType = (row['Tipo de Venta'] || 'pieza').toLowerCase() === 'granel' ? 'granel' : 'pieza';
+          const sku = row['SKU'] || undefined;
+          const barcode = row['Código Barras'] || undefined;
+          const internalCode = row['Código Interno'] || undefined;
+          const providerName = row['Proveedor'];
+
+          if (!name || !catName) {
+            errorCount++;
+            continue;
+          }
+
+          // 1. Resolve Category
+          let category = categories.find(c => c.name.toLowerCase() === catName.toLowerCase());
+          if (!category) {
+            category = await api.addCategory({ name: catName, description: 'Creada por importación masiva' }, businessId);
+            setCategories(prev => [...prev, category!]);
+          }
+
+          // 2. Resolve Provider
+          let providerId: string | undefined = undefined;
+          if (providerName) {
+            const provider = providers.find(p => p.name.toLowerCase() === providerName.toLowerCase());
+            if (provider) {
+              providerId = provider.id;
+            } else {
+              const newProv = await api.addProvider({ name: providerName }, businessId);
+              setProviders(prev => [...prev, newProv]);
+              providerId = newProv.id;
+            }
+          }
+
+          // 3. Register Product
+          const payload = {
+            categoryId: category.id,
+            name,
+            sku,
+            barcode,
+            internalCode,
+            providerId,
+            cost: parseFloat(cost).toFixed(2),
+            price: parseFloat(price).toFixed(2),
+            priceWholesale: parseFloat(priceWholesale).toFixed(2),
+            minStock: parseFloat(minStock).toFixed(3),
+            maxStock: parseFloat(maxStock).toFixed(3),
+            saleType,
+            isSellable: true,
+            isIngredient: providerId ? true : false,
+          };
+
+          const created = await api.addProduct(payload, businessId);
+          setProducts(prev => [...prev, created]);
+          successCount++;
+        } catch (err) {
+          console.error('Error importing row:', row, err);
+          errorCount++;
+        }
+      }
+
+      showToast(`Importación completa: ${successCount} agregados con éxito, ${errorCount} fallaron.`, successCount > 0 ? 'success' : 'error');
+    };
+
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   // Filter products based on search and category
   const filteredProducts = products.filter((p) => {
     const matchesSearch = 
@@ -204,6 +362,37 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
             </svg>
             <span>Sincronizar Catálogo</span>
           </button>
+
+          {!editingProduct && (
+            <>
+              <button
+                onClick={downloadCSVTemplate}
+                className="flex items-center gap-2 px-3 py-1.5 bg-charcoal-surface border border-aged-bronze/40 hover:border-champagne-gold/60 rounded text-xs text-text-secondary hover:text-text-primary transition-all cursor-pointer"
+                title="Descargar plantilla de Excel/CSV para llenar"
+              >
+                <svg className="w-4 h-4 text-champagne-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Descargar Plantilla</span>
+              </button>
+
+              <label
+                className="flex items-center gap-2 px-3 py-1.5 bg-charcoal-surface border border-aged-bronze/40 hover:border-champagne-gold/60 rounded text-xs text-text-secondary hover:text-text-primary transition-all cursor-pointer"
+                title="Subir archivo CSV lleno"
+              >
+                <svg className="w-4 h-4 text-champagne-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                <span>Importar Excel / CSV</span>
+                <input
+                  type="file"
+                  accept=".csv"
+                  className="hidden"
+                  onChange={handleCSVImport}
+                />
+              </label>
+            </>
+          )}
 
           {!editingProduct && (
             <Button
