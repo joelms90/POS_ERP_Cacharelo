@@ -652,28 +652,55 @@ export const api = {
   },
 
   async uploadBulkFile(businessId: string, file: File): Promise<any> {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('businessId', businessId);
-
     const baseUrl = getApiBaseUrl();
     const token = getAdminToken();
-    
-    const headers = new Headers();
+
+    // 1. Get signed URL & import ID from NestJS
+    const urlHeaders = new Headers();
     if (token) {
-      headers.set('X-Admin-Token', token);
+      urlHeaders.set('X-Admin-Token', token);
+    }
+    const urlResponse = await fetch(
+      `${baseUrl}/products/bulk/upload-url?businessId=${businessId}&filename=${encodeURIComponent(file.name)}`,
+      { headers: urlHeaders }
+    );
+    if (!urlResponse.ok) {
+      throw new Error(`Failed to generate upload URL: ${urlResponse.statusText}`);
+    }
+    const { id: importId, url, gcsFileName } = await urlResponse.json();
+
+    // 2. Upload file binary directly to GCS using the signed URL
+    const gcsResponse = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      },
+      body: file,
+    });
+    if (!gcsResponse.ok) {
+      throw new Error(`Failed to upload file to Cloud Storage: ${gcsResponse.statusText}`);
     }
 
-    const response = await fetch(`${baseUrl}/products/bulk/upload`, {
+    // 3. Trigger backend processing
+    const processHeaders = new Headers();
+    processHeaders.set('Content-Type', 'application/json');
+    if (token) {
+      processHeaders.set('X-Admin-Token', token);
+    }
+    const processResponse = await fetch(`${baseUrl}/products/bulk/process`, {
       method: 'POST',
-      headers,
-      body: formData,
+      headers: processHeaders,
+      body: JSON.stringify({
+        businessId,
+        importId,
+        gcsFileName,
+      }),
     });
 
-    if (!response.ok) {
-      let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+    if (!processResponse.ok) {
+      let errorMessage = `Process Error: ${processResponse.status} ${processResponse.statusText}`;
       try {
-        const errorJson = await response.json();
+        const errorJson = await processResponse.json();
         errorMessage = errorJson.error || errorJson.message || errorMessage;
       } catch {
         // ignore
@@ -681,7 +708,7 @@ export const api = {
       throw new Error(errorMessage);
     }
 
-    return response.json();
+    return processResponse.json();
   },
 
   async getBulkImportHistory(businessId: string): Promise<any[]> {

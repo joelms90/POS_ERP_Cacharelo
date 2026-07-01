@@ -7,6 +7,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import * as schema from '../../database/schema';
 import { eq, and, isNull, desc } from 'drizzle-orm';
 import { read, utils } from 'xlsx';
+import { Storage } from '@google-cloud/storage';
 
 @Injectable()
 export class ProductsService {
@@ -309,6 +310,68 @@ export class ProductsService {
 
     // 3. Return the completed/failed import record
     return this.getBulkImportDetails(importRecord.id);
+  }
+
+  async getBulkUploadUrl(businessId: string, filename: string) {
+    const db = this.productsRepository.getDb();
+    
+    // 1. Create a bulk import record
+    const [importRecord] = await db
+      .insert(schema.bulkImports)
+      .values({
+        businessId,
+        filename,
+        status: 'pending',
+        successCount: 0,
+        errorCount: 0,
+        totalRows: 0,
+      })
+      .returning();
+
+    // 2. Generate signed URL for GCS direct upload
+    const storage = new Storage();
+    const bucketName = 'bulk-uploads-fresh-sensor-497515-d3';
+    const gcsFileName = `${importRecord.id}-${filename}`;
+    
+    const [url] = await storage
+      .bucket(bucketName)
+      .file(gcsFileName)
+      .getSignedUrl({
+        version: 'v4',
+        action: 'write',
+        expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+
+    return {
+      id: importRecord.id,
+      url,
+      gcsFileName,
+    };
+  }
+
+  async processBulkImportGcs(businessId: string, importId: string, gcsFileName: string) {
+    const storage = new Storage();
+    const bucketName = 'bulk-uploads-fresh-sensor-497515-d3';
+    
+    // 1. Download file from GCS
+    const [fileBuffer] = await storage
+      .bucket(bucketName)
+      .file(gcsFileName)
+      .download();
+
+    // 2. Process file synchronously
+    await this.processBulkImportBackground(businessId, importId, fileBuffer);
+
+    // 3. Clean up the file from GCS after processing (keeps bucket clean)
+    try {
+      await storage.bucket(bucketName).file(gcsFileName).delete();
+    } catch (e) {
+      console.warn(`Failed to delete temp file ${gcsFileName} from GCS:`, e);
+    }
+
+    // 4. Return the completed/failed import record
+    return this.getBulkImportDetails(importId);
   }
 
   async getBulkHistory(businessId: string) {

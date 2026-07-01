@@ -70,4 +70,21 @@ export class ProductsController {
   async getBulkImportDetails(@Param('id') id: string) {
     return this.productsService.getBulkImportDetails(id);
   }
+
+  @Get('bulk/upload-url')
+  async getBulkUploadUrl(
+    @Query('businessId') businessId: string,
+    @Query('filename') filename: string,
+  ) {
+    return this.productsService.getBulkUploadUrl(businessId, filename);
+  }
+
+  @Post('bulk/process')
+  async processBulkImportGcs(
+    @Body('businessId') businessId: string,
+    @Body('importId') importId: string,
+    @Body('gcsFileName') gcsFileName: string,
+  ) {
+    return this.productsService.processBulkImportGcs(businessId, importId, gcsFileName);
+  }
 }
