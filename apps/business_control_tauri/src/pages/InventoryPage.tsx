@@ -231,19 +231,35 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
 
     const reader = new FileReader();
     reader.onload = async (event) => {
+      showToast('Leyendo archivo...', 'warning');
       try {
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const workbook = read(data, { type: 'array' });
+        
+        let workbook;
+        try {
+          workbook = read(data, { type: 'array' });
+        } catch (readErr: any) {
+          showToast('Error al procesar estructura del archivo Excel: ' + readErr.message, 'error');
+          return;
+        }
         
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         
-        const importedRows = utils.sheet_to_json<Record<string, any>>(worksheet, { defval: '' });
+        let importedRows;
+        try {
+          importedRows = utils.sheet_to_json<Record<string, any>>(worksheet, { defval: '' });
+        } catch (jsonErr: any) {
+          showToast('Error al procesar contenido de la hoja Excel: ' + jsonErr.message, 'error');
+          return;
+        }
         
-        if (importedRows.length === 0) {
+        if (!importedRows || importedRows.length === 0) {
           showToast('El archivo está vacío o no contiene filas de datos.', 'error');
           return;
         }
+
+        showToast('Validando registros...', 'warning');
 
         // Validate and build preview
         const validatedRows = importedRows.map((row, idx) => {
@@ -267,15 +283,15 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
           if (!name) errors.push('Falta el nombre del producto.');
           if (!catName) errors.push('Falta la categoría.');
 
-          // Check if category exists
-          const catExists = categories.some(c => c.name.toLowerCase() === catName.toLowerCase());
+          // Check if category exists (safeguarded against null values/objects)
+          const catExists = (categories || []).some(c => c && c.name && c.name.toString().toLowerCase() === catName.toLowerCase());
           if (catName && !catExists) {
             warnings.push(`Creará nueva categoría: "${catName}"`);
           }
 
-          // Check if provider exists
+          // Check if provider exists (safeguarded against null values/objects)
           if (providerName) {
-            const provExists = providers.some(p => p.name.toLowerCase() === providerName.toLowerCase());
+            const provExists = (providers || []).some(p => p && p.name && p.name.toString().toLowerCase() === providerName.toLowerCase());
             if (!provExists) {
               warnings.push(`Creará nuevo proveedor: "${providerName}"`);
             }
