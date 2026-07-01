@@ -5,6 +5,7 @@ import { Input } from '../components/atoms/Input';
 import { Badge } from '../components/atoms/Badge';
 import { Heading } from '../components/atoms/Heading';
 import { ToastContainer } from '../components/molecules/ToastNotification';
+import * as XLSX from 'xlsx';
 
 interface InventoryPageProps {
   businessId: string;
@@ -211,135 +212,124 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
     document.body.removeChild(link);
   };
 
-  // Import spreadsheet products mapping categories and providers
-  const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Import spreadsheet products mapping categories and providers (handles both xlsx and csv natively!)
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = async (event) => {
-      const text = event.target?.result as string;
-      
-      const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-      if (lines.length <= 1) {
-        showToast('El archivo está vacío o no contiene filas de datos.', 'error');
-        return;
-      }
-
-      const headers = lines[0].replace(/^\uFEFF/, '').split(',').map(h => h.trim());
-      
-      const importedProducts = [];
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
-        if (values.length < headers.length) continue;
-
-        const rowData: Record<string, string> = {};
-        headers.forEach((header, index) => {
-          rowData[header] = values[index];
-        });
-
-        importedProducts.push(rowData);
-      }
-
-      if (importedProducts.length === 0) {
-        showToast('No se encontraron filas válidas para importar.', 'warning');
-        return;
-      }
-
-      showToast(`Procesando importación de ${importedProducts.length} productos...`, 'warning');
-
-      let successCount = 0;
-      let errorCount = 0;
-
-      for (const row of importedProducts) {
-        try {
-          const name = row['Nombre del Producto'];
-          const catName = row['Categoría'];
-          const cost = row['Costo'] || '0.00';
-          const price = row['Precio Venta'] || '0.00';
-          const priceWholesale = row['Precio Mayoreo'] || '0.00';
-          const minStock = row['Inv Mínimo'] || '0.000';
-          const maxStock = row['Inv Máximo'] || '0.000';
-          const saleType = (row['Tipo de Venta'] || 'pieza').toLowerCase() === 'granel' ? 'granel' : 'pieza';
-          const sku = row['SKU'] || undefined;
-          const barcode = row['Código Barras'] || undefined;
-          const internalCode = row['Código Interno'] || undefined;
-          const existence = parseFloat(row['Existencia'] || '0');
-          const providerName = row['Proveedor'];
-
-          if (!name || !catName) {
-            errorCount++;
-            continue;
-          }
-
-          // 1. Resolve Category
-          let category = categories.find(c => c.name.toLowerCase() === catName.toLowerCase());
-          if (!category) {
-            category = await api.addCategory({ name: catName, description: 'Creada por importación masiva' }, businessId);
-            setCategories(prev => [...prev, category!]);
-          }
-
-          // 2. Resolve Provider
-          let providerId: string | undefined = undefined;
-          if (providerName) {
-            const provider = providers.find(p => p.name.toLowerCase() === providerName.toLowerCase());
-            if (provider) {
-              providerId = provider.id;
-            } else {
-              const newProv = await api.addProvider({ name: providerName }, businessId);
-              setProviders(prev => [...prev, newProv]);
-              providerId = newProv.id;
-            }
-          }
-
-          // 3. Register Product
-          const payload = {
-            categoryId: category.id,
-            name,
-            sku,
-            barcode,
-            internalCode,
-            providerId,
-            cost: parseFloat(cost).toFixed(2),
-            price: parseFloat(price).toFixed(2),
-            priceWholesale: parseFloat(priceWholesale).toFixed(2),
-            minStock: parseFloat(minStock).toFixed(3),
-            maxStock: parseFloat(maxStock).toFixed(3),
-            saleType,
-            isSellable: true,
-            isIngredient: providerId ? true : false,
-          };
-
-          const created = await api.addProduct(payload, businessId);
-          setProducts(prev => [...prev, created]);
-
-          // Handle initial stock level import
-          if (!isNaN(existence) && existence > 0) {
-            let targetWhId = warehouses[0]?.id;
-            if (!targetWhId) {
-              const newWh = await api.addWarehouse({ name: 'Bodega Central', code: 'BC' }, businessId);
-              setWarehouses(prev => [...prev, newWh]);
-              targetWhId = newWh.id;
-            }
-
-            await api.adjustStock({
-              productId: created.id,
-              warehouseId: targetWhId,
-              quantity: existence,
-            });
-          }
-
-          successCount++;
-        } catch (err) {
-          console.error('Error importing row:', row, err);
-          errorCount++;
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        const importedRows = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, { defval: '' });
+        
+        if (importedRows.length === 0) {
+          showToast('El archivo está vacío o no contiene filas de datos.', 'error');
+          return;
         }
-      }
 
-      showToast(`Importación completa: ${successCount} agregados con éxito, ${errorCount} fallaron.`, successCount > 0 ? 'success' : 'error');
+        showToast(`Procesando importación de ${importedRows.length} productos...`, 'warning');
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const row of importedRows) {
+          try {
+            const name = row['Nombre del Producto']?.toString().trim();
+            const catName = row['Categoría']?.toString().trim();
+            const cost = row['Costo']?.toString().trim() || '0.00';
+            const price = row['Precio Venta']?.toString().trim() || '0.00';
+            const priceWholesale = row['Precio Mayoreo']?.toString().trim() || '0.00';
+            const minStock = row['Inv Mínimo']?.toString().trim() || '0.000';
+            const maxStock = row['Inv Máximo']?.toString().trim() || '0.000';
+            const saleType = (row['Tipo de Venta']?.toString().trim() || 'pieza').toLowerCase() === 'granel' ? 'granel' : 'pieza';
+            const sku = row['SKU']?.toString().trim() || undefined;
+            const barcode = row['Código Barras']?.toString().trim() || undefined;
+            const internalCode = row['Código Interno']?.toString().trim() || undefined;
+            const existence = parseFloat(row['Existencia']?.toString().trim() || '0');
+            const providerName = row['Proveedor']?.toString().trim();
+
+            if (!name || !catName) {
+              errorCount++;
+              continue;
+            }
+
+            // 1. Resolve Category
+            let category = categories.find(c => c.name.toLowerCase() === catName.toLowerCase());
+            if (!category) {
+              category = await api.addCategory({ name: catName, description: 'Creada por importación masiva' }, businessId);
+              setCategories(prev => [...prev, category!]);
+            }
+
+            // 2. Resolve Provider
+            let providerId: string | undefined = undefined;
+            if (providerName) {
+              const provider = providers.find(p => p.name.toLowerCase() === providerName.toLowerCase());
+              if (provider) {
+                providerId = provider.id;
+              } else {
+                const newProv = await api.addProvider({ name: providerName }, businessId);
+                setProviders(prev => [...prev, newProv]);
+                providerId = newProv.id;
+              }
+            }
+
+            // 3. Register Product
+            const payload = {
+              categoryId: category.id,
+              name,
+              sku,
+              barcode,
+              internalCode,
+              providerId,
+              cost: parseFloat(cost).toFixed(2),
+              price: parseFloat(price).toFixed(2),
+              priceWholesale: parseFloat(priceWholesale).toFixed(2),
+              minStock: parseFloat(minStock).toFixed(3),
+              maxStock: parseFloat(maxStock).toFixed(3),
+              saleType,
+              isSellable: true,
+              isIngredient: providerId ? true : false,
+            };
+
+            const created = await api.addProduct(payload, businessId);
+            setProducts(prev => [...prev, created]);
+
+            // Handle initial stock level import
+            if (!isNaN(existence) && existence > 0) {
+              let targetWhId = warehouses[0]?.id;
+              if (!targetWhId) {
+                const newWh = await api.addWarehouse({ name: 'Bodega Central', code: 'BC' }, businessId);
+                setWarehouses(prev => [...prev, newWh]);
+                targetWhId = newWh.id;
+              }
+
+              await api.adjustStock({
+                productId: created.id,
+                warehouseId: targetWhId,
+                quantity: existence,
+              });
+            }
+
+            successCount++;
+          } catch (err) {
+            console.error('Error importing row:', row, err);
+            errorCount++;
+          }
+        }
+
+        showToast(`Importación completa: ${successCount} agregados con éxito, ${errorCount} fallaron.`, successCount > 0 ? 'success' : 'error');
+      } catch (xlsxErr: any) {
+        showToast('Error al leer el archivo Excel: ' + xlsxErr.message, 'error');
+      }
     };
 
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
     e.target.value = '';
   };
 
@@ -409,9 +399,9 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                 <span>Importar Excel / CSV</span>
                 <input
                   type="file"
-                  accept=".csv"
+                  accept=".csv, .xlsx, .xls"
                   className="hidden"
-                  onChange={handleCSVImport}
+                  onChange={handleFileImport}
                 />
               </label>
             </>
