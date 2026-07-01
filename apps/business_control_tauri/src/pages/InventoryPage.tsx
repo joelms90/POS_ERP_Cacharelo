@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api, Category, Product, Provider } from '../services/api';
 import { Button } from '../components/atoms/Button';
 import { Input } from '../components/atoms/Input';
@@ -30,6 +30,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
   // Import Preview Modal states
   const [importPreview, setImportPreview] = useState<any[] | null>(null);
   const [isImporting, setIsImporting] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -350,21 +351,24 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                 <span>Descargar Plantilla</span>
               </button>
 
-              <label
-                className="flex items-center gap-2 px-3 py-1.5 bg-charcoal-surface border border-aged-bronze/40 hover:border-champagne-gold/60 rounded text-xs text-text-secondary hover:text-text-primary transition-all cursor-pointer"
-                title="Subir archivo CSV lleno"
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-3 py-1.5 bg-charcoal-surface border border-aged-bronze/40 hover:border-champagne-gold/60 rounded text-xs text-text-secondary hover:text-text-primary transition-all cursor-pointer font-sans"
+                title="Subir archivo Excel o CSV lleno"
               >
                 <svg className="w-4 h-4 text-champagne-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
                 <span>Importar Excel / CSV</span>
-                <input
-                  type="file"
-                  accept=".csv, .xlsx, .xls"
-                  className="hidden"
-                  onChange={handleFileImport}
-                />
-              </label>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv, .xlsx, .xls"
+                className="hidden"
+                onChange={handleFileImport}
+              />
             </>
           )}
 
