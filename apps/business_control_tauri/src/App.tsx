@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { LoginPage } from './pages/LoginPage';
 import { AdminLayout } from './components/templates/AdminLayout';
@@ -17,6 +17,23 @@ function App() {
   const { isAuthenticated, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers'>('personal');
   const [activeBusinessId, setActiveBusinessId] = useState<string>('d3b07384-d113-4a0e-a555-e5b12824bf01');
+  const [globalError, setGlobalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleError = (e: ErrorEvent) => {
+      setGlobalError(`${e.message} (en ${e.filename}:${e.lineno}:${e.colno})`);
+    };
+    const handleRejection = (e: PromiseRejectionEvent) => {
+      const reason = e.reason instanceof Error ? e.reason.message : String(e.reason);
+      setGlobalError(`Promesa rechazada: ${reason}`);
+    };
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleRejection);
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
+  }, []);
 
   // Full Screen Loading State
   if (isLoading) {
@@ -40,23 +57,39 @@ function App() {
 
   // Shell Layout when authenticated
   return (
-    <AdminLayout 
-      activeTab={activeTab} 
-      onTabChange={setActiveTab as any}
-      activeBusinessId={activeBusinessId}
-      onBusinessChange={setActiveBusinessId}
-    >
-      {activeTab === 'personal' && <DashboardPage businessId={activeBusinessId} />}
-      {activeTab === 'inventory' && <InventoryPage businessId={activeBusinessId} />}
-      {activeTab === 'providers' && <ProvidersPage businessId={activeBusinessId} />}
-      {activeTab === 'inquiries' && <InquiriesPage />}
-      {activeTab === 'warehouses' && <WarehousesPage businessId={activeBusinessId} />}
-      {activeTab === 'receipts' && <ReceiptsPage businessId={activeBusinessId} />}
-      {activeTab === 'branches' && <BranchesPage businessId={activeBusinessId} />}
-      {activeTab === 'categories' && <CategoriesPage businessId={activeBusinessId} />}
-      {activeTab === 'assembly' && <AssemblyPage businessId={activeBusinessId} />}
-      {activeTab === 'transfers' && <TransfersPage businessId={activeBusinessId} />}
-    </AdminLayout>
+    <>
+      <AdminLayout 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab as any}
+        activeBusinessId={activeBusinessId}
+        onBusinessChange={setActiveBusinessId}
+      >
+        {activeTab === 'personal' && <DashboardPage businessId={activeBusinessId} />}
+        {activeTab === 'inventory' && <InventoryPage businessId={activeBusinessId} />}
+        {activeTab === 'providers' && <ProvidersPage businessId={activeBusinessId} />}
+        {activeTab === 'inquiries' && <InquiriesPage />}
+        {activeTab === 'warehouses' && <WarehousesPage businessId={activeBusinessId} />}
+        {activeTab === 'receipts' && <ReceiptsPage businessId={activeBusinessId} />}
+        {activeTab === 'branches' && <BranchesPage businessId={activeBusinessId} />}
+        {activeTab === 'categories' && <CategoriesPage businessId={activeBusinessId} />}
+        {activeTab === 'assembly' && <AssemblyPage businessId={activeBusinessId} />}
+        {activeTab === 'transfers' && <TransfersPage businessId={activeBusinessId} />}
+      </AdminLayout>
+
+      {globalError && (
+        <div className="bg-error-red border-t border-white/20 text-white p-4 font-mono text-xs z-50 fixed bottom-0 left-0 right-0 max-h-[150px] overflow-y-auto shadow-2xl flex items-center justify-between">
+          <div className="flex-1">
+            <strong>[Error de Sistema]:</strong> {globalError}
+          </div>
+          <button 
+            onClick={() => setGlobalError(null)} 
+            className="ml-4 px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-[10px] uppercase font-bold tracking-widest cursor-pointer"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
