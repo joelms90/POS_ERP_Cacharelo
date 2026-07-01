@@ -304,11 +304,11 @@ export class ProductsService {
       })
       .returning();
 
-    // 2. Process file in the background (asynchronously) without awaiting
-    this.processBulkImportBackground(businessId, importRecord.id, file.buffer);
+    // 2. Process file synchronously (awaiting) to prevent Cloud Run CPU throttling
+    await this.processBulkImportBackground(businessId, importRecord.id, file.buffer);
 
-    // 3. Return the pending import record immediately
-    return importRecord;
+    // 3. Return the completed/failed import record
+    return this.getBulkImportDetails(importRecord.id);
   }
 
   async getBulkHistory(businessId: string) {
