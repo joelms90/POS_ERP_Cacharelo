@@ -416,126 +416,161 @@ export class ProductsService {
       let errorCount = 0;
       const errorDetails: any[] = [];
 
-      // Process row-by-row inside transaction context
-      await db.transaction(async (tx) => {
-        for (let idx = 0; idx < rows.length; idx++) {
-          const row = rows[idx];
-          const rowNumber = idx + 2; // header is row 1
-          
-          const name = getRowValue(row, 'Nombre del Producto') || getRowValue(row, 'Nombre');
-          const catName = getRowValue(row, 'Categoría') || getRowValue(row, 'Categoria');
-          const cost = cleanNumber(getRowValue(row, 'Costo'));
-          const price = cleanNumber(getRowValue(row, 'Precio Venta') || getRowValue(row, 'Precio'));
-          const priceWholesale = cleanNumber(getRowValue(row, 'Precio Mayoreo') || getRowValue(row, 'Mayoreo'));
-          const minStock = cleanNumber(getRowValue(row, 'Inv Mínimo') || getRowValue(row, 'Minimo') || getRowValue(row, 'Stock Minimo'));
-          const maxStock = cleanNumber(getRowValue(row, 'Inv Máximo') || getRowValue(row, 'Maximo') || getRowValue(row, 'Stock Maximo'));
-          const saleType = (getRowValue(row, 'Tipo de Venta') || 'pieza').toLowerCase() === 'granel' ? 'granel' : 'pieza';
-          const sku = getRowValue(row, 'SKU');
-          const barcode = getRowValue(row, 'Código Barras') || getRowValue(row, 'Codigo Barras') || getRowValue(row, 'Codigo de Barras') || getRowValue(row, 'Barcode');
-          const internalCode = getRowValue(row, 'Código Interno') || getRowValue(row, 'Codigo Interno') || getRowValue(row, 'Codigo');
-          const existence = parseFloat(cleanNumber(getRowValue(row, 'Existencia') || getRowValue(row, 'Existencias') || getRowValue(row, 'Cantidad') || getRowValue(row, 'Stock')));
-          const providerName = getRowValue(row, 'Proveedor') || getRowValue(row, 'Proveedores');
-
-          if (!name) {
-            errorCount++;
-            errorDetails.push({ rowNumber, error: 'Falta el nombre del producto.' });
-            continue;
+      // 1. Initial Validation and Row Extraction
+      const validRows: { row: Record<string, any>; rowNumber: number; parsed: any }[] = [];
+      
+      for (let idx = 0; idx < rows.length; idx++) {
+        const row = rows[idx];
+        const rowNumber = idx + 2; // header is row 1
+        
+        const name = getRowValue(row, 'Nombre del Producto') || getRowValue(row, 'Nombre');
+        const catName = getRowValue(row, 'Categoría') || getRowValue(row, 'Categoria');
+        
+        if (!name) {
+          errorCount++;
+          errorDetails.push({ rowNumber, error: 'Falta el nombre del producto.' });
+          continue;
+        }
+        if (!catName) {
+          errorCount++;
+          errorDetails.push({ rowNumber, error: 'Falta la categoría.' });
+          continue;
+        }
+        
+        const cost = cleanNumber(getRowValue(row, 'Costo'));
+        const price = cleanNumber(getRowValue(row, 'Precio Venta') || getRowValue(row, 'Precio'));
+        const priceWholesale = cleanNumber(getRowValue(row, 'Precio Mayoreo') || getRowValue(row, 'Mayoreo'));
+        const minStock = cleanNumber(getRowValue(row, 'Inv Mínimo') || getRowValue(row, 'Minimo') || getRowValue(row, 'Stock Minimo'));
+        const maxStock = cleanNumber(getRowValue(row, 'Inv Máximo') || getRowValue(row, 'Maximo') || getRowValue(row, 'Stock Maximo'));
+        const saleType = (getRowValue(row, 'Tipo de Venta') || 'pieza').toLowerCase() === 'granel' ? 'granel' : 'pieza';
+        const sku = getRowValue(row, 'SKU');
+        const barcode = getRowValue(row, 'Código Barras') || getRowValue(row, 'Codigo Barras') || getRowValue(row, 'Codigo de Barras') || getRowValue(row, 'Barcode');
+        const internalCode = getRowValue(row, 'Código Interno') || getRowValue(row, 'Codigo Interno') || getRowValue(row, 'Codigo');
+        const existence = parseFloat(cleanNumber(getRowValue(row, 'Existencia') || getRowValue(row, 'Existencias') || getRowValue(row, 'Cantidad') || getRowValue(row, 'Stock')));
+        const providerName = getRowValue(row, 'Proveedor') || getRowValue(row, 'Proveedores');
+        
+        validRows.push({
+          row,
+          rowNumber,
+          parsed: {
+            name,
+            catName,
+            cost,
+            price,
+            priceWholesale,
+            minStock,
+            maxStock,
+            saleType,
+            sku,
+            barcode,
+            internalCode,
+            existence,
+            providerName,
           }
-          if (!catName) {
-            errorCount++;
-            errorDetails.push({ rowNumber, error: 'Falta la categoría.' });
-            continue;
+        });
+      }
+
+      // 2. Perform DB operations inside transaction context in bulk
+      if (validRows.length > 0) {
+        await db.transaction(async (tx) => {
+          // A. Insert missing categories in bulk
+          const uniqueCatNames = Array.from(new Set(validRows.map(vr => vr.parsed.catName)));
+          const newCatsToInsert = uniqueCatNames
+            .filter(name => !categories.some(c => c.name.toLowerCase() === name.toLowerCase()))
+            .map(name => ({
+              name,
+              description: 'Creada por importación masiva',
+              businessId,
+            }));
+            
+          if (newCatsToInsert.length > 0) {
+            const insertedCats = await tx.insert(schema.categories).values(newCatsToInsert).returning();
+            categories.push(...insertedCats);
           }
 
-          try {
-            // 1. Category
-            let category = categories.find(c => c.name.toLowerCase() === catName.toLowerCase());
-            if (!category) {
-              const [createdCat] = await tx
-                .insert(schema.categories)
+          // B. Insert missing providers in bulk
+          const uniqueProvNames = Array.from(
+            new Set(
+              validRows
+                .map(vr => vr.parsed.providerName)
+                .filter((name): name is string => typeof name === 'string' && name.trim().length > 0)
+            )
+          );
+          const newProvsToInsert = uniqueProvNames
+            .filter(name => !providers.some(p => p.name.toLowerCase() === name.toLowerCase()))
+            .map(name => ({
+              name,
+              businessId,
+            }));
+            
+          if (newProvsToInsert.length > 0) {
+            const insertedProvs = await tx.insert(schema.providers).values(newProvsToInsert).returning();
+            providers.push(...insertedProvs);
+          }
+
+          // C. Prepare and insert products in bulk
+          const productsToInsert = validRows.map(vr => {
+            const p = vr.parsed;
+            const category = categories.find(c => c.name.toLowerCase() === p.catName.toLowerCase())!;
+            const provider = p.providerName ? providers.find(prov => prov.name.toLowerCase() === p.providerName.toLowerCase()) : null;
+            const providerId = provider ? provider.id : null;
+            
+            return {
+              categoryId: category.id,
+              name: p.name,
+              sku: p.sku || null,
+              barcode: p.barcode || null,
+              internalCode: p.internalCode || null,
+              providerId,
+              cost: p.cost,
+              price: p.price,
+              priceWholesale: p.priceWholesale,
+              minStock: p.minStock,
+              maxStock: p.maxStock,
+              saleType: p.saleType,
+              isSellable: true,
+              isIngredient: providerId ? true : false,
+              businessId,
+            };
+          });
+
+          const insertedProducts = await tx.insert(schema.products).values(productsToInsert).returning();
+          successCount = insertedProducts.length;
+
+          // D. Prepare and insert stock levels in bulk
+          let targetWh = warehouses[0];
+          if (validRows.some(vr => vr.parsed.existence > 0)) {
+            if (!targetWh) {
+              const [createdWh] = await tx
+                .insert(schema.warehouses)
                 .values({
-                  name: catName,
-                  description: 'Creada por importación masiva',
+                  name: 'Bodega Central',
+                  code: 'BC',
                   businessId,
                 })
                 .returning();
-              category = createdCat;
-              categories.push(category);
+              targetWh = createdWh;
+              warehouses.push(targetWh);
             }
 
-            // 2. Provider
-            let providerId: string | null = null;
-            if (providerName) {
-              const provider = providers.find(p => p.name.toLowerCase() === providerName.toLowerCase());
-              if (provider) {
-                providerId = provider.id;
-              } else {
-                const [createdProv] = await tx
-                  .insert(schema.providers)
-                  .values({
-                    name: providerName,
-                    businessId,
-                  })
-                  .returning();
-                providerId = createdProv.id;
-                providers.push(createdProv);
-              }
-            }
-
-            // 3. Product
-            const [product] = await tx
-              .insert(schema.products)
-              .values({
-                categoryId: category.id,
-                name,
-                sku: sku || null,
-                barcode: barcode || null,
-                internalCode: internalCode || null,
-                providerId,
-                cost,
-                price,
-                priceWholesale,
-                minStock,
-                maxStock,
-                saleType,
-                isSellable: true,
-                isIngredient: providerId ? true : false,
-                businessId,
-              })
-              .returning();
-
-            // 4. Warehouse Stock Level
-            if (existence > 0) {
-              let targetWh = warehouses[0];
-              if (!targetWh) {
-                const [createdWh] = await tx
-                  .insert(schema.warehouses)
-                  .values({
-                    name: 'Bodega Central',
-                    code: 'BC',
-                    businessId,
-                  })
-                  .returning();
-                targetWh = createdWh;
-                warehouses.push(createdWh);
-              }
-
-              await tx
-                .insert(schema.stockLevels)
-                .values({
-                  productId: product.id,
+            const stockLevelsToInsert = [];
+            for (let i = 0; i < validRows.length; i++) {
+              const existence = validRows[i].parsed.existence;
+              if (existence > 0) {
+                stockLevelsToInsert.push({
+                  productId: insertedProducts[i].id,
                   warehouseId: targetWh.id,
                   quantity: existence.toString(),
                 });
+              }
             }
 
-            successCount++;
-          } catch (rowErr: any) {
-            errorCount++;
-            errorDetails.push({ rowNumber, error: rowErr.message || 'Error al guardar el producto en base de datos.' });
+            if (stockLevelsToInsert.length > 0) {
+              await tx.insert(schema.stockLevels).values(stockLevelsToInsert);
+            }
           }
-        }
-      });
+        });
+      }
 
       // Update task record with results
       await db
