@@ -65,4 +65,9 @@ export class InventoryController {
   ) {
     return this.inventoryService.getTransfersDetailedReport(businessId, branchId, startDate, endDate);
   }
+
+  @Post('stock/adjust')
+  async adjustStock(@Body() body: { productId: string; warehouseId?: string; branchId?: string; quantity: number }) {
+    return this.inventoryService.adjustStock(body);
+  }
 }

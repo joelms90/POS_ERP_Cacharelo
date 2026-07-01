@@ -530,4 +530,46 @@ export class InventoryService {
       };
     });
   }
+
+  async adjustStock(body: { productId: string; warehouseId?: string; branchId?: string; quantity: number }) {
+    const { productId, warehouseId, branchId, quantity } = body;
+    const db = this.inventoryRepository.getDb();
+
+    const conditions = [eq(schema.stockLevels.productId, productId)];
+    if (warehouseId) {
+      conditions.push(eq(schema.stockLevels.warehouseId, warehouseId));
+    } else if (branchId) {
+      conditions.push(eq(schema.stockLevels.branchId, branchId));
+    } else {
+      throw new BadRequestException('Debe especificar un almacén o sucursal.');
+    }
+
+    const [existing] = await db
+      .select()
+      .from(schema.stockLevels)
+      .where(and(...conditions))
+      .limit(1);
+
+    if (existing) {
+      await db
+        .update(schema.stockLevels)
+        .set({
+          quantity: quantity.toString(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.stockLevels.id, existing.id));
+    } else {
+      await db
+        .insert(schema.stockLevels)
+        .values({
+          productId,
+          warehouseId: warehouseId || null,
+          branchId: branchId || null,
+          quantity: quantity.toString(),
+          updatedAt: new Date(),
+        });
+    }
+
+    return { success: true };
+  }
 }

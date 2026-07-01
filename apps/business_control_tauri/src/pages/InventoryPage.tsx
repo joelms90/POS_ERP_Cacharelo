@@ -26,6 +26,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
   // Edit/Create Product State
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [isSavingProduct, setIsSavingProduct] = useState<boolean>(false);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -40,14 +41,16 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true);
     try {
-      const [catsData, prodsData, provsData] = await Promise.all([
+      const [catsData, prodsData, provsData, whsData] = await Promise.all([
         api.getCategories(businessId),
         api.getProducts(businessId),
         api.getProviders(businessId).catch(() => [] as Provider[]),
+        api.getWarehouses(businessId).catch(() => [] as any[]),
       ]);
       setCategories(catsData);
       setProducts(prodsData);
       setProviders(provsData);
+      setWarehouses(whsData);
     } catch (error: any) {
       showToast(error.message || 'Error al sincronizar catálogo de inventario.', 'error');
     } finally {
@@ -176,6 +179,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
       'Tipo de Venta',
       'SKU',
       'Código Barras',
+      'Existencia',
       'Proveedor'
     ];
     const row = [
@@ -190,6 +194,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
       'granel',
       'SKU-ARROZ',
       '123456789',
+      '50',
       'PLANTA PRODUCCION'
     ];
     
@@ -259,6 +264,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
           const sku = row['SKU'] || undefined;
           const barcode = row['Código Barras'] || undefined;
           const internalCode = row['Código Interno'] || undefined;
+          const existence = parseFloat(row['Existencia'] || '0');
           const providerName = row['Proveedor'];
 
           if (!name || !catName) {
@@ -306,6 +312,23 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
 
           const created = await api.addProduct(payload, businessId);
           setProducts(prev => [...prev, created]);
+
+          // Handle initial stock level import
+          if (!isNaN(existence) && existence > 0) {
+            let targetWhId = warehouses[0]?.id;
+            if (!targetWhId) {
+              const newWh = await api.addWarehouse({ name: 'Bodega Central', code: 'BC' }, businessId);
+              setWarehouses(prev => [...prev, newWh]);
+              targetWhId = newWh.id;
+            }
+
+            await api.adjustStock({
+              productId: created.id,
+              warehouseId: targetWhId,
+              quantity: existence,
+            });
+          }
+
           successCount++;
         } catch (err) {
           console.error('Error importing row:', row, err);

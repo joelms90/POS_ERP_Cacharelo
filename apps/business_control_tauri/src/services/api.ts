@@ -613,6 +613,18 @@ export const api = {
     });
   },
 
+  async adjustStock(payload: {
+    productId: string;
+    warehouseId?: string;
+    branchId?: string;
+    quantity: number;
+  }): Promise<{ success: boolean }> {
+    return apiRequest<{ success: boolean }>('/inventory/stock/adjust', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
   /**
    * Reports
    */
