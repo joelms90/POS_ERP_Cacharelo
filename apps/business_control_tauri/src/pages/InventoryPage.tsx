@@ -5,7 +5,6 @@ import { Input } from '../components/atoms/Input';
 import { Badge } from '../components/atoms/Badge';
 import { Heading } from '../components/atoms/Heading';
 import { ToastContainer } from '../components/molecules/ToastNotification';
-import { read, utils } from 'xlsx';
 
 interface InventoryPageProps {
   businessId: string;
@@ -224,9 +223,15 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
       try {
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
         
+        const XLSX = (window as any).XLSX;
+        if (!XLSX) {
+          showToast('Error: Biblioteca de lectura de archivos no cargada.', 'error');
+          return;
+        }
+
         let workbook;
         try {
-          workbook = read(data, { type: 'array' });
+          workbook = XLSX.read(data, { type: 'array' });
         } catch (readErr: any) {
           showToast('Error al procesar estructura del archivo Excel: ' + readErr.message, 'error');
           return;
@@ -237,7 +242,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
         
         let importedRows;
         try {
-          importedRows = utils.sheet_to_json<Record<string, any>>(worksheet, { defval: '' });
+          importedRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' }) as Record<string, any>[];
         } catch (jsonErr: any) {
           showToast('Error al procesar contenido de la hoja Excel: ' + jsonErr.message, 'error');
           return;
@@ -314,7 +319,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-aged-bronze/10 pb-4">
         <div>
           <Heading level={2} className="!border-none !pb-0 font-light">
-            Control de Inventario y Catálogo (v2.3 - Error Logged)
+            Control de Inventario y Catálogo (v2.4 - CDN Load)
           </Heading>
           <p className="text-sm text-text-secondary mt-1 font-sans">
             Administra las categorías de platillos, bebidas e ingredientes de tu local, así como los precios de venta y costos.
