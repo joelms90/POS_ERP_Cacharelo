@@ -378,6 +378,19 @@ export class ProductsService {
         .set({ status: 'processing', updatedAt: new Date() })
         .where(eq(schema.bulkImports.id, importId));
 
+      // Validate that the buffer is not empty or corrupted (xlsx zip structure is at least a few KB)
+      if (!buffer || buffer.length < 100) {
+        await db
+          .update(schema.bulkImports)
+          .set({ 
+            status: 'failed', 
+            errorDetails: [{ error: 'El archivo subido está vacío, dañado o es inválido.' }],
+            updatedAt: new Date() 
+          })
+          .where(eq(schema.bulkImports.id, importId));
+        return;
+      }
+
       // Parse SheetJS in-memory using read from 'xlsx'
       const workbook = read(buffer, { type: 'buffer' });
       const firstSheetName = workbook.SheetNames[0];
