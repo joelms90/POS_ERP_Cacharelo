@@ -2,12 +2,25 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { db } from './connection';
 import * as path from 'path';
 import * as schema from './schema';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 
 export async function runMigrations() {
   console.log('⏳ Running database migrations...');
   try {
+    console.log('🧹 Terminating orphaned database connections...');
+    try {
+      await db.execute(sql`
+        SELECT pg_terminate_backend(pid) 
+        FROM pg_stat_activity 
+        WHERE pid <> pg_backend_pid()
+          AND (state = 'idle in transaction' OR age(clock_timestamp(), query_start) > interval '3 minutes');
+      `);
+      console.log('✅ Orphaned database connections terminated.');
+    } catch (e) {
+      console.error('⚠️ Failed to terminate orphaned connections:', e);
+    }
+
     // Relative path from dist/database/migrate.js to root migrations/
     const migrationsPath = path.join(__dirname, '../../migrations');
     await migrate(db, {
