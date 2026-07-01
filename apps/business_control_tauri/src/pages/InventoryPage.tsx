@@ -5,7 +5,7 @@ import { Input } from '../components/atoms/Input';
 import { Badge } from '../components/atoms/Badge';
 import { Heading } from '../components/atoms/Heading';
 import { ToastContainer } from '../components/molecules/ToastNotification';
-import * as XLSX from 'xlsx';
+import { read, utils } from 'xlsx';
 
 interface InventoryPageProps {
   businessId: string;
@@ -32,6 +32,14 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
   // Import Preview Modal states
   const [importPreview, setImportPreview] = useState<any[] | null>(null);
   const [isImporting, setIsImporting] = useState<boolean>(false);
+
+  const cleanNumberString = (val: any): string => {
+    if (val === undefined || val === null) return '0.00';
+    const str = val.toString().trim();
+    const cleaned = str.replace(/[$\s,]/g, '');
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? '0.00' : parsed.toString();
+  };
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -225,12 +233,12 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
     reader.onload = async (event) => {
       try {
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = read(data, { type: 'array' });
         
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         
-        const importedRows = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, { defval: '' });
+        const importedRows = utils.sheet_to_json<Record<string, any>>(worksheet, { defval: '' });
         
         if (importedRows.length === 0) {
           showToast('El archivo está vacío o no contiene filas de datos.', 'error');
@@ -241,16 +249,16 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
         const validatedRows = importedRows.map((row, idx) => {
           const name = row['Nombre del Producto']?.toString().trim() || '';
           const catName = row['Categoría']?.toString().trim() || '';
-          const cost = row['Costo']?.toString().trim() || '0.00';
-          const price = row['Precio Venta']?.toString().trim() || '0.00';
-          const priceWholesale = row['Precio Mayoreo']?.toString().trim() || '0.00';
-          const minStock = row['Inv Mínimo']?.toString().trim() || '0.000';
-          const maxStock = row['Inv Máximo']?.toString().trim() || '0.000';
+          const cost = cleanNumberString(row['Costo']);
+          const price = cleanNumberString(row['Precio Venta']);
+          const priceWholesale = cleanNumberString(row['Precio Mayoreo']);
+          const minStock = cleanNumberString(row['Inv Mínimo']);
+          const maxStock = cleanNumberString(row['Inv Máximo']);
           const saleType = (row['Tipo de Venta']?.toString().trim() || 'pieza').toLowerCase() === 'granel' ? 'granel' : 'pieza';
           const sku = row['SKU']?.toString().trim() || '';
           const barcode = row['Código Barras']?.toString().trim() || '';
           const internalCode = row['Código Interno']?.toString().trim() || '';
-          const existence = parseFloat(row['Existencia']?.toString().trim() || '0');
+          const existence = parseFloat(cleanNumberString(row['Existencia']));
           const providerName = row['Proveedor']?.toString().trim() || '';
 
           const errors: string[] = [];
