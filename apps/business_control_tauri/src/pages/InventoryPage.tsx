@@ -314,7 +314,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-aged-bronze/10 pb-4">
         <div>
           <Heading level={2} className="!border-none !pb-0 font-light">
-            Control de Inventario y Catálogo
+            Control de Inventario y Catálogo (v2.2)
           </Heading>
           <p className="text-sm text-text-secondary mt-1 font-sans">
             Administra las categorías de platillos, bebidas e ingredientes de tu local, así como los precios de venta y costos.
