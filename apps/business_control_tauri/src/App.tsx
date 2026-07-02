@@ -12,11 +12,12 @@ import { BranchesPage } from './pages/BranchesPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { AssemblyPage } from './pages/AssemblyPage';
 import { TransfersPage } from './pages/TransfersPage';
+import { HelpPage } from './pages/HelpPage';
 import { api } from './services/api';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers'>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers' | 'help'>('personal');
   const [activeBusinessId, setActiveBusinessId] = useState<string>('d3b07384-d113-4a0e-a555-e5b12824bf01');
   const [globalError, setGlobalError] = useState<string | null>(null);
 
@@ -80,6 +81,7 @@ function App() {
         {activeTab === 'categories' && <CategoriesPage businessId={activeBusinessId} />}
         {activeTab === 'assembly' && <AssemblyPage businessId={activeBusinessId} />}
         {activeTab === 'transfers' && <TransfersPage businessId={activeBusinessId} />}
+        {activeTab === 'help' && <HelpPage />}
       </AdminLayout>
 
       {globalError && (
