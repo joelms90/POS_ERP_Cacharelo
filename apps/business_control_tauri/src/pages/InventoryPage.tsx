@@ -211,7 +211,8 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
       'SKU',
       'Código Barras',
       'Existencia',
-      'Proveedor'
+      'Proveedor',
+      'Para Venta'
     ];
     const row = [
       '1',
@@ -226,7 +227,8 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
       'SKU-ARROZ',
       '123456789',
       '50',
-      'PLANTA PRODUCCION'
+      'PLANTA PRODUCCION',
+      'SI'
     ];
     
     // Include BOM character for proper Spanish characters opening in Excel

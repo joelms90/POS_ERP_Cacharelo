@@ -93,6 +93,19 @@ As a business administrator, I want to see the status of the sync server and its
 - **SC-004**: Network disconnects are detected and displayed as an alert banner in less than 3 seconds.
 - **SC-005**: Admin token is stored securely in local app storage to persist session across application restarts (unless logged out).
 
+## Catalog Bulk Import Classification Rules
+
+In catalog bulk imports, all uploaded products are classified as **Insumos** (Ingredients/Supplies) by default to prevent raw materials from cluttering the sales menu. 
+
+- **Default Classification**: 
+  - `isSellable` is set to `false` (cannot be sold directly at the POS checkout).
+  - `isIngredient` is set to `true` (available for inventory tracking and recipes).
+- **Venta Override ("Para Venta" column)**: 
+  - To classify an item as a finished product for sale, the Excel/CSV sheet must contain a column named **`Para Venta`** (or **`Venta`** / **`Es Venta`**).
+  - If the cell value is explicitly set to `SI`, `S`, `YES`, `Y`, `TRUE`, or `1` (case-insensitive), the item is created with:
+    - `isSellable = true`
+    - `isIngredient = false`
+
 ## Assumptions
 
 - The sync backend (`apps/sync_api`) is already running and exposes the endpoints `/api/auth/admin`, `/api/users`, and `/api/auth/login`.

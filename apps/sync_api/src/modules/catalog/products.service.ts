@@ -541,6 +541,9 @@ export class ProductsService {
         const internalCode = getRowValue(row, 'Código Interno') || getRowValue(row, 'Codigo Interno') || getRowValue(row, 'Codigo');
         const existence = parseFloat(cleanNumber(getRowValue(row, 'Existencia') || getRowValue(row, 'Existencias') || getRowValue(row, 'Cantidad') || getRowValue(row, 'Stock')));
         const providerName = getRowValue(row, 'Proveedor') || getRowValue(row, 'Proveedores');
+        const paraVentaValue = getRowValue(row, 'Para Venta') || getRowValue(row, 'Venta') || getRowValue(row, 'Es Venta');
+        const paraVentaStr = paraVentaValue ? paraVentaValue.toString().toLowerCase().trim() : '';
+        const paraVenta = ['si', 's', 'yes', 'y', 'true', '1'].includes(paraVentaStr);
         
         validRows.push({
           row,
@@ -559,6 +562,7 @@ export class ProductsService {
             internalCode,
             existence,
             providerName,
+            paraVenta,
           }
         });
       }
@@ -621,8 +625,8 @@ export class ProductsService {
               minStock: p.minStock,
               maxStock: p.maxStock,
               saleType: p.saleType,
-              isSellable: true,
-              isIngredient: providerId ? true : false,
+              isSellable: p.paraVenta,
+              isIngredient: !p.paraVenta,
               businessId,
             };
           });
