@@ -5,6 +5,7 @@ import { Button } from '../components/atoms/Button';
 import { Input } from '../components/atoms/Input';
 import { FormField } from '../components/molecules/FormField';
 import { Badge } from '../components/atoms/Badge';
+import { Autocomplete } from '../components/molecules/Autocomplete';
 
 interface AssemblyPageProps {
   businessId: string;
@@ -330,19 +331,17 @@ export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
                 <form onSubmit={handleAddComponentToRecipe} className="flex flex-col sm:flex-row gap-4 items-end bg-charcoal-surface/30 p-4 rounded-md border border-aged-bronze/20 mb-6">
                   <div className="flex-1 min-w-[200px]">
                     <label className="text-[10px] text-text-secondary block mb-1 uppercase tracking-wider font-semibold">Ingrediente Componente</label>
-                    <select
+                    <Autocomplete
+                      options={ingredientCandidates.map(ing => ({
+                        id: ing.id,
+                        label: ing.name,
+                        sublabel: ing.sku ? `SKU: ${ing.sku}` : undefined,
+                      }))}
                       value={newIngredientId}
-                      onChange={(e) => setNewIngredientId(e.target.value)}
-                      className="w-full bg-charcoal-surface border border-aged-bronze focus:border-champagne-gold text-xs text-text-primary p-2.5 rounded focus:outline-none"
+                      onChange={setNewIngredientId}
+                      placeholder="Buscar ingrediente..."
                       required
-                    >
-                      <option value="">-- Seleccionar Ingrediente --</option>
-                      {ingredientCandidates.map(ing => (
-                        <option key={ing.id} value={ing.id}>
-                          {ing.name} {ing.sku ? `(SKU: ${ing.sku})` : ''}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
                   
                   <div className="w-full sm:w-36">

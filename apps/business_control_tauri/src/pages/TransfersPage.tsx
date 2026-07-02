@@ -5,6 +5,7 @@ import { Heading } from '../components/atoms/Heading';
 import { Input } from '../components/atoms/Input';
 import { Badge } from '../components/atoms/Badge';
 import { ToastContainer } from '../components/molecules/ToastNotification';
+import { Autocomplete } from '../components/molecules/Autocomplete';
 
 interface TransfersPageProps {
   businessId: string;
@@ -342,17 +343,16 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
               <form onSubmit={handleAddItem} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end bg-charcoal-surface/40 p-4 rounded border border-aged-bronze/10">
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
                   <label className="text-[10px] text-text-secondary uppercase">Buscar Insumo / Producto</label>
-                  <select
+                  <Autocomplete
+                    options={products.map((p) => ({
+                      id: p.id,
+                      label: p.name,
+                      sublabel: `${p.internalCode ? `Código: ${p.internalCode}` : p.sku ? `SKU: ${p.sku}` : ''} - Costo: $${p.cost || '0.00'}`,
+                    }))}
                     value={selectedProductId}
-                    onChange={(e) => setSelectedProductId(e.target.value)}
-                    className="bg-charcoal-surface border border-aged-bronze text-text-primary rounded p-2.5 font-sans text-xs focus:outline-none cursor-pointer w-full"
-                  >
-                    {products.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} {p.internalCode ? `(${p.internalCode})` : p.sku ? `[${p.sku}]` : ''} - Costo: ${p.cost || '0.00'}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSelectedProductId}
+                    placeholder="Buscar insumo o producto..."
+                  />
                 </div>
                 <div className="flex gap-2 items-end sm:col-span-1">
                   <div className="flex flex-col gap-1.5 flex-1">

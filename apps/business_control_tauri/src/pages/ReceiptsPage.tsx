@@ -3,6 +3,7 @@ import { api, Warehouse } from '../services/api';
 import { Button } from '../components/atoms/Button';
 import { Heading } from '../components/atoms/Heading';
 import { ToastContainer } from '../components/molecules/ToastNotification';
+import { Autocomplete } from '../components/molecules/Autocomplete';
 
 interface ReceiptsPageProps {
   businessId: string;
@@ -319,21 +320,16 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
                 <div className="grid grid-cols-12 gap-2 items-end">
                   <div className="col-span-6">
                     <label className="block text-[10px] text-text-secondary uppercase mb-1">Producto</label>
-                    <select
+                    <Autocomplete
+                      options={products.map((p) => ({
+                        id: p.id,
+                        label: p.name,
+                        sublabel: p.sku ? `SKU: ${p.sku}` : undefined,
+                      }))}
                       value={selectedProductId}
-                      onChange={(e) => setSelectedProductId(e.target.value)}
-                      className="w-full bg-charcoal border border-aged-bronze/45 rounded-md px-2 py-1.5 text-xs text-text-primary focus:outline-none"
-                    >
-                      {products.length === 0 ? (
-                        <option value="">No hay productos catalogados</option>
-                      ) : (
-                        products.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} {p.sku ? `(${p.sku})` : ''}
-                          </option>
-                        ))
-                      )}
-                    </select>
+                      onChange={setSelectedProductId}
+                      placeholder="Buscar insumo o producto..."
+                    />
                   </div>
                   <div className="col-span-3">
                     <label className="block text-[10px] text-text-secondary uppercase mb-1">Cant.</label>
