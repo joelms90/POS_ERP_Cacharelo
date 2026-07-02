@@ -332,6 +332,22 @@ export class ProductsService {
     const storage = new Storage();
     const bucketName = 'bulk-uploads-fresh-sensor-497515-d3';
     const gcsFileName = `${importRecord.id}-${filename}`;
+
+    // Ensure bucket has a 7-day retention/lifecycle policy
+    try {
+      await storage.bucket(bucketName).setMetadata({
+        lifecycle: {
+          rule: [
+            {
+              action: { type: 'Delete' },
+              condition: { age: 7 },
+            },
+          ],
+        },
+      });
+    } catch (e) {
+      console.warn(`Failed to set GCS lifecycle metadata on bucket ${bucketName}:`, e);
+    }
     
     const [url] = await storage
       .bucket(bucketName)
@@ -458,6 +474,7 @@ export class ProductsService {
       const workbook = read(buffer, { type: 'buffer' });
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
+      recalculateSheetRange(worksheet);
       const rows = utils.sheet_to_json<Record<string, any>>(worksheet, { defval: '' });
 
       if (rows.length === 0) {
@@ -676,5 +693,55 @@ export class ProductsService {
         console.error('Failed to log failed state to database:', dbErr);
       }
     }
+  }
+}
+
+function recalculateSheetRange(sheet: any) {
+  let minRow = Infinity;
+  let maxRow = -Infinity;
+  let minCol = Infinity;
+  let maxCol = -Infinity;
+
+  const colLetterToIndex = (col: string) => {
+    let index = 0;
+    for (let i = 0; i < col.length; i++) {
+      index = index * 26 + (col.charCodeAt(i) - 64);
+    }
+    return index - 1;
+  };
+
+  const indexToColLetter = (index: number) => {
+    let col = '';
+    while (index >= 0) {
+      col = String.fromCharCode((index % 26) + 65) + col;
+      index = Math.floor(index / 26) - 1;
+    }
+    return col;
+  };
+
+  for (const key in sheet) {
+    if (key.startsWith('!')) continue;
+    
+    const match = key.match(/^([A-Z]+)([0-9]+)$/);
+    if (!match) continue;
+    
+    const colStr = match[1];
+    const rowStr = match[2];
+    
+    const col = colLetterToIndex(colStr);
+    const row = parseInt(rowStr, 10);
+    
+    if (col < minCol) minCol = col;
+    if (col > maxCol) maxCol = col;
+    if (row < minRow) minRow = row;
+    if (row > maxRow) maxRow = row;
+  }
+
+  if (maxRow === -Infinity) {
+    sheet['!ref'] = 'A1:A1';
+  } else {
+    const minColStr = indexToColLetter(minCol);
+    const maxColStr = indexToColLetter(maxCol);
+    sheet['!ref'] = `${minColStr}${minRow}:${maxColStr}${maxRow}`;
   }
 }
