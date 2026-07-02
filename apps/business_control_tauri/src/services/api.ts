@@ -735,7 +735,25 @@ export const api = {
     if (endDate) url += `&endDate=${endDate}`;
     return apiRequest<any[]>(url);
   },
+
+  async getSalesDashboardReport(businessId: string, startDate?: string, endDate?: string): Promise<SalesDashboardReport> {
+    let url = `/reports/sales-dashboard?businessId=${businessId}`;
+    if (startDate) url += `&startDate=${startDate}`;
+    if (endDate) url += `&endDate=${endDate}`;
+    return apiRequest<SalesDashboardReport>(url);
+  },
 };
+
+export interface SalesDashboardReport {
+  totalSales: number;
+  totalOrdersCount: number;
+  averageTicket: number;
+  salesByBranch: Array<{ id: string; name: string; totalSales: number; ordersCount: number }>;
+  topProducts: Array<{ id: string; name: string; sku: string | null; quantitySold: number; totalSales: number; profitMargin: number }>;
+  topWaiters: Array<{ id: string; name: string; totalSales: number; ordersCount: number }>;
+  topCashiers: Array<{ id: string; name: string; totalSales: number; ordersCount: number }>;
+  hourlySales: Array<{ hour: number; totalSales: number }>;
+}
 
 export interface RecipeItem {
   id?: string;

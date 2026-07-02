@@ -15,6 +15,7 @@ import { WarehousesModule } from './modules/warehouses/warehouses.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { RecipesModule } from './modules/recipes/recipes.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { RecipesModule } from './modules/recipes/recipes.module';
     InventoryModule,
     BranchesModule,
     RecipesModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
