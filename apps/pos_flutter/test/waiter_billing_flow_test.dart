@@ -249,7 +249,7 @@ void main() {
       expect(payment['paymentMethod'], 'cash');
       expect(payment['referenceCode'], isNull);
       expect(item['productId'], productId);
-      expect(item['price'], '21.55');
+      expect(item['price'], '25.00');
     },
   );
 }
