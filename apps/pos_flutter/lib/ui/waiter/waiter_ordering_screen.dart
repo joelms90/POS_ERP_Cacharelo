@@ -6,7 +6,7 @@ import '../widgets/table_node.dart';
 import '../widgets/menu_card.dart';
 import '../widgets/custom_toast.dart';
 import '../widgets/printer_monitor_panel.dart';
-import '../widgets/bluetooth_settings_dialog.dart';
+import '../widgets/printer_settings_dialog.dart';
 import '../login_screen.dart';
 import 'modifier_dialog.dart';
 import 'cart_sidebar.dart';
@@ -34,6 +34,49 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
 
   List<String> activeGenders = ['M'];
   int selectedGuestIndex = 0;
+
+  final TextEditingController _searchController = TextEditingController();
+  String searchProductQuery = '';
+
+  // Store unsent (draft) carts for each table/takeout order
+  final Map<String, List<OrderItem>> _draftCarts = {};
+
+  void _selectOrderingTable(TableModel? table) {
+    // 1. Save the draft cart of the previous active table before switching
+    if (activeOrderingTable != null) {
+      final String prevKey = (activeOrderingTable!.id ?? activeOrderingTable!.label).toString();
+      _draftCarts[prevKey] = List.from(currentCart);
+    }
+
+    setState(() {
+      activeOrderingTable = table;
+      if (table == null) {
+        currentCart = [];
+        isCartOpen = false;
+        activeGenders = ['M'];
+        selectedGuestIndex = 0;
+      } else {
+        // 2. Load the draft cart for the new table, or fall back to already synced items
+        final String newKey = (table.id ?? table.label).toString();
+        if (_draftCarts.containsKey(newKey)) {
+          currentCart = List.from(_draftCarts[newKey]!);
+        } else {
+          currentCart = List.from(table.items);
+        }
+        isCartOpen = false;
+        activeGenders = table.guestGenders.isEmpty
+            ? ['M']
+            : List.from(table.guestGenders);
+        selectedGuestIndex = 0;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   void _triggerSync(BuildContext context) async {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -94,6 +137,9 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
           listenable: widget.state,
           builder: (context, _) {
             final zones = widget.state.tables.map((t) => t.zone).toSet().toList();
+            if (!zones.contains('Para Llevar')) {
+              zones.add('Para Llevar');
+            }
             if (zones.isNotEmpty && !zones.contains(selectedZone)) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) {
@@ -154,6 +200,9 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                                   ),
                                                 ),
                                               );
+                                              if (activeOrderingTable != null) {
+                                                _draftCarts.remove((activeOrderingTable!.id ?? activeOrderingTable!.label).toString());
+                                              }
                                               setState(() {
                                                 activeOrderingTable = null;
                                                 currentCart = [];
@@ -190,6 +239,9 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                               ),
                                             );
 
+                                            if (activeOrderingTable != null) {
+                                              _draftCarts.remove((activeOrderingTable!.id ?? activeOrderingTable!.label).toString());
+                                            }
                                             setState(() {
                                               activeOrderingTable = null;
                                               currentCart = [];
@@ -197,6 +249,9 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                             });
                                           },
                                           onCancel: () {
+                                            if (activeOrderingTable != null) {
+                                              _draftCarts.remove((activeOrderingTable!.id ?? activeOrderingTable!.label).toString());
+                                            }
                                             setState(() {
                                               activeOrderingTable = null;
                                               currentCart = [];
@@ -330,10 +385,13 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                     });
                   },
                   itemBuilder: (BuildContext context) {
-                    final zones = widget.state.tables.isNotEmpty
+                    final zonesList = widget.state.tables.isNotEmpty
                         ? widget.state.tables.map((t) => t.zone).toSet().toList()
-                        : const ['Salón Principal', 'Terraza', 'Bar'];
-                    return zones.map((String zone) {
+                        : ['Salón Principal', 'Terraza', 'Bar'];
+                    if (!zonesList.contains('Para Llevar')) {
+                      zonesList.add('Para Llevar');
+                    }
+                    return zonesList.map((String zone) {
                       return PopupMenuItem<String>(
                         value: zone,
                         child: Text(
@@ -359,14 +417,13 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                   ),
                   tooltip: isCartOpen ? 'Volver al Menú' : 'Volver al Mapa',
                   onPressed: () {
-                    setState(() {
-                      if (isCartOpen) {
+                    if (isCartOpen) {
+                      setState(() {
                         isCartOpen = false;
-                      } else {
-                        activeOrderingTable = null;
-                        currentCart = [];
-                      }
-                    });
+                      });
+                    } else {
+                      _selectOrderingTable(null);
+                    }
                   },
                 ),
                 const SizedBox(width: 12),
@@ -424,13 +481,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                 tooltip: 'Distribución de Mesas',
                 onPressed: activeOrderingTable == null
                     ? null
-                    : () {
-                        setState(() {
-                          activeOrderingTable = null;
-                          currentCart = [];
-                          isCartOpen = false;
-                        });
-                      },
+                    : () => _selectOrderingTable(null),
               ),
               if (activeOrderingTable == null) ...[
                 const SizedBox(width: 8),
@@ -583,7 +634,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                       showDialog(
                         context: context,
                         builder: (context) =>
-                            BluetoothSettingsDialog(state: widget.state),
+                            PrinterSettingsDialog(state: widget.state),
                       );
                     }
                   },
@@ -687,7 +738,325 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
     );
   }
 
+  Widget _buildToGoPanel(List<TableModel> tables) {
+    // Only show occupied or billing tables (meaning there's an active order)
+    final activeOrders = tables.where((t) => t.state == TableState.occupied || t.state == TableState.billing).toList();
+
+    return Container(
+      margin: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: EmpireColors.onyxSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: EmpireColors.agedBronzeDark,
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        children: [
+          // Header Bar
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.shopping_bag_outlined,
+                      color: EmpireColors.champagneGold,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'PEDIDOS PARA LLEVAR',
+                          style: TextStyle(
+                            color: EmpireColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        Text(
+                          '${activeOrders.length} pedidos activos',
+                          style: const TextStyle(
+                            color: EmpireColors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    // Show a quick loader / overlay
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Iniciando nuevo pedido para llevar...'),
+                        backgroundColor: EmpireColors.onyxSurface,
+                        duration: Duration(milliseconds: 800),
+                      ),
+                    );
+
+                    final newTable = await widget.state.startToGoOrder();
+                    if (newTable != null) {
+                      _selectOrderingTable(newTable);
+                    } else {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Error al crear el pedido. Reintente.'),
+                            backgroundColor: EmpireColors.errorRed,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.add_shopping_cart, color: EmpireColors.obsidian, size: 16),
+                  label: const Text(
+                    'NUEVO PEDIDO',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: EmpireColors.champagneGold,
+                    foregroundColor: EmpireColors.obsidian,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(color: EmpireColors.agedBronzeDark, height: 1),
+
+          // Active Orders List / Grid
+          Expanded(
+            child: activeOrders.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.shopping_bag_outlined,
+                          color: EmpireColors.textSecondary.withOpacity(0.3),
+                          size: 64,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No hay pedidos para llevar activos',
+                          style: TextStyle(
+                            color: EmpireColors.textSecondary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Haz clic en "NUEVO PEDIDO" para registrar una venta para llevar.',
+                          style: TextStyle(
+                            color: EmpireColors.textSecondary.withOpacity(0.7),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : GridView.builder(
+                    padding: const EdgeInsets.all(20),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 1.5,
+                    ),
+                    itemCount: activeOrders.length,
+                    itemBuilder: (context, index) {
+                      final table = activeOrders[index];
+                      final itemCount = table.items.fold<int>(0, (sum, i) => sum + i.quantity);
+                      final totalAmount = table.total;
+
+                      // Check if any kitchen ticket for this table is active
+                      final ticketsForTable = widget.state.kitchenOrders
+                          .where((o) => o.tableLabel.toLowerCase() == table.label.toLowerCase())
+                          .toList();
+
+                      String statusText = 'PREPARANDO';
+                      Color statusColor = EmpireColors.successGreen;
+                      Color statusBgColor = EmpireColors.successGreen.withOpacity(0.1);
+
+                      if (table.state == TableState.billing) {
+                        statusText = 'POR COBRAR';
+                        statusColor = EmpireColors.obsidian;
+                        statusBgColor = EmpireColors.champagneGold;
+                      } else {
+                        if (ticketsForTable.isEmpty) {
+                          if (table.items.isNotEmpty) {
+                            statusText = 'ENTREGADO';
+                            statusColor = EmpireColors.textSecondary;
+                            statusBgColor = EmpireColors.charcoalSurface;
+                          } else {
+                            statusText = 'SIN PEDIDO';
+                            statusColor = EmpireColors.textSecondary;
+                            statusBgColor = EmpireColors.charcoalSurface;
+                          }
+                        } else {
+                          final hasReady = ticketsForTable.any((o) => o.status == 'ready');
+                          if (hasReady) {
+                            statusText = 'LISTO';
+                            statusColor = EmpireColors.champagneGold;
+                            statusBgColor = EmpireColors.champagneGold.withOpacity(0.1);
+                          } else {
+                            statusText = 'PREPARANDO';
+                            statusColor = EmpireColors.successGreen;
+                            statusBgColor = EmpireColors.successGreen.withOpacity(0.1);
+                          }
+                        }
+                      }
+
+                      final isHighlighted = table.state == TableState.billing || statusText == 'LISTO';
+
+                      return Card(
+                        color: EmpireColors.charcoalSurface,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: isHighlighted
+                                ? EmpireColors.champagneGold
+                                : EmpireColors.agedBronzeDark,
+                            width: 1.2,
+                          ),
+                        ),
+                        child: InkWell(
+                          onTap: () => _selectOrderingTable(table),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: isHighlighted
+                                            ? EmpireColors.champagneGold.withOpacity(0.1)
+                                            : EmpireColors.agedBronzeDark.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isHighlighted
+                                              ? EmpireColors.champagneGold
+                                              : EmpireColors.agedBronzeDark,
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        table.label.toUpperCase(),
+                                        style: TextStyle(
+                                          color: isHighlighted
+                                              ? EmpireColors.champagneGold
+                                              : EmpireColors.textPrimary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: statusBgColor,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        statusText,
+                                        style: TextStyle(
+                                          color: statusColor,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Spacer(),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'TOTAL',
+                                          style: TextStyle(
+                                            color: EmpireColors.textSecondary,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '\$${totalAmount.toStringAsFixed(2)}',
+                                          style: const TextStyle(
+                                            color: EmpireColors.textGold,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 18,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        const Text(
+                                          'CANTIDAD',
+                                          style: TextStyle(
+                                            color: EmpireColors.textSecondary,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '$itemCount piezas',
+                                          style: const TextStyle(
+                                            color: EmpireColors.textPrimary,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFloorMap(List<TableModel> tables) {
+    if (selectedZone == 'Para Llevar') {
+      return _buildToGoPanel(tables);
+    }
+
     final config = widget.state.roomConfigs[selectedZone] ?? {};
     final String? base64Image = config['image'] as String?;
     final double zoom = (config['zoom'] ?? 1.0).toDouble();
@@ -774,17 +1143,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                         ),
                                       );
                                     } else {
-                                      setState(() {
-                                        activeOrderingTable = table;
-                                        currentCart = List.from(table.items);
-                                        isCartOpen = false;
-                                        activeGenders = List.from(
-                                          table.guestGenders.isEmpty
-                                              ? ['M']
-                                              : table.guestGenders,
-                                        );
-                                        selectedGuestIndex = 0;
-                                      });
+                                      _selectOrderingTable(table);
                                     }
                                   },
                                 ),
@@ -970,6 +1329,64 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
               ),
             ),
           ),
+          const SizedBox(width: 16),
+          // Search box on the right
+          Container(
+            width: 180,
+            height: 32,
+            decoration: BoxDecoration(
+              color: EmpireColors.charcoalSurface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: searchProductQuery.isNotEmpty
+                    ? EmpireColors.champagneGold
+                    : EmpireColors.agedBronzeDark,
+                width: 1,
+              ),
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  searchProductQuery = value;
+                });
+              },
+              style: const TextStyle(
+                color: EmpireColors.textPrimary,
+                fontSize: 12,
+              ),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                hintText: 'Buscar platillo...',
+                hintStyle: const TextStyle(
+                  color: EmpireColors.textSecondary,
+                  fontSize: 11,
+                ),
+                prefixIcon: const Icon(
+                  Icons.search,
+                  color: EmpireColors.textSecondary,
+                  size: 14,
+                ),
+                suffixIcon: searchProductQuery.isNotEmpty
+                    ? GestureDetector(
+                        onTap: () {
+                          _searchController.clear();
+                          setState(() {
+                            searchProductQuery = '';
+                          });
+                        },
+                        child: const Icon(
+                          Icons.clear,
+                          color: EmpireColors.textSecondary,
+                          size: 14,
+                        ),
+                      )
+                    : null,
+                border: InputBorder.none,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -977,7 +1394,12 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
 
   Widget _buildMenuSection(List<String> categories) {
     final filteredMenuItems = AppState.menu
-        .where((i) => i.category == selectedMenuCategory)
+        .where((i) {
+          if (searchProductQuery.isNotEmpty) {
+            return i.name.toLowerCase().contains(searchProductQuery.toLowerCase());
+          }
+          return i.category == selectedMenuCategory;
+        })
         .toList();
 
     return Column(
@@ -985,55 +1407,75 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
         // Comensal Selection Bar
         _buildGuestSelectorBar(),
 
-        // Horizontal Menu Categories tabs
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-          color: EmpireColors.obsidian,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
+        // Multi-row Menu Categories (Only show when not searching)
+        if (searchProductQuery.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            color: EmpireColors.obsidian,
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 10,
               children: categories.map((cat) {
                 final isSelected = selectedMenuCategory == cat;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: ChoiceChip(
-                    label: Text(cat),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      if (selected) {
-                        setState(() => selectedMenuCategory = cat);
-                      }
-                    },
-                    selectedColor: EmpireColors.champagneGold,
-                    backgroundColor: EmpireColors.onyxSurface,
-                    labelStyle: TextStyle(
-                      color: isSelected
-                          ? EmpireColors.obsidian
-                          : EmpireColors.textPrimary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    side: BorderSide(
-                      color: isSelected
-                          ? EmpireColors.champagneGold
-                          : EmpireColors.agedBronzeDark,
-                      width: 1,
-                    ),
+                return ChoiceChip(
+                  label: Text(cat),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() => selectedMenuCategory = cat);
+                    }
+                  },
+                  selectedColor: EmpireColors.champagneGold,
+                  backgroundColor: EmpireColors.onyxSurface,
+                  labelStyle: TextStyle(
+                    color: isSelected
+                        ? EmpireColors.obsidian
+                        : EmpireColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
                   ),
+                  side: BorderSide(
+                    color: isSelected
+                        ? EmpireColors.champagneGold
+                        : EmpireColors.agedBronzeDark,
+                    width: 1,
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 );
               }).toList(),
             ),
+          )
+        else
+          // Small informational indicator when search is active
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            color: EmpireColors.charcoalSurface,
+            child: Row(
+              children: [
+                const Icon(Icons.search, color: EmpireColors.champagneGold, size: 14),
+                const SizedBox(width: 8),
+                Text(
+                  'Resultados para "${searchProductQuery}": ${filteredMenuItems.length} encontrados',
+                  style: const TextStyle(
+                    color: EmpireColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
 
-        // Grid of menu items
+        // Grid of menu items (now in horizontal layout)
         Expanded(
           child: GridView.builder(
             padding: const EdgeInsets.all(20),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
               crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.95,
+              mainAxisSpacing: 12,
+              childAspectRatio: 2.8,
             ),
             itemCount: filteredMenuItems.length,
             itemBuilder: (context, index) {
@@ -1385,6 +1827,97 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 24),
+            const Divider(color: EmpireColors.agedBronzeDark, height: 1),
+            const SizedBox(height: 20),
+            Text(
+              'Cuentas Recientes',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: EmpireColors.champagneGold,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (widget.state.recentClosedSales.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'No hay ventas cerradas recientemente.',
+                  style: TextStyle(
+                    color: EmpireColors.textSecondary,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              )
+            else
+              ...widget.state.recentClosedSales.map((sale) {
+                final dateRaw = sale['closedAt'] as String;
+                final dt = DateTime.tryParse(dateRaw) ?? DateTime.now();
+                final timeStr = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+                final double totalVal = (sale['total'] as num).toDouble();
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  color: EmpireColors.charcoalSurface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: const BorderSide(color: EmpireColors.agedBronzeDark, width: 1),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                sale['label'] ?? 'Mesa',
+                                style: const TextStyle(
+                                  color: EmpireColors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '$timeStr - \$${totalVal.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  color: EmpireColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.print, color: EmpireColors.champagneGold, size: 20),
+                          tooltip: 'Reimprimir Ticket',
+                          onPressed: () {
+                            widget.state.enqueuePrintJob(
+                              PrintJob(
+                                id: 'reprint_${DateTime.now().millisecondsSinceEpoch}',
+                                title: 'Ticket Reimpreso - ${sale['label']}',
+                                details: sale['printDetails'] ?? '',
+                                target: 'Caja',
+                                timestamp: DateTime.now(),
+                              ),
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: EmpireColors.successGreen,
+                                content: Text('Reimpresión enviada para ${sale['label']}.'),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
           ],
         ),
       ),

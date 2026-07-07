@@ -35,7 +35,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
   final TextEditingController _cashReceivedController = TextEditingController();
   final TextEditingController _cardRefController = TextEditingController();
 
-  double get currentSubtotal {
+  double get currentGrossSubtotal {
     if (isEqualSplit) {
       return widget.table.subtotal / splitCount;
     } else {
@@ -47,9 +47,10 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
     }
   }
 
-  double get discountAmount => currentSubtotal * (selectedDiscount / 100.0);
-  double get currentTax => (currentSubtotal - discountAmount) * 0.16; // 16% VAT
-  double get currentTotal => (currentSubtotal - discountAmount) + currentTax;
+  double get currentSubtotal => double.parse((currentGrossSubtotal / ivaFactor).toStringAsFixed(2));
+  double get discountAmount => double.parse((currentSubtotal * (selectedDiscount / 100.0)).toStringAsFixed(2));
+  double get currentTotal => double.parse((currentGrossSubtotal * (1 - (selectedDiscount / 100.0))).toStringAsFixed(2));
+  double get currentTax => double.parse((currentTotal - (currentSubtotal - discountAmount)).toStringAsFixed(2));
 
   double get cashChange {
     final double cash = double.tryParse(_cashReceivedController.text) ?? 0.0;
@@ -93,15 +94,53 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
       }
     }
 
+    // Capture whether this checkout is a partial split check
+    final bool isPartialEqual = isEqualSplit && splitCount > 1;
+    final bool isPartialItems = !isEqualSplit && selectedItemIndexes.isNotEmpty && selectedItemIndexes.length < widget.table.items.length;
+
     // Process the payment
     widget.state.checkoutTable(
       widget.table.id,
       discount: selectedDiscount,
       paymentMethod: selectedPaymentMethod,
       refCode: refCode,
+      cashReceived: selectedPaymentMethod == 'Efectivo'
+          ? double.tryParse(_cashReceivedController.text)
+          : null,
+      cashChange: selectedPaymentMethod == 'Efectivo' ? cashChange : null,
+      isEqualSplit: isEqualSplit,
+      splitCount: splitCount,
+      itemIndicesToPay: isEqualSplit ? null : List.from(selectedItemIndexes),
     );
 
-    widget.onSuccess();
+    // Clear controllers
+    _cashReceivedController.clear();
+    _cardRefController.clear();
+
+    if (isPartialEqual) {
+      setState(() {
+        splitCount -= 1;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: EmpireColors.successGreen,
+          content: Text('Pago parcial registrado con éxito. Quedan $splitCount partes por cobrar.'),
+        ),
+      );
+    } else if (isPartialItems) {
+      setState(() {
+        selectedItemIndexes.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: EmpireColors.successGreen,
+          content: Text('Artículos pagados con éxito. Continúe con los artículos restantes.'),
+        ),
+      );
+    } else {
+      // Full payment complete (either equal split final part, or last items, or full single ticket payment)
+      widget.onSuccess();
+    }
   }
 
   Widget _buildLeftSummaryPanel(BuildContext context) {
@@ -393,7 +432,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Mesa: ${widget.table.label} • Total Original: \$${(widget.table.subtotal * 1.16).toStringAsFixed(2)}',
+                    'Mesa: ${widget.table.label} • Total Original: \$${widget.table.total.toStringAsFixed(2)}',
                     style: const TextStyle(
                       color: EmpireColors.textSecondary,
                       fontSize: 13,
@@ -666,9 +705,8 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: EmpireColors.champagneGold.withOpacity(
-                                      0.1,
-                                    ),
+                                    color: EmpireColors.champagneGold
+                                        .withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(4),
                                     border: Border.all(
                                       color: EmpireColors.champagneGold
@@ -695,7 +733,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                             ),
                           ),
                           secondary: Text(
-                            '\$${item.totalPrice.toStringAsFixed(2)}',
+                            '\$${item.netTotalPrice.toStringAsFixed(2)}',
                             style: const TextStyle(
                               color: EmpireColors.textGold,
                               fontSize: 13,
