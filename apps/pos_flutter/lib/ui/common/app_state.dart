@@ -1843,7 +1843,7 @@ class AppState extends ChangeNotifier {
   Map<String, dynamic> _cloudOrderItemPayload(OrderItem item) => {
     'productId': _productRemoteIdForItem(item),
     'quantity': item.quantity,
-    'price': (item.netTotalPrice / item.quantity).toStringAsFixed(2),
+    'price': (item.totalPrice / item.quantity).toStringAsFixed(2),
     'assignedGuest': _assignedGuestNumber(item.assignedGuest),
     'notes': [
       if (item.modifiers.isNotEmpty) item.modifiers.join(', '),
