@@ -1350,7 +1350,10 @@ class AppState extends ChangeNotifier {
       final netUnitPrice =
           double.tryParse(item['price']?.toString() ?? '') ??
           menuItem.price / ivaFactor;
-      final grossUnitPrice = double.parse((netUnitPrice * ivaFactor).toStringAsFixed(2));
+      final double calculatedGross = netUnitPrice * ivaFactor;
+      final double grossUnitPrice = (calculatedGross - menuItem.price).abs() < 0.05
+          ? menuItem.price
+          : double.parse(calculatedGross.toStringAsFixed(2));
       final assignedGuest = item['assignedGuest'] == null
           ? null
           : 'P${item['assignedGuest']}';
