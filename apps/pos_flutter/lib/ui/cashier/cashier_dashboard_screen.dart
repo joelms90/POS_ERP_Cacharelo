@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../common/colors.dart';
 import '../common/app_state.dart';
 import '../widgets/printer_monitor_panel.dart';
-import '../widgets/bluetooth_settings_dialog.dart';
+import '../widgets/printer_settings_dialog.dart';
 import '../login_screen.dart';
 import 'shift_control_panel.dart';
 import 'split_checkout_view.dart';
@@ -21,6 +21,58 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
   bool isPrinterQueueOpen = false;
   String selectedFilter = 'TODOS'; // 'TODOS', 'OCUPADAS', 'POR COBRAR'
 
+  void _triggerSync(BuildContext context) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: EmpireColors.obsidian,
+              ),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'Sincronizando datos con el servidor...',
+              style: TextStyle(
+                color: EmpireColors.obsidian,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: EmpireColors.champagneGold,
+        duration: Duration(milliseconds: 1500),
+      ),
+    );
+
+    final bool success = await widget.state.syncAllData();
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success
+                ? 'Sincronización completa con éxito.'
+                : 'Sincronización incompleta. Revise su conexión de red.',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: success
+              ? EmpireColors.successGreen
+              : EmpireColors.errorRed,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -37,9 +89,8 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
               if (selectedFilter == 'POR COBRAR') {
                 return t.state == TableState.billing;
               }
-              return t.state !=
-                  TableState
-                      .free; // Show all active occupied/billing/cleaning tables
+              // 'TODOS' shows only occupied and billing tables
+              return t.state == TableState.occupied || t.state == TableState.billing;
             }).toList();
 
             return Stack(
@@ -51,23 +102,20 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
 
                     // Main dashboard workspace
                     Expanded(
-                      child: (selectedTableForCheckout != null && widget.state.isShiftOpen)
+                      child:
+                          (selectedTableForCheckout != null &&
+                              widget.state.isShiftOpen)
                           ? SplitCheckoutView(
                               table: selectedTableForCheckout!,
                               state: widget.state,
                               onCancel: () {
-                                setState(
-                                  () => selectedTableForCheckout = null,
-                                );
+                                setState(() => selectedTableForCheckout = null);
                               },
                               onSuccess: () {
-                                setState(
-                                  () => selectedTableForCheckout = null,
-                                );
+                                setState(() => selectedTableForCheckout = null);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    backgroundColor:
-                                        EmpireColors.successGreen,
+                                    backgroundColor: EmpireColors.successGreen,
                                     content: Text(
                                       'Facturación completada con éxito. Mesa liberada.',
                                     ),
@@ -89,7 +137,9 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                                         ),
                                       ),
                                     ),
-                                    child: ShiftControlPanel(state: widget.state),
+                                    child: ShiftControlPanel(
+                                      state: widget.state,
+                                    ),
                                   ),
                                 ),
 
@@ -97,14 +147,17 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                                 Expanded(
                                   flex: 18,
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
                                     children: [
                                       _buildFilterBar(),
 
                                       // Table grid
                                       Expanded(
                                         child: widget.state.isShiftOpen
-                                            ? _buildActiveTablesGrid(filteredTables)
+                                            ? _buildActiveTablesGrid(
+                                                filteredTables,
+                                              )
                                             : _buildLockedOverlay(),
                                       ),
                                     ],
@@ -251,6 +304,18 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                     : EmpireColors.warningOrange,
                 size: 20,
               ),
+              const SizedBox(width: 12),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(
+                  Icons.sync,
+                  color: EmpireColors.textGold,
+                  size: 20,
+                ),
+                tooltip: 'Sincronizar Datos',
+                onPressed: () => _triggerSync(context),
+              ),
               if (!widget.state.isOnline) ...[
                 const SizedBox(width: 8),
                 Container(
@@ -342,7 +407,7 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                       showDialog(
                         context: context,
                         builder: (context) =>
-                            BluetoothSettingsDialog(state: widget.state),
+                            PrinterSettingsDialog(state: widget.state),
                       );
                     }
                   },
@@ -624,7 +689,7 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        '\$${(table.subtotal * 1.16).toStringAsFixed(2)}',
+                        '\$${table.total.toStringAsFixed(2)}',
                         style: const TextStyle(
                           color: EmpireColors.champagneGold,
                           fontWeight: FontWeight.bold,
