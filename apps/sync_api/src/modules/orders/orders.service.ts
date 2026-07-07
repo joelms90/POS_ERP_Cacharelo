@@ -66,11 +66,9 @@ export class OrdersService {
 
     const currentSubtotal = parseFloat(order.subtotal);
     const currentDiscount = parseFloat(order.discount);
-    const currentTax = parseFloat(order.tax);
 
     const newSubtotalVal = currentSubtotal + addedSubtotal;
-    // Recalculate tax (say, 16% IVA on the difference, or just keep tax proportional. Let's do simple: keep tax at 16% IVA on subtotal if not defined, or calculate simple total = subtotal - discount + tax)
-    const newTaxVal = newSubtotalVal * 0.16; // 16% standard IVA
+    const newTaxVal = newSubtotalVal * 0.16;
     const newTotalVal = newSubtotalVal - currentDiscount + newTaxVal;
 
     return this.ordersRepository.addItems(orderId, itemsToInsert, {
@@ -104,5 +102,13 @@ export class OrdersService {
       paymentMethod,
       referenceCode: referenceCode || null,
     });
+  }
+
+  async cancelOrder(orderId: string) {
+    const order = await this.findOne(orderId);
+    if (order.state === 'closed' || order.state === 'cancelled') {
+      throw new ConflictException(`Cannot cancel an order in state: ${order.state}`);
+    }
+    return this.ordersRepository.updateOrderAndTableState(orderId, 'cancelled', 'free');
   }
 }

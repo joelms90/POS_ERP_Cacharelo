@@ -9,7 +9,8 @@ class CartSidebar extends StatefulWidget {
   final Future<bool> Function() onRemoveGuest;
   final VoidCallback? onBillingRequested;
   final VoidCallback onBackToMenu;
-  final Function(List<OrderItem> finalItems, int guests, bool shouldPrint) onConfirm;
+  final Function(List<OrderItem> finalItems, int guests, bool shouldPrint)
+  onConfirm;
   final VoidCallback onCancel;
 
   const CartSidebar({
@@ -86,8 +87,7 @@ class _CartSidebarState extends State<CartSidebar> {
   }
 
   double get subtotal => _cartItems.fold(0.0, (sum, i) => sum + i.totalPrice);
-  double get tax => subtotal * 0.16; // 16% VAT
-  double get total => subtotal + tax;
+  double get total => subtotal;
 
   void _incrementQuantity(int index) {
     setState(() {
@@ -183,7 +183,8 @@ class _CartSidebarState extends State<CartSidebar> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop('enviar_e_imprimir'),
+                    onPressed: () =>
+                        Navigator.of(context).pop('enviar_e_imprimir'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: EmpireColors.champagneGold,
                       foregroundColor: EmpireColors.obsidian,
@@ -193,11 +194,15 @@ class _CartSidebarState extends State<CartSidebar> {
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop('enviar_solamente'),
+                    onPressed: () =>
+                        Navigator.of(context).pop('enviar_solamente'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: EmpireColors.charcoalSurface,
                       foregroundColor: EmpireColors.textPrimary,
-                      side: const BorderSide(color: EmpireColors.agedBronze, width: 1),
+                      side: const BorderSide(
+                        color: EmpireColors.agedBronze,
+                        width: 1,
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     child: const Text('ENVIAR COMANDA (SIN IMPRIMIR)'),
@@ -206,9 +211,7 @@ class _CartSidebarState extends State<CartSidebar> {
                   OutlinedButton(
                     onPressed: () => Navigator.of(context).pop(null),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(
-                        color: EmpireColors.textSecondary,
-                      ),
+                      side: const BorderSide(color: EmpireColors.textSecondary),
                       foregroundColor: EmpireColors.textPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
@@ -531,46 +534,6 @@ class _CartSidebarState extends State<CartSidebar> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Subtotal',
-                      style: TextStyle(
-                        color: EmpireColors.textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
-                    Text(
-                      '\$${subtotal.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: EmpireColors.textPrimary,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'IVA (16%)',
-                      style: TextStyle(
-                        color: EmpireColors.textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
-                    Text(
-                      '\$${tax.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: EmpireColors.textPrimary,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(color: EmpireColors.agedBronzeDark, height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
                       'TOTAL DE COMANDA',
                       style: TextStyle(
                         color: EmpireColors.textGold,
@@ -643,18 +606,70 @@ class _CartSidebarState extends State<CartSidebar> {
               const SizedBox(width: 16),
               Expanded(
                 child: ElevatedButton(
-                  onPressed:
-                      (_cartItems.isEmpty || !_cartItems.any((i) => !i.isSent))
-                      ? null
-                      : _showConfirmOrderDialog,
+                  onPressed: _cartItems.isEmpty
+                      ? () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              backgroundColor: EmpireColors.obsidian,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: const BorderSide(color: EmpireColors.agedBronze, width: 1.5),
+                              ),
+                              title: const Text(
+                                'Liberar Mesa',
+                                style: TextStyle(
+                                  color: EmpireColors.champagneGold,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              content: Text(
+                                '¿Deseas liberar la ${widget.table.label}? Todos los platillos actuales se eliminarán y la mesa quedará libre.',
+                                style: const TextStyle(color: EmpireColors.textPrimary),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(false),
+                                  child: const Text(
+                                    'CANCELAR',
+                                    style: TextStyle(color: EmpireColors.textSecondary),
+                                  ),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.of(context).pop(true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: EmpireColors.errorRed,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  child: const Text(
+                                    'LIBERAR',
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            widget.onConfirm([], 0, false);
+                          }
+                        }
+                      : ((!_cartItems.any((i) => !i.isSent))
+                          ? null
+                          : _showConfirmOrderDialog),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: EmpireColors.champagneGold,
-                    foregroundColor: EmpireColors.obsidian,
+                    backgroundColor: _cartItems.isEmpty
+                        ? EmpireColors.errorRed
+                        : EmpireColors.champagneGold,
+                    foregroundColor: _cartItems.isEmpty
+                        ? Colors.white
+                        : EmpireColors.obsidian,
+                    disabledBackgroundColor: EmpireColors.charcoalSurface,
+                    disabledForegroundColor: EmpireColors.textSecondary,
                   ),
-                  child: const Text(
-                    'CONFIRMAR PEDIDO',
-                    style: TextStyle(
+                  child: Text(
+                    _cartItems.isEmpty ? 'LIBERAR MESA' : 'CONFIRMAR PEDIDO',
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
                     ),

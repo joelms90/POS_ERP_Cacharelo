@@ -43,4 +43,10 @@ export class OrdersController {
   async processPayment(@Param('id') id: string, @Body() createPaymentDto: CreatePaymentDto) {
     return this.ordersService.processPayment(id, createPaymentDto);
   }
+
+  @Post(':id/cancel')
+  @HttpCode(HttpStatus.OK)
+  async cancel(@Param('id') id: string) {
+    return this.ordersService.cancelOrder(id);
+  }
 }

@@ -1347,13 +1347,9 @@ class AppState extends ChangeNotifier {
         fallbackName: item['productName']?.toString(),
       );
       final quantity = (item['quantity'] as num?)?.toInt() ?? 1;
-      final netUnitPrice =
+      final grossUnitPrice =
           double.tryParse(item['price']?.toString() ?? '') ??
-          menuItem.price / ivaFactor;
-      final double calculatedGross = netUnitPrice * ivaFactor;
-      final double grossUnitPrice = (calculatedGross - menuItem.price).abs() < 0.05
-          ? menuItem.price
-          : double.parse(calculatedGross.toStringAsFixed(2));
+          menuItem.price;
       final assignedGuest = item['assignedGuest'] == null
           ? null
           : 'P${item['assignedGuest']}';
@@ -1587,6 +1583,11 @@ class AppState extends ChangeNotifier {
     List<String> genders, {
     bool printComanda = false,
   }) {
+    if (cartItems.isEmpty) {
+      unawaited(cancelActiveOrder(tableId));
+      return;
+    }
+
     final index = tables.indexWhere((t) => t.id == tableId);
     if (index != -1) {
       // Filter out only new (unsent) items to print and send to kitchen
@@ -1710,6 +1711,40 @@ class AppState extends ChangeNotifier {
       }
 
       notifyListeners();
+    }
+  }
+
+  Future<void> cancelActiveOrder(int tableId) async {
+    final index = tables.indexWhere((t) => t.id == tableId);
+    if (index == -1) return;
+
+    final table = tables[index];
+    final tableRemoteId = _remoteIdForTable(table);
+    final orderId = tableRemoteId == null
+        ? null
+        : _activeOrderIdsByTableRemoteId[tableRemoteId];
+
+    // Clear local state
+    table.items = [];
+    table.guests = 0;
+    table.state = TableState.free;
+
+    if (tableRemoteId != null) {
+      _activeOrderIdsByTableRemoteId.remove(tableRemoteId);
+    }
+
+    notifyListeners();
+
+    if (orderId != null) {
+      try {
+        final String baseUrl =
+            terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+        await http
+            .post(Uri.parse('$baseUrl/orders/$orderId/cancel'))
+            .timeout(const Duration(seconds: 8));
+      } catch (e) {
+        debugPrint('Cloud order cancel failed: $e');
+      }
     }
   }
 
@@ -2731,7 +2766,7 @@ class AppState extends ChangeNotifier {
             'orderId': orderId,
             'productId': productId,
             'quantity': item.quantity,
-            'price': (item.item.price / ivaFactor).toStringAsFixed(2),
+            'price': item.item.price.toStringAsFixed(2),
             'assignedGuest': _assignedGuestNumber(item.assignedGuest),
             'isSent': true,
             'notes': item.notes.isEmpty ? null : item.notes,
