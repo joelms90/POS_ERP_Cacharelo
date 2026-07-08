@@ -100,5 +100,5 @@ Como Administrador, quiero exportar el reporte actual filtrado en formatos Excel
 ## Assumptions
 
 - Se asume que el backend calcula los datos de ventas directamente sobre las tablas de órdenes cobradas/completadas (`orders` y `order_items` con estado `closed`).
-- La tasa de IVA aplicable para todos los productos en este reporte es del 16% de manera fija, de acuerdo con las especificaciones del negocio.
+- Todos los precios de venta almacenados en la base de datos (tanto en productos como en order_items) son precios brutos (con IVA del 16% incluido). Por lo tanto, los cálculos netos de venta y del impuesto se derivan de forma descendente (dividiendo entre 1.16).
 - No se incluye en el MVP la desagregación por modificadores (ej. extras de ingredientes), los cuales se totalizan dentro del precio del producto principal vendido.

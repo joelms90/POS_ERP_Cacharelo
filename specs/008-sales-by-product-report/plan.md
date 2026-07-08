@@ -127,10 +127,10 @@ const items = await this.db
   );
 ```
 Aggregations will be computed in memory:
-* `grossSales` = `sum(price * quantity)`
+* `grossSales` = `sum(price * quantity)`  (Note: `price` from database is gross, including 16% IVA)
 * `averagePrice` = `grossSales / sum(quantity)`
 * `taxAmount` = `grossSales - (grossSales / 1.16)`
-* `netSales` = `grossSales - taxAmount`
+* `netSales` = `grossSales / 1.16` (or `grossSales - taxAmount`)
 
 ### 2. Export Implementations
 * **CSV**: Loop over dataset, escape strings, separate with commas, create Blob, and download as `reporte-ventas-productos-[timestamp].csv`.
