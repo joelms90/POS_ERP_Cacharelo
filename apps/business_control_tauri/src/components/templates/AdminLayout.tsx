@@ -2,18 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { api, SystemHealth } from '../../services/api';
 import { StatusIndicator } from '../molecules/StatusIndicator';
-import { Button } from '../atoms/Button';
+
 import { Heading } from '../atoms/Heading';
+import type { AdminTab } from '../../App';
+import type { AuthUser } from '../../services/api';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
-  activeTab: 'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers' | 'help' | 'reports';
-  onTabChange: (tab: 'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers' | 'help' | 'reports') => void;
+  activeTab: AdminTab;
+  onTabChange: (tab: AdminTab) => void;
   activeBusinessId: string;
   onBusinessChange: (businessId: string) => void;
+  allowedTabs: AdminTab[];
+  currentUser: AuthUser | null;
+  allowedBusinessIds?: string[];
 }
 
-export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, onTabChange, activeBusinessId, onBusinessChange }) => {
+export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, onTabChange, activeBusinessId, onBusinessChange, allowedTabs, currentUser, allowedBusinessIds }) => {
   const { logout } = useAuth();
   
   const [health, setHealth] = useState<SystemHealth>({
@@ -48,10 +53,18 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
     fetchHealth();
   }, []);
 
-  const handleTabClick = (tab: typeof activeTab) => {
+  const handleTabClick = (tab: AdminTab) => {
     onTabChange(tab);
     setIsMobileMenuOpen(false);
   };
+
+  const canSee = (tab: AdminTab) => allowedTabs.includes(tab);
+  const businessOptions = [
+    { value: 'd3b07384-d113-4a0e-a555-e5b12824bf01', label: 'Cafetería' },
+    { value: 'd3b07384-d113-4a0e-a555-e5b12824bf03', label: 'Empanadas' },
+    { value: 'd3b07384-d113-4a0e-a555-e5b12824bf07', label: 'Tortas' },
+    { value: 'd3b07384-d113-4a0e-a555-e5b12824bf05', label: 'Hamburguesas' },
+  ].filter((option) => !allowedBusinessIds || allowedBusinessIds.includes(option.value));
 
   return (
     <div className="flex h-screen w-screen bg-obsidian text-text-primary overflow-hidden font-sans select-none relative">
@@ -65,11 +78,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
       )}
 
       {/* Sidebar Panel */}
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-onyx-surface border-r border-aged-bronze/40 flex flex-col justify-between h-full transform transition-transform duration-300 ease-in-out ${
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-onyx-surface border-r border-aged-bronze/40 flex flex-col justify-start h-full transform transition-transform duration-300 ease-in-out ${
         isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       }`}>
-        <div>
-          {/* Logo Brand Header */}
+        {/* Logo Brand Header */}
           <div className="p-6 border-b border-aged-bronze/20 flex flex-col items-center gap-1 relative">
             <span className="font-display text-2xl tracking-widest text-champagne-gold uppercase">
               Cacharelo
@@ -90,7 +102,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
           </div>
  
           {/* Navigation Links */}
-          <nav className="p-4 flex flex-col gap-1 overflow-y-auto max-h-[calc(100vh-160px)]">
+          <nav className="p-4 flex flex-col gap-1 flex-1 overflow-y-auto">
             {/* Group: Operaciones */}
             <div className="px-3 py-1.5 mt-1 select-none">
               <span className="text-[10px] font-bold text-aged-bronze uppercase tracking-widest">
@@ -98,6 +110,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </span>
             </div>
 
+            {canSee('administrators') && (
+            <button
+              onClick={() => handleTabClick('administrators')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
+                activeTab === 'administrators'
+                  ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
+                  : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-charcoal-surface/50'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.657 0 3-1.567 3-3.5S13.657 4 12 4 9 5.567 9 7.5 10.343 11 12 11zm-7 9a7 7 0 0114 0M18 8h3m-1.5-1.5v3" />
+              </svg>
+              <span className="text-xs">Administradores</span>
+            </button>
+            )}
+
+            {canSee('personal') && (
             <button
               onClick={() => handleTabClick('personal')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
@@ -111,7 +140,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </svg>
               <span className="text-xs">Personal (PINs)</span>
             </button>
+            )}
 
+            {canSee('branches') && (
             <button
               onClick={() => handleTabClick('branches')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
@@ -126,7 +157,41 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </svg>
               <span className="text-xs">Sucursales</span>
             </button>
+            )}
 
+            {canSee('ticket-settings') && (
+            <button
+              onClick={() => handleTabClick('ticket-settings')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
+                activeTab === 'ticket-settings'
+                  ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
+                  : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-charcoal-surface/50'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14h6m-6-4h6m-7 10h8a2 2 0 002-2V6.5L14.5 3H8a2 2 0 00-2 2v13a2 2 0 002 2z" />
+              </svg>
+              <span className="text-xs">Ticket Fiscal</span>
+            </button>
+            )}
+
+            {canSee('pos-simulator') && (
+            <button
+              onClick={() => handleTabClick('pos-simulator')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
+                activeTab === 'pos-simulator'
+                  ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
+                  : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-charcoal-surface/50'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span className="text-xs">Simulador POS</span>
+            </button>
+            )}
+
+            {canSee('inquiries') && (
             <button
               onClick={() => handleTabClick('inquiries')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
@@ -140,6 +205,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </svg>
               <span className="text-xs">Consultas Web</span>
             </button>
+            )}
 
             {/* Group: Catálogo & Inventario */}
             <div className="px-3 py-1.5 mt-3 select-none">
@@ -148,6 +214,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </span>
             </div>
 
+            {canSee('inventory') && (
             <button
               onClick={() => handleTabClick('inventory')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
@@ -161,7 +228,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </svg>
               <span className="text-xs">Productos</span>
             </button>
+            )}
 
+            {canSee('categories') && (
             <button
               onClick={() => handleTabClick('categories')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
@@ -175,7 +244,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </svg>
               <span className="text-xs">Categorías</span>
             </button>
+            )}
 
+            {canSee('assembly') && (
             <button
               onClick={() => handleTabClick('assembly')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
@@ -190,7 +261,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </svg>
               <span className="text-xs">Producción (Recetas)</span>
             </button>
+            )}
 
+            {canSee('receipts') && (
             <button
               onClick={() => handleTabClick('receipts')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
@@ -204,7 +277,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </svg>
               <span className="text-xs">Recepción de Insumos</span>
             </button>
+            )}
 
+            {canSee('warehouses') && (
             <button
               onClick={() => handleTabClick('warehouses')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
@@ -218,7 +293,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </svg>
               <span className="text-xs">Bodegas (Almacén)</span>
             </button>
+            )}
 
+            {canSee('providers') && (
             <button
               onClick={() => handleTabClick('providers')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
@@ -232,7 +309,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </svg>
               <span className="text-xs">Proveedores</span>
             </button>
+            )}
 
+            {canSee('transfers') && (
             <button
               onClick={() => handleTabClick('transfers')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
@@ -246,7 +325,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </svg>
               <span className="text-xs">Traspasos y Reportes</span>
             </button>
+            )}
 
+            {canSee('reports') && (
             <button
               onClick={() => handleTabClick('reports')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
@@ -260,7 +341,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </svg>
               <span className="text-xs">Reportes de Venta</span>
             </button>
+            )}
 
+            {canSee('help') && (
             <button
               onClick={() => handleTabClick('help')}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
@@ -274,18 +357,22 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               </svg>
               <span className="text-xs">Guía y Manual (FAQ)</span>
             </button>
-          </nav>
-        </div>
+            )}
 
-        {/* Sidebar Footer (Logout) */}
-        <div className="p-4 border-t border-aged-bronze/20">
-          <Button variant="secondary" fullWidth onClick={logout} className="flex items-center justify-center gap-2">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            <span>Cerrar Sesión</span>
-          </Button>
-        </div>
+            {/* Divider */}
+            <div className="border-t border-aged-bronze/20 my-3" />
+
+            {/* Cerrar Sesión (Logout Link) */}
+            <button
+              onClick={logout}
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded border border-transparent text-left transition-all duration-200 text-error-red/90 hover:text-error-red hover:bg-error-red/10"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              <span className="text-xs font-medium">Cerrar Sesión</span>
+            </button>
+          </nav>
       </aside>
 
       {/* Main Container */}
@@ -328,12 +415,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               <select
                 value={activeBusinessId}
                 onChange={(e) => onBusinessChange(e.target.value)}
+                disabled={currentUser?.role === 'inventory_admin' && businessOptions.length <= 1}
                 className="bg-transparent text-xs text-champagne-gold font-sans font-medium focus:outline-none cursor-pointer hover:text-champagne-gold/80 transition-colors"
               >
-                <option value="d3b07384-d113-4a0e-a555-e5b12824bf01" className="bg-onyx text-text-primary">Cafetería</option>
-                <option value="d3b07384-d113-4a0e-a555-e5b12824bf03" className="bg-onyx text-text-primary">Empanadas</option>
-                <option value="d3b07384-d113-4a0e-a555-e5b12824bf07" className="bg-onyx text-text-primary">Tortas</option>
-                <option value="d3b07384-d113-4a0e-a555-e5b12824bf05" className="bg-onyx text-text-primary">Hamburguesas</option>
+                {businessOptions.map((option) => (
+                  <option key={option.value} value={option.value} className="bg-onyx text-text-primary">
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

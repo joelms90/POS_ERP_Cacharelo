@@ -75,7 +75,7 @@ export const BrandGrid: React.FC = () => {
   return (
     <section className="w-full py-24 px-margin-mobile md:px-margin-desktop bg-[#0B0B0C]" id="marcas">
       <div className="max-w-container-max mx-auto flex flex-col items-center">
-        <Typography variant="h2" className="text-[#d4b038]  mb-16 text-center font-spec-hero" id="brands-section-heading">
+        <Typography variant="h2" className="text-[#d4b038]  mb-16 text-center font-spec-hero">
           NUESTRAS CUATRO MARCAS
         </Typography>
         

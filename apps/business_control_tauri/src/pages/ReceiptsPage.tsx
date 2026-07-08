@@ -42,6 +42,11 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
   const [itemQuantity, setItemQuantity] = useState('1');
   const [itemUnitCost, setItemUnitCost] = useState('0');
 
+  // Inline editing states
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingQuantity, setEditingQuantity] = useState('');
+  const [editingCost, setEditingCost] = useState('');
+
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { id, message, type }]);
@@ -87,6 +92,16 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
     // Reset form item lists on business change
     setItemsList([]);
   }, [loadData, businessId]);
+
+  // Preload cost when product is selected
+  useEffect(() => {
+    if (selectedProductId && products.length > 0) {
+      const product = products.find(p => p.id === selectedProductId);
+      if (product && product.cost) {
+        setItemUnitCost(product.cost);
+      }
+    }
+  }, [selectedProductId, products]);
 
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,6 +150,45 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
 
   const handleRemoveItem = (index: number) => {
     setItemsList((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Inline editing handlers
+  const handleStartEditing = (index: number) => {
+    const item = itemsList[index];
+    setEditingIndex(index);
+    setEditingQuantity(item.quantity.toString());
+    setEditingCost(item.unitCost.toString());
+  };
+
+  const handleSaveEdit = (index: number) => {
+    const qty = parseFloat(editingQuantity);
+    const cost = parseFloat(editingCost);
+
+    if (isNaN(qty) || qty <= 0) {
+      showToast('La cantidad debe ser mayor a cero.', 'warning');
+      return;
+    }
+    if (isNaN(cost) || cost < 0) {
+      showToast('El costo unitario no puede ser negativo.', 'warning');
+      return;
+    }
+
+    const newList = [...itemsList];
+    newList[index] = {
+      ...newList[index],
+      quantity: qty,
+      unitCost: cost,
+    };
+    setItemsList(newList);
+    setEditingIndex(null);
+    setEditingQuantity('');
+    setEditingCost('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingIndex(null);
+    setEditingQuantity('');
+    setEditingCost('');
   };
 
   const handleSubmitReceipt = async (e: React.FormEvent) => {
@@ -377,25 +431,109 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
                 ) : (
                   <div className="flex flex-col gap-2">
                     {itemsList.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-xs bg-charcoal/40 border border-aged-bronze/10 rounded px-2.5 py-2">
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-text-primary">{item.productName}</span>
-                          <span className="text-[10px] text-text-secondary">
-                            Cant: {item.quantity} x ${item.unitCost}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono text-champagne-gold font-semibold">
-                            ${(item.quantity * item.unitCost).toFixed(2)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(idx)}
-                            className="text-error-red/80 hover:text-error-red transition-colors text-[10px]"
-                          >
-                            Quitar
-                          </button>
-                        </div>
+                      <div key={idx} className="group bg-charcoal/40 border border-aged-bronze/10 rounded px-2.5 py-2 hover:bg-charcoal/60 transition-colors">
+                        {editingIndex === idx ? (
+                          // Editing mode
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-text-primary text-xs">{item.productName}</span>
+                              <div className="flex gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEdit(idx)}
+                                  className="text-success-green hover:text-success-green/80 p-1"
+                                  title="Guardar (Enter)"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEdit}
+                                  className="text-text-secondary hover:text-text-primary p-1"
+                                  title="Cancelar (Esc)"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 items-center">
+                              <div className="flex-1">
+                                <label className="block text-[9px] text-text-secondary uppercase mb-0.5">Cantidad</label>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  min="0.001"
+                                  value={editingQuantity}
+                                  onChange={(e) => setEditingQuantity(e.target.value)}
+                                  className="w-full bg-charcoal border border-aged-bronze/45 rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-champagne-gold"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveEdit(idx);
+                                    if (e.key === 'Escape') handleCancelEdit();
+                                  }}
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <label className="block text-[9px] text-text-secondary uppercase mb-0.5">Costo Unit.</label>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  min="0"
+                                  value={editingCost}
+                                  onChange={(e) => setEditingCost(e.target.value)}
+                                  className="w-full bg-charcoal border border-aged-bronze/45 rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-champagne-gold"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveEdit(idx);
+                                    if (e.key === 'Escape') handleCancelEdit();
+                                  }}
+                                />
+                              </div>
+                              <div className="flex-1 text-right">
+                                <label className="block text-[9px] text-text-secondary uppercase mb-0.5">Subtotal</label>
+                                <span className="font-mono text-champagne-gold font-semibold text-xs">
+                                  ${(parseFloat(editingQuantity || '0') * parseFloat(editingCost || '0')).toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          // Display mode
+                          <div className="flex justify-between items-center text-xs">
+                            <div className="flex flex-col flex-1">
+                              <span className="font-semibold text-text-primary">{item.productName}</span>
+                              <span className="text-[10px] text-text-secondary">
+                                Cant: {item.quantity} x ${item.unitCost}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono text-champagne-gold font-semibold">
+                                ${(item.quantity * item.unitCost).toFixed(2)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditing(idx)}
+                                className="text-champagne-gold/70 hover:text-champagne-gold transition-colors opacity-0 group-hover:opacity-100 p-1"
+                                title="Editar cantidad y costo"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItem(idx)}
+                                className="text-error-red/80 hover:text-error-red transition-colors text-[10px]"
+                                title="Quitar"
+                              >
+                                Quitar
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

@@ -1,6 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'common/colors.dart';
 import 'common/app_state.dart';
 import 'waiter/waiter_ordering_screen.dart';
@@ -24,11 +24,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // Terminal Activation Controllers
   final TextEditingController _jsonController = TextEditingController();
-  final TextEditingController _businessIdController = TextEditingController(text: 'd3b07384-d113-4a0e-a555-e5b12824bf01');
+  final TextEditingController _businessIdController = TextEditingController(
+    text: 'd3b07384-d113-4a0e-a555-e5b12824bf01',
+  );
   final TextEditingController _branchIdController = TextEditingController();
-  final TextEditingController _businessNameController = TextEditingController(text: 'Empire POS');
-  final TextEditingController _branchNameController = TextEditingController(text: 'Sucursal Centro');
-  final TextEditingController _apiUrlController = TextEditingController(text: 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api');
+  final TextEditingController _businessNameController = TextEditingController(
+    text: 'Empire POS',
+  );
+  final TextEditingController _branchNameController = TextEditingController(
+    text: 'Sucursal Centro',
+  );
+  final TextEditingController _apiUrlController = TextEditingController(
+    text: 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api',
+  );
 
   bool _showManualConfig = false;
   String _activationError = "";
@@ -52,15 +60,24 @@ class _LoginScreenState extends State<LoginScreen> {
       fillColor: EmpireColors.charcoalSurface,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: EmpireColors.agedBronze, width: 1.5),
+        borderSide: const BorderSide(
+          color: EmpireColors.agedBronze,
+          width: 1.5,
+        ),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: EmpireColors.agedBronzeDark, width: 1.5),
+        borderSide: const BorderSide(
+          color: EmpireColors.agedBronzeDark,
+          width: 1.5,
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: EmpireColors.champagneGold, width: 1.5),
+        borderSide: const BorderSide(
+          color: EmpireColors.champagneGold,
+          width: 1.5,
+        ),
       ),
     );
   }
@@ -88,7 +105,11 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Icon(Icons.qr_code_scanner, size: 48, color: EmpireColors.textGold),
+              const Icon(
+                Icons.qr_code_scanner,
+                size: 48,
+                color: EmpireColors.textGold,
+              ),
               const SizedBox(height: 16),
               const Text(
                 'VINCULAR DISPOSITIVO POS',
@@ -107,18 +128,24 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
               const SizedBox(height: 24),
-              
+
               if (_activationError.isNotEmpty) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: EmpireColors.errorRed.withOpacity(0.1),
-                    border: Border.all(color: EmpireColors.errorRed.withOpacity(0.3)),
+                    border: Border.all(
+                      color: EmpireColors.errorRed.withOpacity(0.3),
+                    ),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     _activationError,
-                    style: const TextStyle(color: EmpireColors.errorRed, fontSize: 11, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: EmpireColors.errorRed,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -128,7 +155,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextField(
                   controller: _jsonController,
                   maxLines: 1,
-                  style: const TextStyle(color: Colors.white, fontSize: 12, fontFamily: 'monospace'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                  ),
                   decoration: _inputDecoration('Código de Activación (UUID)'),
                 ),
                 const SizedBox(height: 20),
@@ -138,12 +169,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: ElevatedButton.icon(
                         onPressed: _startCameraScan,
                         icon: const Icon(Icons.camera_alt),
-                        label: const Text('ESCANEAR QR', style: TextStyle(fontWeight: FontWeight.bold)),
+                        label: const Text(
+                          'ESCANEAR QR',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: EmpireColors.champagneGold,
                           foregroundColor: EmpireColors.obsidian,
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                     ),
@@ -151,13 +187,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: _processCodeActivation,
-                        child: const Text('VINCULAR CÓDIGO', style: TextStyle(fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: EmpireColors.charcoalSurface,
                           foregroundColor: EmpireColors.textGold,
-                          side: const BorderSide(color: EmpireColors.agedBronze),
+                          side: const BorderSide(
+                            color: EmpireColors.agedBronze,
+                          ),
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'VINCULAR CÓDIGO',
+                          style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -200,9 +243,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     backgroundColor: EmpireColors.champagneGold,
                     foregroundColor: EmpireColors.obsidian,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                  child: const Text('GUARDAR CONFIGURACIÓN', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'GUARDAR CONFIGURACIÓN',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
 
@@ -215,8 +263,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   });
                 },
                 child: Text(
-                  _showManualConfig ? 'Volver a Activación por QR/JSON' : 'Configuración Manual',
-                  style: const TextStyle(color: EmpireColors.textGold, fontSize: 12),
+                  _showManualConfig
+                      ? 'Volver a Activación por QR/JSON'
+                      : 'Configuración Manual',
+                  style: const TextStyle(
+                    color: EmpireColors.textGold,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],
@@ -235,7 +288,9 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final RegExp uuidRegex = RegExp(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}');
+    final RegExp uuidRegex = RegExp(
+      r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}',
+    );
     final Match? match = uuidRegex.firstMatch(code);
     final String cleanCode = match != null ? match.group(0)! : code;
 
@@ -250,7 +305,8 @@ class _LoginScreenState extends State<LoginScreen> {
       });
     } else {
       setState(() {
-        _activationError = "No se pudo vincular la terminal. Verifique que el código UUID sea correcto y que el servidor de sincronización esté activo.";
+        _activationError =
+            "No se pudo vincular la terminal. Verifique que el código UUID sea correcto y que el servidor de sincronización esté activo.";
       });
     }
   }
@@ -264,7 +320,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (bId.isEmpty || brId.isEmpty || url.isEmpty) {
       setState(() {
-        _activationError = "Los campos de ID de Negocio, ID de Sucursal y URL Base son obligatorios.";
+        _activationError =
+            "Los campos de ID de Negocio, ID de Sucursal y URL Base son obligatorios.";
       });
       return;
     }
@@ -284,9 +341,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _startCameraScan() async {
     final String? scannedValue = await Navigator.of(context).push<String>(
-      MaterialPageRoute(
-        builder: (context) => const QrScannerDialog(),
-      ),
+      MaterialPageRoute(builder: (context) => const QrScannerDialog()),
     );
 
     if (scannedValue != null && scannedValue.isNotEmpty) {
@@ -385,8 +440,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -410,6 +463,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   return LayoutBuilder(
                     builder: (context, constraints) {
                       final isLandscape = constraints.maxWidth > 700;
+                      final isCompactHeight = constraints.maxHeight < 660;
+                      final panelPadding = EdgeInsets.symmetric(
+                        horizontal: isCompactHeight ? 28 : 40,
+                        vertical: isCompactHeight ? 12 : 20,
+                      );
+                      final titleGap = isCompactHeight ? 16.0 : 30.0;
+                      final indicatorGap = isCompactHeight ? 12.0 : 20.0;
+                      final keypadGap = isCompactHeight ? 14.0 : 30.0;
+                      final footerGap = isCompactHeight ? 10.0 : 24.0;
+                      final keypadWidth = isCompactHeight ? 280.0 : 320.0;
                       return Row(
                         children: [
                           // Left branding side (takes full width if portrait)
@@ -420,10 +483,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           Expanded(
                             flex: 10,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 40,
-                                vertical: 20,
-                              ),
+                              padding: panelPadding,
                               decoration: BoxDecoration(
                                 border: isLandscape
                                     ? const Border(
@@ -440,7 +500,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
-                                        '${widget.state.terminalBusinessName} - ${widget.state.terminalBranchName}'.toUpperCase(),
+                                        '${widget.state.terminalBusinessName} - ${widget.state.terminalBranchName}'
+                                            .toUpperCase(),
                                         textAlign: TextAlign.center,
                                         style: Theme.of(context)
                                             .textTheme
@@ -463,14 +524,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                               fontWeight: FontWeight.bold,
                                               letterSpacing: 1.5,
                                               fontSize: 10,
-                                              ),
+                                            ),
                                       ),
-                                      const SizedBox(height: 30),
+                                      SizedBox(height: titleGap),
 
                                       // PIN Code indicators
-                                      _buildPinIndicators(),
+                                      _buildPinIndicators(
+                                        compact: isCompactHeight,
+                                      ),
 
-                                      const SizedBox(height: 20),
+                                      SizedBox(height: indicatorGap),
 
                                       if (hasError)
                                         Text(
@@ -482,29 +545,46 @@ class _LoginScreenState extends State<LoginScreen> {
                                           ),
                                         )
                                       else
-                                        const SizedBox(height: 18),
+                                        SizedBox(
+                                          height: isCompactHeight ? 12 : 18,
+                                        ),
 
-                                      const SizedBox(height: 30),
+                                      SizedBox(height: keypadGap),
 
                                       // Numeric Keyboard
                                       Container(
-                                        constraints: const BoxConstraints(
-                                          maxWidth: 320,
+                                        constraints: BoxConstraints(
+                                          maxWidth: keypadWidth,
                                         ),
-                                        child: _buildKeypadGrid(),
+                                        child: _buildKeypadGrid(
+                                          compact: isCompactHeight,
+                                        ),
                                       ),
 
-                                      const SizedBox(height: 30),
+                                      SizedBox(height: footerGap),
                                       TextButton(
                                         onPressed: () {
                                           widget.state.deconfigureTerminal();
                                         },
+                                        style: TextButton.styleFrom(
+                                          visualDensity: isCompactHeight
+                                              ? VisualDensity.compact
+                                              : VisualDensity.standard,
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: isCompactHeight ? 6 : 10,
+                                          ),
+                                          minimumSize: Size.zero,
+                                          tapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                        ),
                                         child: const Text(
                                           'Vincular a otra Sucursal',
                                           style: TextStyle(
                                             color: Colors.white38,
                                             fontSize: 11,
-                                            decoration: TextDecoration.underline,
+                                            decoration:
+                                                TextDecoration.underline,
                                           ),
                                         ),
                                       ),
@@ -518,7 +598,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       );
                     },
                   );
-                }
+                },
               ),
             ),
           ],
@@ -544,26 +624,27 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                width: 72,
+                height: 72,
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   border: Border.all(
                     color: EmpireColors.champagneGold,
                     width: 1.5,
                   ),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
-                  Icons.restaurant_menu,
-                  color: EmpireColors.champagneGold,
-                  size: 40,
+                child: Image.asset(
+                  'assets/logo.png',
+                  fit: BoxFit.contain,
                 ),
               ),
               const SizedBox(height: 40),
               Text(
-                'Grupo Cacharelo',
+                'Cacharelo Restaurant',
                 style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                  fontSize: 48,
-                  letterSpacing: 3,
+                  fontSize: 40,
+                  letterSpacing: 2,
                 ),
               ),
               const SizedBox(height: 12),
@@ -608,15 +689,15 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildPinIndicators() {
+  Widget _buildPinIndicators({bool compact = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(4, (index) {
         final isActive = index < pin.length;
         return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 12),
-          width: 18,
-          height: 18,
+          margin: EdgeInsets.symmetric(horizontal: compact ? 9 : 12),
+          width: compact ? 14 : 18,
+          height: compact ? 14 : 18,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: isActive ? EmpireColors.champagneGold : Colors.transparent,
@@ -643,7 +724,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildKeypadGrid() {
+  Widget _buildKeypadGrid({bool compact = false}) {
     final keys = [
       ["1", "2", "3"],
       ["4", "5", "6"],
@@ -654,11 +735,11 @@ class _LoginScreenState extends State<LoginScreen> {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.15,
+        crossAxisSpacing: compact ? 10 : 16,
+        mainAxisSpacing: compact ? 10 : 16,
+        childAspectRatio: compact ? 1.3 : 1.15,
       ),
       itemCount: 12,
       itemBuilder: (context, index) {
@@ -742,7 +823,21 @@ class QrScannerDialog extends StatefulWidget {
 }
 
 class _QrScannerDialogState extends State<QrScannerDialog> {
-  final MobileScannerController controller = MobileScannerController();
+  late final MobileScannerController controller;
+  bool _isClosing = false;
+  bool _hasCameraPermission = false;
+  String? _scannerError;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = MobileScannerController(
+      autoStart: false,
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      formats: const [BarcodeFormat.qrCode],
+    );
+    _prepareScanner();
+  }
 
   @override
   void dispose() {
@@ -750,26 +845,112 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
     super.dispose();
   }
 
+  Future<void> _prepareScanner() async {
+    final status = await Permission.camera.request();
+    if (!mounted) return;
+
+    if (!status.isGranted) {
+      setState(() {
+        _hasCameraPermission = false;
+        _scannerError =
+            'Permiso de cámara denegado. Active la cámara o ingrese el código manualmente.';
+      });
+      return;
+    }
+
+    setState(() {
+      _hasCameraPermission = true;
+      _scannerError = null;
+    });
+
+    try {
+      await controller.start();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _scannerError = 'No se pudo iniciar la cámara: $error';
+      });
+    }
+  }
+
+  Future<void> _finishScan(String value) async {
+    if (_isClosing || !mounted) return;
+    _isClosing = true;
+
+    try {
+      await controller.stop();
+    } catch (_) {
+      // The route is closing anyway; scanner shutdown errors should not block.
+    }
+
+    if (mounted) {
+      Navigator.of(context).pop(value);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Escanee el Código QR', style: TextStyle(color: EmpireColors.textGold, fontSize: 16)),
+        title: const Text(
+          'Escanee el Código QR',
+          style: TextStyle(color: EmpireColors.textGold, fontSize: 16),
+        ),
         backgroundColor: EmpireColors.obsidian,
         iconTheme: const IconThemeData(color: EmpireColors.textGold),
       ),
       backgroundColor: Colors.black,
-      body: MobileScanner(
-        controller: controller,
-        onDetect: (capture) {
-          final List<Barcode> barcodes = capture.barcodes;
-          for (final barcode in barcodes) {
-            if (barcode.rawValue != null) {
-              Navigator.of(context).pop(barcode.rawValue);
-              break;
-            }
-          }
-        },
+      body: _hasCameraPermission && _scannerError == null
+          ? MobileScanner(
+              controller: controller,
+              errorBuilder: (context, error, child) {
+                final details = error.errorDetails?.message;
+                return _buildScannerMessage(
+                  details == null || details.isEmpty
+                      ? 'No se pudo abrir el escáner (${error.errorCode.name}).'
+                      : details,
+                );
+              },
+              onDetect: (capture) {
+                for (final barcode in capture.barcodes) {
+                  final value = barcode.rawValue?.trim();
+                  if (value != null && value.isNotEmpty) {
+                    _finishScan(value);
+                    break;
+                  }
+                }
+              },
+            )
+          : _buildScannerMessage(
+              _scannerError ?? 'Preparando cámara...',
+              showProgress: _scannerError == null,
+            ),
+    );
+  }
+
+  Widget _buildScannerMessage(String message, {bool showProgress = false}) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showProgress)
+              const CircularProgressIndicator(color: EmpireColors.textGold)
+            else
+              const Icon(
+                Icons.error_outline,
+                color: EmpireColors.errorRed,
+                size: 40,
+              ),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+            ),
+          ],
+        ),
       ),
     );
   }

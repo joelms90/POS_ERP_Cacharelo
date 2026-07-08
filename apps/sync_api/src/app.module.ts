@@ -16,6 +16,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { RecipesModule } from './modules/recipes/recipes.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { TicketSettingsModule } from './modules/ticket-settings/ticket-settings.module';
 
 @Module({
   imports: [
@@ -34,9 +35,9 @@ import { ReportsModule } from './modules/reports/reports.module';
     BranchesModule,
     RecipesModule,
     ReportsModule,
+    TicketSettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
-

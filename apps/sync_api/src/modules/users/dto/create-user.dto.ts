@@ -1,4 +1,7 @@
 import { IsString, IsEmail, IsOptional, Length, IsUUID, IsEnum, Matches } from 'class-validator';
+import type { UserRole } from '../../auth/roles';
+
+export const USER_ROLES = ['waiter', 'cashier', 'kitchen', 'admin', 'vendedor', 'owner', 'inventory_admin'] as const;
 
 export class CreateUserDto {
   @IsUUID()
@@ -27,8 +30,8 @@ export class CreateUserDto {
   @Matches(/^\d{4}$/, { message: 'PIN must consist of exactly 4 digits' })
   pin: string;
 
-  @IsEnum(['waiter', 'cashier', 'kitchen', 'admin', 'vendedor'], {
-    message: 'Role must be one of: waiter, cashier, kitchen, admin, vendedor',
+  @IsEnum(USER_ROLES, {
+    message: 'Role must be one of: waiter, cashier, kitchen, admin, vendedor, owner, inventory_admin',
   })
-  role: 'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor';
+  role: UserRole;
 }

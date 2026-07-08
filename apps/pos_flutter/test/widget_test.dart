@@ -13,10 +13,15 @@ void main() {
   testWidgets('Login screen loads smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     final appState = AppState();
+    appState.isTerminalConfigured = true;
+    appState.terminalBusinessName = 'Cacharelo Restaurant';
+    appState.terminalBranchName = 'Sucursal Centro';
+
     await tester.pumpWidget(MyApp(state: appState));
+    await tester.pump();
 
     // Verify that our login screen loads and displays the branding text.
-    expect(find.text('Grupo Cacharelo'), findsOneWidget);
+    expect(find.text('Cacharelo Restaurant'), findsOneWidget);
     expect(find.text('INGRESAR CREDENCIAL'), findsOneWidget);
   });
 }

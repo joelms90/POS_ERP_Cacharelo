@@ -118,3 +118,72 @@ apps/business_control_tauri/
 ## Complexity Tracking
 
 *No constitution violations detected. Fits within standard web application design guidelines.*
+
+## Reports Intelligence Addendum
+
+**Date**: 2026-07-07
+
+### Problem Statement
+
+The current `Reportes e Inteligencia de Ventas` section relies on `/api/reports/sales-dashboard`, but the response can be misleading because it aggregates different concepts without reconciliation:
+
+- `totalSales` is calculated from `orders.total` for closed orders.
+- `topProducts.totalSales` is calculated from `order_items.price * quantity`.
+- Zero-total or unpaid closed orders still contribute product rows.
+- Hourly sales are bucketed from server-side `Date.getHours()`, which can use Cloud Run UTC rather than the restaurant's local business timezone.
+- Product history excludes inactive products, which can erase historical sales from product rankings.
+
+### Design Direction
+
+Use a reconciled dashboard contract with these sections:
+
+- `financial`: gross order sales, discounts, taxes, net order sales, collected payments, average check, contribution margin, and payment mix.
+- `operations`: order count, item count, hourly sales, kitchen ticket speed, and unsupported operational metrics with missing-data reasons.
+- `menu`: top 10 products by quantity, revenue, and contribution margin.
+- `staff`: waiter and cashier rankings based on the selected sales basis.
+- `inventory`: stock value, low-stock count, and future actual-vs-theoretical variance status.
+- `reconciliation`: order/payment/item mismatch counts and detail rows.
+
+### Metric Feasibility
+
+Available now from the existing schema:
+
+- Gross sales, discounts, taxes, net order sales, order count, average check.
+- Collected sales and payment mix from `payments`.
+- Item velocity and contribution margin from `order_items` and `products.cost`.
+- Branch/user rankings from `orders`, `branches`, and `users`.
+- Hourly sales after timezone normalization.
+- Kitchen ticket speed from `kitchen_tickets`.
+- Inventory stock value and Kardex from stock/movement tables.
+
+Blocked until data model changes:
+
+- Prime cost percentage: needs labor cost records.
+- Labor cost percentage: needs employee hourly wages and shift attendance.
+- PPA / covers: needs guest count at order/table level.
+- RevPASH: needs seat capacity and occupied-seat-hour tracking.
+- Dining duration: needs table/order lifecycle timestamps beyond `createdAt`.
+- Actual vs theoretical food-cost variance: needs recipe depletion snapshots and physical count adjustments.
+
+### Implementation Plan
+
+1. Fix report accounting basis in `ReportsService.getSalesDashboard`.
+   - Use closed paid orders for primary financial KPIs.
+   - Sum `payments.amount` for collected sales and payment mix.
+   - Return reconciliation exceptions for closed orders with zero total, missing payments, or mismatched payment totals.
+   - Keep item velocity separate from financial totals unless reconciled to the selected basis.
+
+2. Update the API contract and TypeScript models.
+   - Add `financial`, `operations`, `menu`, `staff`, `inventory`, and `reconciliation` sections.
+   - Preserve compatibility by keeping legacy fields only if needed during UI migration.
+
+3. Redesign `ReportsPage` sales tab.
+   - Default view should show the highest-signal restaurant metrics first: gross/net/collected sales, orders, average check, contribution margin, payment mix, item velocity, and reconciliation warnings.
+   - Move currently unsupported metrics to a "Pendiente de captura de datos" panel.
+
+4. Add verification fixtures.
+   - Include paid orders, zero-total closed orders, inactive products, multiple payment methods, and Mexico timezone boundaries.
+   - Assert financial totals reconcile within MXN 0.01.
+
+5. Defer schema changes to a later feature.
+   - Add future migrations for channel, covers, labor cost, seat capacity, table lifecycle timestamps, and physical inventory counts only after the reporting foundation is correct.

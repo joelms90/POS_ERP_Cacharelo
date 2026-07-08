@@ -30,6 +30,7 @@ export class InventoryRepository {
         productId: schema.stockLevels.productId,
         productName: schema.products.name,
         isIngredient: schema.products.isIngredient,
+        isActive: schema.products.isActive,
         quantity: schema.stockLevels.quantity,
         updatedAt: schema.stockLevels.updatedAt,
         warehouseId: schema.stockLevels.warehouseId,

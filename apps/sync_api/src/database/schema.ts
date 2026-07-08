@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, integer, timestamp, boolean, decimal, text, doublePrecision, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, integer, timestamp, boolean, decimal, text, doublePrecision, jsonb, index } from 'drizzle-orm/pg-core';
 
 // ==========================================
 // 1. Tenants & Catalog Entities
@@ -25,6 +25,25 @@ export const branches = pgTable('branches', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  version: integer('version').default(1).notNull(),
+});
+
+export const ticketFiscalConfigurations = pgTable('ticket_fiscal_configurations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  businessId: uuid('business_id').references(() => businesses.id).notNull(),
+  branchId: uuid('branch_id').references(() => branches.id),
+  sellerDisplayName: varchar('seller_display_name', { length: 120 }).notNull(),
+  legalName: varchar('legal_name', { length: 180 }).notNull(),
+  fiscalId: varchar('fiscal_id', { length: 50 }).notNull(),
+  branchName: varchar('branch_name', { length: 120 }).notNull(),
+  branchAddress: text('branch_address').notNull(),
+  phone: varchar('phone', { length: 30 }),
+  receiptPrefix: varchar('receipt_prefix', { length: 20 }).default('CCH').notNull(),
+  taxMode: varchar('tax_mode', { length: 20 }).default('breakdown').notNull(),
+  footerText: text('footer_text'),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   version: integer('version').default(1).notNull(),
 });
 
@@ -57,6 +76,17 @@ export const users = pgTable('users', {
   passwordHash: varchar('password_hash', { length: 255 }),
   pin: varchar('pin', { length: 255 }).notNull(), // Checked for uniqueness per business
   role: varchar('role', { length: 20 }).notNull(), // waiter, cashier, kitchen, admin
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  version: integer('version').default(1).notNull(),
+});
+
+export const adminBusinessAccess = pgTable('admin_business_access', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  businessId: uuid('business_id').references(() => businesses.id).notNull(),
+  role: varchar('role', { length: 20 }).notNull(), // owner, inventory_admin
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -133,6 +163,7 @@ export const products = pgTable('products', {
   saleType: varchar('sale_type', { length: 20 }).default('pieza').notNull(),
   isSellable: boolean('is_sellable').default(true).notNull(),
   isIngredient: boolean('is_ingredient').default(false).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
   imageUrl: text('image_url'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -334,3 +365,36 @@ export const bulkImports = pgTable('bulk_imports', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const inventoryMovements = pgTable('inventory_movements', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  businessId: uuid('business_id').references(() => businesses.id).notNull(),
+  productId: uuid('product_id').references(() => products.id).notNull(),
+  
+  // Ubicaciones
+  branchId: uuid('branch_id').references(() => branches.id),
+  warehouseId: uuid('warehouse_id').references(() => warehouses.id),
+  
+  // Detalle del Movimiento
+  quantity: decimal('quantity', { precision: 12, scale: 3 }).notNull(), // Positivo = Entrada, Negativo = Salida
+  type: varchar('type', { length: 30 }).notNull(), 
+  // 'receipt' | 'sale' | 'production_input' | 'production_output' | 'transfer_out' | 'transfer_in' | 'adjustment' | 'initial'
+  
+  // Referencias cruzadas
+  referenceId: uuid('reference_id'), // ID de la tabla asociada (order_id, receipt_id, transfer_id, etc.)
+  documentNumber: varchar('document_number', { length: 50 }), // SKU de orden, Folio de compra, etc.
+  notes: text('notes'),
+  
+  // Lotes y Caducidades
+  lotNumber: varchar('lot_number', { length: 100 }),
+  expirationDate: timestamp('expiration_date', { withTimezone: true }),
+  drawerLocation: varchar('drawer_location', { length: 100 }), // Ubicación física (cajón/anaquel)
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  createdById: uuid('created_by_id').references(() => users.id),
+}, (table) => [
+  index('idx_inv_mov_bus_prod').on(table.businessId, table.productId),
+  index('idx_inv_mov_branch').on(table.branchId),
+  index('idx_inv_mov_warehouse').on(table.warehouseId),
+  index('idx_inv_mov_created_at').on(table.createdAt),
+]);

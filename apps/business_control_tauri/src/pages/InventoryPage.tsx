@@ -14,6 +14,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
+  const [stockLevels, setStockLevels] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
   // Search & Filter state
@@ -27,33 +28,65 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [isSavingProduct, setIsSavingProduct] = useState<boolean>(false);
   // Import History states
-  const [activeSubTab, setActiveSubTab] = useState<'products' | 'bulk'>('products');
+  const [activeSubTab, setActiveSubTab] = useState<'products' | 'deprecated' | 'bulk'>('products');
   const [importHistory, setImportHistory] = useState<any[]>([]);
   const [selectedImportDetails, setSelectedImportDetails] = useState<any | null>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Inventory Audit & Kardex Modal States
+  const [auditProduct, setAuditProduct] = useState<any | null>(null);
+  const [auditMovements, setAuditMovements] = useState<any[]>([]);
+  const [auditLocations, setAuditLocations] = useState<any[]>([]);
+  const [isAuditLoading, setIsAuditLoading] = useState<boolean>(false);
+
+  const handleOpenAudit = async (product: any) => {
+    setAuditProduct(product);
+    setIsAuditLoading(true);
+    try {
+      const existenceReport = await api.getInventoryExistenceReport({
+        businessId,
+        productId: product.id,
+        consolidated: false,
+      });
+
+      const movements = await api.getInventoryKardexReport({
+        businessId,
+        productId: product.id,
+      });
+
+      setAuditLocations(existenceReport.data || []);
+      setAuditMovements(movements || []);
+    } catch (err: any) {
+      showToast(err.message || 'Error al cargar datos de auditoría.', 'error');
+    } finally {
+      setIsAuditLoading(false);
+    }
+  };
+ 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { id, message, type }]);
   }, []);
-
+ 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
-
+ 
   // Fetch all data
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true);
     try {
-      const [catsData, prodsData, provsData] = await Promise.all([
+      const [catsData, prodsData, provsData, stockData] = await Promise.all([
         api.getCategories(businessId),
         api.getProducts(businessId),
         api.getProviders(businessId).catch(() => [] as Provider[]),
+        api.getStockLevels(businessId).catch(() => []),
       ]);
       setCategories(catsData);
       setProducts(prodsData);
       setProviders(provsData);
+      setStockLevels(stockData);
     } catch (error: any) {
       showToast(error.message || 'Error al sincronizar catálogo de inventario.', 'error');
     } finally {
@@ -159,6 +192,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
         saleType: editingProduct.saleType || 'pieza',
         isSellable: editingProduct.isSellable ?? true,
         isIngredient: editingProduct.isIngredient ?? false,
+        isActive: editingProduct.isActive ?? true,
         imageUrl: editingProduct.imageUrl || undefined,
       };
 
@@ -193,6 +227,118 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
       showToast(`Producto "${name}" eliminado.`, 'warning');
     } catch (error: any) {
       showToast(error.message || 'No se pudo eliminar el producto.', 'error');
+    }
+  };
+
+  // Quick toggle product active/inactive status
+  const toggleProductActive = async (product: Product) => {
+    const newActiveState = product.isActive === false ? true : false;
+    const actionWord = newActiveState ? 'activar' : 'inactivar';
+    if (!window.confirm(`¿Está seguro de que desea ${actionWord} el producto "${product.name}"?`)) {
+      return;
+    }
+    try {
+      const updated = await api.updateProduct(product.id, { isActive: newActiveState });
+      setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      showToast(`Producto "${updated.name}" ${newActiveState ? 'activado' : 'inactivado'} con éxito.`, 'success');
+    } catch (error: any) {
+      showToast(error.message || 'No se pudo cambiar el estado del producto.', 'error');
+    }
+  };
+
+  // Export products catalog to CSV format (compatible with re-import)
+  const exportProductsToCSV = () => {
+    try {
+      if (filteredProducts.length === 0) {
+        showToast('No hay productos disponibles para exportar.', 'warning');
+        return;
+      }
+
+      // Check for products without categories and warn user
+      const productsWithoutCategory = filteredProducts.filter(p => !p.categoryId || !categories.find(c => c.id === p.categoryId));
+      if (productsWithoutCategory.length > 0) {
+        console.warn(`${productsWithoutCategory.length} productos sin categoría válida serán exportados como "General"`, productsWithoutCategory.map(p => p.name));
+      }
+
+      // CSV Header Row - aligned with import template format
+      // ID is included for reliable UPSERT (update existing products)
+      const headers = [
+        'ID',
+        'Código Interno',
+        'Nombre del Producto',
+        'Categoría',
+        'Costo',
+        'Precio Venta',
+        'Precio Mayoreo',
+        'Inv Mínimo',
+        'Inv Máximo',
+        'Tipo de Venta',
+        'SKU',
+        'Código Barras',
+        'Existencia',
+        'Proveedor',
+        'Para Venta'
+      ];
+
+      // Format individual cell helper
+      const formatCell = (val: any) => {
+        if (val === null || val === undefined) return '';
+        const strVal = String(val).trim().replace(/"/g, '""'); // escape double quotes
+        // For empty strings after trim, return empty to avoid ""
+        if (strVal === '') return '';
+        return `"${strVal}"`;
+      };
+
+      // Map rows - compatible with re-import
+      const rows = filteredProducts.map((p) => {
+        // Ensure every product has a valid category name
+        let catName = 'General';
+        if (p.categoryId) {
+          const foundCat = categories.find(c => c.id === p.categoryId);
+          if (foundCat && foundCat.name && foundCat.name.trim()) {
+            catName = foundCat.name.trim();
+          }
+        }
+
+        const providerName = providers.find(pr => pr.id === p.providerId)?.name || '';
+
+        return [
+          p.id, // Product ID for exact matching on re-import
+          p.internalCode || '',
+          p.name || '',
+          catName,
+          p.cost || '0.00',
+          p.price || '0.00',
+          p.priceWholesale || '0.00',
+          p.minStock || '0',
+          p.maxStock || '0',
+          p.saleType || 'pieza',
+          p.sku || '',
+          p.barcode || '',
+          '', // Existencia - left empty for re-import
+          providerName,
+          p.isSellable !== false ? 'SI' : 'NO'
+        ].map(formatCell).join(',');
+      });
+
+      // Join headers & rows
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n'); // Add UTF-8 BOM for Excel support
+
+      // Create download blob
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `catalogo_productos_${businessId}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showToast('Catálogo exportado exitosamente.', 'success');
+    } catch (err: any) {
+      console.error(err);
+      showToast('Error al exportar catálogo.', 'error');
     }
   };
 
@@ -264,7 +410,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
     }
   };
 
-  // Filter products based on search and category
+  // Filter products based on search, category and status
   const filteredProducts = products.filter((p) => {
     const matchesSearch = 
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -274,7 +420,11 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
     const matchesCategory = 
       selectedCategoryFilter === 'all' || p.categoryId === selectedCategoryFilter;
     
-    return matchesSearch && matchesCategory;
+    const matchesTab = activeSubTab === 'deprecated'
+      ? p.isActive === false
+      : p.isActive !== false;
+    
+    return matchesSearch && matchesCategory && matchesTab;
   });
 
   return (
@@ -357,6 +507,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                 saleType: 'pieza',
                 isSellable: true,
                 isIngredient: false,
+                isActive: true,
                 imageUrl: '',
               })}
               disabled={categories.length === 0}
@@ -397,6 +548,16 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                 }`}
               >
                 Artículos y Catálogo
+              </button>
+              <button
+                onClick={() => setActiveSubTab('deprecated')}
+                className={`pb-3 text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer ${
+                  activeSubTab === 'deprecated'
+                    ? 'border-champagne-gold text-champagne-gold font-semibold'
+                    : 'border-transparent text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Deprecados / Inactivos
               </button>
               <button
                 onClick={() => setActiveSubTab('bulk')}
@@ -844,6 +1005,36 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                           </span>
                         </div>
                       </label>
+
+                      {/* Is Active Checkbox */}
+                      <label className="flex items-center gap-3 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={editingProduct.isActive ?? true}
+                          onChange={(e) => setEditingProduct(prev => ({ ...prev, isActive: e.target.checked }))}
+                          disabled={isSavingProduct}
+                          className="sr-only"
+                        />
+                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all duration-300 ${
+                          (editingProduct.isActive ?? true)
+                            ? 'bg-champagne-gold border-champagne-gold text-obsidian'
+                            : 'border-aged-bronze group-hover:border-champagne-gold/60 bg-onyx-surface'
+                        }`}>
+                          {(editingProduct.isActive ?? true) && (
+                            <svg className="w-3.5 h-3.5 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-text-primary group-hover:text-champagne-gold transition-colors">
+                            Producto Activo
+                          </span>
+                          <span className="text-[11px] text-text-secondary">
+                            Si se desactiva, no aparecerá en reportes de venta ni en el POS.
+                          </span>
+                        </div>
+                      </label>
                     </div>
 
                     {/* Provider Selector for Ingredients */}
@@ -907,18 +1098,32 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                     </svg>
                   </div>
 
-                  <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                    <span className="text-xs text-text-secondary whitespace-nowrap">Filtrar Categoría:</span>
-                    <select
-                      value={selectedCategoryFilter}
-                      onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                      className="px-3 py-1.5 bg-charcoal-surface border border-aged-bronze focus:border-champagne-gold rounded font-sans text-xs text-text-primary transition-all duration-300 focus:outline-none"
+                  <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-text-secondary whitespace-nowrap">Filtrar Categoría:</span>
+                      <select
+                        value={selectedCategoryFilter}
+                        onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+                        className="px-3 py-1.5 bg-charcoal-surface border border-aged-bronze focus:border-champagne-gold rounded font-sans text-xs text-text-primary transition-all duration-300 focus:outline-none cursor-pointer"
+                      >
+                        <option value="all">Todas las Categorías</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={exportProductsToCSV}
+                      className="flex items-center gap-1.5 cursor-pointer font-semibold uppercase tracking-wider text-[10px]"
                     >
-                      <option value="all">Todas las Categorías</option>
-                      {categories.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Exportar CSV
+                    </Button>
                   </div>
                 </div>
 
@@ -931,6 +1136,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                           <th className="px-6 py-4">Producto</th>
                           <th className="px-6 py-4">Categoría</th>
                           <th className="px-6 py-4">Códigos SKU / EAN</th>
+                          <th className="px-6 py-4 text-right">Existencia</th>
                           <th className="px-6 py-4 text-right">Costo</th>
                           <th className="px-6 py-4 text-right">Precio</th>
                           <th className="px-6 py-4">Destino</th>
@@ -940,7 +1146,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                       <tbody className="divide-y divide-aged-bronze/20 text-sm">
                         {filteredProducts.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="px-6 py-12 text-center text-text-secondary italic">
+                            <td colSpan={8} className="px-6 py-12 text-center text-text-secondary italic">
                               {categories.length === 0 
                                 ? 'Registre una categoría a la izquierda antes de agregar productos.'
                                 : 'No se encontraron artículos en el inventario que coincidan con la búsqueda.'}
@@ -949,6 +1155,16 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                         ) : (
                           filteredProducts.map((p) => {
                             const catName = categories.find(c => c.id === p.categoryId)?.name || 'Sin Categoría';
+                            
+                            // Calculate total existence
+                            const prodStock = stockLevels
+                              .filter(sl => sl.productId === p.id)
+                              .reduce((sum, sl) => sum + parseFloat(sl.quantity || '0'), 0);
+                            
+                            const minStock = parseFloat(p.minStock || '0');
+                            const isLowStock = minStock > 0 && prodStock < minStock;
+                            const displayStock = p.isIngredient ? prodStock.toFixed(3) : prodStock.toFixed(0);
+
                             return (
                               <tr key={p.id} className="hover:bg-charcoal-surface/20 transition-colors">
                                 <td className="px-6 py-4 font-medium text-text-primary">
@@ -983,6 +1199,16 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                                     {!p.sku && !p.barcode && !p.internalCode && !p.providerId && <span className="text-[10px] italic">-</span>}
                                   </div>
                                 </td>
+                                <td className="px-6 py-4 text-right font-mono text-xs">
+                                  <span className={isLowStock ? 'text-error-red font-bold animate-pulse' : 'text-text-primary font-medium'}>
+                                    {displayStock}
+                                  </span>
+                                  {isLowStock && (
+                                    <span className="text-[9px] text-error-red block font-sans font-normal">
+                                      mín: {minStock}
+                                    </span>
+                                  )}
+                                </td>
                                 <td className="px-6 py-4 text-right font-mono text-xs text-text-secondary">
                                   ${p.cost || '0.00'}
                                 </td>
@@ -997,40 +1223,74 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 text-xs">
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {p.isSellable !== false && (
-                                      <Badge variant="success">Venta</Badge>
-                                    )}
-                                    {p.isIngredient && (
-                                      <Badge variant="warning">Insumo</Badge>
-                                    )}
-                                    {p.isSellable === false && !p.isIngredient && (
-                                      <span className="text-[10px] text-text-secondary italic">Inactivo</span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                  <div className="inline-flex items-center justify-center gap-3">
-                                    <button
-                                      onClick={() => setEditingProduct(p)}
-                                      className="p-1 hover:text-champagne-gold text-text-secondary transition-colors focus:outline-none"
-                                      title="Editar artículo"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                      </svg>
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteProduct(p.id, p.name)}
-                                      className="p-1 hover:text-error-red text-text-secondary transition-colors focus:outline-none"
-                                      title="Eliminar artículo"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                      </svg>
-                                    </button>
-                                  </div>
-                                </td>
+                                   <div className="flex flex-wrap gap-1.5 font-sans">
+                                     {p.isActive === false ? (
+                                       <Badge variant="error" className="bg-red-500/10 text-error-red border border-error-red/20">Deprecado</Badge>
+                                     ) : (
+                                       <>
+                                         {p.isSellable !== false && (
+                                           <Badge variant="success">Venta</Badge>
+                                         )}
+                                         {p.isIngredient && (
+                                           <Badge variant="warning">Insumo</Badge>
+                                         )}
+                                         {p.isSellable === false && !p.isIngredient && (
+                                           <span className="text-[10px] text-text-secondary italic">Inactivo</span>
+                                         )}
+                                       </>
+                                     )}
+                                   </div>
+                                 </td>
+                                 <td className="px-6 py-4 text-center">
+                                   <div className="inline-flex items-center justify-center gap-3">
+                                      <button
+                                        onClick={() => handleOpenAudit(p)}
+                                        className="p-1 hover:text-champagne-gold text-text-secondary transition-colors focus:outline-none"
+                                        title="Ver Auditoría y Kardex"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                                        </svg>
+                                      </button>
+                                     <button
+                                       onClick={() => setEditingProduct(p)}
+                                       className="p-1 hover:text-champagne-gold text-text-secondary transition-colors focus:outline-none"
+                                       title="Editar artículo"
+                                     >
+                                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                       </svg>
+                                     </button>
+                                     <button
+                                       onClick={() => toggleProductActive(p)}
+                                       className={`p-1 transition-colors focus:outline-none ${
+                                         p.isActive === false
+                                           ? 'hover:text-success-green text-text-secondary'
+                                           : 'hover:text-warning-yellow/80 text-text-secondary'
+                                       }`}
+                                       title={p.isActive === false ? "Activar artículo" : "Inactivar artículo"}
+                                     >
+                                       {p.isActive === false ? (
+                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                         </svg>
+                                       ) : (
+                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                         </svg>
+                                       )}
+                                     </button>
+                                     <button
+                                       onClick={() => handleDeleteProduct(p.id, p.name)}
+                                       className="p-1 hover:text-error-red text-text-secondary transition-colors focus:outline-none"
+                                       title="Eliminar artículo"
+                                     >
+                                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                       </svg>
+                                     </button>
+                                   </div>
+                                 </td>
                               </tr>
                             );
                           })
@@ -1120,6 +1380,218 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
             <div className="p-6 border-t border-aged-bronze/25 flex justify-end">
               <Button onClick={() => setSelectedImportDetails(null)} className="font-sans text-xs">
                 Cerrar Reporte
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inventory Audit & Kardex Modal */}
+      {auditProduct && (
+        <div className="fixed inset-0 bg-obsidian/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in font-sans">
+          <div className="bg-onyx-surface border border-aged-bronze/35 rounded-xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="p-6 border-b border-aged-bronze/25 flex items-center justify-between">
+              <div>
+                <Heading level={2} className="!text-champagne-gold !border-none !pb-0 font-light font-sans text-lg">
+                  Auditoría de Stock y Kardex de Movimientos
+                </Heading>
+                <p className="text-xs text-text-secondary mt-1 font-sans">
+                  Producto: <span className="text-text-primary font-semibold">{auditProduct.name}</span>
+                  {auditProduct.sku && ` (SKU: ${auditProduct.sku})`}
+                  {auditProduct.internalCode && ` (Código: ${auditProduct.internalCode})`}
+                </p>
+              </div>
+              <button 
+                onClick={() => setAuditProduct(null)}
+                className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content Area */}
+            <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-6">
+              {isAuditLoading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3">
+                  <svg className="animate-spin h-8 w-8 text-champagne-gold" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="text-xs text-text-secondary">Cargando bitácora de movimientos...</span>
+                </div>
+              ) : (
+                <>
+                  {/* Integrity and Breakdown Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Catalog Summary */}
+                    <div className="p-4 bg-charcoal-surface/30 border border-aged-bronze/10 rounded-lg flex flex-col gap-1">
+                      <span className="text-[10px] text-text-secondary uppercase">Stock Consolidado (Catálogo)</span>
+                      <span className="text-xl font-bold font-mono text-champagne-gold">
+                        {(stockLevels
+                          .filter(sl => sl.productId === auditProduct.id)
+                          .reduce((sum, sl) => sum + parseFloat(sl.quantity || '0'), 0)
+                        ).toFixed(auditProduct.isIngredient ? 3 : 0)}
+                      </span>
+                    </div>
+
+                    {/* Physical Locations Sum */}
+                    <div className="p-4 bg-charcoal-surface/30 border border-aged-bronze/10 rounded-lg flex flex-col gap-1">
+                      <span className="text-[10px] text-text-secondary uppercase">Suma de Existencias Física</span>
+                      <span className="text-xl font-bold font-mono text-text-primary">
+                        {(auditLocations.reduce((sum, loc) => sum + loc.quantity, 0)).toFixed(auditProduct.isIngredient ? 3 : 0)}
+                      </span>
+                    </div>
+
+                    {/* Integrity Validation Status */}
+                    <div className={`p-4 border rounded-lg flex flex-col justify-center gap-1 ${
+                      Math.abs(
+                        (stockLevels
+                          .filter(sl => sl.productId === auditProduct.id)
+                          .reduce((sum, sl) => sum + parseFloat(sl.quantity || '0'), 0)
+                        ) - auditLocations.reduce((sum, loc) => sum + loc.quantity, 0)
+                      ) < 0.001
+                        ? 'border-success-green/20 bg-success-green/5 text-success-green'
+                        : 'border-warning-yellow/20 bg-warning-yellow/5 text-warning-yellow'
+                    }`}>
+                      <span className="text-[10px] uppercase opacity-75">Estado de Integridad</span>
+                      <span className="text-sm font-bold flex items-center gap-1.5 font-sans">
+                        {Math.abs(
+                          (stockLevels
+                            .filter(sl => sl.productId === auditProduct.id)
+                            .reduce((sum, sl) => sum + parseFloat(sl.quantity || '0'), 0)
+                          ) - auditLocations.reduce((sum, loc) => sum + loc.quantity, 0)
+                        ) < 0.001 ? (
+                          <>✓ Existencias Cuadradas</>
+                        ) : (
+                          <>⚠ Discrepancia Detectada</>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Existence Breakdown by Location */}
+                  <div className="flex flex-col gap-2.5">
+                    <h3 className="text-xs font-semibold text-champagne-gold uppercase tracking-wider">
+                      Desglose de existencias por Ubicación
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      {auditLocations.length === 0 ? (
+                        <span className="text-xs text-text-secondary italic">No hay existencias registradas en ninguna bodega o sucursal.</span>
+                      ) : (
+                        auditLocations.map((loc, i) => (
+                          <div key={i} className="p-3 bg-charcoal-surface border border-aged-bronze/15 rounded flex justify-between items-center">
+                            <span className="text-xs text-text-primary font-medium">{loc.warehouseName || loc.branchName || 'Ubicación'}</span>
+                            <span className="text-xs font-bold font-mono text-champagne-gold">
+                              {loc.quantity.toFixed(auditProduct.isIngredient ? 3 : 0)}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Movements Ledger (Kardex) */}
+                  <div className="flex flex-col gap-2.5 flex-1">
+                    <h3 className="text-xs font-semibold text-champagne-gold uppercase tracking-wider">
+                      Ledger de Auditoría (Kardex)
+                    </h3>
+                    <div className="overflow-x-auto border border-aged-bronze/10 rounded max-h-[30vh]">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-aged-bronze/20 bg-charcoal-surface text-[10px] font-semibold text-text-secondary uppercase">
+                            <th className="py-2 px-3">Fecha</th>
+                            <th className="py-2 px-3">Ubicación</th>
+                            <th className="py-2 px-3">Movimiento</th>
+                            <th className="py-2 px-3 text-right">Variación</th>
+                            <th className="py-2 px-3 text-right">S. Anterior</th>
+                            <th className="py-2 px-3 text-right">S. Final</th>
+                            <th className="py-2 px-3">Usuario</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-aged-bronze/5 text-[11px] font-sans">
+                          {auditMovements.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="py-8 text-center text-text-secondary italic">
+                                No se registran movimientos históricos en el Kardex para este producto.
+                              </td>
+                            </tr>
+                          ) : (
+                            auditMovements.map((m) => {
+                              const isPositive = m.quantity > 0;
+                              const isInternal = m.type === 'transfer_out' || m.type === 'transfer_in';
+                              
+                              let typeLabel = m.type;
+                              if (m.type === 'receipt') typeLabel = 'Compra Prov';
+                              else if (m.type === 'sale') typeLabel = 'Venta POS';
+                              else if (m.type === 'production_input') typeLabel = 'Consumo Ensamble';
+                              else if (m.type === 'production_output') typeLabel = 'Entrada Ensamble';
+                              else if (m.type === 'transfer_out') typeLabel = 'Traspaso Env';
+                              else if (m.type === 'transfer_in') typeLabel = 'Traspaso Rec';
+                              else if (m.type === 'adjustment') typeLabel = 'Ajuste Manual';
+                              else if (m.type === 'initial') typeLabel = 'Inventario Inicial';
+
+                              return (
+                                <tr key={m.id} className="hover:bg-charcoal-surface/10">
+                                  <td className="py-2 px-3 font-mono text-text-secondary whitespace-nowrap">
+                                    {new Date(m.createdAt).toLocaleString('es-MX', {
+                                      year: 'numeric',
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </td>
+                                  <td className="py-2 px-3 text-text-primary whitespace-nowrap">
+                                    {m.warehouseName || m.branchName || 'N/A'}
+                                  </td>
+                                  <td className="py-2 px-3 font-medium">
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider ${
+                                      isInternal 
+                                        ? 'bg-warning-yellow/10 text-warning-yellow'
+                                        : isPositive 
+                                          ? 'bg-success-green/10 text-success-green'
+                                          : 'bg-error-red/10 text-error-red'
+                                    }`}>
+                                      {typeLabel}
+                                    </span>
+                                  </td>
+                                  <td className={`py-2 px-3 text-right font-mono font-bold ${
+                                    isInternal 
+                                      ? 'text-warning-yellow' 
+                                      : isPositive 
+                                        ? 'text-success-green' 
+                                        : 'text-error-red'
+                                  }`}>
+                                    {isPositive ? '+' : ''}{m.quantity.toFixed(auditProduct.isIngredient ? 3 : 0)}
+                                  </td>
+                                  <td className="py-2 px-3 text-right font-mono text-text-secondary">
+                                    {m.previousBalance.toFixed(auditProduct.isIngredient ? 3 : 0)}
+                                  </td>
+                                  <td className="py-2 px-3 text-right font-mono font-semibold text-text-primary">
+                                    {m.finalBalance.toFixed(auditProduct.isIngredient ? 3 : 0)}
+                                  </td>
+                                  <td className="py-2 px-3 text-text-secondary truncate max-w-[120px]" title={m.createdByName}>
+                                    {m.createdByName || 'Sistema'}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-aged-bronze/25 flex justify-end">
+              <Button onClick={() => setAuditProduct(null)} className="font-sans text-xs">
+                Cerrar Auditoría
               </Button>
             </div>
           </div>

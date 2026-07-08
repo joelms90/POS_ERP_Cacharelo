@@ -214,9 +214,23 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
     );
   }
 
+  if (activeReportTab === 'sales' && !reportData) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-obsidian text-text-secondary select-none p-6">
+        <span className="text-sm text-error-red">{error || 'No se pudieron cargar las estadísticas de ventas.'}</span>
+        <button
+          onClick={fetchReport}
+          className="bg-charcoal border border-aged-bronze/45 hover:border-champagne-gold hover:text-champagne-gold text-xs px-3 py-1.5 rounded transition-all cursor-pointer font-semibold uppercase tracking-wider text-text-primary"
+        >
+          Reintentar Cargar
+        </button>
+      </div>
+    );
+  }
+
   // Calculate top profit margins
   const topProfitProducts = reportData?.topProducts
-    ? [...reportData.topProducts].sort((a, b) => b.profitMargin - a.profitMargin)
+    ? [...(reportData.topProducts || [])].sort((a, b) => b.profitMargin - a.profitMargin)
     : [];
 
   // Filter stock levels based on selected status and location filters
@@ -753,13 +767,13 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-aged-bronze/10">
-                    {reportData?.salesByBranch.length === 0 ? (
+                    {(reportData?.salesByBranch || []).length === 0 ? (
                       <tr>
                         <td colSpan={4} className="p-4 text-center text-text-secondary italic">No hay ventas registradas</td>
                       </tr>
                     ) : (
-                      reportData?.salesByBranch.map((branch) => {
-                        const share = reportData.totalSales > 0 ? (branch.totalSales / reportData.totalSales) * 100 : 0;
+                      (reportData?.salesByBranch || []).map((branch) => {
+                        const share = (reportData?.totalSales || 0) > 0 ? (branch.totalSales / reportData!.totalSales) * 100 : 0;
                         return (
                           <tr key={branch.id} className="hover:bg-charcoal-surface/10">
                             <td className="p-3 font-medium text-text-primary">{branch.name}</td>
@@ -788,7 +802,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                 Ventas por Hora (Pico Operativo)
               </span>
               <div className="flex-1 flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
-                {reportData?.hourlySales
+                {(reportData?.hourlySales || [])
                   .filter(h => h.totalSales > 0)
                   .sort((a, b) => b.totalSales - a.totalSales)
                   .slice(0, 5)
@@ -803,7 +817,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                       </div>
                     </div>
                   ))}
-                {(!reportData?.hourlySales.some(h => h.totalSales > 0)) && (
+                {(!(reportData?.hourlySales || []).some(h => h.totalSales > 0)) && (
                   <div className="flex-1 flex items-center justify-center text-text-secondary italic text-xs">
                     Sin registros suficientes
                   </div>
@@ -830,12 +844,12 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-aged-bronze/10">
-                    {reportData?.topProducts.length === 0 ? (
+                    {(reportData?.topProducts || []).length === 0 ? (
                       <tr>
                         <td colSpan={4} className="p-4 text-center text-text-secondary italic">No hay productos vendidos</td>
                       </tr>
                     ) : (
-                      reportData?.topProducts.slice(0, 6).map((prod) => (
+                      (reportData?.topProducts || []).slice(0, 6).map((prod) => (
                         <tr key={prod.id} className="hover:bg-charcoal-surface/10">
                           <td className="p-3 font-medium text-text-primary">
                             {prod.name}
@@ -860,15 +874,15 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                   Meseros que más Venden
                 </span>
                 <div className="flex flex-col gap-2 max-h-[120px] overflow-y-auto pr-1">
-                  {reportData?.topWaiters.length === 0 ? (
+                  {(reportData?.topWaiters || []).length === 0 ? (
                     <span className="text-xs text-text-secondary italic text-center py-2 block">Sin meseros registrados</span>
                   ) : (
-                    reportData?.topWaiters.slice(0, 3).map((w, idx) => (
+                    (reportData?.topWaiters || []).slice(0, 3).map((w, idx) => (
                       <div key={w.id} className="flex items-center justify-between text-xs py-1.5 border-b border-aged-bronze/10">
                         <span className="text-text-primary font-medium">{idx + 1}. {w.name}</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-text-secondary">{w.ordersCount} ped.</span>
-                          <span className="font-semibold text-champagne-gold font-mono">{formatCurrency(w.totalSales)}</span>
+                           <span className="text-text-secondary">{w.ordersCount} ped.</span>
+                           <span className="font-semibold text-champagne-gold font-mono">{formatCurrency(w.totalSales)}</span>
                         </div>
                       </div>
                     ))
@@ -882,10 +896,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                   Cajeros / Administradores (Operadores)
                 </span>
                 <div className="flex flex-col gap-2 max-h-[120px] overflow-y-auto pr-1">
-                  {reportData?.topCashiers.length === 0 ? (
+                  {(reportData?.topCashiers || []).length === 0 ? (
                     <span className="text-xs text-text-secondary italic text-center py-2 block">Sin operadores registrados</span>
                   ) : (
-                    reportData?.topCashiers.slice(0, 3).map((c, idx) => (
+                    (reportData?.topCashiers || []).slice(0, 3).map((c, idx) => (
                       <div key={c.id} className="flex items-center justify-between text-xs py-1.5 border-b border-aged-bronze/10">
                         <span className="text-text-primary font-medium">{idx + 1}. {c.name}</span>
                         <div className="flex items-center gap-2">
@@ -919,7 +933,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                   <strong>Incrementar Ticket Promedio</strong>: Tu ticket promedio es de <span className="text-text-primary font-medium font-mono">{formatCurrency(reportData.averageTicket)}</span>. Considera crear combos (ej. bebida + alimento) u ofrecer productos adicionales de bajo costo para elevar el consumo medio.
                 </li>
               )}
-              {reportData?.hourlySales.some(h => h.totalSales > 0) && (
+              {(reportData?.hourlySales || []).some(h => h.totalSales > 0) && (
                 <li>
                   <strong>Eficiencia de Producción</strong>: Revisa tus picos de venta horaria. Pre-elabora o ensambla lotes de productos terminados (recetas) 30 minutos antes de la hora pico más alta para reducir tiempos de espera de los clientes y evitar cuellos de botella en la cocina.
                 </li>

@@ -49,7 +49,10 @@ export class KitchenRepository {
       const items = await this.db
         .select({
           id: schema.orderItems.id,
+          productId: schema.orderItems.productId,
           quantity: schema.orderItems.quantity,
+          price: schema.orderItems.price,
+          assignedGuest: schema.orderItems.assignedGuest,
           notes: schema.orderItems.notes,
           productName: schema.products.name,
           categoryName: schema.categories.name,

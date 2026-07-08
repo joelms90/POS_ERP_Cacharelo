@@ -38,6 +38,10 @@ export class UpdateProductDto {
   @IsOptional()
   isIngredient?: boolean;
 
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+
   @IsString()
   @IsOptional()
   imageUrl?: string;

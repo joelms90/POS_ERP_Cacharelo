@@ -10,6 +10,7 @@ interface LoginFormProps {
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   const { login, error, isLoading, clearError } = useAuth();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -24,7 +25,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
       return;
     }
 
-    const success = await login(password);
+    const success = await login(email, password);
     if (success) {
       onSuccess();
     }
@@ -33,7 +34,24 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5 w-full max-w-sm">
       <FormField
-        label="Contraseña de Administrador"
+        label="Correo"
+        error={undefined}
+      >
+        <Input
+          type="email"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            if (validationError) setValidationError(null);
+            if (error) clearError();
+          }}
+          placeholder="owner@cacharelo.com"
+          disabled={isLoading}
+        />
+      </FormField>
+
+      <FormField
+        label="Contraseña"
         error={validationError || error || undefined}
         required
       >
@@ -84,7 +102,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
             </svg>
-            <span>Desbloquear Consola</span>
+            <span>Entrar</span>
           </>
         )}
       </Button>

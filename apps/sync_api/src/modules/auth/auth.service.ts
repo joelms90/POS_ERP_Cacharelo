@@ -93,11 +93,23 @@ export class AuthService {
   }
 
   private async generateAuthTokens(user: any, deviceId: string) {
+    const businessAccess = await this.usersRepository.findAdminAccessForUser(user.id);
+    const normalizedAccess = businessAccess.length > 0
+      ? businessAccess.map((access) => ({
+          businessId: access.businessId,
+          role: access.role,
+        }))
+      : user.businessId
+        ? [{ businessId: user.businessId, role: user.role }]
+        : [];
+    const primaryBusinessId = user.businessId || normalizedAccess[0]?.businessId || null;
+
     const jwtPayload = {
       sub: user.id,
       name: user.name,
       role: user.role,
-      businessId: user.businessId,
+      businessId: primaryBusinessId,
+      businessAccess: normalizedAccess,
     };
 
     const secret = process.env.JWT_SECRET || 'dev_jwt_secret_key';
@@ -131,7 +143,11 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: sanitizedUser,
+      user: {
+        ...sanitizedUser,
+        businessId: primaryBusinessId,
+        businessAccess: normalizedAccess,
+      },
     };
   }
 

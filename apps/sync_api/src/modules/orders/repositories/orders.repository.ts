@@ -54,7 +54,31 @@ export class OrdersRepository {
         ),
       );
 
-    return activeOrders;
+    const hydrated = [];
+    for (const order of activeOrders) {
+      const items = await this.db
+        .select()
+        .from(schema.orderItems)
+        .where(
+          and(
+            eq(schema.orderItems.orderId, order.id),
+            isNull(schema.orderItems.deletedAt),
+          ),
+        );
+
+      const payments = await this.db
+        .select()
+        .from(schema.payments)
+        .where(eq(schema.payments.orderId, order.id));
+
+      hydrated.push({
+        ...order,
+        items,
+        payments,
+      });
+    }
+
+    return hydrated;
   }
 
   async create(orderData: typeof schema.orders.$inferInsert, itemsData: Omit<typeof schema.orderItems.$inferInsert, 'orderId'>[]) {
@@ -330,5 +354,23 @@ async function deductDirectStock(tx: any, productId: string, quantity: number, w
         quantity: (-quantity).toString(),
         updatedAt: new Date(),
       });
+  }
+
+  // Record stock movement
+  const [product] = await tx
+    .select()
+    .from(schema.products)
+    .where(eq(schema.products.id, productId))
+    .limit(1);
+
+  if (product) {
+    await tx.insert(schema.inventoryMovements).values({
+      businessId: product.businessId,
+      productId,
+      warehouseId,
+      quantity: (-quantity).toString(),
+      type: 'sale',
+      notes: `Venta POS`,
+    });
   }
 }

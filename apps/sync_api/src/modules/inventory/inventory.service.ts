@@ -111,6 +111,19 @@ export class InventoryService {
               updatedAt: new Date(),
             });
         }
+
+        // Record stock movement
+        await tx.insert(schema.inventoryMovements).values({
+          businessId,
+          productId: item.productId,
+          warehouseId: warehouseId || null,
+          branchId: branchId || null,
+          quantity: item.quantity.toString(),
+          type: 'receipt',
+          referenceId: receipt.id,
+          documentNumber: documentNumber || null,
+          notes: notes || null,
+        });
       }
 
       return {
@@ -169,6 +182,18 @@ export class InventoryService {
         );
       }
     }
+
+    // Fetch product to resolve businessId
+    const [product] = await db
+      .select()
+      .from(schema.products)
+      .where(eq(schema.products.id, productId))
+      .limit(1);
+
+    if (!product) {
+      throw new NotFoundException(`Producto con ID ${productId} no encontrado`);
+    }
+    const businessId = product.businessId;
 
     // 3. Execute transaction: decrement ingredients stock, increment parent stock, log run
     return db.transaction(async (tx) => {
@@ -240,6 +265,31 @@ export class InventoryService {
           notes: notes || null,
         })
         .returning();
+
+      // Record output movement (assembled product entry)
+      await tx.insert(schema.inventoryMovements).values({
+        businessId,
+        productId,
+        warehouseId,
+        quantity: quantityProduced.toString(),
+        type: 'production_output',
+        referenceId: run.id,
+        notes: notes || null,
+      });
+
+      // Record input movements (ingredients deduction)
+      for (const item of recipe) {
+        const decrementQty = parseFloat(item.quantityNeeded) * quantityProduced;
+        await tx.insert(schema.inventoryMovements).values({
+          businessId,
+          productId: item.ingredientProductId,
+          warehouseId,
+          quantity: (-decrementQty).toString(),
+          type: 'production_input',
+          referenceId: run.id,
+          notes: `Insumo consumido en receta para ensamble de ${product.name}`,
+        });
+      }
 
       return {
         success: true,
@@ -394,6 +444,29 @@ export class InventoryService {
             unitCost,
             totalCost,
           });
+
+        // Record stock movements
+        await tx.insert(schema.inventoryMovements).values({
+          businessId,
+          productId: item.productId,
+          warehouseId: fromWarehouseId || null,
+          branchId: fromBranchId || null,
+          quantity: (-item.quantity).toString(),
+          type: 'transfer_out',
+          referenceId: transfer.id,
+          notes: `Traspaso enviado`,
+        });
+
+        await tx.insert(schema.inventoryMovements).values({
+          businessId,
+          productId: item.productId,
+          warehouseId: toWarehouseId || null,
+          branchId: toBranchId || null,
+          quantity: item.quantity.toString(),
+          type: 'transfer_in',
+          referenceId: transfer.id,
+          notes: `Traspaso recibido`,
+        });
       }
 
       return {
@@ -535,6 +608,17 @@ export class InventoryService {
     const { productId, warehouseId, branchId, quantity } = body;
     const db = this.inventoryRepository.getDb();
 
+    // Fetch product to resolve businessId
+    const [product] = await db
+      .select()
+      .from(schema.products)
+      .where(eq(schema.products.id, productId))
+      .limit(1);
+
+    if (!product) {
+      throw new NotFoundException(`Producto con ID ${productId} no encontrado`);
+    }
+
     const conditions = [eq(schema.stockLevels.productId, productId)];
     if (warehouseId) {
       conditions.push(eq(schema.stockLevels.warehouseId, warehouseId));
@@ -550,25 +634,42 @@ export class InventoryService {
       .where(and(...conditions))
       .limit(1);
 
-    if (existing) {
-      await db
-        .update(schema.stockLevels)
-        .set({
-          quantity: quantity.toString(),
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.stockLevels.id, existing.id));
-    } else {
-      await db
-        .insert(schema.stockLevels)
-        .values({
+    const oldQty = existing ? parseFloat(existing.quantity) : 0;
+    const diff = quantity - oldQty;
+
+    await db.transaction(async (tx) => {
+      if (existing) {
+        await tx
+          .update(schema.stockLevels)
+          .set({
+            quantity: quantity.toString(),
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.stockLevels.id, existing.id));
+      } else {
+        await tx
+          .insert(schema.stockLevels)
+          .values({
+            productId,
+            warehouseId: warehouseId || null,
+            branchId: branchId || null,
+            quantity: quantity.toString(),
+            updatedAt: new Date(),
+          });
+      }
+
+      if (diff !== 0) {
+        await tx.insert(schema.inventoryMovements).values({
+          businessId: product.businessId,
           productId,
           warehouseId: warehouseId || null,
           branchId: branchId || null,
-          quantity: quantity.toString(),
-          updatedAt: new Date(),
+          quantity: diff.toString(),
+          type: 'adjustment',
+          notes: `Ajuste manual de stock (anterior: ${oldQty}, nuevo: ${quantity})`,
         });
-    }
+      }
+    });
 
     return { success: true };
   }

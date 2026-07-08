@@ -57,12 +57,31 @@ As a business administrator, I want to see the status of the sync server and its
 
 ---
 
+### User Story 4 - Restaurant Sales Intelligence Dashboard (Priority: P1)
+
+As a restaurant owner or manager, I want the Reports section to summarize the most important business health metrics so that I can make daily decisions without manually reconciling raw POS data.
+
+**Why this priority**: The current sales dashboard mixes order-level totals and item-level sales in a way that can produce confusing results. For example, a weekly response can show `totalSales = 886` while product-level sales sum much higher because closed zero-total orders still contribute item rows. Reports must use one clear accounting basis.
+
+**Independent Test**: Request `/api/reports/sales-dashboard` for a known date range and verify that gross sales, net sales, item sales, payments, and branch/user totals reconcile within rounding tolerance.
+
+**Acceptance Scenarios**:
+
+1. **Given** closed orders with line items and payments, **When** the sales dashboard loads, **Then** the KPI cards show reconciled gross sales, discounts, net sales collected, order count, average check, item count, payment mix, and contribution margin.
+2. **Given** a closed order has no successful payment or a zero total, **When** reports aggregate product performance, **Then** the row is flagged or excluded according to the selected accounting basis instead of silently inflating product revenue.
+3. **Given** the business operates in Mexico, **When** hourly sales are displayed, **Then** the hour buckets use the configured business timezone instead of Cloud Run server UTC.
+4. **Given** a metric is not supported by the current data model, **When** the dashboard displays it, **Then** it is labeled as pending data capture rather than presented as a real value.
+
+---
+
 ### Edge Cases
 
 - **Connection Drop**: If the network connection to `sync_api` is lost while the administrator is editing user access, the UI must display a connection error alert and disable edit actions rather than silently failing or hanging.
 - **PIN Format Violations**: The UI must prevent submitting PINs that are not exactly 4 digits or contain non-numeric characters, notifying the user immediately on the form.
 - **Concurrent DB Modifications**: If another administrator modifies the database, the employee list should support manual refresh to sync with the current backend state.
 - **Server Database Configuration Errors**: If the backend server fails to connect to PostgreSQL and is using JSON fallback, the UI should display a status warning so the administrator is aware that data is not persisting to the main database.
+- **Unpaid Closed Orders**: Closed orders with `total = 0`, missing payments, or payment totals that do not match order totals must be surfaced as reconciliation exceptions in reports.
+- **Timezone Drift**: Date-range filters and hourly buckets must consistently use the business timezone (`America/Mexico_City` by default) so management views match the restaurant day.
 
 ## Requirements *(mandatory)*
 
@@ -76,12 +95,20 @@ As a business administrator, I want to see the status of the sync server and its
 - **FR-006**: System MUST show a real-time status indicator of the sync server backend and database connectivity.
 - **FR-007**: System MUST validate PIN inputs on the client side (numeric, length 4) before making API calls.
 - **FR-008**: System MUST secure all employee-related API requests by attaching the administrator authorization token.
+- **FR-009**: Reports MUST reconcile order totals, item totals, and payment totals, returning explicit exception counts when they differ.
+- **FR-010**: Reports MUST distinguish gross sales, discounts, taxes, net sales, collected payments, and contribution margin.
+- **FR-011**: Reports MUST compute hourly sales using a business timezone parameter or stored business timezone.
+- **FR-012**: Reports MUST limit Top Products to top 10 by default while supporting sorting by quantity, revenue, and contribution margin.
+- **FR-013**: Reports MUST mark unsupported metrics as pending data capture instead of displaying fabricated values.
 
 ### Key Entities
 
 - **Administrator Session**: Tracks the active auth token and authentication state of the admin.
 - **Employee Access Card**: Represents a user profile in the system. Attributes: `id` (UUID), `name` (string), `pin` (4-digit string), `role` (waiter/cashier/kitchen).
 - **Server Status**: State of the backend server. Attributes: `apiConnected` (boolean), `databaseConnected` (boolean), `databaseType` (PostgreSQL or local JSON).
+- **Sales Dashboard Summary**: Aggregated restaurant KPIs for a date range. Attributes: `grossSales`, `discounts`, `taxes`, `netSales`, `collectedSales`, `ordersCount`, `itemsCount`, `averageCheck`, `contributionMargin`, `paymentMix`, `reconciliation`.
+- **Product Performance Row**: Menu item ranking. Attributes: `productId`, `name`, `sku`, `quantitySold`, `grossSales`, `netSales`, `estimatedCogs`, `contributionMargin`, `marginPercent`.
+- **Operational Metric Status**: Metadata for metrics that require additional data capture. Attributes: `metric`, `status` (`available` or `needs_data`), `missingFields`.
 
 ## Success Criteria *(mandatory)*
 
@@ -92,6 +119,41 @@ As a business administrator, I want to see the status of the sync server and its
 - **SC-003**: Access revocation propagates to the backend database within 1.0 second under normal network latency.
 - **SC-004**: Network disconnects are detected and displayed as an alert banner in less than 3 seconds.
 - **SC-005**: Admin token is stored securely in local app storage to persist session across application restarts (unless logged out).
+- **SC-006**: For any sales dashboard response, `salesByBranch.totalSales` MUST equal the selected total-sales KPI within MXN 0.01.
+- **SC-007**: Product revenue totals MUST either reconcile to order/payment totals within MXN 0.01 or return a non-zero `reconciliation.exceptionsCount` with detail rows.
+- **SC-008**: Hourly sales buckets MUST match `America/Mexico_City` local business hours for the requested range.
+
+## Reports Intelligence Roadmap
+
+### Metrics Available With Current Data
+
+- Gross sales, discounts, taxes, net order sales, and order count from `orders`.
+- Collected sales and payment mix from `payments`.
+- Average check size from collected or net order sales divided by closed paid orders.
+- Menu item velocity and contribution margin from `order_items.price`, `order_items.quantity`, and `products.cost`.
+- Branch and waiter/cashier sales rankings from `orders`, `branches`, and `users`.
+- Hourly sales using order/payment timestamps after timezone normalization.
+- Kitchen ticket speed from `kitchen_tickets.createdAt`, `startedAt`, `readyAt`, and `servedAt`.
+- Inventory on hand, stock value, below-minimum stock, and Kardex from stock and inventory movement tables.
+
+### Metrics Requiring Data Capture
+
+- Net sales by channel requires an order `channel` field and delivery/third-party commission fields.
+- Labor cost percentage requires shift-level payroll or hourly rate records by employee and role.
+- PPA / covers requires guest count per order, not only `assignedGuest` on individual items.
+- RevPASH requires seat capacity by branch/table and occupied-seat-hour tracking.
+- Average dining duration requires seated/opened/billing/closed timestamps on orders or table sessions.
+- Actual vs theoretical food-cost variance requires recipe depletion snapshots, purchase costs, and physical count adjustments by period.
+
+### Reporting TODOs
+
+- TODO: Redesign `/api/reports/sales-dashboard` response around reconciled summary sections: `financial`, `operations`, `menu`, `staff`, `inventory`, and `reconciliation`.
+- TODO: Use payments as the primary collected-sales basis and return order-total vs payment-total exceptions.
+- TODO: Remove inactive-product filtering from historical item sales or include historical product names so old sales do not disappear when a product is deactivated.
+- TODO: Add timezone-aware date bucketing. Default to `America/Mexico_City` until business timezone is stored.
+- TODO: Add report UI cards for Gross Sales, Net Sales, Collected Sales, Discounts, Taxes, Average Check, Contribution Margin, Payment Mix, Item Velocity, and Reconciliation Exceptions.
+- TODO: Add a "Needs data capture" panel for Prime Cost, Labor Cost %, PPA, RevPASH, Dining Duration, and Actual vs Theoretical Food Cost Variance.
+- TODO: Add backend tests with a fixture containing paid orders, zero-total closed orders, inactive products, multiple payment methods, and Mexico-time hourly boundaries.
 
 ## Catalog Bulk Import Classification Rules
 

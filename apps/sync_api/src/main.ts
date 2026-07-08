@@ -5,8 +5,18 @@ import { ValidationPipe } from '@nestjs/common';
 import { json, urlencoded } from 'express';
 
 async function bootstrap() {
-  // Run database migrations on startup
-  await runMigrations();
+  // In production, migrations should be run separately via Cloud Run Jobs
+  // In development, run migrations on startup for convenience
+  const shouldRunMigrations =
+    process.env.RUN_MIGRATIONS_ON_STARTUP === 'true' ||
+    (process.env.NODE_ENV !== 'production' && process.env.SKIP_MIGRATIONS !== 'true');
+
+  if (shouldRunMigrations) {
+    console.log('🔄 Running migrations on startup...');
+    await runMigrations();
+  } else {
+    console.log('⏭️  Skipping migrations (run separately in production)');
+  }
 
   const app = await NestFactory.create(AppModule);
 

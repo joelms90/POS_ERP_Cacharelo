@@ -14,13 +14,39 @@ import { AssemblyPage } from './pages/AssemblyPage';
 import { TransfersPage } from './pages/TransfersPage';
 import { HelpPage } from './pages/HelpPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { TicketSettingsPage } from './pages/TicketSettingsPage';
+import { PosSimulatorPage } from './pages/PosSimulatorPage';
+import { AdministratorsPage } from './pages/AdministratorsPage';
 import { api } from './services/api';
 
+export type AdminTab = 'administrators' | 'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers' | 'help' | 'reports' | 'ticket-settings' | 'pos-simulator';
+
+export const roleTabs: Record<string, AdminTab[]> = {
+  owner: ['administrators', 'personal', 'branches', 'ticket-settings', 'pos-simulator', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'transfers', 'reports', 'inquiries', 'help'],
+  inventory_admin: ['inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'help'],
+};
+
 function App() {
-  const { isAuthenticated, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers' | 'help' | 'reports'>('personal');
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const [activeTab, setActiveTab] = useState<AdminTab>('personal');
   const [activeBusinessId, setActiveBusinessId] = useState<string>('d3b07384-d113-4a0e-a555-e5b12824bf01');
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const allowedTabs = roleTabs[user?.role || 'owner'] || roleTabs.owner;
+  const allowedBusinessIds = user?.role === 'inventory_admin'
+    ? (user.businessAccess?.map((access) => access.businessId) || (user.businessId ? [user.businessId] : []))
+    : undefined;
+
+  useEffect(() => {
+    if (!allowedTabs.includes(activeTab)) {
+      setActiveTab(allowedTabs[0]);
+    }
+  }, [activeTab, allowedTabs]);
+
+  useEffect(() => {
+    if (allowedBusinessIds?.length && !allowedBusinessIds.includes(activeBusinessId)) {
+      setActiveBusinessId(allowedBusinessIds[0]);
+    }
+  }, [allowedBusinessIds, activeBusinessId]);
 
   useEffect(() => {
     const handleError = (e: ErrorEvent) => {
@@ -71,7 +97,11 @@ function App() {
         onTabChange={setActiveTab as any}
         activeBusinessId={activeBusinessId}
         onBusinessChange={setActiveBusinessId}
+        allowedTabs={allowedTabs}
+        currentUser={user}
+        allowedBusinessIds={allowedBusinessIds}
       >
+        {activeTab === 'administrators' && <AdministratorsPage businessId={activeBusinessId} />}
         {activeTab === 'personal' && <DashboardPage businessId={activeBusinessId} />}
         {activeTab === 'inventory' && <InventoryPage businessId={activeBusinessId} />}
         {activeTab === 'providers' && <ProvidersPage businessId={activeBusinessId} />}
@@ -84,6 +114,8 @@ function App() {
         {activeTab === 'transfers' && <TransfersPage businessId={activeBusinessId} />}
         {activeTab === 'help' && <HelpPage />}
         {activeTab === 'reports' && <ReportsPage businessId={activeBusinessId} />}
+        {activeTab === 'ticket-settings' && <TicketSettingsPage businessId={activeBusinessId} />}
+        {activeTab === 'pos-simulator' && <PosSimulatorPage businessId={activeBusinessId} />}
       </AdminLayout>
 
       {globalError && (

@@ -26,30 +26,7 @@ class _ModifierDialogState extends State<ModifierDialog> {
   final TextEditingController _notesController = TextEditingController();
   int selectedGuestIndex = 0;
 
-  // Predefined modifiers list based on category
-  final Map<String, List<String>> _availableModifiers = {
-    'Pastas': [
-      'Queso Extra',
-      'Salsa de Ajo',
-      'Pan con Ajo Adicional',
-      'Champiñones Extra',
-    ],
-    'Hamburguesas': [
-      'Papas Fritas',
-      'Tocino Extra',
-      'Queso Cheddar',
-      'Término Medio',
-      'Bien Cocido',
-      'Sin Cebolla',
-    ],
-    'Postres': [
-      'Helado de Vainilla',
-      'Fresa Adicional',
-      'Crema Batida',
-      'Salsa de Chocolate',
-    ],
-    'Bebidas': ['Hielo', 'Sin Azúcar', 'Limón Extra', 'Endulzante'],
-  };
+  // TODO: Add dynamic modifier loading from the database/API using widget.item.modifierGroups
 
   @override
   void initState() {
@@ -78,9 +55,8 @@ class _ModifierDialogState extends State<ModifierDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final modifiers =
-        _availableModifiers[widget.item.category] ??
-        ['Extra Queso', 'Picante', 'Sin Sal'];
+    // TODO: Load dynamic modifiers from database/API using widget.item.modifierGroups (currently empty/stub)
+    final List<String> modifiers = [];
     final basePrice = widget.item.price;
     final totalPrice =
         (basePrice + (selectedModifiers.length * 1.5)) * quantity;
@@ -189,62 +165,62 @@ class _ModifierDialogState extends State<ModifierDialog> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-
-                  // Modifiers List Title
-                  const Text(
-                    'Modificadores (+\$1.50 c/u)',
-                    style: TextStyle(
-                      color: EmpireColors.textGold,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                  if (modifiers.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    // Modifiers List Title
+                    const Text(
+                      'Modificadores (+\$1.50 c/u)',
+                      style: TextStyle(
+                        color: EmpireColors.textGold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
+                    const SizedBox(height: 10),
 
-                  // Modifiers Checkbox list
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: modifiers.map((mod) {
-                      final isSelected = selectedModifiers.contains(mod);
-                      return ChoiceChip(
-                        label: Text(mod),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          setState(() {
-                            if (selected) {
-                              selectedModifiers.add(mod);
-                            } else {
-                              selectedModifiers.remove(mod);
-                            }
-                          });
-                        },
-                        selectedColor: EmpireColors.champagneGold.withOpacity(
-                          0.2,
-                        ),
-                        backgroundColor: EmpireColors.charcoalSurface,
-                        labelStyle: TextStyle(
-                          color: isSelected
-                              ? EmpireColors.champagneGold
-                              : EmpireColors.textPrimary,
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                          fontSize: 12,
-                        ),
-                        side: BorderSide(
-                          color: isSelected
-                              ? EmpireColors.champagneGold
-                              : EmpireColors.agedBronzeDark,
-                          width: 1,
-                        ),
-                        checkmarkColor: EmpireColors.champagneGold,
-                      );
-                    }).toList(),
-                  ),
-
-                  const SizedBox(height: 20),
+                    // Modifiers Checkbox list
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: modifiers.map((mod) {
+                        final isSelected = selectedModifiers.contains(mod);
+                        return ChoiceChip(
+                          label: Text(mod),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                selectedModifiers.add(mod);
+                              } else {
+                                selectedModifiers.remove(mod);
+                              }
+                            });
+                          },
+                          selectedColor: EmpireColors.champagneGold.withOpacity(
+                            0.2,
+                          ),
+                          backgroundColor: EmpireColors.charcoalSurface,
+                          labelStyle: TextStyle(
+                            color: isSelected
+                                ? EmpireColors.champagneGold
+                                : EmpireColors.textPrimary,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            fontSize: 12,
+                          ),
+                          side: BorderSide(
+                            color: isSelected
+                                ? EmpireColors.champagneGold
+                                : EmpireColors.agedBronzeDark,
+                            width: 1,
+                          ),
+                          checkmarkColor: EmpireColors.champagneGold,
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
 
                   // Assigned Guest Selector
                   const Text(

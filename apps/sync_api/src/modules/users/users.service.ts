@@ -1,8 +1,11 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { UsersRepository } from './repositories/users.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { CreateAdminUserDto } from './dto/create-admin-user.dto';
+import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 import * as bcrypt from 'bcrypt';
+import { ADMIN_ROLES } from '../auth/roles';
 
 @Injectable()
 export class UsersService {
@@ -62,6 +65,43 @@ export class UsersService {
     return this.sanitizeUser(newUser);
   }
 
+  async findBusinessAdmins(businessId: string) {
+    const users = await this.usersRepository.findAll();
+    const adminUsers = users.filter((user) => ADMIN_ROLES.includes(user.role as any));
+    const accessRows = await this.usersRepository.findAdminAccessForUsers(
+      adminUsers.map((user) => user.id),
+    );
+    return adminUsers
+      .map((user) => this.sanitizeAdminUser(user, accessRows))
+      .filter((user) =>
+        user.businessAccess.some((access: { businessId: string }) => access.businessId === businessId) ||
+        user.businessId === businessId,
+      );
+  }
+
+  async createBusinessAdmin(createUserDto: CreateAdminUserDto) {
+    if (!createUserDto.businessId) {
+      throw new BadRequestException('businessId is required');
+    }
+    if (!ADMIN_ROLES.includes(createUserDto.role as any)) {
+      throw new BadRequestException('role must be owner or inventory_admin');
+    }
+    if (!createUserDto.email || !createUserDto.password) {
+      throw new BadRequestException('email and password are required for Business Control admins');
+    }
+
+    const newUser = await this.create({
+      ...createUserDto,
+      branchId: undefined,
+      pin: createUserDto.pin || '0000',
+    });
+    await this.usersRepository.replaceAdminAccess(
+      newUser.id,
+      this.normalizeAdminAccess(createUserDto.businessId, createUserDto.role, createUserDto.businessAccess),
+    );
+    return this.findOneAdmin(newUser.id);
+  }
+
   async update(id: string, updateUserDto: UpdateUserDto) {
     const user = await this.usersRepository.findById(id);
     if (!user) {
@@ -70,6 +110,18 @@ export class UsersService {
 
     const { branchId, pin, email, password, ...rest } = updateUserDto;
     const updates: any = { ...rest };
+
+    if (
+      user.role === 'owner' &&
+      user.businessId &&
+      updateUserDto.role &&
+      updateUserDto.role !== 'owner'
+    ) {
+      const ownerCount = await this.usersRepository.countActiveOwners(user.businessId);
+      if (ownerCount <= 1) {
+        throw new BadRequestException('No puedes cambiar el rol del ultimo owner activo.');
+      }
+    }
 
     if (branchId !== undefined) {
       updates.branchId = branchId || null;
@@ -109,18 +161,124 @@ export class UsersService {
     return this.sanitizeUser(updatedUser);
   }
 
+  async findOneAdmin(id: string) {
+    const user = await this.usersRepository.findById(id);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+    const accessRows = await this.usersRepository.findAdminAccessForUser(id);
+    return this.sanitizeAdminUser(user, accessRows);
+  }
+
+  async updateBusinessAdmin(id: string, updateUserDto: UpdateAdminUserDto) {
+    const user = await this.usersRepository.findById(id);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+    if (!ADMIN_ROLES.includes(user.role as any)) {
+      throw new BadRequestException('User is not a Business Control admin');
+    }
+    if (updateUserDto.role && !ADMIN_ROLES.includes(updateUserDto.role as any)) {
+      throw new BadRequestException('role must be owner or inventory_admin');
+    }
+    const { businessAccess, ...userUpdates } = updateUserDto;
+    const updated = await this.update(id, {
+      ...userUpdates,
+      branchId: undefined,
+    });
+    if (businessAccess) {
+      await this.usersRepository.replaceAdminAccess(
+        id,
+        this.normalizeAdminAccess(user.businessId, updateUserDto.role || user.role, businessAccess),
+      );
+    }
+    return this.findOneAdmin(updated.id);
+  }
+
   async remove(id: string) {
     const user = await this.usersRepository.findById(id);
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
+    if (user.role === 'owner' && user.businessId) {
+      const ownerCount = await this.usersRepository.countActiveOwners(user.businessId);
+      if (ownerCount <= 1) {
+        throw new BadRequestException('No puedes desactivar el ultimo owner activo.');
+      }
+    }
     await this.usersRepository.softDelete(id);
     return { success: true, message: `User deleted successfully` };
+  }
+
+  async deactivateBusinessAdmin(id: string, actorUserId?: string) {
+    const user = await this.usersRepository.findById(id);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+    if (!ADMIN_ROLES.includes(user.role as any)) {
+      throw new BadRequestException('User is not a Business Control admin');
+    }
+    if (user.role === 'owner' && user.businessId) {
+      const ownerCount = await this.usersRepository.countActiveOwners(user.businessId);
+      if (ownerCount <= 1) {
+        throw new BadRequestException('No puedes desactivar el ultimo owner activo.');
+      }
+      if (actorUserId === id && ownerCount <= 1) {
+        throw new BadRequestException('No puedes desactivar tu propio acceso owner.');
+      }
+    }
+    await this.usersRepository.softDelete(id);
+    return { success: true, message: 'Administrador desactivado correctamente' };
   }
 
   private sanitizeUser(user: any) {
     if (!user) return null;
     const { passwordHash, pin, ...sanitized } = user;
     return sanitized;
+  }
+
+  private sanitizeAdminUser(user: any, accessRows: any[]) {
+    const sanitized = this.sanitizeUser(user);
+    const businessAccess = accessRows
+      .filter((access) => access.userId === user.id)
+      .map((access) => ({
+        businessId: access.businessId,
+        role: access.role,
+      }));
+
+    if (businessAccess.length === 0 && user.businessId && ADMIN_ROLES.includes(user.role as any)) {
+      businessAccess.push({
+        businessId: user.businessId,
+        role: user.role,
+      });
+    }
+
+    return {
+      ...sanitized,
+      businessAccess,
+    };
+  }
+
+  private normalizeAdminAccess(
+    defaultBusinessId: string | null | undefined,
+    defaultRole: string,
+    access?: Array<{ businessId: string; role: string }>,
+  ) {
+    const source = access?.length
+      ? access
+      : defaultBusinessId
+        ? [{ businessId: defaultBusinessId, role: defaultRole }]
+        : [];
+    const unique = new Map<string, { businessId: string; role: string }>();
+    for (const item of source) {
+      if (!ADMIN_ROLES.includes(item.role as any)) {
+        throw new BadRequestException('businessAccess role must be owner or inventory_admin');
+      }
+      unique.set(item.businessId, {
+        businessId: item.businessId,
+        role: item.role,
+      });
+    }
+    return Array.from(unique.values());
   }
 }

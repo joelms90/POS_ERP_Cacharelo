@@ -28,6 +28,47 @@ export async function runMigrations() {
     });
     console.log('✅ Migrations completed successfully.');
 
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS ticket_fiscal_configurations (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        business_id uuid NOT NULL REFERENCES businesses(id),
+        branch_id uuid REFERENCES branches(id),
+        seller_display_name varchar(120) NOT NULL,
+        legal_name varchar(180) NOT NULL,
+        fiscal_id varchar(50) NOT NULL,
+        branch_name varchar(120) NOT NULL,
+        branch_address text NOT NULL,
+        phone varchar(30),
+        receipt_prefix varchar(20) NOT NULL DEFAULT 'CCH',
+        tax_mode varchar(20) NOT NULL DEFAULT 'breakdown',
+        footer_text text,
+        is_active boolean NOT NULL DEFAULT true,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        version integer NOT NULL DEFAULT 1
+      );
+    `);
+    console.log('✅ Ticket fiscal configuration table ensured.');
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS admin_business_access (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id uuid NOT NULL REFERENCES users(id),
+        business_id uuid NOT NULL REFERENCES businesses(id),
+        role varchar(20) NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        deleted_at timestamptz,
+        version integer NOT NULL DEFAULT 1
+      );
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS admin_business_access_user_business_active_idx
+      ON admin_business_access(user_id, business_id)
+      WHERE deleted_at IS NULL;
+    `);
+    console.log('✅ Admin business access table ensured.');
+
     // Ensure specific default business and branch exist
     const businessLines = [
       {
@@ -73,7 +114,8 @@ export async function runMigrations() {
           version: 1,
         });
       } else {
-        await db.update(schema.businesses)
+        await db
+          .update(schema.businesses)
           .set({ name: b.name })
           .where(eq(schema.businesses.id, b.id));
       }
@@ -95,50 +137,184 @@ export async function runMigrations() {
           version: 1,
         });
       } else {
-        await db.update(schema.branches)
+        await db
+          .update(schema.branches)
           .set({ name: b.branchName })
           .where(eq(schema.branches.id, b.branchId));
+      }
+
+      const mockFiscalConfig = {
+        businessId: b.id,
+        branchId: b.branchId,
+        sellerDisplayName: b.name,
+        legalName: `${b.name} S.A. de C.V.`,
+        fiscalId: 'CACX010101ABC',
+        branchName: b.branchName,
+        branchAddress: 'Av. Principal 123, Centro, Mexico',
+        phone: '555-1234',
+        receiptPrefix: b.name.substring(0, 3).toUpperCase(),
+        taxMode: 'breakdown',
+        footerText:
+          'Comprobante de compra. IVA incluido en precios al publico.\ncacharelo.com',
+        isActive: true,
+        version: 1,
+      };
+
+      const matchTicketConfig = await db
+        .select()
+        .from(schema.ticketFiscalConfigurations)
+        .where(
+          and(
+            eq(schema.ticketFiscalConfigurations.businessId, b.id),
+            eq(schema.ticketFiscalConfigurations.branchId, b.branchId),
+          ),
+        )
+        .limit(1);
+
+      if (matchTicketConfig.length === 0) {
+        await db.insert(schema.ticketFiscalConfigurations).values(mockFiscalConfig);
+      } else if (!String(matchTicketConfig[0].footerText || '').includes('cacharelo.com')) {
+        const existingFooter = String(matchTicketConfig[0].footerText || '').trim();
+        await db
+          .update(schema.ticketFiscalConfigurations)
+          .set({
+            footerText: existingFooter
+              ? `${existingFooter}\ncacharelo.com`
+              : mockFiscalConfig.footerText,
+            updatedAt: new Date(),
+            version: sql`${schema.ticketFiscalConfigurations.version} + 1`,
+          })
+          .where(eq(schema.ticketFiscalConfigurations.id, matchTicketConfig[0].id));
       }
     }
     console.log('✅ Specific default business lines and branches seeded.');
 
-    // Clear and seed fresh employees for Cafetería only
-    console.log('🧹 Clearing old users/employees...');
-    await db.delete(schema.refreshTokens);
-    await db.delete(schema.users);
+    console.log('🌱 Ensuring default employees for Cafetería...');
 
-    console.log('🌱 Seeding fresh employees for Cafetería...');
-    const waiterPin = await bcrypt.hash('1111', 10);
-    const cashierPin = await bcrypt.hash('2222', 10);
-    const kitchenPin = await bcrypt.hash('3333', 10);
+    // Check if users exist first to avoid slow bcrypt operations
+    const existingEmployees = await db
+      .select()
+      .from(schema.users)
+      .where(
+        inArray(schema.users.id, [
+          '81a6df6c-5bcb-4d0b-8e75-02f18f399041',
+          '81a6df6c-5bcb-4d0b-8e75-02f18f399042',
+          '81a6df6c-5bcb-4d0b-8e75-02f18f399043',
+        ])
+      );
 
-    await db.insert(schema.users).values([
+    if (existingEmployees.length === 0) {
+      console.log('  Hashing default employee PINs (first time only)...');
+      const waiterPin = await bcrypt.hash('1111', 10);
+      const cashierPin = await bcrypt.hash('2222', 10);
+      const kitchenPin = await bcrypt.hash('3333', 10);
+
+      await db
+        .insert(schema.users)
+        .values([
+          {
+            id: '81a6df6c-5bcb-4d0b-8e75-02f18f399041',
+            businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01', // Cafeteria
+            name: 'Juan (Mesero)',
+            pin: waiterPin,
+            role: 'waiter',
+            version: 1,
+          },
+          {
+            id: '81a6df6c-5bcb-4d0b-8e75-02f18f399042',
+            businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01', // Cafeteria
+            name: 'Sofia (Cajero)',
+            pin: cashierPin,
+            role: 'cashier',
+            version: 1,
+          },
+          {
+            id: '81a6df6c-5bcb-4d0b-8e75-02f18f399043',
+            businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01', // Cafeteria
+            name: 'Carlos (Cocina)',
+            pin: kitchenPin,
+            role: 'kitchen',
+            version: 1,
+          },
+        ]);
+    }
+    console.log('✅ Default Cafetería employees ensured.');
+
+    console.log('🌱 Ensuring default Business Control admin users...');
+
+    // Check if admin users exist first to avoid slow bcrypt operations
+    const existingAdmins = await db
+      .select()
+      .from(schema.users)
+      .where(
+        inArray(schema.users.id, [
+          '91a6df6c-5bcb-4d0b-8e75-02f18f399041',
+          '91a6df6c-5bcb-4d0b-8e75-02f18f399042',
+        ])
+      );
+
+    if (existingAdmins.length === 0) {
+      console.log('  Hashing admin passwords (first time only)...');
+      const adminPin = await bcrypt.hash('0000', 10);
+      const ownerPassword = await bcrypt.hash(process.env.DEFAULT_OWNER_PASSWORD || 'owner123', 10);
+      const inventoryAdminPassword = await bcrypt.hash(
+        process.env.DEFAULT_INVENTORY_ADMIN_PASSWORD || 'inventario123',
+        10,
+      );
+
+      await db
+        .insert(schema.users)
+        .values([
+          {
+            id: '91a6df6c-5bcb-4d0b-8e75-02f18f399041',
+            businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01',
+            name: 'Owner Cacharelo',
+            email: 'owner@cacharelo.com',
+            passwordHash: ownerPassword,
+            pin: adminPin,
+            role: 'owner',
+            version: 1,
+          },
+          {
+            id: '91a6df6c-5bcb-4d0b-8e75-02f18f399042',
+            businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01',
+            name: 'Inventario Cacharelo',
+            email: 'inventario@cacharelo.com',
+            passwordHash: inventoryAdminPassword,
+            pin: adminPin,
+            role: 'inventory_admin',
+            version: 1,
+          },
+        ]);
+    }
+
+    const accessRows = [
       {
-        id: '81a6df6c-5bcb-4d0b-8e75-02f18f399041',
-        businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01', // Cafeteria
-        name: 'Juan (Mesero)',
-        pin: waiterPin,
-        role: 'waiter',
+        userId: '91a6df6c-5bcb-4d0b-8e75-02f18f399041',
+        businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01',
+        role: 'owner',
         version: 1,
       },
       {
-        id: '81a6df6c-5bcb-4d0b-8e75-02f18f399042',
-        businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01', // Cafeteria
-        name: 'Sofia (Cajero)',
-        pin: cashierPin,
-        role: 'cashier',
+        userId: '91a6df6c-5bcb-4d0b-8e75-02f18f399042',
+        businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01',
+        role: 'inventory_admin',
         version: 1,
       },
-      {
-        id: '81a6df6c-5bcb-4d0b-8e75-02f18f399043',
-        businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01', // Cafeteria
-        name: 'Carlos (Cocina)',
-        pin: kitchenPin,
-        role: 'kitchen',
-        version: 1,
-      },
-    ]);
-    console.log('✅ Fresh Cafetería employees seeded.');
+    ];
+
+    for (const access of accessRows) {
+      await db.execute(sql`
+        INSERT INTO admin_business_access (user_id, business_id, role, version)
+        VALUES (${access.userId}, ${access.businessId}, ${access.role}, ${access.version})
+        ON CONFLICT (user_id, business_id) WHERE deleted_at IS NULL
+        DO UPDATE SET
+          role = excluded.role,
+          updated_at = now(),
+          version = admin_business_access.version + 1;
+      `);
+    }
+    console.log('✅ Default Business Control admin users ensured.');
 
     // Cleanup any bulk imports left in 'pending' or 'processing' states due to server restarts (stale > 5 mins)
     console.log('🧹 Cleaning up interrupted bulk imports...');
@@ -147,17 +323,21 @@ export async function runMigrations() {
       .update(schema.bulkImports)
       .set({
         status: 'failed',
-        errorDetails: [{ error: 'La importación fue interrumpida por un reinicio o apagado del servidor.' }],
+        errorDetails: [
+          {
+            error:
+              'La importación fue interrumpida por un reinicio o apagado del servidor.',
+          },
+        ],
         updatedAt: new Date(),
       })
       .where(
         and(
           inArray(schema.bulkImports.status, ['pending', 'processing']),
-          lte(schema.bulkImports.updatedAt, fiveMinutesAgo)
-        )
+          lte(schema.bulkImports.updatedAt, fiveMinutesAgo),
+        ),
       );
     console.log('✅ Interrupted bulk imports cleaned up.');
-
   } catch (error) {
     console.error('❌ Migration failed:', error);
     // Do not block app boot in development if database is not reachable,

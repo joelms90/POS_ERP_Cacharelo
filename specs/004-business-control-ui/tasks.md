@@ -103,6 +103,52 @@
 
 ---
 
+## Phase 7: User Story 4 - Restaurant Sales Intelligence Dashboard (Priority: P1)
+
+**Goal**: Make `Reportes e Inteligencia de Ventas` reconcile POS sales data and expose the highest-value restaurant management metrics.
+
+**Independent Test**: Seed a reporting fixture with paid orders, zero-total closed orders, inactive products, mixed payments, and Mexico-time sales. Verify `/api/reports/sales-dashboard` totals reconcile and `ReportsPage` shows exceptions instead of misleading KPIs.
+
+### Investigation and Data Contract
+
+- [ ] T026 [US4] Document current mismatch cases in `apps/sync_api/src/modules/reports/reports.service.spec.ts`: item totals exceeding order totals, closed zero-total orders, inactive products excluded from historical rankings, and UTC hour buckets.
+- [ ] T027 [P] [US4] Update `specs/004-business-control-ui/contracts/api.md` with the new `sales-dashboard` response shape: `financial`, `operations`, `menu`, `staff`, `inventory`, and `reconciliation`.
+- [ ] T028 [P] [US4] Update `apps/business_control_tauri/src/services/api.ts` TypeScript interfaces for the new reporting contract while preserving existing callers during migration.
+
+### Backend Reporting Corrections
+
+- [x] T029 [US4] Refactor `ReportsService.getSalesDashboard` in `apps/sync_api/src/modules/reports/reports.service.ts` to calculate financial KPIs from closed paid orders and `payments.amount`.
+- [x] T030 [US4] Add reconciliation output for closed orders with zero totals, missing payments, payment/order mismatches, and item/order mismatches.
+- [ ] T031 [US4] Add payment mix aggregation by `payments.paymentMethod` and include collected sales in the financial summary.
+- [ ] T032 [US4] Split item velocity from financial sales totals: product rows must expose quantity sold, item gross sales, estimated COGS, contribution margin, and margin percentage.
+- [ ] T033 [US4] Remove the active-product filter from historical sales ranking or return archived product identity so deactivated products remain in historical reports.
+- [ ] T034 [US4] Make hourly sales timezone-aware using a `timezone` query parameter with default `America/Mexico_City`.
+- [ ] T035 [US4] Add kitchen ticket speed metrics using `kitchen_tickets.createdAt`, `startedAt`, `readyAt`, and `servedAt` where available.
+
+### Frontend Report UI
+
+- [ ] T036 [US4] Redesign the sales KPI row in `apps/business_control_tauri/src/pages/ReportsPage.tsx` to show Gross Sales, Net Sales, Collected Sales, Discounts, Taxes, Average Check, Contribution Margin, and Order Count.
+- [ ] T037 [US4] Add payment mix and reconciliation warning panels in `ReportsPage`; exception rows must be visible when totals do not reconcile.
+- [ ] T038 [US4] Change product tables to default to Top 10 and allow ranking by quantity, revenue, and contribution margin.
+- [ ] T039 [US4] Add a "Pendiente de captura de datos" panel for Prime Cost %, Labor Cost %, PPA, RevPASH, Dining Duration, and Actual vs Theoretical Food Cost Variance.
+- [ ] T040 [US4] Update hourly sales labels to show local business time and the selected date range.
+
+### Verification
+
+- [ ] T041 [US4] Add backend unit tests for reconciled report fixtures in `apps/sync_api/src/modules/reports/reports.service.spec.ts`.
+- [ ] T042 [US4] Run `pnpm test -- reports.service.spec.ts` or the closest available sync API test command and record any blocked test runner issues.
+- [ ] T043 [US4] Run `pnpm build` in `apps/business_control_tauri` after UI migration and verify the Reports tab compiles.
+
+### Future Schema TODOs
+
+- [ ] T044 [US4] TODO: Add order channel and third-party commission fields before implementing Gross vs Net Sales by Channel.
+- [ ] T045 [US4] TODO: Add labor cost or wage records before implementing Prime Cost % and Labor Cost %.
+- [ ] T046 [US4] TODO: Add order/table guest count before implementing PPA / covers.
+- [ ] T047 [US4] TODO: Add seat capacity and table occupancy timestamps before implementing RevPASH and dining duration.
+- [ ] T048 [US4] TODO: Add recipe depletion snapshots and physical count variance records before implementing Actual vs Theoretical Food Cost Variance.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

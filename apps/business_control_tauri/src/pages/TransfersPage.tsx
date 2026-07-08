@@ -41,8 +41,10 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
 
   // Form states (Create Transfer)
-  const [fromWarehouseId, setFromWarehouseId] = useState('');
-  const [toBranchId, setToBranchId] = useState('');
+  const [fromType, setFromType] = useState<'warehouse' | 'branch'>('warehouse');
+  const [fromId, setFromId] = useState('');
+  const [toType, setToType] = useState<'warehouse' | 'branch'>('branch');
+  const [toId, setToId] = useState('');
   const [notes, setNotes] = useState('');
   const [itemsList, setItemsList] = useState<Array<{ productId: string; productName: string; quantity: number; cost: string }>>([]);
   
@@ -74,11 +76,21 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
       setTransfers(transData);
       setBranches(branchData);
 
-      if (whData.length > 0) setFromWarehouseId(whData[0].id);
-      if (branchData.length > 0) {
-        setToBranchId(branchData[0].id);
-        setSelectedReportBranchId(branchData[0].id);
+      if (whData.length > 0) {
+        setFromId(whData[0].id);
+      } else if (branchData.length > 0) {
+        setFromType('branch');
+        setFromId(branchData[0].id);
       }
+
+      if (branchData.length > 0) {
+        setToId(branchData[0].id);
+        setSelectedReportBranchId(branchData[0].id);
+      } else if (whData.length > 0) {
+        setToType('warehouse');
+        setToId(whData[0].id);
+      }
+      
       if (prodData.length > 0) setSelectedProductId(prodData[0].id);
     } catch (err: any) {
       showToast(err.message || 'Error al cargar catálogos de traspaso.', 'error');
@@ -170,16 +182,22 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
       showToast('Debe agregar al menos un producto a la lista.', 'warning');
       return;
     }
-    if (!fromWarehouseId || !toBranchId) {
-      showToast('Especifique bodega origen y sucursal destino.', 'warning');
+    if (!fromId || !toId) {
+      showToast('Especifique origen y destino para el traspaso.', 'warning');
+      return;
+    }
+    if (fromType === toType && fromId === toId) {
+      showToast('El origen y el destino no pueden ser idénticos.', 'error');
       return;
     }
 
     setIsSubmitting(true);
     try {
       const payload = {
-        fromWarehouseId,
-        toBranchId,
+        fromWarehouseId: fromType === 'warehouse' ? fromId : undefined,
+        fromBranchId: fromType === 'branch' ? fromId : undefined,
+        toWarehouseId: toType === 'warehouse' ? toId : undefined,
+        toBranchId: toType === 'branch' ? toId : undefined,
         notes: notes.trim() || undefined,
         items: itemsList.map(item => ({
           productId: item.productId,
@@ -286,31 +304,95 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                 Configuración del Traspaso
               </span>
               
+              {/* Origen Selector */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs text-text-secondary">Desde Bodega (Origen)</label>
+                <label className="text-xs text-text-secondary font-semibold">Origen del Traspaso</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFromType('warehouse');
+                      if (warehouses.length > 0) setFromId(warehouses[0].id);
+                    }}
+                    className={`flex-1 py-1 rounded text-[10px] font-semibold uppercase tracking-wider border transition-all ${
+                      fromType === 'warehouse'
+                        ? 'bg-champagne-gold/20 text-champagne-gold border-champagne-gold/40'
+                        : 'bg-charcoal-surface text-text-secondary border-aged-bronze/10'
+                    }`}
+                  >
+                    Bodega
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFromType('branch');
+                      if (branches.length > 0) setFromId(branches[0].id);
+                    }}
+                    className={`flex-1 py-1 rounded text-[10px] font-semibold uppercase tracking-wider border transition-all ${
+                      fromType === 'branch'
+                        ? 'bg-champagne-gold/20 text-champagne-gold border-champagne-gold/40'
+                        : 'bg-charcoal-surface text-text-secondary border-aged-bronze/10'
+                    }`}
+                  >
+                    Sucursal
+                  </button>
+                </div>
                 <select
-                  value={fromWarehouseId}
-                  onChange={(e) => setFromWarehouseId(e.target.value)}
+                  value={fromId}
+                  onChange={(e) => setFromId(e.target.value)}
                   className="bg-charcoal-surface border border-aged-bronze text-text-primary rounded p-2.5 font-sans text-xs focus:outline-none focus:ring-1 focus:ring-champagne-gold cursor-pointer"
                   required
                 >
-                  {warehouses.map(w => (
-                    <option key={w.id} value={w.id}>{w.name}</option>
-                  ))}
+                  {fromType === 'warehouse'
+                    ? warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)
+                    : branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)
+                  }
                 </select>
               </div>
 
+              {/* Destino Selector */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs text-text-secondary">Hacia Sucursal (Destino / POS)</label>
+                <label className="text-xs text-text-secondary font-semibold">Destino del Traspaso</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setToType('warehouse');
+                      if (warehouses.length > 0) setToId(warehouses[0].id);
+                    }}
+                    className={`flex-1 py-1 rounded text-[10px] font-semibold uppercase tracking-wider border transition-all ${
+                      toType === 'warehouse'
+                        ? 'bg-champagne-gold/20 text-champagne-gold border-champagne-gold/40'
+                        : 'bg-charcoal-surface text-text-secondary border-aged-bronze/10'
+                    }`}
+                  >
+                    Bodega
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setToType('branch');
+                      if (branches.length > 0) setToId(branches[0].id);
+                    }}
+                    className={`flex-1 py-1 rounded text-[10px] font-semibold uppercase tracking-wider border transition-all ${
+                      toType === 'branch'
+                        ? 'bg-champagne-gold/20 text-champagne-gold border-champagne-gold/40'
+                        : 'bg-charcoal-surface text-text-secondary border-aged-bronze/10'
+                    }`}
+                  >
+                    Sucursal
+                  </button>
+                </div>
                 <select
-                  value={toBranchId}
-                  onChange={(e) => setToBranchId(e.target.value)}
+                  value={toId}
+                  onChange={(e) => setToId(e.target.value)}
                   className="bg-charcoal-surface border border-aged-bronze text-text-primary rounded p-2.5 font-sans text-xs focus:outline-none focus:ring-1 focus:ring-champagne-gold cursor-pointer"
                   required
                 >
-                  {branches.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
+                  {toType === 'warehouse'
+                    ? warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)
+                    : branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)
+                  }
                 </select>
               </div>
 
@@ -464,8 +546,8 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                             minute: '2-digit',
                           })}
                         </td>
-                        <td className="py-3 px-4 text-text-secondary">{t.fromWarehouseName || 'Central'}</td>
-                        <td className="py-3 px-4 text-text-primary font-medium">{t.toBranchName || 'Bodega'}</td>
+                        <td className="py-3 px-4 text-text-secondary">{t.fromWarehouseName || t.fromBranchName || 'Desconocido'}</td>
+                        <td className="py-3 px-4 text-text-primary font-medium">{t.toWarehouseName || t.toBranchName || 'Desconocido'}</td>
                         <td className="py-3 px-4">
                           <Badge variant="success">{t.status.toUpperCase()}</Badge>
                         </td>

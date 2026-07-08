@@ -129,3 +129,129 @@ All endpoint paths are relative to the API base URL: `http://localhost:3000/api`
   "error": "Usuario no encontrado"
 }
 ```
+
+---
+
+## 5. GET `/reports/sales-dashboard`
+
+**Purpose**: Returns reconciled restaurant sales intelligence for the Business Control Reports page.
+**Headers**: `Authorization: Bearer <accessToken>` or legacy `X-Admin-Token: <token>`
+
+### Query Parameters
+
+- `businessId` (required): Business UUID.
+- `startDate` (optional): ISO timestamp inclusive lower bound.
+- `endDate` (optional): ISO timestamp inclusive upper bound.
+- `timezone` (optional): IANA timezone used for date buckets. Defaults to `America/Mexico_City`.
+- `basis` (optional): Sales accounting basis. Supported values: `payments` (default), `orders`.
+
+### Response Shape (Planned)
+
+```json
+{
+  "financial": {
+    "grossSales": 1000.0,
+    "discounts": 50.0,
+    "taxes": 131.03,
+    "netSales": 950.0,
+    "collectedSales": 950.0,
+    "ordersCount": 17,
+    "paidOrdersCount": 14,
+    "itemsCount": 31,
+    "averageCheck": 67.86,
+    "estimatedCogs": 420.0,
+    "contributionMargin": 530.0,
+    "contributionMarginPercent": 55.79,
+    "paymentMix": [
+      {
+        "paymentMethod": "cash",
+        "total": 650.0,
+        "paymentsCount": 10,
+        "sharePercent": 68.42
+      },
+      {
+        "paymentMethod": "card",
+        "total": 300.0,
+        "paymentsCount": 4,
+        "sharePercent": 31.58
+      }
+    ]
+  },
+  "operations": {
+    "hourlySales": [
+      {
+        "hour": 7,
+        "localHourLabel": "07:00",
+        "totalSales": 886.0,
+        "ordersCount": 14
+      }
+    ],
+    "kitchenSpeed": {
+      "averageMinutesToReady": 12.5,
+      "ticketsCount": 24
+    },
+    "pendingDataMetrics": [
+      {
+        "metric": "RevPASH",
+        "missingFields": ["seat capacity", "occupied-seat-hours"]
+      }
+    ]
+  },
+  "menu": {
+    "topProducts": [
+      {
+        "id": "product-uuid",
+        "name": "Croissant italiano",
+        "sku": "CACH-CRO-CROISSANT-ITALIANO-002",
+        "quantitySold": 3,
+        "grossSales": 323.28,
+        "estimatedCogs": 150.0,
+        "contributionMargin": 173.28,
+        "contributionMarginPercent": 53.6
+      }
+    ]
+  },
+  "staff": {
+    "topWaiters": [
+      {
+        "id": "user-uuid",
+        "name": "Juan (Mesero)",
+        "totalSales": 886.0,
+        "ordersCount": 14,
+        "averageCheck": 63.29
+      }
+    ],
+    "topCashiers": []
+  },
+  "inventory": {
+    "stockValue": 0.0,
+    "lowStockCount": 0,
+    "actualVsTheoreticalStatus": "needs_data"
+  },
+  "reconciliation": {
+    "status": "warning",
+    "ordersTotal": 886.0,
+    "paymentsTotal": 886.0,
+    "itemsGrossTotal": 2947.42,
+    "exceptionsCount": 3,
+    "exceptions": [
+      {
+        "orderId": "order-uuid",
+        "type": "zero_total_with_items",
+        "orderTotal": 0.0,
+        "paymentTotal": 0.0,
+        "itemsGrossTotal": 310.35
+      }
+    ]
+  }
+}
+```
+
+### Contract Rules
+
+- `financial.collectedSales` MUST equal the sum of `paymentMix.total` within MXN 0.01.
+- `salesByBranch` and staff totals, if retained for legacy compatibility, MUST state whether they use `basis=payments` or `basis=orders`.
+- Product rows MUST be treated as item velocity and contribution-margin data, not as proof that money was collected.
+- Closed orders with missing payments, zero totals, or mismatched payment totals MUST appear in `reconciliation.exceptions`.
+- Hour buckets MUST use the requested `timezone`, not the server runtime timezone.
+- Unsupported restaurant metrics MUST be returned in `operations.pendingDataMetrics` or equivalent metadata.

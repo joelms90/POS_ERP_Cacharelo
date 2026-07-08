@@ -42,6 +42,10 @@ export class CreateProductDto {
   @IsOptional()
   isIngredient?: boolean;
 
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+
   @IsString()
   @IsOptional()
   imageUrl?: string;

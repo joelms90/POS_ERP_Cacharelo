@@ -17,7 +17,13 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "catalog:to-insumos": "ts-node src/database/convert-all-to-insumos.ts",
+    "db:clean": "ts-node src/database/reset-transactional-data.ts",
+    "db:clean-today": "ts-node src/database/clean-today-sales.ts",
+    "db:clean-old-history": "ts-node src/database/clean-old-sales-history.ts",
+    "db:clean-all-sales": "ts-node src/database/clean-all-sales-history.ts",
+    "migrate": "tsx scripts/run-migrations.ts"
   },
   "dependencies": {
     "@google-cloud/firestore": "^8.6.0",

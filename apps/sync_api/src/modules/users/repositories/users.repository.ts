@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
-import { eq, and, isNull, or } from 'drizzle-orm';
+import { eq, and, isNull, or, inArray } from 'drizzle-orm';
 
 @Injectable()
 export class UsersRepository {
@@ -68,6 +68,72 @@ export class UsersRepository {
         ),
       );
     return results[0] || null;
+  }
+
+  async countActiveOwners(businessId: string) {
+    const results = await this.db
+      .select()
+      .from(schema.adminBusinessAccess)
+      .where(
+        and(
+          eq(schema.adminBusinessAccess.businessId, businessId),
+          eq(schema.adminBusinessAccess.role, 'owner'),
+          isNull(schema.adminBusinessAccess.deletedAt),
+        ),
+      );
+    return results.length;
+  }
+
+  async findAdminAccessForUser(userId: string) {
+    return this.db
+      .select()
+      .from(schema.adminBusinessAccess)
+      .where(
+        and(
+          eq(schema.adminBusinessAccess.userId, userId),
+          isNull(schema.adminBusinessAccess.deletedAt),
+        ),
+      );
+  }
+
+  async findAdminAccessForUsers(userIds: string[]) {
+    if (userIds.length === 0) return [];
+    return this.db
+      .select()
+      .from(schema.adminBusinessAccess)
+      .where(
+        and(
+          inArray(schema.adminBusinessAccess.userId, userIds),
+          isNull(schema.adminBusinessAccess.deletedAt),
+        ),
+      );
+  }
+
+  async replaceAdminAccess(userId: string, access: Array<{ businessId: string; role: string }>) {
+    return this.db.transaction(async (tx) => {
+      await tx
+        .update(schema.adminBusinessAccess)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(
+          and(
+            eq(schema.adminBusinessAccess.userId, userId),
+            isNull(schema.adminBusinessAccess.deletedAt),
+          ),
+        );
+
+      if (access.length > 0) {
+        await tx.insert(schema.adminBusinessAccess).values(
+          access.map((item) => ({
+            userId,
+            businessId: item.businessId,
+            role: item.role,
+            version: 1,
+          })),
+        );
+      }
+
+      return this.findAdminAccessForUser(userId);
+    });
   }
 
   async create(user: typeof schema.users.$inferInsert) {

@@ -56,6 +56,7 @@ export class ProductsService {
       saleType: createProductDto.saleType || 'pieza',
       isSellable: createProductDto.isSellable ?? true,
       isIngredient: createProductDto.isIngredient ?? false,
+      isActive: createProductDto.isActive ?? true,
     });
   }
 
@@ -515,7 +516,9 @@ export class ProductsService {
       for (let idx = 0; idx < rows.length; idx++) {
         const row = rows[idx];
         const rowNumber = idx + 2; // header is row 1
-        
+
+        // Extract product ID if present (for UPSERT)
+        const productId = getRowValue(row, 'ID');
         const name = getRowValue(row, 'Nombre del Producto') || getRowValue(row, 'Nombre');
         const catName = getRowValue(row, 'Categoría') || getRowValue(row, 'Categoria');
         
@@ -549,6 +552,7 @@ export class ProductsService {
           row,
           rowNumber,
           parsed: {
+            productId, // Include product ID for exact matching
             name,
             catName,
             cost,
@@ -605,14 +609,17 @@ export class ProductsService {
             providers.push(...insertedProvs);
           }
 
-          // C. Prepare and insert products in bulk
-          const productsToInsert = validRows.map(vr => {
+          // C. Prepare and upsert products (update existing or insert new)
+          const insertedProducts = [];
+          let updatedCount = 0;
+
+          for (const vr of validRows) {
             const p = vr.parsed;
             const category = categories.find(c => c.name.toLowerCase() === p.catName.toLowerCase())!;
             const provider = p.providerName ? providers.find(prov => prov.name.toLowerCase() === p.providerName.toLowerCase()) : null;
             const providerId = provider ? provider.id : null;
-            
-            return {
+
+            const productData = {
               categoryId: category.id,
               name: p.name,
               sku: p.sku || null,
@@ -628,13 +635,90 @@ export class ProductsService {
               isSellable: p.paraVenta,
               isIngredient: !p.paraVenta,
               businessId,
+              updatedAt: new Date(),
             };
-          });
 
-          const insertedProducts = await tx.insert(schema.products).values(productsToInsert).returning();
+            // Try to find existing product - prioritize exact ID match, then fallback to fuzzy matching
+            let existingProduct = null;
+
+            // 1. Try exact match by Product ID (most reliable)
+            if (p.productId) {
+              existingProduct = await tx
+                .select()
+                .from(schema.products)
+                .where(and(
+                  eq(schema.products.id, p.productId),
+                  eq(schema.products.businessId, businessId),
+                  isNull(schema.products.deletedAt)
+                ))
+                .limit(1);
+            }
+
+            // 2. Fallback to internal code matching
+            if (!existingProduct || existingProduct.length === 0) {
+              if (p.internalCode) {
+                existingProduct = await tx
+                  .select()
+                  .from(schema.products)
+                  .where(and(
+                    eq(schema.products.businessId, businessId),
+                    eq(schema.products.internalCode, p.internalCode),
+                    isNull(schema.products.deletedAt)
+                  ))
+                  .limit(1);
+              }
+            }
+
+            // 3. Fallback to SKU matching
+            if (!existingProduct || existingProduct.length === 0) {
+              if (p.sku) {
+                existingProduct = await tx
+                  .select()
+                  .from(schema.products)
+                  .where(and(
+                    eq(schema.products.businessId, businessId),
+                    eq(schema.products.sku, p.sku),
+                    isNull(schema.products.deletedAt)
+                  ))
+                  .limit(1);
+              }
+            }
+
+            // 4. Last resort: match by name
+            if (!existingProduct || existingProduct.length === 0) {
+              existingProduct = await tx
+                .select()
+                .from(schema.products)
+                .where(and(
+                  eq(schema.products.businessId, businessId),
+                  eq(schema.products.name, p.name),
+                  isNull(schema.products.deletedAt)
+                ))
+                .limit(1);
+            }
+
+            if (existingProduct && existingProduct.length > 0) {
+              // UPDATE existing product
+              const [updated] = await tx
+                .update(schema.products)
+                .set(productData)
+                .where(eq(schema.products.id, existingProduct[0].id))
+                .returning();
+              insertedProducts.push(updated);
+              updatedCount++;
+            } else {
+              // INSERT new product
+              const [inserted] = await tx
+                .insert(schema.products)
+                .values(productData)
+                .returning();
+              insertedProducts.push(inserted);
+            }
+          }
+
           successCount = insertedProducts.length;
 
-          // D. Prepare and insert stock levels in bulk
+          // D. Upsert stock levels for products with existence > 0
           let targetWh = warehouses[0];
           if (validRows.some(vr => vr.parsed.existence > 0)) {
             if (!targetWh) {
@@ -650,20 +734,40 @@ export class ProductsService {
               warehouses.push(targetWh);
             }
 
-            const stockLevelsToInsert = [];
+            // Upsert stock levels (update if exists, insert if new)
             for (let i = 0; i < validRows.length; i++) {
               const existence = validRows[i].parsed.existence;
               if (existence > 0) {
-                stockLevelsToInsert.push({
-                  productId: insertedProducts[i].id,
-                  warehouseId: targetWh.id,
-                  quantity: existence.toString(),
-                });
-              }
-            }
+                const productId = insertedProducts[i].id;
 
-            if (stockLevelsToInsert.length > 0) {
-              await tx.insert(schema.stockLevels).values(stockLevelsToInsert);
+                // Check if stock level exists
+                const existingStock = await tx
+                  .select()
+                  .from(schema.stockLevels)
+                  .where(and(
+                    eq(schema.stockLevels.productId, productId),
+                    eq(schema.stockLevels.warehouseId, targetWh.id)
+                  ))
+                  .limit(1);
+
+                if (existingStock && existingStock.length > 0) {
+                  // Update existing stock level
+                  await tx
+                    .update(schema.stockLevels)
+                    .set({
+                      quantity: existence.toString(),
+                      updatedAt: new Date(),
+                    })
+                    .where(eq(schema.stockLevels.id, existingStock[0].id));
+                } else {
+                  // Insert new stock level
+                  await tx.insert(schema.stockLevels).values({
+                    productId,
+                    warehouseId: targetWh.id,
+                    quantity: existence.toString(),
+                  });
+                }
+              }
             }
           }
         });
