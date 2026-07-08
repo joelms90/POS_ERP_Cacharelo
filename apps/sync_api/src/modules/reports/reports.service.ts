@@ -389,9 +389,10 @@ export class ReportsService {
       .leftJoin(schema.products, eq(schema.orderItems.productId, schema.products.id))
       .leftJoin(schema.categories, eq(schema.products.categoryId, schema.categories.id))
       .innerJoin(schema.orders, eq(schema.orderItems.orderId, schema.orders.id))
+      .innerJoin(schema.branches, eq(schema.orders.branchId, schema.branches.id))
       .where(
         and(
-          eq(schema.orders.businessId, businessId),
+          eq(schema.branches.businessId, businessId),
           eq(schema.orders.state, 'closed'),
           isNull(schema.orders.deletedAt),
           isNull(schema.orderItems.deletedAt),

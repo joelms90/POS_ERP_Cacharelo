@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, integer, timestamp, boolean, decimal, text, doublePrecision, jsonb, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, integer, timestamp, boolean, decimal, text, doublePrecision, jsonb, index, bigserial } from 'drizzle-orm/pg-core';
 
 // ==========================================
 // 1. Tenants & Catalog Entities
@@ -397,4 +397,15 @@ export const inventoryMovements = pgTable('inventory_movements', {
   index('idx_inv_mov_branch').on(table.branchId),
   index('idx_inv_mov_warehouse').on(table.warehouseId),
   index('idx_inv_mov_created_at').on(table.createdAt),
+]);
+
+export const changeLog = pgTable('change_log', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  entity: varchar('entity', { length: 50 }).notNull(), // 'orders' | 'orderItems' | 'branchTables'
+  entityId: uuid('entity_id').notNull(),
+  branchId: uuid('branch_id').references(() => branches.id).notNull(),
+  versionAt: timestamp('version_at', { withTimezone: true }).defaultNow().notNull(),
+  payload: jsonb('payload').notNull(),
+}, (table) => [
+  index('idx_change_log_branch_version').on(table.branchId, table.versionAt),
 ]);
