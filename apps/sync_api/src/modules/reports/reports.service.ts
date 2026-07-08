@@ -4,6 +4,22 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../database/schema';
 import { eq, and, isNull, gte, lte, inArray } from 'drizzle-orm';
 
+export type ReconciliationExceptionType =
+  | 'zero_total_with_items'
+  | 'missing_payment'
+  | 'payment_mismatch'
+  | 'item_subtotal_mismatch';
+
+export interface ReconciliationException {
+  orderId: string;
+  type: ReconciliationExceptionType;
+  orderTotal: number;
+  paymentTotal: number;
+  itemsGrossTotal: number;
+  subtotal: number;
+  difference: number;
+}
+
 @Injectable()
 export class ReportsService {
   constructor(
@@ -26,6 +42,8 @@ export class ReportsService {
         id: schema.orders.id,
         total: schema.orders.total,
         subtotal: schema.orders.subtotal,
+        discount: schema.orders.discount,
+        tax: schema.orders.tax,
         createdAt: schema.orders.createdAt,
         branchId: schema.orders.branchId,
         branchName: schema.branches.name,
@@ -57,6 +75,29 @@ export class ReportsService {
         topWaiters: [],
         topCashiers: [],
         hourlySales: Array.from({ length: 24 }, (_, i) => ({ hour: i, totalSales: 0 })),
+        financial: {
+          grossSales: 0,
+          discounts: 0,
+          taxes: 0,
+          netSales: 0,
+          collectedSales: 0,
+          ordersCount: 0,
+          paidOrdersCount: 0,
+          itemsCount: 0,
+          averageCheck: 0,
+          estimatedCogs: 0,
+          contributionMargin: 0,
+          contributionMarginPercent: 0,
+          paymentMix: [],
+        },
+        reconciliation: {
+          status: 'ok',
+          ordersTotal: 0,
+          paymentsTotal: 0,
+          itemsGrossTotal: 0,
+          exceptionsCount: 0,
+          exceptions: [],
+        },
       };
     }
 
@@ -82,22 +123,98 @@ export class ReportsService {
         )
       );
 
+    const paymentsList = await this.db
+      .select({
+        orderId: schema.payments.orderId,
+        amount: schema.payments.amount,
+        paymentMethod: schema.payments.paymentMethod,
+        createdAt: schema.payments.createdAt,
+      })
+      .from(schema.payments)
+      .where(inArray(schema.payments.orderId, orderIds));
+
     // 4. Perform In-Memory Aggregations for speed and flexibility
 
     // Total metrics
-    let totalSales = 0;
+    let ordersTotal = 0;
+    let discounts = 0;
+    let taxes = 0;
+    let grossSales = 0;
     ordersList.forEach((o) => {
-      totalSales += parseFloat(o.total as string || '0');
+      ordersTotal += this.parseMoney(o.total);
+      discounts += this.parseMoney(o.discount);
+      taxes += this.parseMoney(o.tax);
+      grossSales += this.parseMoney(o.subtotal) + this.parseMoney(o.discount);
     });
 
     const totalOrdersCount = ordersList.length;
-    const averageTicket = totalOrdersCount > 0 ? totalSales / totalOrdersCount : 0;
+    const paymentsByOrder = new Map<string, number>();
+    const paymentMixMap = new Map<string, { paymentMethod: string; total: number; paymentsCount: number }>();
+    let paymentsTotal = 0;
+
+    paymentsList.forEach((payment) => {
+      const amount = this.parseMoney(payment.amount);
+      paymentsTotal += amount;
+      paymentsByOrder.set(payment.orderId, (paymentsByOrder.get(payment.orderId) || 0) + amount);
+
+      const existingMix = paymentMixMap.get(payment.paymentMethod);
+      if (existingMix) {
+        existingMix.total += amount;
+        existingMix.paymentsCount += 1;
+      } else {
+        paymentMixMap.set(payment.paymentMethod, {
+          paymentMethod: payment.paymentMethod,
+          total: amount,
+          paymentsCount: 1,
+        });
+      }
+    });
+
+    const paymentMix = Array.from(paymentMixMap.values())
+      .map((mix) => ({
+        ...mix,
+        total: this.roundMoney(mix.total),
+        sharePercent: paymentsTotal > 0 ? this.roundMoney((mix.total / paymentsTotal) * 100) : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    const paidOrdersCount = ordersList.filter((o) => (paymentsByOrder.get(o.id) || 0) > 0).length;
+    const totalSales = this.roundMoney(paymentsTotal);
+    const averageTicket = paidOrdersCount > 0 ? paymentsTotal / paidOrdersCount : 0;
+
+    const itemsByOrder = new Map<string, { grossTotal: number; estimatedCogs: number; itemsCount: number }>();
+    itemsList.forEach((item) => {
+      const qty = item.quantity;
+      const priceVal = this.parseMoney(item.price);
+      const costVal = this.parseMoney(item.cost);
+      const existing = itemsByOrder.get(item.orderId) || { grossTotal: 0, estimatedCogs: 0, itemsCount: 0 };
+      existing.grossTotal += priceVal * qty;
+      existing.estimatedCogs += costVal * qty;
+      existing.itemsCount += qty;
+      itemsByOrder.set(item.orderId, existing);
+    });
+
+    const itemsGrossTotal = Array.from(itemsByOrder.values()).reduce((sum, item) => sum + item.grossTotal, 0);
+    const estimatedCogs = Array.from(itemsByOrder.values()).reduce((sum, item) => sum + item.estimatedCogs, 0);
+    const itemsCount = Array.from(itemsByOrder.values()).reduce((sum, item) => sum + item.itemsCount, 0);
+    const contributionMargin = paymentsTotal - estimatedCogs;
+    const contributionMarginPercent = paymentsTotal > 0 ? (contributionMargin / paymentsTotal) * 100 : 0;
+
+    const exceptions = this.buildReconciliationExceptions(
+      ordersList.map((order) => ({
+        id: order.id,
+        total: this.parseMoney(order.total),
+        subtotal: this.parseMoney(order.subtotal),
+      })),
+      paymentsByOrder,
+      itemsByOrder,
+    );
 
     // A. Sales by Branch
     const branchMap = new Map<string, { id: string; name: string; totalSales: number; ordersCount: number }>();
     ordersList.forEach((o) => {
       const existing = branchMap.get(o.branchId);
-      const val = parseFloat(o.total as string || '0');
+      const val = paymentsByOrder.get(o.id) || 0;
       if (existing) {
         existing.totalSales += val;
         existing.ordersCount += 1;
@@ -110,25 +227,42 @@ export class ReportsService {
         });
       }
     });
-    const salesByBranch = Array.from(branchMap.values()).sort((a, b) => b.totalSales - a.totalSales);
+    const salesByBranch = Array.from(branchMap.values())
+      .map((branch) => ({ ...branch, totalSales: this.roundMoney(branch.totalSales) }))
+      .sort((a, b) => b.totalSales - a.totalSales);
 
     // B. Top Products (Units, Revenue, Margin)
     const productMap = new Map<
       string,
-      { id: string; name: string; sku: string | null; quantitySold: number; totalSales: number; profitMargin: number }
+      {
+        id: string;
+        name: string;
+        sku: string | null;
+        quantitySold: number;
+        totalSales: number;
+        profitMargin: number;
+        grossSales: number;
+        estimatedCogs: number;
+        contributionMargin: number;
+        contributionMarginPercent: number;
+      }
     >();
     itemsList.forEach((item) => {
       const existing = productMap.get(item.productId);
       const qty = item.quantity;
-      const priceVal = parseFloat(item.price as string || '0');
-      const costVal = parseFloat(item.cost as string || '0');
+      const priceVal = this.parseMoney(item.price);
+      const costVal = this.parseMoney(item.cost);
       const revenue = priceVal * qty;
-      const profit = (priceVal - costVal) * qty;
+      const cost = costVal * qty;
+      const profit = revenue - cost;
 
       if (existing) {
         existing.quantitySold += qty;
         existing.totalSales += revenue;
         existing.profitMargin += profit;
+        existing.grossSales += revenue;
+        existing.estimatedCogs += cost;
+        existing.contributionMargin += profit;
       } else {
         productMap.set(item.productId, {
           id: item.productId,
@@ -137,10 +271,26 @@ export class ReportsService {
           quantitySold: qty,
           totalSales: revenue,
           profitMargin: profit,
+          grossSales: revenue,
+          estimatedCogs: cost,
+          contributionMargin: profit,
+          contributionMarginPercent: 0,
         });
       }
     });
-    const topProducts = Array.from(productMap.values()).sort((a, b) => b.quantitySold - a.quantitySold);
+    const topProducts = Array.from(productMap.values())
+      .map((product) => ({
+        ...product,
+        totalSales: this.roundMoney(product.totalSales),
+        profitMargin: this.roundMoney(product.profitMargin),
+        grossSales: this.roundMoney(product.grossSales),
+        estimatedCogs: this.roundMoney(product.estimatedCogs),
+        contributionMargin: this.roundMoney(product.contributionMargin),
+        contributionMarginPercent: product.grossSales > 0
+          ? this.roundMoney((product.contributionMargin / product.grossSales) * 100)
+          : 0,
+      }))
+      .sort((a, b) => b.quantitySold - a.quantitySold);
 
     // C. Waiters Performance (waiter role)
     const waiterMap = new Map<string, { id: string; name: string; totalSales: number; ordersCount: number }>();
@@ -148,7 +298,7 @@ export class ReportsService {
     const cashierMap = new Map<string, { id: string; name: string; totalSales: number; ordersCount: number }>();
 
     ordersList.forEach((o) => {
-      const orderVal = parseFloat(o.total as string || '0');
+      const orderVal = paymentsByOrder.get(o.id) || 0;
       const targetMap = o.waiterRole === 'cashier' || o.waiterRole === 'admin' ? cashierMap : waiterMap;
       const existing = targetMap.get(o.waiterId);
 
@@ -165,25 +315,426 @@ export class ReportsService {
       }
     });
 
-    const topWaiters = Array.from(waiterMap.values()).sort((a, b) => b.totalSales - a.totalSales);
-    const topCashiers = Array.from(cashierMap.values()).sort((a, b) => b.totalSales - a.totalSales);
+    const topWaiters = Array.from(waiterMap.values())
+      .map((waiter) => ({ ...waiter, totalSales: this.roundMoney(waiter.totalSales) }))
+      .sort((a, b) => b.totalSales - a.totalSales);
+    const topCashiers = Array.from(cashierMap.values())
+      .map((cashier) => ({ ...cashier, totalSales: this.roundMoney(cashier.totalSales) }))
+      .sort((a, b) => b.totalSales - a.totalSales);
 
     // E. Hourly Sales Peak
     const hourlyMap = Array.from({ length: 24 }, (_, i) => ({ hour: i, totalSales: 0 }));
     ordersList.forEach((o) => {
       const hour = new Date(o.createdAt).getHours();
-      hourlyMap[hour].totalSales += parseFloat(o.total as string || '0');
+      hourlyMap[hour].totalSales += paymentsByOrder.get(o.id) || 0;
     });
 
     return {
-      totalSales,
+      totalSales: this.roundMoney(totalSales),
       totalOrdersCount,
-      averageTicket,
+      averageTicket: this.roundMoney(averageTicket),
       salesByBranch,
       topProducts,
       topWaiters,
       topCashiers,
-      hourlySales: hourlyMap,
+      hourlySales: hourlyMap.map((hour) => ({ ...hour, totalSales: this.roundMoney(hour.totalSales) })),
+      financial: {
+        grossSales: this.roundMoney(grossSales),
+        discounts: this.roundMoney(discounts),
+        taxes: this.roundMoney(taxes),
+        netSales: this.roundMoney(ordersTotal),
+        collectedSales: this.roundMoney(paymentsTotal),
+        ordersCount: totalOrdersCount,
+        paidOrdersCount,
+        itemsCount,
+        averageCheck: this.roundMoney(averageTicket),
+        estimatedCogs: this.roundMoney(estimatedCogs),
+        contributionMargin: this.roundMoney(contributionMargin),
+        contributionMarginPercent: this.roundMoney(contributionMarginPercent),
+        paymentMix,
+      },
+      reconciliation: {
+        status: exceptions.length > 0 ? 'warning' : 'ok',
+        ordersTotal: this.roundMoney(ordersTotal),
+        paymentsTotal: this.roundMoney(paymentsTotal),
+        itemsGrossTotal: this.roundMoney(itemsGrossTotal),
+        exceptionsCount: exceptions.length,
+        exceptions,
+      },
     };
+  }
+
+  async getProductSalesReport(query: {
+    businessId: string;
+    startDate?: string;
+    endDate?: string;
+    branchId?: string;
+    categoryId?: string;
+  }) {
+    const { businessId, startDate, endDate, branchId, categoryId } = query;
+
+    const start = startDate ? new Date(startDate + 'T00:00:00') : null;
+    const end = endDate ? new Date(endDate + 'T23:59:59') : null;
+
+    const itemsList = await this.db
+      .select({
+        productId: schema.orderItems.productId,
+        productName: schema.products.name,
+        sku: schema.products.sku,
+        categoryName: schema.categories.name,
+        price: schema.orderItems.price,
+        quantity: schema.orderItems.quantity,
+      })
+      .from(schema.orderItems)
+      .leftJoin(schema.products, eq(schema.orderItems.productId, schema.products.id))
+      .leftJoin(schema.categories, eq(schema.products.categoryId, schema.categories.id))
+      .innerJoin(schema.orders, eq(schema.orderItems.orderId, schema.orders.id))
+      .where(
+        and(
+          eq(schema.orders.businessId, businessId),
+          eq(schema.orders.state, 'closed'),
+          isNull(schema.orders.deletedAt),
+          isNull(schema.orderItems.deletedAt),
+          start ? gte(schema.orders.createdAt, start) : undefined,
+          end ? lte(schema.orders.createdAt, end) : undefined,
+          branchId ? eq(schema.orders.branchId, branchId) : undefined,
+          categoryId ? eq(schema.products.categoryId, categoryId) : undefined,
+        ),
+      );
+
+    const productMap = new Map<string, {
+      productId: string;
+      productName: string;
+      sku: string;
+      categoryName: string;
+      quantitySold: number;
+      grossSales: number;
+    }>();
+
+    itemsList.forEach((item) => {
+      if (!item.productId) return;
+      const existing = productMap.get(item.productId);
+      const qty = item.quantity;
+      const priceVal = this.parseMoney(item.price);
+      const revenue = priceVal * qty;
+
+      if (existing) {
+        existing.quantitySold += qty;
+        existing.grossSales += revenue;
+      } else {
+        productMap.set(item.productId, {
+          productId: item.productId,
+          productName: item.productName || 'Producto Eliminado',
+          sku: item.sku || '',
+          categoryName: item.categoryName || 'Otros',
+          quantitySold: qty,
+          grossSales: revenue,
+        });
+      }
+    });
+
+    return Array.from(productMap.values())
+      .map((row) => {
+        const grossSalesRounded = this.roundMoney(row.grossSales);
+        const averagePrice = row.quantitySold > 0 ? this.roundMoney(row.grossSales / row.quantitySold) : 0;
+        const taxAmount = this.roundMoney(grossSalesRounded - (grossSalesRounded / 1.16));
+        const netSales = this.roundMoney(grossSalesRounded / 1.16);
+
+        return {
+          productId: row.productId,
+          productName: row.productName,
+          sku: row.sku,
+          categoryName: row.categoryName,
+          quantitySold: row.quantitySold,
+          averagePrice,
+          grossSales: grossSalesRounded,
+          taxAmount,
+          netSales,
+        };
+      })
+      .sort((a, b) => b.quantitySold - a.quantitySold);
+  }
+
+  private buildReconciliationExceptions(
+    orders: Array<{ id: string; total: number; subtotal: number }>,
+    paymentsByOrder: Map<string, number>,
+    itemsByOrder: Map<string, { grossTotal: number; estimatedCogs: number; itemsCount: number }>,
+  ): ReconciliationException[] {
+    const tolerance = 0.01;
+    const exceptions: ReconciliationException[] = [];
+
+    orders.forEach((order) => {
+      const paymentTotal = paymentsByOrder.get(order.id) || 0;
+      const itemsGrossTotal = itemsByOrder.get(order.id)?.grossTotal || 0;
+      const hasZeroTotalWithItems = order.total === 0 && itemsGrossTotal > tolerance;
+      const hasMissingPayment = order.total > tolerance && paymentTotal <= tolerance;
+
+      if (hasZeroTotalWithItems) {
+        exceptions.push(this.createReconciliationException(
+          order,
+          paymentTotal,
+          itemsGrossTotal,
+          'zero_total_with_items',
+          itemsGrossTotal,
+        ));
+      }
+
+      if (hasMissingPayment) {
+        exceptions.push(this.createReconciliationException(
+          order,
+          paymentTotal,
+          itemsGrossTotal,
+          'missing_payment',
+          order.total,
+        ));
+      }
+
+      const paymentDifference = this.roundMoney(paymentTotal - order.total);
+      if (!hasMissingPayment && order.total > tolerance && Math.abs(paymentDifference) > tolerance) {
+        exceptions.push(this.createReconciliationException(
+          order,
+          paymentTotal,
+          itemsGrossTotal,
+          'payment_mismatch',
+          paymentDifference,
+        ));
+      }
+
+      const itemDifference = this.roundMoney(itemsGrossTotal - order.subtotal);
+      if (!hasZeroTotalWithItems && itemsGrossTotal > tolerance && Math.abs(itemDifference) > tolerance) {
+        exceptions.push(this.createReconciliationException(
+          order,
+          paymentTotal,
+          itemsGrossTotal,
+          'item_subtotal_mismatch',
+          itemDifference,
+        ));
+      }
+    });
+
+    return exceptions;
+  }
+
+  private createReconciliationException(
+    order: { id: string; total: number; subtotal: number },
+    paymentTotal: number,
+    itemsGrossTotal: number,
+    type: ReconciliationExceptionType,
+    difference: number,
+  ): ReconciliationException {
+    return {
+      orderId: order.id,
+      type,
+      orderTotal: this.roundMoney(order.total),
+      paymentTotal: this.roundMoney(paymentTotal),
+      itemsGrossTotal: this.roundMoney(itemsGrossTotal),
+      subtotal: this.roundMoney(order.subtotal),
+      difference: this.roundMoney(difference),
+    };
+  }
+
+  private parseMoney(value: string | number | null | undefined): number {
+    if (value === null || value === undefined) return 0;
+    const parsed = typeof value === 'number' ? value : parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  private roundMoney(value: number): number {
+    return Math.round((value + Number.EPSILON) * 100) / 100;
+  }
+
+  async getInventoryExistence(query: {
+    businessId: string;
+    warehouseId?: string;
+    branchId?: string;
+    categoryId?: string;
+    productId?: string;
+    status?: string;
+    stockFilter?: string;
+    consolidated?: string;
+  }) {
+    const { businessId, warehouseId, branchId, categoryId, productId, status = 'active', stockFilter = 'all' } = query;
+
+    const conditions = [eq(schema.products.businessId, businessId)];
+
+    if (warehouseId) {
+      conditions.push(eq(schema.stockLevels.warehouseId, warehouseId));
+    }
+    if (branchId) {
+      conditions.push(eq(schema.stockLevels.branchId, branchId));
+    }
+    if (categoryId) {
+      conditions.push(eq(schema.products.categoryId, categoryId));
+    }
+    if (productId) {
+      conditions.push(eq(schema.products.id, productId));
+    }
+
+    if (status === 'active') {
+      conditions.push(eq(schema.products.isActive, true));
+    } else if (status === 'inactive') {
+      conditions.push(eq(schema.products.isActive, false));
+    }
+
+    const data = await this.db
+      .select({
+        id: schema.stockLevels.id,
+        productId: schema.stockLevels.productId,
+        productName: schema.products.name,
+        sku: schema.products.sku,
+        internalCode: schema.products.internalCode,
+        categoryName: schema.categories.name,
+        isActive: schema.products.isActive,
+        quantity: schema.stockLevels.quantity,
+        cost: schema.products.cost,
+        minStock: schema.products.minStock,
+        warehouseId: schema.stockLevels.warehouseId,
+        warehouseName: schema.warehouses.name,
+        branchId: schema.stockLevels.branchId,
+        branchName: schema.branches.name,
+      })
+      .from(schema.stockLevels)
+      .innerJoin(schema.products, eq(schema.stockLevels.productId, schema.products.id))
+      .innerJoin(schema.categories, eq(schema.products.categoryId, schema.categories.id))
+      .leftJoin(schema.warehouses, eq(schema.stockLevels.warehouseId, schema.warehouses.id))
+      .leftJoin(schema.branches, eq(schema.stockLevels.branchId, schema.branches.id))
+      .where(and(...conditions));
+
+    // Post-filter stock levels in JS for flexibility
+    let filtered = data.map((item) => {
+      const quantity = parseFloat(item.quantity);
+      const cost = parseFloat(item.cost || '0');
+      const minStock = parseFloat(item.minStock || '0');
+      const totalCost = quantity * cost;
+
+      return {
+        ...item,
+        quantity,
+        cost,
+        minStock,
+        totalCost,
+      };
+    });
+
+    if (stockFilter === 'aboveZero') {
+      filtered = filtered.filter((item) => item.quantity > 0);
+    } else if (stockFilter === 'zero') {
+      filtered = filtered.filter((item) => item.quantity === 0);
+    } else if (stockFilter === 'belowMin') {
+      filtered = filtered.filter((item) => item.quantity < item.minStock);
+    }
+
+    if (query.consolidated === 'true') {
+      const productMap = new Map<string, any>();
+      filtered.forEach((item) => {
+        const existing = productMap.get(item.productId);
+        if (existing) {
+          existing.quantity += item.quantity;
+          existing.totalCost += item.totalCost;
+        } else {
+          productMap.set(item.productId, {
+            productId: item.productId,
+            productName: item.productName,
+            sku: item.sku,
+            internalCode: item.internalCode,
+            categoryName: item.categoryName,
+            isActive: item.isActive,
+            quantity: item.quantity,
+            cost: item.cost,
+            minStock: item.minStock,
+            totalCost: item.totalCost,
+          });
+        }
+      });
+      filtered = Array.from(productMap.values());
+    }
+
+    // Calculations of aggregates
+    const totalProducts = filtered.length;
+    const totalQuantity = filtered.reduce((sum, item) => sum + item.quantity, 0);
+    const totalCost = filtered.reduce((sum, item) => sum + item.totalCost, 0);
+
+    return {
+      data: filtered,
+      summary: {
+        totalProducts,
+        totalQuantity,
+        totalCost,
+      },
+    };
+  }
+
+  async getInventoryKardex(query: {
+    businessId: string;
+    productId: string;
+    warehouseId?: string;
+    branchId?: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    const { businessId, productId, warehouseId, branchId, startDate, endDate } = query;
+
+    const conditions = [
+      eq(schema.inventoryMovements.businessId, businessId),
+      eq(schema.inventoryMovements.productId, productId),
+    ];
+
+    if (warehouseId) {
+      conditions.push(eq(schema.inventoryMovements.warehouseId, warehouseId));
+    }
+    if (branchId) {
+      conditions.push(eq(schema.inventoryMovements.branchId, branchId));
+    }
+
+    const movements = await this.db
+      .select({
+        id: schema.inventoryMovements.id,
+        productId: schema.inventoryMovements.productId,
+        warehouseId: schema.inventoryMovements.warehouseId,
+        warehouseName: schema.warehouses.name,
+        branchId: schema.inventoryMovements.branchId,
+        branchName: schema.branches.name,
+        quantity: schema.inventoryMovements.quantity,
+        type: schema.inventoryMovements.type,
+        referenceId: schema.inventoryMovements.referenceId,
+        documentNumber: schema.inventoryMovements.documentNumber,
+        notes: schema.inventoryMovements.notes,
+        lotNumber: schema.inventoryMovements.lotNumber,
+        expirationDate: schema.inventoryMovements.expirationDate,
+        drawerLocation: schema.inventoryMovements.drawerLocation,
+        createdAt: schema.inventoryMovements.createdAt,
+        createdById: schema.inventoryMovements.createdById,
+        createdByName: schema.users.name,
+      })
+      .from(schema.inventoryMovements)
+      .leftJoin(schema.warehouses, eq(schema.inventoryMovements.warehouseId, schema.warehouses.id))
+      .leftJoin(schema.branches, eq(schema.inventoryMovements.branchId, schema.branches.id))
+      .leftJoin(schema.users, eq(schema.inventoryMovements.createdById, schema.users.id))
+      .where(and(...conditions))
+      .orderBy(schema.inventoryMovements.createdAt);
+
+    // Calculate balances sequentially in memory
+    let runningBalance = 0;
+    const data = movements.map((m) => {
+      const quantity = parseFloat(m.quantity);
+      const previousBalance = runningBalance;
+      runningBalance += quantity;
+      return {
+        ...m,
+        quantity,
+        previousBalance,
+        finalBalance: runningBalance,
+      };
+    });
+
+    let filtered = data;
+    if (startDate) {
+      filtered = filtered.filter((m) => new Date(m.createdAt) >= new Date(startDate));
+    }
+    if (endDate) {
+      filtered = filtered.filter((m) => new Date(m.createdAt) <= new Date(endDate));
+    }
+
+    return filtered;
   }
 }

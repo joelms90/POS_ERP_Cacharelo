@@ -3,8 +3,30 @@ export interface Employee {
   businessId?: string;
   branchId?: string;
   name: string;
+  email?: string;
   pin: string;
-  role: 'waiter' | 'cashier' | 'kitchen' | 'admin';
+  role: 'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'owner' | 'inventory_admin';
+}
+
+export interface AdminUser {
+  id: string;
+  businessId?: string;
+  name: string;
+  email: string;
+  role: 'owner' | 'inventory_admin';
+  businessAccess: Array<{ businessId: string; role: 'owner' | 'inventory_admin' }>;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AuthUser {
+  id: string;
+  businessId?: string;
+  branchId?: string;
+  name: string;
+  email?: string;
+  role: 'owner' | 'inventory_admin' | 'admin' | 'waiter' | 'cashier' | 'kitchen' | 'vendedor';
+  businessAccess?: Array<{ businessId: string; role: 'owner' | 'inventory_admin' }>;
 }
 
 export interface Warehouse {
@@ -25,6 +47,25 @@ export interface Branch {
   phone?: string;
   roomConfigs?: string;
   createdAt?: string;
+  version?: number;
+}
+
+export interface TicketFiscalConfiguration {
+  id: string;
+  businessId: string;
+  branchId?: string | null;
+  sellerDisplayName: string;
+  legalName: string;
+  fiscalId: string;
+  branchName: string;
+  branchAddress: string;
+  phone?: string | null;
+  receiptPrefix: string;
+  taxMode: 'breakdown' | 'included';
+  footerText?: string | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
   version?: number;
 }
 
@@ -69,6 +110,7 @@ export interface Product {
   price?: string;
   isSellable?: boolean;
   isIngredient?: boolean;
+  isActive?: boolean;
   imageUrl?: string;
   internalCode?: string;
   priceWholesale?: string;
@@ -77,6 +119,73 @@ export interface Product {
   saleType?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface BranchTable {
+  id: string;
+  branchId: string;
+  label: string;
+  capacity?: number;
+  room?: string;
+  state?: 'available' | 'occupied' | 'billing' | 'cleaning' | string;
+  x?: number;
+  y?: number;
+  shape?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface OrderItem {
+  id: string;
+  orderId: string;
+  productId: string;
+  quantity: number;
+  price: string;
+  assignedGuest?: number;
+  notes?: string | null;
+  isSent?: boolean;
+  productName?: string;
+  categoryName?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Payment {
+  id: string;
+  orderId: string;
+  amount: string;
+  paymentMethod: 'cash' | 'card';
+  referenceCode?: string | null;
+  createdAt?: string;
+}
+
+export interface ActiveOrder {
+  id: string;
+  branchId: string;
+  tableId: string;
+  waiterId: string;
+  state: 'open' | 'billing' | 'closed' | 'cancelled' | string;
+  subtotal: string;
+  discount: string;
+  tax: string;
+  total: string;
+  items: OrderItem[];
+  payments: Payment[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface KitchenTicket {
+  id: string;
+  orderId: string;
+  status: 'pending' | 'preparing' | 'ready' | 'served';
+  station: 'cocina' | 'barra' | string;
+  tableLabel?: string;
+  tableName?: string;
+  items: OrderItem[];
+  createdAt?: string;
+  startedAt?: string | null;
+  readyAt?: string | null;
 }
 
 export interface Provider {
@@ -100,9 +209,57 @@ export const getApiBaseUrl = (): string => {
 
 // Key used to store the admin token in localStorage
 const TOKEN_KEY = 'X-Admin-Token';
+const ACCESS_TOKEN_KEY = 'BC-Access-Token';
+const REFRESH_TOKEN_KEY = 'BC-Refresh-Token';
+const AUTH_USER_KEY = 'BC-Auth-User';
+export const AUTH_EXPIRED_EVENT = 'business-control:auth-expired';
 
 export const getAdminToken = (): string | null => {
   return localStorage.getItem(TOKEN_KEY);
+};
+
+export const getAccessToken = (): string | null => {
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
+};
+
+const decodeJwtPayload = (token: string): { exp?: number } | null => {
+  const [, payload] = token.split('.');
+  if (!payload) return null;
+
+  try {
+    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedPayload = normalizedPayload.padEnd(
+      normalizedPayload.length + ((4 - normalizedPayload.length % 4) % 4),
+      '=',
+    );
+    return JSON.parse(atob(paddedPayload));
+  } catch {
+    return null;
+  }
+};
+
+export const isJwtExpired = (token: string, clockSkewSeconds = 30): boolean => {
+  const payload = decodeJwtPayload(token);
+  if (!payload?.exp) return false;
+  return payload.exp <= Math.floor(Date.now() / 1000) + clockSkewSeconds;
+};
+
+export const hasValidStoredSession = (): boolean => {
+  const accessToken = getAccessToken();
+  if (accessToken) {
+    return !isJwtExpired(accessToken);
+  }
+  return Boolean(getAdminToken());
+};
+
+export const getAuthUser = (): AuthUser | null => {
+  const raw = localStorage.getItem(AUTH_USER_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AuthUser;
+  } catch {
+    return null;
+  }
 };
 
 export const setAdminToken = (token: string): void => {
@@ -111,6 +268,22 @@ export const setAdminToken = (token: string): void => {
 
 export const clearAdminToken = (): void => {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_USER_KEY);
+};
+
+const expireAuthSession = (): void => {
+  clearAdminToken();
+  window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+};
+
+const storeAuthSession = (payload: { accessToken: string; refreshToken?: string; user: AuthUser }) => {
+  localStorage.setItem(ACCESS_TOKEN_KEY, payload.accessToken);
+  if (payload.refreshToken) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, payload.refreshToken);
+  }
+  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(payload.user));
 };
 
 /**
@@ -122,10 +295,18 @@ async function apiRequest<T>(
 ): Promise<T> {
   const baseUrl = getApiBaseUrl();
   const token = getAdminToken();
+  const accessToken = getAccessToken();
+  const hadStoredSession = Boolean(accessToken || token);
   
   const headers = new Headers(options.headers || {});
   headers.set('Content-Type', 'application/json');
-  if (token) {
+  if (accessToken) {
+    if (isJwtExpired(accessToken)) {
+      expireAuthSession();
+      throw new Error('Tu sesion expiro. Inicia sesion nuevamente.');
+    }
+    headers.set('Authorization', `Bearer ${accessToken}`);
+  } else if (token) {
     headers.set('X-Admin-Token', token);
   }
 
@@ -142,6 +323,9 @@ async function apiRequest<T>(
     } catch {
       // ignore JSON parse error
     }
+    if (hadStoredSession && response.status === 401) {
+      expireAuthSession();
+    }
     throw new Error(errorMessage);
   }
 
@@ -155,6 +339,15 @@ export const api = {
   /**
    * Verify the admin password and store token
    */
+  async login(email: string, password: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
+    const data = await apiRequest<{ accessToken: string; refreshToken: string; user: AuthUser }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    storeAuthSession(data);
+    return data;
+  },
+
   async verifyAdminPassword(password: string): Promise<{ success: boolean; token: string }> {
     const data = await apiRequest<{ success: boolean; token: string }>('/auth/admin', {
       method: 'POST',
@@ -165,6 +358,40 @@ export const api = {
       setAdminToken(data.token);
     }
     return data;
+  },
+
+  async getAdminUsers(businessId: string): Promise<AdminUser[]> {
+    return apiRequest<AdminUser[]>(`/admin-users?businessId=${businessId}`);
+  },
+
+  async addAdminUser(payload: {
+    businessId: string;
+    name: string;
+    email: string;
+    password: string;
+    role: 'owner' | 'inventory_admin';
+    businessAccess?: Array<{ businessId: string; role: 'owner' | 'inventory_admin' }>;
+  }): Promise<AdminUser> {
+    return apiRequest<AdminUser>('/admin-users', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateAdminUser(
+    id: string,
+    payload: Partial<Pick<AdminUser, 'name' | 'email' | 'role' | 'businessAccess'>> & { password?: string },
+  ): Promise<AdminUser> {
+    return apiRequest<AdminUser>(`/admin-users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deactivateAdminUser(id: string): Promise<{ success: boolean; message: string }> {
+    return apiRequest<{ success: boolean; message: string }>(`/admin-users/${id}`, {
+      method: 'DELETE',
+    });
   },
 
   async getUsers(businessId: string, branchId?: string): Promise<Employee[]> {
@@ -430,8 +657,8 @@ export const api = {
   /**
    * Get all tables for a branch
    */
-  async getBranchTables(branchId: string): Promise<any[]> {
-    return apiRequest<any[]>(`/branches/${branchId}/tables`);
+  async getBranchTables(branchId: string): Promise<BranchTable[]> {
+    return apiRequest<BranchTable[]>(`/branches/${branchId}/tables`);
   },
 
   /**
@@ -474,6 +701,92 @@ export const api = {
     return apiRequest<any>(`/branches/${branchId}/tables/${tableId}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
+    });
+  },
+
+  async getTicketSettings(businessId: string, branchId?: string): Promise<TicketFiscalConfiguration> {
+    let url = `/ticket-settings?businessId=${businessId}`;
+    if (branchId) url += `&branchId=${branchId}`;
+    return apiRequest<TicketFiscalConfiguration>(url);
+  },
+
+  async saveTicketSettings(payload: Omit<TicketFiscalConfiguration, 'id' | 'createdAt' | 'updatedAt' | 'version'>): Promise<TicketFiscalConfiguration> {
+    return apiRequest<TicketFiscalConfiguration>('/ticket-settings', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getActiveOrders(branchId: string): Promise<ActiveOrder[]> {
+    return apiRequest<ActiveOrder[]>(`/orders/active?branchId=${branchId}`);
+  },
+
+  async createOrder(payload: {
+    branchId: string;
+    tableId: string;
+    waiterId: string;
+    subtotal: string;
+    discount?: string;
+    tax?: string;
+    total: string;
+    items: Array<{
+      productId: string;
+      quantity: number;
+      price: string;
+      assignedGuest?: number;
+      notes?: string;
+    }>;
+  }): Promise<ActiveOrder> {
+    return apiRequest<ActiveOrder>('/orders', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async addOrderItems(orderId: string, items: Array<{
+    productId: string;
+    quantity: number;
+    price: string;
+    assignedGuest?: number;
+    notes?: string;
+  }>): Promise<any> {
+    return apiRequest<any>(`/orders/${orderId}/items`, {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    });
+  },
+
+  async requestOrderBilling(orderId: string): Promise<ActiveOrder> {
+    return apiRequest<ActiveOrder>(`/orders/${orderId}/billing`, {
+      method: 'POST',
+    });
+  },
+
+  async payOrder(orderId: string, payload: {
+    amount: string;
+    paymentMethod: 'cash' | 'card';
+    referenceCode?: string;
+  }): Promise<any> {
+    return apiRequest<any>(`/orders/${orderId}/payments`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async sendOrderToKitchen(orderId: string): Promise<any> {
+    return apiRequest<any>(`/kitchen/orders/${orderId}/send`, {
+      method: 'POST',
+    });
+  },
+
+  async getActiveKitchenTickets(branchId: string): Promise<KitchenTicket[]> {
+    return apiRequest<KitchenTicket[]>(`/kitchen/active?branchId=${branchId}`);
+  },
+
+  async updateKitchenTicketStatus(ticketId: string, status: KitchenTicket['status']): Promise<KitchenTicket> {
+    return apiRequest<KitchenTicket>(`/kitchen/tickets/${ticketId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
     });
   },
 
@@ -742,7 +1055,71 @@ export const api = {
     if (endDate) url += `&endDate=${endDate}`;
     return apiRequest<SalesDashboardReport>(url);
   },
+
+  async getProductSalesReport(params: {
+    businessId: string;
+    startDate?: string;
+    endDate?: string;
+    branchId?: string;
+    categoryId?: string;
+  }): Promise<ProductSalesReportLine[]> {
+    let url = `/reports/sales/products?businessId=${params.businessId}`;
+    if (params.startDate) url += `&startDate=${params.startDate}`;
+    if (params.endDate) url += `&endDate=${params.endDate}`;
+    if (params.branchId) url += `&branchId=${params.branchId}`;
+    if (params.categoryId) url += `&categoryId=${params.categoryId}`;
+    return apiRequest<ProductSalesReportLine[]>(url);
+  },
+
+  async getInventoryExistenceReport(params: {
+    businessId: string;
+    warehouseId?: string;
+    branchId?: string;
+    categoryId?: string;
+    productId?: string;
+    status?: string;
+    stockFilter?: string;
+    consolidated?: boolean;
+  }): Promise<{ data: any[]; summary: { totalProducts: number; totalQuantity: number; totalCost: number } }> {
+    let url = `/reports/inventory/existence?businessId=${params.businessId}`;
+    if (params.warehouseId) url += `&warehouseId=${params.warehouseId}`;
+    if (params.branchId) url += `&branchId=${params.branchId}`;
+    if (params.categoryId) url += `&categoryId=${params.categoryId}`;
+    if (params.productId) url += `&productId=${params.productId}`;
+    if (params.status) url += `&status=${params.status}`;
+    if (params.stockFilter) url += `&stockFilter=${params.stockFilter}`;
+    if (params.consolidated) url += `&consolidated=true`;
+    return apiRequest<{ data: any[]; summary: { totalProducts: number; totalQuantity: number; totalCost: number } }>(url);
+  },
+
+  async getInventoryKardexReport(params: {
+    businessId: string;
+    productId: string;
+    warehouseId?: string;
+    branchId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<any[]> {
+    let url = `/reports/inventory/kardex?businessId=${params.businessId}&productId=${params.productId}`;
+    if (params.warehouseId) url += `&warehouseId=${params.warehouseId}`;
+    if (params.branchId) url += `&branchId=${params.branchId}`;
+    if (params.startDate) url += `&startDate=${params.startDate}`;
+    if (params.endDate) url += `&endDate=${params.endDate}`;
+    return apiRequest<any[]>(url);
+  },
 };
+
+export interface ProductSalesReportLine {
+  productId: string;
+  productName: string;
+  sku: string;
+  categoryName: string;
+  quantitySold: number;
+  averagePrice: number;
+  grossSales: number;
+  taxAmount: number;
+  netSales: number;
+}
 
 export interface SalesDashboardReport {
   totalSales: number;
@@ -785,5 +1162,3 @@ export interface SupplierProduct {
   createdAt?: string;
   updatedAt?: string;
 }
-
-

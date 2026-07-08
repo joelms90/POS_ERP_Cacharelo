@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { api, SalesDashboardReport } from '../services/api';
+import { api, SalesDashboardReport, ProductSalesReportLine } from '../services/api';
 import { Heading } from '../components/atoms/Heading';
 import { Badge } from '../components/atoms/Badge';
+import { Autocomplete } from '../components/molecules/Autocomplete';
 
 interface ReportsPageProps {
   businessId: string;
@@ -14,6 +15,34 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   
+  // Tab selection for reports
+  const [activeReportTab, setActiveReportTab] = useState<'sales' | 'salesByProduct' | 'stock' | 'kardex'>('sales');
+
+  // Product sales report states
+  const [productSales, setProductSales] = useState<ProductSalesReportLine[]>([]);
+  const [isProductSalesLoading, setIsProductSalesLoading] = useState<boolean>(false);
+  const [productFilterBranch, setProductFilterBranch] = useState<string>('all');
+  const [productFilterCategory, setProductFilterCategory] = useState<string>('all');
+  const [productSearchQuery, setProductSearchQuery] = useState<string>('');
+
+  // Stock report states
+  const [stockLevels, setStockLevels] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [isStockLoading, setIsStockLoading] = useState<boolean>(false);
+  const [stockFilterStatus, setStockFilterStatus] = useState<'active' | 'inactive' | 'all'>('active');
+  const [stockFilterLocation, setStockFilterLocation] = useState<string>('all');
+
+  // Kardex report states
+  const [selectedAuditProductId, setSelectedAuditProductId] = useState<string>('');
+  const [auditLocations, setAuditLocations] = useState<any[]>([]);
+  const [auditMovements, setAuditMovements] = useState<any[]>([]);
+  const [isAuditLoading, setIsAuditLoading] = useState<boolean>(false);
+  const [auditStartDate, setAuditStartDate] = useState<string>('');
+  const [auditEndDate, setAuditEndDate] = useState<string>('');
+
   // Date range state
   const [dateRange, setDateRange] = useState<DateRangeType>('month');
   const [startDate, setStartDate] = useState<string>('');
@@ -70,18 +99,117 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
     }
   }, [businessId, startDate, endDate]);
 
+  const fetchStockData = React.useCallback(async () => {
+    try {
+      setIsStockLoading(true);
+      setError(null);
+      const [levels, whs, brs, prods, cats] = await Promise.all([
+        api.getStockLevels(businessId),
+        api.getWarehouses(businessId),
+        api.getBranches(businessId).catch(() => []),
+        api.getProducts(businessId),
+        api.getCategories(businessId),
+      ]);
+      setStockLevels(levels);
+      setWarehouses(whs);
+      setBranches(brs);
+      setProducts(prods);
+      setCategories(cats);
+
+      // Auto-select first product if on Kardex tab and none is selected
+      if (prods.length > 0 && !selectedAuditProductId) {
+        setSelectedAuditProductId(prods[0].id);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError('No se pudieron cargar los datos de existencia de almacén.');
+    } finally {
+      setIsStockLoading(false);
+    }
+  }, [businessId, selectedAuditProductId]);
+
+  useEffect(() => {
+    if (activeReportTab === 'stock' || activeReportTab === 'kardex' || activeReportTab === 'salesByProduct') {
+      fetchStockData();
+    }
+  }, [activeReportTab, fetchStockData]);
+
+  const fetchAuditData = React.useCallback(async (productId: string) => {
+    if (!productId) return;
+    setIsAuditLoading(true);
+    try {
+      const [existenceReport, movements] = await Promise.all([
+        api.getInventoryExistenceReport({
+          businessId,
+          productId,
+          consolidated: false,
+        }),
+        api.getInventoryKardexReport({
+          businessId,
+          productId,
+          startDate: auditStartDate || undefined,
+          endDate: auditEndDate || undefined,
+        }),
+      ]);
+      setAuditLocations(existenceReport.data || []);
+      setAuditMovements(movements || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsAuditLoading(false);
+    }
+  }, [businessId, auditStartDate, auditEndDate]);
+
+  useEffect(() => {
+    if (activeReportTab === 'kardex' && selectedAuditProductId) {
+      fetchAuditData(selectedAuditProductId);
+    }
+  }, [activeReportTab, selectedAuditProductId, fetchAuditData]);
+
+  const fetchProductSalesReport = React.useCallback(async () => {
+    try {
+      setIsProductSalesLoading(true);
+      setError(null);
+      const data = await api.getProductSalesReport({
+        businessId,
+        startDate,
+        endDate,
+        branchId: productFilterBranch !== 'all' ? productFilterBranch : undefined,
+        categoryId: productFilterCategory !== 'all' ? productFilterCategory : undefined,
+      });
+      setProductSales(data);
+    } catch (err: any) {
+      console.error(err);
+      setError('No se pudo cargar el reporte de ventas por producto.');
+    } finally {
+      setIsProductSalesLoading(false);
+    }
+  }, [businessId, startDate, endDate, productFilterBranch, productFilterCategory]);
+
+  useEffect(() => {
+    if (activeReportTab === 'salesByProduct' && startDate && endDate) {
+      fetchProductSalesReport();
+    }
+  }, [activeReportTab, startDate, endDate, fetchProductSalesReport]);
+
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
   };
 
-  if (isLoading && !reportData) {
+  if (
+    (activeReportTab === 'sales' && isLoading && !reportData) || 
+    (activeReportTab === 'salesByProduct' && isProductSalesLoading && productSales.length === 0) ||
+    ((activeReportTab === 'stock' || activeReportTab === 'kardex') && isStockLoading && stockLevels.length === 0)
+  ) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-obsidian text-text-secondary select-none">
         <svg className="animate-spin h-8 w-8 text-champagne-gold" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
-        <span className="text-xs uppercase tracking-widest">Generando Métricas de Negocio...</span>
+        <span className="text-xs uppercase tracking-widest">
+          {activeReportTab === 'sales' ? 'Generando Métricas de Negocio...' : (activeReportTab === 'salesByProduct' ? 'Generando Reporte de Productos...' : 'Consultando Inventario y Catálogo...')}
+        </span>
       </div>
     );
   }
@@ -91,153 +219,798 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
     ? [...reportData.topProducts].sort((a, b) => b.profitMargin - a.profitMargin)
     : [];
 
+  // Filter stock levels based on selected status and location filters
+  const filteredStockLevels = stockLevels.filter((level) => {
+    // 1. Status Filter: active/inactive/all
+    const isActive = level.isActive !== false; // handle null/undefined as true
+    if (stockFilterStatus === 'active' && !isActive) return false;
+    if (stockFilterStatus === 'inactive' && isActive) return false;
+
+    // 2. Location Filter
+    if (stockFilterLocation !== 'all') {
+      const [type, locId] = stockFilterLocation.split(':');
+      if (type === 'warehouse' && level.warehouseId !== locId) return false;
+      if (type === 'branch' && level.branchId !== locId) return false;
+    }
+
+    return true;
+  });
+
+  // Find currently selected audit product
+  const selectedAuditProduct = products.find((p) => p.id === selectedAuditProductId);
+
+  // Compute catalog stock sum
+  const catalogStock = selectedAuditProductId
+    ? stockLevels
+        .filter((sl) => sl.productId === selectedAuditProductId)
+        .reduce((sum, sl) => sum + parseFloat(sl.quantity || '0'), 0)
+    : 0;
+
+  // Compute sum across physical locations returned from the audit endpoint
+  const sumOfLocations = auditLocations.reduce((sum, loc) => sum + parseFloat(loc.quantity || '0'), 0);
+
+  const renderSalesByProductTab = () => {
+    const filteredProductSales = productSales.filter((item) => {
+      if (productSearchQuery.trim() === '') return true;
+      const query = productSearchQuery.toLowerCase();
+      return (
+        item.productName.toLowerCase().includes(query) ||
+        (item.sku && item.sku.toLowerCase().includes(query))
+      );
+    });
+
+    const totalUnits = filteredProductSales.reduce((acc, curr) => acc + curr.quantitySold, 0);
+    const totalGross = filteredProductSales.reduce((acc, curr) => acc + curr.grossSales, 0);
+    const totalTax = filteredProductSales.reduce((acc, curr) => acc + curr.taxAmount, 0);
+    const totalNet = filteredProductSales.reduce((acc, curr) => acc + curr.netSales, 0);
+    const overallAvgPrice = totalUnits > 0 ? totalGross / totalUnits : 0;
+
+    const exportToCSV = () => {
+      const headers = ['Producto', 'Categoría', 'SKU', 'Unidades Vendidas', 'Precio Unitario Promedio', 'Venta Bruta Total', 'IVA Incluido (16%)', 'Venta Neta Total'];
+      const rows = filteredProductSales.map(item => [
+        item.productName,
+        item.categoryName,
+        item.sku || '',
+        item.quantitySold,
+        item.averagePrice.toFixed(2),
+        item.grossSales.toFixed(2),
+        item.taxAmount.toFixed(2),
+        item.netSales.toFixed(2)
+      ]);
+      
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+      
+      const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `reporte-ventas-productos-${startDate}-a-${endDate}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    const exportToXLSX = () => {
+      // @ts-ignore
+      const XLSX = window.XLSX;
+      if (!XLSX) {
+        console.error('XLSX library not loaded.');
+        return;
+      }
+      
+      const headers = ['Producto', 'Categoría', 'SKU', 'Unidades Vendidas', 'Precio Unitario Ponderado', 'Venta Bruta Total', 'IVA Incluido (16%)', 'Venta Neta Total'];
+      const rows = filteredProductSales.map(item => [
+        item.productName,
+        item.categoryName,
+        item.sku || '',
+        item.quantitySold,
+        item.averagePrice,
+        item.grossSales,
+        item.taxAmount,
+        item.netSales
+      ]);
+      
+      const footer = [
+        'TOTALES',
+        '',
+        '',
+        totalUnits,
+        totalUnits > 0 ? Number((totalGross / totalUnits).toFixed(2)) : 0,
+        Number(totalGross.toFixed(2)),
+        Number(totalTax.toFixed(2)),
+        Number(totalNet.toFixed(2))
+      ];
+      
+      const data = [headers, ...rows, footer];
+      const worksheet = XLSX.utils.aoa_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Ventas por Producto');
+      
+      XLSX.writeFile(workbook, `reporte-ventas-productos-${startDate}-a-${endDate}.xlsx`);
+    };
+
+    return (
+      <div className="flex-1 overflow-hidden flex flex-col gap-4">
+        <style>{`
+          @media print {
+            .no-print, nav, header, button, select, input, .sub-tabs-nav, .heading-container {
+              display: none !important;
+            }
+            .print-area {
+              width: 100% !important;
+              background: white !important;
+              color: black !important;
+              border-collapse: collapse !important;
+              position: absolute;
+              left: 0;
+              top: 0;
+              margin: 0;
+              padding: 20px;
+            }
+            .print-table {
+              width: 100% !important;
+              border: 1px solid #000 !important;
+              border-collapse: collapse !important;
+              color: black !important;
+            }
+            .print-table th, .print-table td {
+              border: 1px solid #000 !important;
+              padding: 8px !important;
+              color: black !important;
+            }
+            .print-table th {
+              background: #f2f2f2 !important;
+              font-weight: bold !important;
+            }
+          }
+        `}</style>
+
+        <div className="bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 shadow-xl flex-1 flex flex-col min-h-0 print-area">
+          <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider mb-4 flex justify-between items-center no-print">
+            <span>Listado de Ventas por Producto</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={exportToCSV}
+                className="bg-charcoal border border-aged-bronze/45 hover:border-champagne-gold hover:text-champagne-gold text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 rounded transition-all cursor-pointer"
+              >
+                Exportar CSV
+              </button>
+              <button
+                onClick={exportToXLSX}
+                className="bg-charcoal border border-aged-bronze/45 hover:border-champagne-gold hover:text-champagne-gold text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 rounded transition-all cursor-pointer"
+              >
+                Exportar Excel
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="bg-charcoal border border-aged-bronze/45 hover:border-champagne-gold hover:text-champagne-gold text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 rounded transition-all cursor-pointer"
+              >
+                Imprimir PDF
+              </button>
+            </div>
+          </span>
+
+          <div className="hidden print:block mb-4">
+            <h1 className="text-lg font-bold text-black">Reporte de Ventas por Producto</h1>
+            <p className="text-xs text-black">Rango: {startDate} a {endDate}</p>
+            {productFilterBranch !== 'all' && (
+              <p className="text-xs text-black">Sucursal: {branches.find(b => b.id === productFilterBranch)?.name || 'Seleccionada'}</p>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto pr-1">
+            <table className="w-full text-left border-collapse text-xs select-text font-sans print-table">
+              <thead>
+                <tr className="bg-charcoal-surface border-b border-aged-bronze/20 text-text-secondary uppercase text-[9px] tracking-wider">
+                  <th className="p-3 font-medium">Producto</th>
+                  <th className="p-3 font-medium">Categoría</th>
+                  <th className="p-3 font-medium text-center">SKU</th>
+                  <th className="p-3 font-medium text-center">Unidades</th>
+                  <th className="p-3 font-medium text-right">Precio Prom. (Bruto)</th>
+                  <th className="p-3 font-medium text-right">Venta Bruta</th>
+                  <th className="p-3 font-medium text-right">IVA (16%)</th>
+                  <th className="p-3 font-medium text-right">Venta Neta</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-aged-bronze/10 text-text-primary">
+                {filteredProductSales.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center text-text-secondary italic">
+                      No se encontraron registros de ventas para los filtros seleccionados
+                    </td>
+                  </tr>
+                ) : (
+                  filteredProductSales.map((item) => (
+                    <tr key={item.productId} className="hover:bg-charcoal-surface/10">
+                      <td className="p-3 font-medium text-text-primary">{item.productName}</td>
+                      <td className="p-3 text-text-secondary">{item.categoryName}</td>
+                      <td className="p-3 text-center font-mono text-text-secondary">{item.sku || '-'}</td>
+                      <td className="p-3 text-center text-text-secondary">{item.quantitySold}</td>
+                      <td className="p-3 text-right text-text-secondary font-mono">{formatCurrency(item.averagePrice)}</td>
+                      <td className="p-3 text-right font-medium text-text-primary font-mono">{formatCurrency(item.grossSales)}</td>
+                      <td className="p-3 text-right text-text-secondary font-mono">{formatCurrency(item.taxAmount)}</td>
+                      <td className="p-3 text-right font-semibold text-champagne-gold font-mono">{formatCurrency(item.netSales)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              {filteredProductSales.length > 0 && (
+                <tfoot>
+                  <tr className="bg-charcoal-surface/30 border-t-2 border-aged-bronze/35 font-bold text-text-primary">
+                    <td className="p-3" colSpan={3}>TOTALES</td>
+                    <td className="p-3 text-center font-mono">{totalUnits}</td>
+                    <td className="p-3 text-right font-mono">{formatCurrency(overallAvgPrice)}</td>
+                    <td className="p-3 text-right font-mono text-text-primary">{formatCurrency(totalGross)}</td>
+                    <td className="p-3 text-right font-mono text-text-secondary">{formatCurrency(totalTax)}</td>
+                    <td className="p-3 text-right font-mono text-champagne-gold">{formatCurrency(totalNet)}</td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Check if they match
+  const isConsistent = Math.abs(catalogStock - sumOfLocations) < 0.001;
+
   return (
     <div className="w-full lg:h-full min-h-full bg-obsidian p-2 lg:p-6 font-sans overflow-y-auto lg:overflow-hidden flex flex-col">
       {/* Header & Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-aged-bronze/30 pb-4 mb-6">
         <div>
           <Heading level={2} className="!border-none !pb-0 text-champagne-gold font-light">
-            Reportes e Inteligencia de Ventas
+            {activeReportTab === 'stock'
+              ? 'Reporte de Existencia de Almacén'
+              : activeReportTab === 'kardex'
+                ? 'Auditoría Visual y Kardex de Inventario'
+                : 'Reportes e Inteligencia de Ventas'}
           </Heading>
           <p className="text-xs text-text-secondary mt-1">
-            Análisis de ingresos, rentabilidad de productos, sucursales y desempeño del personal.
+            {activeReportTab === 'stock'
+              ? 'Control de inventario en bodegas y sucursales con detalle de mínimos de stock y deprecados.'
+              : activeReportTab === 'salesByProduct'
+                ? 'Reporte detallado de ventas por producto vendido consolidando cantidades, importes, IVA y venta neta.'
+                : activeReportTab === 'kardex'
+                  ? 'Monitoreo de consistencia de stock por sucursal y registro del libro diario de movimientos.'
+                  : 'Análisis de ingresos, rentabilidad de productos, sucursales y desempeño del personal.'}
           </p>
         </div>
 
         {/* Filters bar */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex bg-charcoal border border-aged-bronze/45 rounded p-0.5">
-            {(['today', 'week', 'month', 'last30', 'custom'] as DateRangeType[]).map((range) => (
-              <button
-                key={range}
-                onClick={() => setDateRange(range)}
-                className={`px-3 py-1.5 rounded text-[10px] uppercase font-semibold tracking-wider transition-all duration-200 ${
-                  dateRange === range
-                    ? 'bg-charcoal-surface text-champagne-gold shadow-sm'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                {range === 'today' ? 'Hoy' : range === 'week' ? 'Semana' : range === 'month' ? 'Mes' : range === 'last30' ? '30 Días' : 'Fijo'}
-              </button>
-            ))}
-          </div>
+          {activeReportTab === 'sales' || activeReportTab === 'salesByProduct' ? (
+            <>
+              <div className="flex bg-charcoal border border-aged-bronze/45 rounded p-0.5">
+                {(['today', 'week', 'month', 'last30', 'custom'] as DateRangeType[]).map((range) => (
+                  <button
+                    key={range}
+                    onClick={() => setDateRange(range)}
+                    className={`px-3 py-1.5 rounded text-[10px] uppercase font-semibold tracking-wider transition-all duration-200 cursor-pointer ${
+                      dateRange === range
+                        ? 'bg-charcoal-surface text-champagne-gold shadow-sm'
+                        : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    {range === 'today' ? 'Hoy' : range === 'week' ? 'Semana' : range === 'month' ? 'Mes' : range === 'last30' ? '30 Días' : 'Fijo'}
+                  </button>
+                ))}
+              </div>
 
-          {dateRange === 'custom' && (
+              {dateRange === 'custom' && (
+                <div className="flex items-center gap-2 bg-charcoal border border-aged-bronze/45 rounded p-1">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="bg-transparent text-xs text-text-primary focus:outline-none px-1"
+                  />
+                  <span className="text-[10px] text-text-secondary uppercase">a</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="bg-transparent text-xs text-text-primary focus:outline-none px-1"
+                  />
+                  <button
+                    onClick={activeReportTab === 'salesByProduct' ? fetchProductSalesReport : fetchReport}
+                    className="bg-charcoal-surface border border-aged-bronze/45 hover:border-champagne-gold hover:text-champagne-gold text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded transition-all cursor-pointer"
+                  >
+                    Filtrar
+                  </button>
+                </div>
+              )}
+
+              {activeReportTab === 'salesByProduct' && (
+                <>
+                  <div className="flex items-center gap-2 bg-charcoal border border-aged-bronze/45 rounded p-1">
+                    <span className="text-[10px] text-text-secondary uppercase px-1">Sucursal:</span>
+                    <select
+                      value={productFilterBranch}
+                      onChange={(e) => setProductFilterBranch(e.target.value)}
+                      className="bg-transparent text-xs text-text-primary focus:outline-none px-1 cursor-pointer font-medium text-champagne-gold"
+                    >
+                      <option value="all">Todas</option>
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id} className="bg-onyx text-text-primary">{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2 bg-charcoal border border-aged-bronze/45 rounded p-1">
+                    <span className="text-[10px] text-text-secondary uppercase px-1">Categoría:</span>
+                    <select
+                      value={productFilterCategory}
+                      onChange={(e) => setProductFilterCategory(e.target.value)}
+                      className="bg-transparent text-xs text-text-primary focus:outline-none px-1 cursor-pointer font-medium text-champagne-gold"
+                    >
+                      <option value="all">Todas</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id} className="bg-onyx text-text-primary">{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2 bg-charcoal border border-aged-bronze/45 rounded p-1">
+                    <span className="text-[10px] text-text-secondary uppercase px-1">Búsqueda:</span>
+                    <input
+                      type="text"
+                      value={productSearchQuery}
+                      onChange={(e) => setProductSearchQuery(e.target.value)}
+                      placeholder="Nombre o SKU..."
+                      className="bg-transparent text-xs text-text-primary focus:outline-none px-1 w-32 placeholder-text-secondary/50"
+                    />
+                  </div>
+                </>
+              )}
+            </>
+          ) : activeReportTab === 'stock' ? (
+            <>
+              {/* Location Filter */}
+              <div className="flex items-center gap-2 bg-charcoal border border-aged-bronze/45 rounded p-1">
+                <span className="text-[10px] text-text-secondary uppercase px-1">Ubicación:</span>
+                <select
+                  value={stockFilterLocation}
+                  onChange={(e) => setStockFilterLocation(e.target.value)}
+                  className="bg-transparent text-xs text-text-primary focus:outline-none px-1 cursor-pointer font-medium text-champagne-gold"
+                >
+                  <option value="all">Todos los Puntos</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={`warehouse:${w.id}`} className="bg-onyx text-text-primary">Bodega: {w.name}</option>
+                  ))}
+                  {branches.map((b) => (
+                    <option key={b.id} value={`branch:${b.id}`} className="bg-onyx text-text-primary">Sucursal: {b.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex bg-charcoal border border-aged-bronze/45 rounded p-0.5">
+                {(['active', 'inactive', 'all'] as const).map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setStockFilterStatus(status)}
+                    className={`px-3 py-1.5 rounded text-[10px] uppercase font-semibold tracking-wider transition-all duration-200 cursor-pointer ${
+                      stockFilterStatus === status
+                        ? 'bg-charcoal-surface text-champagne-gold shadow-sm'
+                        : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    {status === 'active' ? 'Activos' : status === 'inactive' ? 'Inactivos' : 'Todos'}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            /* Kardex date filters */
             <div className="flex items-center gap-2 bg-charcoal border border-aged-bronze/45 rounded p-1">
+              <span className="text-[10px] text-text-secondary uppercase px-1">Rango Kardex:</span>
               <input
                 type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                value={auditStartDate}
+                onChange={(e) => setAuditStartDate(e.target.value)}
                 className="bg-transparent text-xs text-text-primary focus:outline-none px-1"
               />
               <span className="text-[10px] text-text-secondary uppercase">a</span>
               <input
                 type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                value={auditEndDate}
+                onChange={(e) => setAuditEndDate(e.target.value)}
                 className="bg-transparent text-xs text-text-primary focus:outline-none px-1"
               />
-              <button
-                onClick={fetchReport}
-                className="bg-charcoal-surface border border-aged-bronze/45 hover:border-champagne-gold hover:text-champagne-gold text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded transition-all"
-              >
-                Filtrar
-              </button>
             </div>
           )}
         </div>
       </div>
 
+      {/* Sub tabs navigation */}
+      <div className="flex border-b border-aged-bronze/25 gap-6 mb-6">
+        <button
+          onClick={() => setActiveReportTab('sales')}
+          className={`pb-3 text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer ${
+            activeReportTab === 'sales'
+              ? 'border-champagne-gold text-champagne-gold font-semibold'
+              : 'border-transparent text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          Reporte de Ventas y Finanzas
+        </button>
+        <button
+          onClick={() => setActiveReportTab('salesByProduct')}
+          className={`pb-3 text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer ${
+            activeReportTab === 'salesByProduct'
+              ? 'border-champagne-gold text-champagne-gold font-semibold'
+              : 'border-transparent text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          Ventas por Producto
+        </button>
+        <button
+          onClick={() => setActiveReportTab('stock')}
+          className={`pb-3 text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer ${
+            activeReportTab === 'stock'
+              ? 'border-champagne-gold text-champagne-gold font-semibold'
+              : 'border-transparent text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          Existencia de Almacén (Inventario)
+        </button>
+        <button
+          onClick={() => setActiveReportTab('kardex')}
+          className={`pb-3 text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer ${
+            activeReportTab === 'kardex'
+              ? 'border-champagne-gold text-champagne-gold font-semibold'
+              : 'border-transparent text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          Auditoría y Kardex Visual
+        </button>
+      </div>
+
       {error && (
         <div className="bg-error-red/20 border border-error-red text-white p-4 rounded-md text-xs mb-6 flex justify-between items-center">
           <span>{error}</span>
-          <button onClick={fetchReport} className="underline font-semibold hover:text-text-secondary">Reintentar</button>
+          <button 
+            onClick={
+              activeReportTab === 'stock'
+                ? fetchStockData
+                : activeReportTab === 'kardex'
+                  ? () => selectedAuditProductId && fetchAuditData(selectedAuditProductId)
+                  : fetchReport
+            } 
+            className="underline font-semibold hover:text-text-secondary cursor-pointer"
+          >
+            Reintentar
+          </button>
         </div>
       )}
 
-      {/* Main Grid View */}
-      <div className="flex-1 overflow-y-auto pr-0 lg:pr-2 flex flex-col gap-6">
-        
-        {/* KPI Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 flex flex-col justify-between shadow-xl">
-            <span className="text-[10px] text-text-secondary uppercase tracking-widest font-semibold">
-              Venta Total Bruta
-            </span>
-            <span className="text-2xl font-light text-champagne-gold mt-2">
-              {formatCurrency(reportData?.totalSales || 0)}
-            </span>
-            <div className="text-[10px] text-text-secondary mt-1 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-success-green inline-block"></span>
-              Ingresos cerrados y facturados en rango
+      {/* Main Grid/List View */}
+      {activeReportTab === 'sales' ? (
+        <div className="flex-1 overflow-y-auto pr-0 lg:pr-2 flex flex-col gap-6">
+          {/* KPI Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 flex flex-col justify-between shadow-xl">
+              <span className="text-[10px] text-text-secondary uppercase tracking-widest font-semibold">
+                Venta Total Bruta
+              </span>
+              <span className="text-2xl font-light text-champagne-gold mt-2">
+                {formatCurrency(reportData?.totalSales || 0)}
+              </span>
+              <div className="text-[10px] text-text-secondary mt-1 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-success-green inline-block"></span>
+                Ingresos cerrados y facturados en rango
+              </div>
+            </div>
+
+            <div className="bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 flex flex-col justify-between shadow-xl">
+              <span className="text-[10px] text-text-secondary uppercase tracking-widest font-semibold">
+                Órdenes Completadas
+              </span>
+              <span className="text-2xl font-light text-text-primary mt-2">
+                {reportData?.totalOrdersCount || 0}
+              </span>
+              <div className="text-[10px] text-text-secondary mt-1 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-champagne-gold inline-block"></span>
+                Transacciones cobradas totales
+              </div>
+            </div>
+
+            <div className="bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 flex flex-col justify-between shadow-xl">
+              <span className="text-[10px] text-text-secondary uppercase tracking-widest font-semibold">
+                Ticket Promedio
+              </span>
+              <span className="text-2xl font-light text-text-primary mt-2">
+                {formatCurrency(reportData?.averageTicket || 0)}
+              </span>
+              <div className="text-[10px] text-text-secondary mt-1 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-success-green inline-block"></span>
+                Consumo promedio por transacción
+              </div>
             </div>
           </div>
 
-          <div className="bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 flex flex-col justify-between shadow-xl">
-            <span className="text-[10px] text-text-secondary uppercase tracking-widest font-semibold">
-              Órdenes Completadas
-            </span>
-            <span className="text-2xl font-light text-text-primary mt-2">
-              {reportData?.totalOrdersCount || 0}
-            </span>
-            <div className="text-[10px] text-text-secondary mt-1 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-champagne-gold inline-block"></span>
-              Transacciones cobradas totales
+          {/* Middle panels: Branch sales and Hourly peaks */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Sales by Branch */}
+            <div className="lg:col-span-7 bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 shadow-xl flex flex-col">
+              <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider mb-4">
+                Ventas por Sucursal
+              </span>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-charcoal-surface border-b border-aged-bronze/20 text-text-secondary uppercase text-[9px] tracking-wider">
+                      <th className="p-3 font-medium">Sucursal</th>
+                      <th className="p-3 font-medium text-center">Pedidos</th>
+                      <th className="p-3 font-medium text-right">Venta Total</th>
+                      <th className="p-3 font-medium">Participación</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-aged-bronze/10">
+                    {reportData?.salesByBranch.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="p-4 text-center text-text-secondary italic">No hay ventas registradas</td>
+                      </tr>
+                    ) : (
+                      reportData?.salesByBranch.map((branch) => {
+                        const share = reportData.totalSales > 0 ? (branch.totalSales / reportData.totalSales) * 100 : 0;
+                        return (
+                          <tr key={branch.id} className="hover:bg-charcoal-surface/10">
+                            <td className="p-3 font-medium text-text-primary">{branch.name}</td>
+                            <td className="p-3 text-center text-text-secondary">{branch.ordersCount}</td>
+                            <td className="p-3 text-right font-medium text-champagne-gold">{formatCurrency(branch.totalSales)}</td>
+                            <td className="p-3 w-40">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-charcoal-surface h-2 rounded-full overflow-hidden">
+                                  <div className="bg-champagne-gold h-full" style={{ width: `${share}%` }}></div>
+                                </div>
+                                <span className="text-[10px] text-text-secondary font-mono w-8 text-right">{share.toFixed(0)}%</span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Hourly Peaks */}
+            <div className="lg:col-span-5 bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 shadow-xl flex flex-col">
+              <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider mb-4">
+                Ventas por Hora (Pico Operativo)
+              </span>
+              <div className="flex-1 flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
+                {reportData?.hourlySales
+                  .filter(h => h.totalSales > 0)
+                  .sort((a, b) => b.totalSales - a.totalSales)
+                  .slice(0, 5)
+                  .map((h, idx) => (
+                    <div key={h.hour} className="flex items-center justify-between p-2 rounded bg-charcoal-surface/30 border border-aged-bronze/10 text-xs">
+                      <span className="text-text-primary font-medium">
+                        {idx + 1}. {h.hour}:00 hrs
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-champagne-gold font-mono">{formatCurrency(h.totalSales)}</span>
+                        <Badge variant="warning">Pico {idx === 0 ? 'Máximo' : ''}</Badge>
+                      </div>
+                    </div>
+                  ))}
+                {(!reportData?.hourlySales.some(h => h.totalSales > 0)) && (
+                  <div className="flex-1 flex items-center justify-center text-text-secondary italic text-xs">
+                    Sin registros suficientes
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 flex flex-col justify-between shadow-xl">
-            <span className="text-[10px] text-text-secondary uppercase tracking-widest font-semibold">
-              Ticket Promedio
-            </span>
-            <span className="text-2xl font-light text-text-primary mt-2">
-              {formatCurrency(reportData?.averageTicket || 0)}
-            </span>
-            <div className="text-[10px] text-text-secondary mt-1 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-success-green inline-block"></span>
-              Consumo promedio por transacción
+          {/* Lower panels: Top products, and Waiters/Cashiers */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+            {/* Top Products */}
+            <div className="lg:col-span-7 bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 shadow-xl flex flex-col">
+              <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider mb-4">
+                Productos Estrella: Volumen y Rentabilidad
+              </span>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-charcoal-surface border-b border-aged-bronze/20 text-text-secondary uppercase text-[9px] tracking-wider">
+                      <th className="p-3 font-medium">Nombre</th>
+                      <th className="p-3 font-medium text-center">Unidades</th>
+                      <th className="p-3 font-medium text-right">Venta Bruta</th>
+                      <th className="p-3 font-medium text-right">Utilidad Neta (Margen)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-aged-bronze/10">
+                    {reportData?.topProducts.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="p-4 text-center text-text-secondary italic">No hay productos vendidos</td>
+                      </tr>
+                    ) : (
+                      reportData?.topProducts.slice(0, 6).map((prod) => (
+                        <tr key={prod.id} className="hover:bg-charcoal-surface/10">
+                          <td className="p-3 font-medium text-text-primary">
+                            {prod.name}
+                            {prod.sku && <span className="block text-[9px] text-text-secondary font-mono">{prod.sku}</span>}
+                          </td>
+                          <td className="p-3 text-center text-text-secondary">{prod.quantitySold}</td>
+                          <td className="p-3 text-right font-medium text-text-primary">{formatCurrency(prod.totalSales)}</td>
+                          <td className="p-3 text-right font-semibold text-champagne-gold">{formatCurrency(prod.profitMargin)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
+
+            {/* Waiters and Cashiers */}
+            <div className="lg:col-span-5 bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 shadow-xl flex flex-col gap-6">
+              {/* Top Waiters */}
+              <div>
+                <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider mb-3 block">
+                  Meseros que más Venden
+                </span>
+                <div className="flex flex-col gap-2 max-h-[120px] overflow-y-auto pr-1">
+                  {reportData?.topWaiters.length === 0 ? (
+                    <span className="text-xs text-text-secondary italic text-center py-2 block">Sin meseros registrados</span>
+                  ) : (
+                    reportData?.topWaiters.slice(0, 3).map((w, idx) => (
+                      <div key={w.id} className="flex items-center justify-between text-xs py-1.5 border-b border-aged-bronze/10">
+                        <span className="text-text-primary font-medium">{idx + 1}. {w.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-text-secondary">{w.ordersCount} ped.</span>
+                          <span className="font-semibold text-champagne-gold font-mono">{formatCurrency(w.totalSales)}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Top Cashiers */}
+              <div>
+                <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider mb-3 block">
+                  Cajeros / Administradores (Operadores)
+                </span>
+                <div className="flex flex-col gap-2 max-h-[120px] overflow-y-auto pr-1">
+                  {reportData?.topCashiers.length === 0 ? (
+                    <span className="text-xs text-text-secondary italic text-center py-2 block">Sin operadores registrados</span>
+                  ) : (
+                    reportData?.topCashiers.slice(0, 3).map((c, idx) => (
+                      <div key={c.id} className="flex items-center justify-between text-xs py-1.5 border-b border-aged-bronze/10">
+                        <span className="text-text-primary font-medium">{idx + 1}. {c.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-text-secondary">{c.ordersCount} ped.</span>
+                          <span className="font-semibold text-champagne-gold font-mono">{formatCurrency(c.totalSales)}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Business Intelligence Advisory Panel */}
+          <div className="bg-charcoal-surface/40 border border-champagne-gold/30 rounded-lg p-5 mb-6 shadow-xl flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-base">💡</span>
+              <h4 className="text-sm font-semibold text-champagne-gold uppercase tracking-wider">
+                Sugerencias de Inteligencia para Maximizar Ganancias
+              </h4>
+            </div>
+            <ul className="list-disc pl-5 text-xs text-text-secondary flex flex-col gap-2.5 leading-relaxed">
+              {topProfitProducts.length > 0 && (
+                <li>
+                  <strong>Foco en Margen Neto</strong>: El producto <span className="text-champagne-gold font-semibold">{topProfitProducts[0].name}</span> genera la mayor utilidad neta (<span className="text-text-primary font-medium font-mono">{formatCurrency(topProfitProducts[0].profitMargin)}</span>) en este período. Promover ventas cruzadas de este artículo incrementará drásticamente la utilidad final.
+                </li>
+              )}
+              {reportData && reportData.averageTicket < 150 && (
+                <li>
+                  <strong>Incrementar Ticket Promedio</strong>: Tu ticket promedio es de <span className="text-text-primary font-medium font-mono">{formatCurrency(reportData.averageTicket)}</span>. Considera crear combos (ej. bebida + alimento) u ofrecer productos adicionales de bajo costo para elevar el consumo medio.
+                </li>
+              )}
+              {reportData?.hourlySales.some(h => h.totalSales > 0) && (
+                <li>
+                  <strong>Eficiencia de Producción</strong>: Revisa tus picos de venta horaria. Pre-elabora o ensambla lotes de productos terminados (recetas) 30 minutos antes de la hora pico más alta para reducir tiempos de espera de los clientes y evitar cuellos de botella en la cocina.
+                </li>
+              )}
+            </ul>
           </div>
         </div>
-
-        {/* Middle panels: Branch sales and Hourly peaks */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* Sales by Branch */}
-          <div className="lg:col-span-7 bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 shadow-xl flex flex-col">
-            <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider mb-4">
-              Ventas por Sucursal
+      ) : activeReportTab === 'salesByProduct' ? (
+        renderSalesByProductTab()
+      ) : activeReportTab === 'stock' ? (
+        /* Stock Existence Report Tab */
+        <div className="flex-1 overflow-hidden flex flex-col gap-4">
+          <div className="bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 shadow-xl flex-1 flex flex-col min-h-0">
+            <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider mb-4 flex justify-between items-center">
+              <span>Listado de Existencias en Almacén</span>
+              <span className="text-xs font-normal text-text-secondary lowercase font-sans">
+                Mostrando {filteredStockLevels.length} registros
+              </span>
             </span>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+            
+            <div className="flex-1 overflow-y-auto pr-1">
+              <table className="w-full text-left border-collapse text-xs select-text font-sans">
                 <thead>
-                  <tr className="bg-charcoal-surface border-b border-aged-bronze/20 text-text-secondary uppercase text-[9px] tracking-wider">
-                    <th className="p-3 font-medium">Sucursal</th>
-                    <th className="p-3 font-medium text-center">Pedidos</th>
-                    <th className="p-3 font-medium text-right">Venta Total</th>
-                    <th className="p-3 font-medium">Participación</th>
+                  <tr className="bg-charcoal-surface border-b border-aged-bronze/20 text-text-secondary uppercase text-[9px] tracking-wider sticky top-0 z-10">
+                    <th className="p-3 font-medium">Producto</th>
+                    <th className="p-3 font-medium">Categoría</th>
+                    <th className="p-3 font-medium">Ubicación</th>
+                    <th className="p-3 font-medium">Tipo</th>
+                    <th className="p-3 font-medium text-right">Existencia</th>
+                    <th className="p-3 font-medium text-center">Estado</th>
+                    <th className="p-3 font-medium text-right">Último Movimiento</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-aged-bronze/10">
-                  {reportData?.salesByBranch.length === 0 ? (
+                  {filteredStockLevels.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="p-4 text-center text-text-secondary italic">No hay ventas registradas</td>
+                      <td colSpan={7} className="p-8 text-center text-text-secondary italic">
+                        No se encontraron existencias en el inventario con los filtros seleccionados.
+                      </td>
                     </tr>
                   ) : (
-                    reportData?.salesByBranch.map((branch) => {
-                      const share = reportData.totalSales > 0 ? (branch.totalSales / reportData.totalSales) * 100 : 0;
+                    filteredStockLevels.map((level) => {
+                      const product = products.find(p => p.id === level.productId);
+                      const catName = product ? (categories.find(c => c.id === product.categoryId)?.name || 'Sin Categoría') : 'Cargando...';
+                      
+                      // Location Name resolution
+                      let locationName = '-';
+                      if (level.warehouseId) {
+                        locationName = `Bodega: ${warehouses.find(w => w.id === level.warehouseId)?.name || 'Central'}`;
+                      } else if (level.branchId) {
+                        locationName = `Sucursal: ${branches.find(b => b.id === level.branchId)?.name || 'Punto de Venta'}`;
+                      }
+
+                      // Check for low stock warning
+                      const qty = parseFloat(level.quantity);
+                      const minStock = product ? parseFloat(product.minStock || '0') : 0;
+                      const isLowStock = product && minStock > 0 && qty < minStock;
+
                       return (
-                        <tr key={branch.id} className="hover:bg-charcoal-surface/10">
-                          <td className="p-3 font-medium text-text-primary">{branch.name}</td>
-                          <td className="p-3 text-center text-text-secondary">{branch.ordersCount}</td>
-                          <td className="p-3 text-right font-medium text-champagne-gold">{formatCurrency(branch.totalSales)}</td>
-                          <td className="p-3 w-40">
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 bg-charcoal-surface h-2 rounded-full overflow-hidden">
-                                <div className="bg-champagne-gold h-full" style={{ width: `${share}%` }}></div>
-                              </div>
-                              <span className="text-[10px] text-text-secondary font-mono w-8 text-right">{share.toFixed(0)}%</span>
-                            </div>
+                        <tr key={level.id} className="hover:bg-charcoal-surface/10">
+                          <td className="p-3 font-medium text-text-primary">{level.productName}</td>
+                          <td className="p-3 text-text-secondary">
+                            <Badge variant="charcoal">{catName}</Badge>
+                          </td>
+                          <td className="p-3 text-text-secondary">{locationName}</td>
+                          <td className="p-3">
+                            {level.isIngredient ? (
+                              <Badge variant="warning">Insumo</Badge>
+                            ) : (
+                              <Badge variant="success">Venta</Badge>
+                            )}
+                          </td>
+                          <td className="p-3 text-right font-mono font-medium">
+                            <span className={isLowStock ? 'text-error-red font-bold animate-pulse' : 'text-text-primary'}>
+                              {qty.toFixed(level.isIngredient ? 3 : 0)}
+                            </span>
+                            {isLowStock && (
+                              <span className="text-[9px] text-error-red block font-sans font-normal">
+                                mín: {minStock}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            {level.isActive === false ? (
+                              <Badge variant="error" className="bg-red-500/10 text-error-red border border-error-red/20">Deprecado</Badge>
+                            ) : (
+                              <Badge variant="success">Activo</Badge>
+                            )}
+                          </td>
+                          <td className="p-3 text-right text-text-secondary font-mono">
+                            {level.updatedAt ? new Date(level.updatedAt).toLocaleString() : '-'}
                           </td>
                         </tr>
                       );
@@ -247,154 +1020,218 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
               </table>
             </div>
           </div>
+        </div>
+      ) : (
+        /* Kardex & Auditoria Tab */
+        <div className="flex-1 overflow-hidden flex flex-col gap-4">
+          <div className="bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 shadow-xl flex-1 flex flex-col min-h-0">
+            <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center mb-4 border-b border-aged-bronze/10 pb-4">
+              <div className="flex flex-col gap-1 w-full md:w-96 select-text">
+                <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider">
+                  Seleccione Producto / Insumo para Auditar
+                </span>
+                <Autocomplete
+                  options={products.map((p) => ({
+                    id: p.id,
+                    label: p.name,
+                    sublabel: `${p.internalCode ? `Código: ${p.internalCode}` : p.sku ? `SKU: ${p.sku}` : ''} - Costo: $${p.cost || '0.00'}`,
+                  }))}
+                  value={selectedAuditProductId}
+                  onChange={setSelectedAuditProductId}
+                  placeholder="Buscar producto o insumo..."
+                />
+              </div>
 
-          {/* Hourly Peaks */}
-          <div className="lg:col-span-5 bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 shadow-xl flex flex-col">
-            <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider mb-4">
-              Ventas por Hora (Pico Operativo)
-            </span>
-            <div className="flex-1 flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
-              {reportData?.hourlySales
-                .filter(h => h.totalSales > 0)
-                .sort((a, b) => b.totalSales - a.totalSales)
-                .slice(0, 5)
-                .map((h, idx) => (
-                  <div key={h.hour} className="flex items-center justify-between p-2 rounded bg-charcoal-surface/30 border border-aged-bronze/10 text-xs">
-                    <span className="text-text-primary font-medium">
-                      {idx + 1}. {h.hour}:00 hrs
-                    </span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-champagne-gold font-mono">{formatCurrency(h.totalSales)}</span>
-                      <Badge variant="warning">Pico {idx === 0 ? 'Máximo' : ''}</Badge>
-                    </div>
-                  </div>
-                ))}
-              {(!reportData?.hourlySales.some(h => h.totalSales > 0)) && (
-                <div className="flex-1 flex items-center justify-center text-text-secondary italic text-xs">
-                  Sin registros suficientes
+              {selectedAuditProduct && (
+                <div className="flex flex-wrap gap-2 text-xs select-none">
+                  <Badge variant="charcoal">
+                    Categoría: {categories.find(c => c.id === selectedAuditProduct.categoryId)?.name || 'Sin Categoría'}
+                  </Badge>
+                  {selectedAuditProduct.isIngredient ? (
+                    <Badge variant="warning">Insumo</Badge>
+                  ) : (
+                    <Badge variant="success">Venta</Badge>
+                  )}
                 </div>
               )}
             </div>
-          </div>
-        </div>
 
-        {/* Lower panels: Top products, and Waiters/Cashiers */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
-          
-          {/* Top Products */}
-          <div className="lg:col-span-7 bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 shadow-xl flex flex-col">
-            <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider mb-4">
-              Productos Estrella: Volumen y Rentabilidad
-            </span>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-charcoal-surface border-b border-aged-bronze/20 text-text-secondary uppercase text-[9px] tracking-wider">
-                    <th className="p-3 font-medium">Nombre</th>
-                    <th className="p-3 font-medium text-center">Unidades</th>
-                    <th className="p-3 font-medium text-right">Venta Bruta</th>
-                    <th className="p-3 font-medium text-right">Utilidad Neta (Margen)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-aged-bronze/10">
-                  {reportData?.topProducts.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="p-4 text-center text-text-secondary italic">No hay productos vendidos</td>
-                    </tr>
-                  ) : (
-                    reportData?.topProducts.slice(0, 6).map((prod) => (
-                      <tr key={prod.id} className="hover:bg-charcoal-surface/10">
-                        <td className="p-3 font-medium text-text-primary">
-                          {prod.name}
-                          {prod.sku && <span className="block text-[9px] text-text-secondary font-mono">{prod.sku}</span>}
-                        </td>
-                        <td className="p-3 text-center text-text-secondary">{prod.quantitySold}</td>
-                        <td className="p-3 text-right font-medium text-text-primary">{formatCurrency(prod.totalSales)}</td>
-                        <td className="p-3 text-right font-semibold text-champagne-gold">{formatCurrency(prod.profitMargin)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Waiters and Cashiers */}
-          <div className="lg:col-span-5 bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 shadow-xl flex flex-col gap-6">
-            
-            {/* Top Waiters */}
-            <div>
-              <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider mb-3 block">
-                Meseros que más Venden
-              </span>
-              <div className="flex flex-col gap-2 max-h-[120px] overflow-y-auto pr-1">
-                {reportData?.topWaiters.length === 0 ? (
-                  <span className="text-xs text-text-secondary italic text-center py-2 block">Sin meseros registrados</span>
-                ) : (
-                  reportData?.topWaiters.slice(0, 3).map((w, idx) => (
-                    <div key={w.id} className="flex items-center justify-between text-xs py-1.5 border-b border-aged-bronze/10">
-                      <span className="text-text-primary font-medium">{idx + 1}. {w.name}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-text-secondary">{w.ordersCount} ped.</span>
-                        <span className="font-semibold text-champagne-gold font-mono">{formatCurrency(w.totalSales)}</span>
-                      </div>
-                    </div>
-                  ))
-                )}
+            {/* If loading or no product selected */}
+            {isAuditLoading ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3">
+                <svg className="animate-spin h-8 w-8 text-champagne-gold" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="text-xs text-text-secondary">Generando reporte de auditoría y movimientos...</span>
               </div>
-            </div>
-
-            {/* Top Cashiers */}
-            <div>
-              <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider mb-3 block">
-                Cajeros / Administradores (Operadores)
-              </span>
-              <div className="flex flex-col gap-2 max-h-[120px] overflow-y-auto pr-1">
-                {reportData?.topCashiers.length === 0 ? (
-                  <span className="text-xs text-text-secondary italic text-center py-2 block">Sin operadores registrados</span>
-                ) : (
-                  reportData?.topCashiers.slice(0, 3).map((c, idx) => (
-                    <div key={c.id} className="flex items-center justify-between text-xs py-1.5 border-b border-aged-bronze/10">
-                      <span className="text-text-primary font-medium">{idx + 1}. {c.name}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-text-secondary">{c.ordersCount} ped.</span>
-                        <span className="font-semibold text-champagne-gold font-mono">{formatCurrency(c.totalSales)}</span>
-                      </div>
-                    </div>
-                  ))
-                )}
+            ) : !selectedAuditProductId ? (
+              <div className="flex-1 flex items-center justify-center text-text-secondary italic text-xs">
+                Seleccione un producto para ver el desglose por sucursales y Kardex
               </div>
-            </div>
-          </div>
-        </div>
+            ) : (
+              <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-1 min-h-0 select-text">
+                {/* 1. Consistency / Integrity Section */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-charcoal-surface/30 border border-aged-bronze/10 rounded-lg flex flex-col gap-1">
+                    <span className="text-[10px] text-text-secondary uppercase">Stock Consolidado (Catálogo)</span>
+                    <span className="text-xl font-bold font-mono text-champagne-gold">
+                      {catalogStock.toFixed(selectedAuditProduct?.isIngredient ? 3 : 0)}
+                    </span>
+                  </div>
 
-        {/* Business Intelligence Advisory Panel */}
-        <div className="bg-charcoal-surface/40 border border-champagne-gold/30 rounded-lg p-5 mb-6 shadow-xl flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-base">💡</span>
-            <h4 className="text-sm font-semibold text-champagne-gold uppercase tracking-wider">
-              Sugerencias de Inteligencia para Maximizar Ganancias
-            </h4>
+                  <div className="p-4 bg-charcoal-surface/30 border border-aged-bronze/10 rounded-lg flex flex-col gap-1">
+                    <span className="text-[10px] text-text-secondary uppercase">Suma de Existencias Física</span>
+                    <span className="text-xl font-bold font-mono text-text-primary">
+                      {sumOfLocations.toFixed(selectedAuditProduct?.isIngredient ? 3 : 0)}
+                    </span>
+                  </div>
+
+                  <div className={`p-4 border rounded-lg flex flex-col justify-center gap-1 ${
+                    isConsistent
+                      ? 'border-success-green/20 bg-success-green/5 text-success-green'
+                      : 'border-warning-yellow/20 bg-warning-yellow/5 text-warning-yellow'
+                  }`}>
+                    <span className="text-[10px] uppercase opacity-75">Estado de Integridad</span>
+                    <span className="text-sm font-bold flex items-center gap-1.5">
+                      {isConsistent ? (
+                        <>✓ Existencias Cuadradas</>
+                      ) : (
+                        <>⚠ Discrepancia Detectada</>
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Branch breakdown visual display */}
+                <div className="flex flex-col gap-3">
+                  <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider">
+                    Desglose de existencias por Ubicación (Sucursales y Bodegas)
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {auditLocations.length === 0 ? (
+                      <span className="text-xs text-text-secondary italic">No se encontraron existencias físicas registradas para este producto.</span>
+                    ) : (
+                      auditLocations.map((loc, i) => {
+                        const maxVal = sumOfLocations > 0 ? sumOfLocations : 1;
+                        const pct = Math.min(100, Math.max(0, (loc.quantity / maxVal) * 100));
+                        return (
+                          <div key={i} className="p-3 bg-charcoal-surface border border-aged-bronze/15 rounded flex flex-col gap-2 shadow">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-text-primary font-medium">{loc.warehouseName || loc.branchName || 'Ubicación'}</span>
+                              <span className="font-bold font-mono text-champagne-gold">
+                                {loc.quantity.toFixed(selectedAuditProduct?.isIngredient ? 3 : 0)}
+                              </span>
+                            </div>
+                            <div className="w-full bg-onyx-surface rounded-full h-1.5 overflow-hidden">
+                              <div 
+                                className="bg-champagne-gold h-full rounded-full transition-all duration-500" 
+                                style={{ width: `${pct}%` }} 
+                              />
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Movements Ledger (Kardex) */}
+                <div className="flex flex-col gap-3 flex-1 min-h-[300px]">
+                  <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider">
+                    Libro Diario de Movimientos (Kardex Histórico)
+                  </span>
+                  <div className="overflow-x-auto border border-aged-bronze/10 rounded flex-1">
+                    <table className="w-full text-left border-collapse text-xs select-text">
+                      <thead>
+                        <tr className="border-b border-aged-bronze/20 bg-charcoal-surface text-[10px] font-semibold text-text-secondary uppercase sticky top-0 z-10">
+                          <th className="py-2.5 px-3">Fecha y Hora</th>
+                          <th className="py-2.5 px-3">Ubicación</th>
+                          <th className="py-2.5 px-3">Tipo Movimiento</th>
+                          <th className="py-2.5 px-3 text-right">Variación</th>
+                          <th className="py-2.5 px-3 text-right">Saldo Ant.</th>
+                          <th className="py-2.5 px-3 text-right">Saldo Post.</th>
+                          <th className="py-2.5 px-3">Usuario</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-aged-bronze/5 text-[11px] font-sans">
+                        {auditMovements.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="py-8 text-center text-text-secondary italic">
+                              No hay movimientos históricos registrados en el Kardex para el rango de fechas seleccionado.
+                            </td>
+                          </tr>
+                        ) : (
+                          auditMovements.map((m) => {
+                            const isPositive = m.quantity > 0;
+                            const isInternal = m.type === 'transfer_out' || m.type === 'transfer_in';
+                            
+                            let typeLabel = m.type;
+                            if (m.type === 'receipt') typeLabel = 'Compra Prov';
+                            else if (m.type === 'sale') typeLabel = 'Venta POS';
+                            else if (m.type === 'production_input') typeLabel = 'Consumo Ensamble';
+                            else if (m.type === 'production_output') typeLabel = 'Entrada Ensamble';
+                            else if (m.type === 'transfer_out') typeLabel = 'Traspaso Env';
+                            else if (m.type === 'transfer_in') typeLabel = 'Traspaso Rec';
+                            else if (m.type === 'adjustment') typeLabel = 'Ajuste Manual';
+                            else if (m.type === 'initial') typeLabel = 'Inventario Inicial';
+
+                            return (
+                              <tr key={m.id} className="hover:bg-charcoal-surface/10 transition-colors">
+                                <td className="py-2 px-3 font-mono text-text-secondary whitespace-nowrap">
+                                  {new Date(m.createdAt).toLocaleString('es-MX', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </td>
+                                <td className="py-2 px-3 text-text-primary whitespace-nowrap">
+                                  {m.warehouseName || m.branchName || 'N/A'}
+                                </td>
+                                <td className="py-2 px-3 font-medium">
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider ${
+                                    isInternal 
+                                      ? 'bg-warning-yellow/10 text-warning-yellow border border-warning-yellow/20'
+                                      : isPositive 
+                                        ? 'bg-success-green/10 text-success-green border border-success-green/20'
+                                        : 'bg-error-red/10 text-error-red border border-error-red/20'
+                                  }`}>
+                                    {typeLabel}
+                                  </span>
+                                </td>
+                                <td className={`py-2 px-3 text-right font-mono font-bold ${
+                                  isInternal 
+                                    ? 'text-warning-yellow' 
+                                    : isPositive 
+                                      ? 'text-success-green' 
+                                      : 'text-error-red'
+                                }`}>
+                                  {isPositive ? '+' : ''}{m.quantity.toFixed(selectedAuditProduct?.isIngredient ? 3 : 0)}
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono text-text-secondary">
+                                  {m.previousBalance.toFixed(selectedAuditProduct?.isIngredient ? 3 : 0)}
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono font-semibold text-text-primary">
+                                  {m.finalBalance.toFixed(selectedAuditProduct?.isIngredient ? 3 : 0)}
+                                </td>
+                                <td className="py-2 px-3 text-text-secondary truncate max-w-[120px]" title={m.createdByName}>
+                                  {m.createdByName || 'Sistema'}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <ul className="list-disc pl-5 text-xs text-text-secondary flex flex-col gap-2.5 leading-relaxed">
-            {topProfitProducts.length > 0 && (
-              <li>
-                <strong>Foco en Margen Neto</strong>: El producto <span className="text-champagne-gold font-semibold">{topProfitProducts[0].name}</span> genera la mayor utilidad neta (<span className="text-text-primary font-medium font-mono">{formatCurrency(topProfitProducts[0].profitMargin)}</span>) en este período. Promover ventas cruzadas de este artículo incrementará drásticamente la utilidad final.
-              </li>
-            )}
-            {reportData && reportData.averageTicket < 150 && (
-              <li>
-                <strong>Incrementar Ticket Promedio</strong>: Tu ticket promedio es de <span className="text-text-primary font-medium font-mono">{formatCurrency(reportData.averageTicket)}</span>. Considera crear combos (ej. bebida + alimento) u ofrecer productos adicionales de bajo costo para elevar el consumo medio.
-              </li>
-            )}
-            {reportData?.hourlySales.some(h => h.totalSales > 0) && (
-              <li>
-                <strong>Eficiencia de Producción</strong>: Revisa tus picos de venta horaria. Pre-elabora o ensambla lotes de productos terminados (recetas) 30 minutos antes de la hora pico más alta para reducir tiempos de espera de los clientes y evitar cuellos de botella en la cocina.
-              </li>
-            )}
-          </ul>
         </div>
-      </div>
+      )}
     </div>
   );
 };
