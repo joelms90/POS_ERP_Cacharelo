@@ -300,6 +300,9 @@ async function apiRequest<T>(
   
   const headers = new Headers(options.headers || {});
   headers.set('Content-Type', 'application/json');
+  headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  headers.set('Pragma', 'no-cache');
+  headers.set('Expires', '0');
   if (accessToken) {
     if (isJwtExpired(accessToken)) {
       expireAuthSession();
@@ -313,6 +316,7 @@ async function apiRequest<T>(
   const response = await fetch(`${baseUrl}${endpoint}`, {
     ...options,
     headers,
+    cache: 'no-store',
   });
 
   if (!response.ok) {
