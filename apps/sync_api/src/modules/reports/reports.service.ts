@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../database/schema';
-import { eq, and, isNull, gte, lte, inArray } from 'drizzle-orm';
+import { eq, and, isNull, gte, lte, inArray, desc } from 'drizzle-orm';
 
 export type ReconciliationExceptionType =
   | 'zero_total_with_items'
@@ -454,6 +454,221 @@ export class ReportsService {
         };
       })
       .sort((a, b) => b.quantitySold - a.quantitySold);
+  }
+
+  async getPaymentMethodsSalesReport(query: {
+    businessId: string;
+    startDate?: string;
+    endDate?: string;
+    branchId?: string;
+  }) {
+    const { businessId, startDate, endDate, branchId } = query;
+
+    const start = startDate ? new Date(startDate + 'T00:00:00') : null;
+    const end = endDate ? new Date(endDate + 'T23:59:59') : null;
+
+    const paymentsList = await this.db
+      .select({
+        paymentMethod: schema.payments.paymentMethod,
+        amount: schema.payments.amount,
+      })
+      .from(schema.payments)
+      .innerJoin(schema.orders, eq(schema.payments.orderId, schema.orders.id))
+      .innerJoin(schema.branches, eq(schema.orders.branchId, schema.branches.id))
+      .where(
+        and(
+          eq(schema.branches.businessId, businessId),
+          eq(schema.orders.state, 'closed'),
+          isNull(schema.orders.deletedAt),
+          start ? gte(schema.payments.createdAt, start) : undefined,
+          end ? lte(schema.payments.createdAt, end) : undefined,
+          branchId ? eq(schema.orders.branchId, branchId) : undefined,
+        ),
+      );
+
+    const methodsMap = new Map<string, {
+      paymentMethod: string;
+      totalAmount: number;
+      paymentsCount: number;
+    }>();
+
+    let totalSum = 0;
+
+    paymentsList.forEach((item) => {
+      const method = item.paymentMethod || 'Otros';
+      const amountVal = this.parseMoney(item.amount);
+      totalSum += amountVal;
+
+      const existing = methodsMap.get(method);
+      if (existing) {
+        existing.totalAmount += amountVal;
+        existing.paymentsCount += 1;
+      } else {
+        methodsMap.set(method, {
+          paymentMethod: method,
+          totalAmount: amountVal,
+          paymentsCount: 1,
+        });
+      }
+    });
+
+    return Array.from(methodsMap.values()).map((row) => {
+      const totalAmountRounded = this.roundMoney(row.totalAmount);
+      const sharePercent = totalSum > 0 ? this.roundMoney((row.totalAmount / totalSum) * 100) : 0;
+      return {
+        paymentMethod: row.paymentMethod,
+        totalAmount: totalAmountRounded,
+        paymentsCount: row.paymentsCount,
+        sharePercent,
+      };
+    }).sort((a, b) => b.totalAmount - a.totalAmount);
+  }
+
+  async getCashShiftsList(query: {
+    businessId: string;
+    startDate?: string;
+    endDate?: string;
+    branchId?: string;
+  }) {
+    const { businessId, startDate, endDate, branchId } = query;
+
+    const start = startDate ? new Date(startDate + 'T00:00:00') : null;
+    const end = endDate ? new Date(endDate + 'T23:59:59') : null;
+
+    return await this.db
+      .select({
+        id: schema.cashShifts.id,
+        cashierName: schema.users.name,
+        branchName: schema.branches.name,
+        initialFloat: schema.cashShifts.initialFloat,
+        cashDrawerAmount: schema.cashShifts.cashDrawerAmount,
+        status: schema.cashShifts.status,
+        openedAt: schema.cashShifts.openedAt,
+        closedAt: schema.cashShifts.closedAt,
+      })
+      .from(schema.cashShifts)
+      .innerJoin(schema.users, eq(schema.cashShifts.cashierId, schema.users.id))
+      .innerJoin(schema.branches, eq(schema.cashShifts.branchId, schema.branches.id))
+      .where(
+        and(
+          eq(schema.branches.businessId, businessId),
+          start ? gte(schema.cashShifts.openedAt, start) : undefined,
+          end ? lte(schema.cashShifts.openedAt, end) : undefined,
+          branchId ? eq(schema.cashShifts.branchId, branchId) : undefined,
+        ),
+      )
+      .orderBy(desc(schema.cashShifts.openedAt));
+  }
+
+  async getCashShiftAuditReport(shiftId: string) {
+    const shiftList = await this.db
+      .select({
+        id: schema.cashShifts.id,
+        cashierName: schema.users.name,
+        branchId: schema.cashShifts.branchId,
+        branchName: schema.branches.name,
+        initialFloat: schema.cashShifts.initialFloat,
+        cashDrawerAmount: schema.cashShifts.cashDrawerAmount,
+        status: schema.cashShifts.status,
+        openedAt: schema.cashShifts.openedAt,
+        closedAt: schema.cashShifts.closedAt,
+      })
+      .from(schema.cashShifts)
+      .innerJoin(schema.users, eq(schema.cashShifts.cashierId, schema.users.id))
+      .innerJoin(schema.branches, eq(schema.cashShifts.branchId, schema.branches.id))
+      .where(eq(schema.cashShifts.id, shiftId));
+
+    if (shiftList.length === 0) {
+      throw new Error('Shift not found');
+    }
+
+    const shift = shiftList[0];
+    const openedAt = new Date(shift.openedAt);
+    const closedAt = shift.closedAt ? new Date(shift.closedAt) : new Date();
+
+    const transactionsList = await this.db
+      .select({
+        id: schema.cashTransactions.id,
+        type: schema.cashTransactions.type,
+        amount: schema.cashTransactions.amount,
+        reason: schema.cashTransactions.reason,
+        createdAt: schema.cashTransactions.createdAt,
+      })
+      .from(schema.cashTransactions)
+      .where(eq(schema.cashTransactions.shiftId, shiftId))
+      .orderBy(schema.cashTransactions.createdAt);
+
+    let totalCashIn = 0;
+    let totalCashOut = 0;
+    transactionsList.forEach((t) => {
+      const amt = this.parseMoney(t.amount);
+      if (t.type === 'cash-in') {
+        totalCashIn += amt;
+      } else if (t.type === 'cash-out') {
+        totalCashOut += amt;
+      }
+    });
+
+    const paymentsList = await this.db
+      .select({
+        paymentMethod: schema.payments.paymentMethod,
+        amount: schema.payments.amount,
+      })
+      .from(schema.payments)
+      .innerJoin(schema.orders, eq(schema.payments.orderId, schema.orders.id))
+      .where(
+        and(
+          eq(schema.orders.branchId, shift.branchId),
+          eq(schema.orders.state, 'closed'),
+          isNull(schema.orders.deletedAt),
+          gte(schema.payments.createdAt, openedAt),
+          lte(schema.payments.createdAt, closedAt),
+        ),
+      );
+
+    let cashSales = 0;
+    let cardSales = 0;
+    paymentsList.forEach((p) => {
+      const amt = this.parseMoney(p.amount);
+      if (p.paymentMethod === 'cash') {
+        cashSales += amt;
+      } else if (p.paymentMethod === 'card') {
+        cardSales += amt;
+      }
+    });
+
+    const initialFloatVal = this.parseMoney(shift.initialFloat);
+    const countedCashVal = this.parseMoney(shift.cashDrawerAmount);
+    const expectedCash = initialFloatVal + cashSales + totalCashIn - totalCashOut;
+    const discrepancy = countedCashVal - expectedCash;
+
+    return {
+      shiftInfo: {
+        id: shift.id,
+        cashierName: shift.cashierName,
+        branchId: shift.branchId,
+        branchName: shift.branchName,
+        status: shift.status,
+        openedAt: shift.openedAt,
+        closedAt: shift.closedAt,
+        initialFloat: initialFloatVal,
+        cashDrawerAmount: countedCashVal,
+      },
+      salesSummary: {
+        cashSales: this.roundMoney(cashSales),
+        cardSales: this.roundMoney(cardSales),
+        totalSales: this.roundMoney(cashSales + cardSales),
+      },
+      transactions: transactionsList.map((t) => ({
+        id: t.id,
+        type: t.type,
+        amount: this.parseMoney(t.amount),
+        reason: t.reason,
+        createdAt: t.createdAt,
+      })),
+      expectedCash: this.roundMoney(expectedCash),
+      discrepancy: shift.status === 'closed' ? this.roundMoney(discrepancy) : 0,
+    };
   }
 
   private buildReconciliationExceptions(

@@ -1111,6 +1111,36 @@ export const api = {
     if (params.endDate) url += `&endDate=${params.endDate}`;
     return apiRequest<any[]>(url);
   },
+
+  async getPaymentMethodsSalesReport(params: {
+    businessId: string;
+    startDate?: string;
+    endDate?: string;
+    branchId?: string;
+  }): Promise<PaymentMethodSalesReportLine[]> {
+    let url = `/reports/sales/payment-methods?businessId=${params.businessId}`;
+    if (params.startDate) url += `&startDate=${params.startDate}`;
+    if (params.endDate) url += `&endDate=${params.endDate}`;
+    if (params.branchId) url += `&branchId=${params.branchId}`;
+    return apiRequest<PaymentMethodSalesReportLine[]>(url);
+  },
+
+  async getCashShiftsList(params: {
+    businessId: string;
+    startDate?: string;
+    endDate?: string;
+    branchId?: string;
+  }): Promise<CashShiftHeader[]> {
+    let url = `/reports/cash-shifts?businessId=${params.businessId}`;
+    if (params.startDate) url += `&startDate=${params.startDate}`;
+    if (params.endDate) url += `&endDate=${params.endDate}`;
+    if (params.branchId) url += `&branchId=${params.branchId}`;
+    return apiRequest<CashShiftHeader[]>(url);
+  },
+
+  async getCashShiftAuditReport(id: string): Promise<CashShiftAuditReport> {
+    return apiRequest<CashShiftAuditReport>(`/reports/cash-shifts/${id}/audit`);
+  },
 };
 
 export interface ProductSalesReportLine {
@@ -1165,4 +1195,50 @@ export interface SupplierProduct {
   conversionFactor: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface PaymentMethodSalesReportLine {
+  paymentMethod: string;
+  totalAmount: number;
+  paymentsCount: number;
+  sharePercent: number;
+}
+
+export interface CashShiftHeader {
+  id: string;
+  cashierName: string;
+  branchName: string;
+  initialFloat: number | string;
+  cashDrawerAmount: number | string;
+  status: 'open' | 'closed';
+  openedAt: string;
+  closedAt: string | null;
+}
+
+export interface CashShiftAuditReport {
+  shiftInfo: {
+    id: string;
+    cashierName: string;
+    branchId: string;
+    branchName: string;
+    status: 'open' | 'closed';
+    openedAt: string;
+    closedAt: string | null;
+    initialFloat: number;
+    cashDrawerAmount: number;
+  };
+  salesSummary: {
+    cashSales: number;
+    cardSales: number;
+    totalSales: number;
+  };
+  transactions: Array<{
+    id: string;
+    type: 'cash-in' | 'cash-out';
+    amount: number;
+    reason: string;
+    createdAt: string;
+  }>;
+  expectedCash: number;
+  discrepancy: number;
 }

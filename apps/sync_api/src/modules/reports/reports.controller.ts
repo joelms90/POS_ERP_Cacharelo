@@ -1,4 +1,4 @@
-import { Controller, Get, Query, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Query, BadRequestException, Param } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 
 @Controller('reports')
@@ -86,5 +86,48 @@ export class ReportsController {
       startDate,
       endDate,
     });
+  }
+
+  @Get('sales/payment-methods')
+  async getPaymentMethodsSalesReport(
+    @Query('businessId') businessId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    if (!businessId) {
+      throw new BadRequestException('El parámetro businessId es obligatorio.');
+    }
+    return this.reportsService.getPaymentMethodsSalesReport({
+      businessId,
+      startDate,
+      endDate,
+      branchId,
+    });
+  }
+
+  @Get('cash-shifts')
+  async getCashShiftsList(
+    @Query('businessId') businessId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    if (!businessId) {
+      throw new BadRequestException('El parámetro businessId es obligatorio.');
+    }
+    return this.reportsService.getCashShiftsList({
+      businessId,
+      startDate,
+      endDate,
+      branchId,
+    });
+  }
+
+  @Get('cash-shifts/:id/audit')
+  async getCashShiftAuditReport(
+    @Param('id') id: string,
+  ) {
+    return this.reportsService.getCashShiftAuditReport(id);
   }
 }

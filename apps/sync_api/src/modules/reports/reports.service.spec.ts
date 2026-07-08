@@ -202,4 +202,43 @@ describe('ReportsService', () => {
     expect(cafe.netSales).toBe(116.38);
     expect(cafe.taxAmount).toBe(18.62);
   });
+
+  it('calculates payment methods report totals and shares correctly', async () => {
+    const payments = [
+      {
+        paymentMethod: 'cash',
+        amount: '150.00',
+      },
+      {
+        paymentMethod: 'card',
+        amount: '350.00',
+      },
+      {
+        paymentMethod: 'cash',
+        amount: '100.00',
+      },
+    ];
+
+    mockDb.select.mockReturnValueOnce(makeQuery(payments));
+
+    const result = await service.getPaymentMethodsSalesReport({
+      businessId: 'business-1',
+      startDate: '2026-07-01',
+      endDate: '2026-07-02',
+    });
+
+    expect(result.length).toBe(2);
+    
+    const card = result.find(r => r.paymentMethod === 'card');
+    expect(card).toBeDefined();
+    expect(card.totalAmount).toBe(350.00);
+    expect(card.paymentsCount).toBe(1);
+    expect(card.sharePercent).toBe(58.33);
+
+    const cash = result.find(r => r.paymentMethod === 'cash');
+    expect(cash).toBeDefined();
+    expect(cash.totalAmount).toBe(250.00);
+    expect(cash.paymentsCount).toBe(2);
+    expect(cash.sharePercent).toBe(41.67);
+  });
 });

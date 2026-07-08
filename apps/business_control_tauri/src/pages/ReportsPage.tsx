@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api, SalesDashboardReport, ProductSalesReportLine } from '../services/api';
+import { api, SalesDashboardReport, ProductSalesReportLine, PaymentMethodSalesReportLine, CashShiftHeader, CashShiftAuditReport } from '../services/api';
 import { Heading } from '../components/atoms/Heading';
 import { Badge } from '../components/atoms/Badge';
 import { Autocomplete } from '../components/molecules/Autocomplete';
@@ -16,7 +16,20 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
   const [error, setError] = useState<string | null>(null);
   
   // Tab selection for reports
-  const [activeReportTab, setActiveReportTab] = useState<'sales' | 'salesByProduct' | 'stock' | 'kardex'>('sales');
+  const [activeReportTab, setActiveReportTab] = useState<'sales' | 'salesByProduct' | 'salesByPaymentMethod' | 'cashShifts' | 'stock' | 'kardex'>('sales');
+
+  // Payment Method report states
+  const [paymentMethodSales, setPaymentMethodSales] = useState<PaymentMethodSalesReportLine[]>([]);
+  const [isPaymentMethodSalesLoading, setIsPaymentMethodSalesLoading] = useState<boolean>(false);
+  const [paymentMethodFilterBranch, setPaymentMethodFilterBranch] = useState<string>('all');
+
+  // Cash Shifts states
+  const [cashShifts, setCashShifts] = useState<CashShiftHeader[]>([]);
+  const [isCashShiftsLoading, setIsCashShiftsLoading] = useState<boolean>(false);
+  const [cashShiftsFilterBranch, setCashShiftsFilterBranch] = useState<string>('all');
+  const [selectedShiftId, setSelectedShiftId] = useState<string>('');
+  const [selectedShiftAudit, setSelectedShiftAudit] = useState<CashShiftAuditReport | null>(null);
+  const [isShiftAuditLoading, setIsShiftAuditLoading] = useState<boolean>(false);
 
   // Product sales report states
   const [productSales, setProductSales] = useState<ProductSalesReportLine[]>([]);
@@ -185,12 +198,82 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
       setIsProductSalesLoading(false);
     }
   }, [businessId, startDate, endDate, productFilterBranch, productFilterCategory]);
-
   useEffect(() => {
     if (activeReportTab === 'salesByProduct' && startDate && endDate) {
       fetchProductSalesReport();
     }
   }, [activeReportTab, startDate, endDate, fetchProductSalesReport]);
+
+  const fetchPaymentMethodSalesReport = React.useCallback(async () => {
+    try {
+      setIsPaymentMethodSalesLoading(true);
+      setError(null);
+      const data = await api.getPaymentMethodsSalesReport({
+        businessId,
+        startDate,
+        endDate,
+        branchId: paymentMethodFilterBranch !== 'all' ? paymentMethodFilterBranch : undefined,
+      });
+      setPaymentMethodSales(data);
+    } catch (err: any) {
+      console.error(err);
+      setError('No se pudo cargar el reporte de ventas por método de pago.');
+    } finally {
+      setIsPaymentMethodSalesLoading(false);
+    }
+  }, [businessId, startDate, endDate, paymentMethodFilterBranch]);
+
+  const fetchCashShifts = React.useCallback(async () => {
+    try {
+      setIsCashShiftsLoading(true);
+      setError(null);
+      const data = await api.getCashShiftsList({
+        businessId,
+        startDate,
+        endDate,
+        branchId: cashShiftsFilterBranch !== 'all' ? cashShiftsFilterBranch : undefined,
+      });
+      setCashShifts(data);
+    } catch (err: any) {
+      console.error(err);
+      setError('No se pudo cargar el listado de cortes de caja.');
+    } finally {
+      setIsCashShiftsLoading(false);
+    }
+  }, [businessId, startDate, endDate, cashShiftsFilterBranch]);
+
+  const fetchShiftAudit = React.useCallback(async (shiftId: string) => {
+    try {
+      setIsShiftAuditLoading(true);
+      const data = await api.getCashShiftAuditReport(shiftId);
+      setSelectedShiftAudit(data);
+    } catch (err: any) {
+      console.error(err);
+      setError('No se pudo cargar la auditoría del turno seleccionado.');
+    } finally {
+      setIsShiftAuditLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeReportTab === 'salesByPaymentMethod' && startDate && endDate) {
+      fetchPaymentMethodSalesReport();
+    }
+  }, [activeReportTab, startDate, endDate, fetchPaymentMethodSalesReport]);
+
+  useEffect(() => {
+    if (activeReportTab === 'cashShifts' && startDate && endDate) {
+      fetchCashShifts();
+    }
+  }, [activeReportTab, startDate, endDate, fetchCashShifts]);
+
+  useEffect(() => {
+    if (selectedShiftId) {
+      fetchShiftAudit(selectedShiftId);
+    } else {
+      setSelectedShiftAudit(null);
+    }
+  }, [selectedShiftId, fetchShiftAudit]);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
@@ -199,6 +282,8 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
   if (
     (activeReportTab === 'sales' && isLoading && !reportData) || 
     (activeReportTab === 'salesByProduct' && isProductSalesLoading && productSales.length === 0) ||
+    (activeReportTab === 'salesByPaymentMethod' && isPaymentMethodSalesLoading && paymentMethodSales.length === 0) ||
+    (activeReportTab === 'cashShifts' && isCashShiftsLoading && cashShifts.length === 0) ||
     ((activeReportTab === 'stock' || activeReportTab === 'kardex') && isStockLoading && stockLevels.length === 0)
   ) {
     return (
@@ -208,7 +293,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
         <span className="text-xs uppercase tracking-widest">
-          {activeReportTab === 'sales' ? 'Generando Métricas de Negocio...' : (activeReportTab === 'salesByProduct' ? 'Generando Reporte de Productos...' : 'Consultando Inventario y Catálogo...')}
+          {activeReportTab === 'sales' ? 'Generando Métricas de Negocio...' : (activeReportTab === 'salesByProduct' ? 'Generando Reporte de Productos...' : (activeReportTab === 'salesByPaymentMethod' ? 'Analizando Métodos de Pago...' : (activeReportTab === 'cashShifts' ? 'Consultando Cortes de Caja...' : 'Consultando Inventario y Catálogo...')))}
         </span>
       </div>
     );
@@ -470,6 +555,355 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
     );
   };
 
+  const renderSalesByPaymentMethodTab = () => {
+    const totalAmount = paymentMethodSales.reduce((acc, curr) => acc + curr.totalAmount, 0);
+    const totalPayments = paymentMethodSales.reduce((acc, curr) => acc + curr.paymentsCount, 0);
+
+    const exportToCSV = () => {
+      const headers = ['Método de Pago', 'Número de Pagos', 'Monto Recibido (Bruto)', 'Participación (%)'];
+      const rows = paymentMethodSales.map(item => [
+        item.paymentMethod === 'cash' ? 'Efectivo' : item.paymentMethod === 'card' ? 'Tarjeta / Medios Electrónicos' : item.paymentMethod,
+        item.paymentsCount,
+        item.totalAmount.toFixed(2),
+        item.sharePercent.toFixed(2)
+      ]);
+      
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+      
+      const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `reporte-ventas-metodo-pago-${startDate}-a-${endDate}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    return (
+      <div className="flex-1 overflow-hidden flex flex-col gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 no-print">
+          {paymentMethodSales.map((item) => {
+            const methodLabel = item.paymentMethod === 'cash' ? 'Efectivo' : item.paymentMethod === 'card' ? 'Tarjeta / Electrónico' : item.paymentMethod;
+            const icon = item.paymentMethod === 'cash' ? '💵' : item.paymentMethod === 'card' ? '💳' : '💰';
+            const colorClass = item.paymentMethod === 'cash' ? 'border-successGreen/35 text-successGreen' : 'border-blue-400/35 text-blue-400';
+            return (
+              <div key={item.paymentMethod} className={`bg-onyx-surface border ${colorClass} rounded-lg p-5 shadow-lg flex flex-col justify-between`}>
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs uppercase font-bold tracking-wider opacity-75">{methodLabel}</span>
+                  <span className="text-xl">{icon}</span>
+                </div>
+                <div>
+                  <span className="text-2xl font-bold font-mono text-text-primary block">{formatCurrency(item.totalAmount)}</span>
+                  <div className="flex justify-between text-xs text-text-secondary mt-1">
+                    <span>{item.paymentsCount} transacciones</span>
+                    <span className="font-semibold text-champagne-gold">{item.sharePercent}% del total</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="bg-charcoal border border-aged-bronze/40 rounded-lg p-5 shadow-lg flex flex-col justify-between">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-xs uppercase font-bold text-champagne-gold tracking-wider">Total Recaudado</span>
+              <span className="text-xl">📊</span>
+            </div>
+            <div>
+              <span className="text-2xl font-bold font-mono text-champagne-gold block">{formatCurrency(totalAmount)}</span>
+              <div className="flex justify-between text-xs text-text-secondary mt-1">
+                <span>{totalPayments} transacciones totales</span>
+                <span className="font-semibold">100.00%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 shadow-xl flex-1 flex flex-col min-h-0">
+          <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider mb-4 flex justify-between items-center no-print">
+            <span>Resumen Detallado por Forma de Pago</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={exportToCSV}
+                className="bg-charcoal border border-aged-bronze/45 hover:border-champagne-gold hover:text-champagne-gold text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 rounded transition-all cursor-pointer"
+              >
+                Exportar CSV
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="bg-charcoal border border-aged-bronze/45 hover:border-champagne-gold hover:text-champagne-gold text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 rounded transition-all cursor-pointer"
+              >
+                Imprimir PDF
+              </button>
+            </div>
+          </span>
+
+          <div className="flex-1 overflow-y-auto pr-1">
+            <table className="w-full text-left border-collapse text-xs select-text font-sans">
+              <thead>
+                <tr className="bg-charcoal-surface border-b border-aged-bronze/20 text-text-secondary uppercase text-[9px] tracking-wider">
+                  <th className="p-3 font-medium">Método de Pago</th>
+                  <th className="p-3 font-medium text-center">Transacciones (Pagos)</th>
+                  <th className="p-3 font-medium text-right">Monto Recibido</th>
+                  <th className="p-3 font-medium text-right">Participación (%)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-aged-bronze/10 text-text-primary">
+                {paymentMethodSales.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="p-8 text-center text-text-secondary italic">
+                      No se registraron transacciones para los filtros seleccionados
+                    </td>
+                  </tr>
+                ) : (
+                  paymentMethodSales.map((item) => {
+                    const methodLabel = item.paymentMethod === 'cash' ? 'Efectivo' : item.paymentMethod === 'card' ? 'Tarjeta / Electrónico' : item.paymentMethod;
+                    return (
+                      <tr key={item.paymentMethod} className="hover:bg-charcoal-surface/10">
+                        <td className="p-3 font-medium text-text-primary capitalize">{methodLabel}</td>
+                        <td className="p-3 text-center text-text-secondary font-mono">{item.paymentsCount}</td>
+                        <td className="p-3 text-right font-medium text-text-primary font-mono">{formatCurrency(item.totalAmount)}</td>
+                        <td className="p-3 text-right font-semibold text-champagne-gold font-mono">{item.sharePercent.toFixed(2)}%</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+              {paymentMethodSales.length > 0 && (
+                <tfoot>
+                  <tr className="bg-charcoal-surface/30 border-t-2 border-aged-bronze/35 font-bold text-text-primary">
+                    <td className="p-3">TOTALES</td>
+                    <td className="p-3 text-center font-mono">{totalPayments}</td>
+                    <td className="p-3 text-right font-mono text-champagne-gold">{formatCurrency(totalAmount)}</td>
+                    <td className="p-3 text-right font-mono">100.00%</td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCashShiftsTab = () => {
+    const exportShiftsToCSV = () => {
+      const headers = ['Operador', 'Sucursal', 'Fondo Inicial', 'Fondo Final Entregado', 'Estado', 'Fecha Apertura', 'Fecha Cierre'];
+      const rows = cashShifts.map(item => [
+        item.cashierName,
+        item.branchName,
+        Number(item.initialFloat).toFixed(2),
+        item.closedAt ? Number(item.cashDrawerAmount).toFixed(2) : 'Activo (Sin Cierre)',
+        item.status === 'open' ? 'Abierto' : 'Cerrado',
+        new Date(item.openedAt).toLocaleString('es-MX'),
+        item.closedAt ? new Date(item.closedAt).toLocaleString('es-MX') : '-'
+      ]);
+      
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(val => `"${val.toString().replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+      
+      const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `reporte-cortes-caja-${startDate}-a-${endDate}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    return (
+      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-6 min-h-0">
+        <div className="bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 shadow-xl flex-1 flex flex-col min-h-[300px] lg:min-h-0">
+          <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider mb-4 flex justify-between items-center no-print">
+            <span>Historial de Turnos y Cortes</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={exportShiftsToCSV}
+                className="bg-charcoal border border-aged-bronze/45 hover:border-champagne-gold hover:text-champagne-gold text-[10px] uppercase font-bold tracking-wider px-2 py-1.5 rounded transition-all cursor-pointer"
+              >
+                Exportar CSV
+              </button>
+            </div>
+          </span>
+
+          <div className="flex-1 overflow-y-auto pr-1">
+            <div className="flex flex-col gap-2">
+              {cashShifts.length === 0 ? (
+                <div className="p-8 text-center text-text-secondary italic text-xs">
+                  No se encontraron turnos registrados para el rango seleccionado
+                </div>
+              ) : (
+                cashShifts.map((shift) => {
+                  const isSelected = selectedShiftId === shift.id;
+                  const isOpen = shift.status === 'open';
+                  const dateStr = new Date(shift.openedAt).toLocaleDateString('es-MX', {
+                    day: '2-digit',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
+
+                  return (
+                    <div
+                      key={shift.id}
+                      onClick={() => setSelectedShiftId(shift.id)}
+                      className={`p-4 rounded-lg border transition-all duration-200 cursor-pointer flex flex-col gap-2 shadow-md ${
+                        isSelected
+                          ? 'bg-charcoal-surface border-champagne-gold/60 ring-1 ring-champagne-gold/30'
+                          : 'bg-charcoal/50 border-aged-bronze/15 hover:border-aged-bronze/45'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-text-primary">{shift.cashierName}</span>
+                        <span className={`px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider ${
+                          isOpen
+                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25'
+                            : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/25'
+                        }`}>
+                          {isOpen ? 'Caja Activa (X)' : 'Cerrado (Z)'}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-xs text-text-secondary">
+                        <span>Sucursal: <strong className="text-text-primary">{shift.branchName}</strong></span>
+                        <span className="font-mono text-[10px]">{dateStr}</span>
+                      </div>
+
+                      <div className="flex justify-between text-xs border-t border-aged-bronze/10 pt-2 mt-1">
+                        <span>Fondo Inicial: <strong className="text-text-primary font-mono">{formatCurrency(Number(shift.initialFloat))}</strong></span>
+                        {!isOpen && (
+                          <span>Entrega: <strong className="text-champagne-gold font-mono">{formatCurrency(Number(shift.cashDrawerAmount))}</strong></span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 shadow-xl w-full lg:w-96 flex flex-col min-h-[450px] lg:min-h-0">
+          <span className="text-xs font-semibold text-champagne-gold uppercase tracking-wider mb-4 block">
+            Auditoría y Arqueo Detallado
+          </span>
+
+          {isShiftAuditLoading ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-2">
+              <svg className="animate-spin h-6 w-6 text-champagne-gold" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span className="text-xs text-text-secondary">Generando arqueo...</span>
+            </div>
+          ) : selectedShiftAudit ? (
+            <div className="flex-1 flex flex-col min-h-0 overflow-y-auto pr-1 text-xs gap-4 select-text">
+              <div className="bg-charcoal/40 p-3 rounded-lg border border-aged-bronze/20 flex flex-col gap-1.5">
+                <div className="flex justify-between font-bold text-text-primary text-[13px]">
+                  <span>{selectedShiftAudit.shiftInfo.cashierName}</span>
+                  <span className="text-champagne-gold font-mono">{selectedShiftAudit.shiftInfo.status === 'open' ? 'Turno Abierto' : 'Turno Cerrado'}</span>
+                </div>
+                <div className="text-text-secondary text-[10.5px]">
+                  <div>Sucursal: <strong className="text-text-primary">{selectedShiftAudit.shiftInfo.branchName}</strong></div>
+                  <div>Apertura: {new Date(selectedShiftAudit.shiftInfo.openedAt).toLocaleString('es-MX')}</div>
+                  {selectedShiftAudit.shiftInfo.closedAt && (
+                    <div>Cierre: {new Date(selectedShiftAudit.shiftInfo.closedAt).toLocaleString('es-MX')}</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5 border-b border-aged-bronze/20 pb-3">
+                <div className="flex justify-between text-text-secondary">
+                  <span>(+) Fondo Inicial de Caja:</span>
+                  <span className="font-mono text-text-primary font-medium">{formatCurrency(selectedShiftAudit.shiftInfo.initialFloat)}</span>
+                </div>
+                <div className="flex justify-between text-text-secondary">
+                  <span>(+) Ventas Efectivo Sistema:</span>
+                  <span className="font-mono text-text-primary font-medium">{formatCurrency(selectedShiftAudit.salesSummary.cashSales)}</span>
+                </div>
+
+                {selectedShiftAudit.transactions.length > 0 && (
+                  <div className="bg-charcoal/20 p-2 rounded flex flex-col gap-1 my-1 border border-aged-bronze/10">
+                    <span className="text-[10px] font-bold text-text-secondary uppercase">Movimientos de Turno:</span>
+                    {selectedShiftAudit.transactions.map((t) => (
+                      <div key={t.id} className="flex justify-between text-[11px] font-mono">
+                        <span className="text-text-secondary truncate w-36">
+                          {t.type === 'cash-in' ? '[+] Ingreso' : '[-] Retiro'}: {t.reason}
+                        </span>
+                        <span className={t.type === 'cash-in' ? 'text-successGreen' : 'text-red-400'}>
+                          {t.type === 'cash-in' ? '+' : '-'}{formatCurrency(t.amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex justify-between font-bold text-text-primary border-t border-aged-bronze/15 pt-2 mt-1">
+                  <span>(=) Efectivo Esperado en Caja:</span>
+                  <span className="font-mono">{formatCurrency(selectedShiftAudit.expectedCash)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-text-primary">
+                  <span>(=) Efectivo Físico Entregado:</span>
+                  <span className="font-mono text-champagne-gold">
+                    {selectedShiftAudit.shiftInfo.status === 'open' ? 'Sin arqueo físico' : formatCurrency(selectedShiftAudit.shiftInfo.cashDrawerAmount)}
+                  </span>
+                </div>
+              </div>
+
+              {selectedShiftAudit.shiftInfo.status === 'closed' ? (
+                <div className={`p-4 rounded-lg border text-center flex flex-col gap-1 ${
+                  selectedShiftAudit.discrepancy === 0
+                    ? 'bg-successGreen/5 border-successGreen/30 text-successGreen'
+                    : selectedShiftAudit.discrepancy > 0
+                    ? 'bg-successGreen/5 border-successGreen/30 text-successGreen'
+                    : 'bg-red-500/5 border-red-500/30 text-red-400'
+                }`}>
+                  <span className="text-[10px] uppercase font-bold tracking-wider opacity-75">Resultado del Arqueo</span>
+                  <span className="text-xl font-extrabold font-mono">
+                    {selectedShiftAudit.discrepancy === 0 
+                      ? 'DIFERENCIA: $0.00 (Cuadrado)' 
+                      : `${selectedShiftAudit.discrepancy > 0 ? 'SOBRANTE' : 'FALTANTE'}: ${formatCurrency(Math.abs(selectedShiftAudit.discrepancy))}`}
+                  </span>
+                  <span className="text-[10px] opacity-75">
+                    {selectedShiftAudit.discrepancy === 0 
+                      ? 'El arqueo físico coincide exactamente con el sistema.' 
+                      : `Hay una discrepancia de ${formatCurrency(Math.abs(selectedShiftAudit.discrepancy))} frente a las ventas esperadas.`}
+                  </span>
+                </div>
+              ) : (
+                <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-400 text-center text-[11px] leading-relaxed">
+                  ⚠️ <strong>Caja en operación</strong>. Se está auditando el corte parcial (Corte X). El resultado del arqueo final y discrepancias se mostrará cuando el cajero realice el Corte Z en su terminal.
+                </div>
+              )}
+
+              <div className="bg-charcoal/10 border border-aged-bronze/15 rounded-lg p-3 flex flex-col gap-1.5 mt-2">
+                <span className="text-[10px] font-bold text-text-secondary uppercase mb-1">Otros Medios de Pago</span>
+                <div className="flex justify-between text-text-secondary">
+                  <span>Tarjeta / Electrónico Sistema:</span>
+                  <span className="font-mono text-text-primary">{formatCurrency(selectedShiftAudit.salesSummary.cardSales)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-text-primary border-t border-aged-bronze/10 pt-2 mt-1">
+                  <span>Venta Total del Turno:</span>
+                  <span className="font-mono text-champagne-gold">{formatCurrency(selectedShiftAudit.salesSummary.totalSales)}</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-center text-text-secondary italic text-xs p-6">
+              Selecciona un turno de la lista para ver la auditoría de caja detallada
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // Check if they match
   const isConsistent = Math.abs(catalogStock - sumOfLocations) < 0.001;
 
@@ -498,7 +932,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
 
         {/* Filters bar */}
         <div className="flex flex-wrap items-center gap-2">
-          {activeReportTab === 'sales' || activeReportTab === 'salesByProduct' ? (
+          {activeReportTab === 'sales' || activeReportTab === 'salesByProduct' || activeReportTab === 'salesByPaymentMethod' || activeReportTab === 'cashShifts' ? (
             <>
               <div className="flex bg-charcoal border border-aged-bronze/45 rounded p-0.5">
                 {(['today', 'week', 'month', 'last30', 'custom'] as DateRangeType[]).map((range) => (
@@ -532,7 +966,15 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                     className="bg-transparent text-xs text-text-primary focus:outline-none px-1"
                   />
                   <button
-                    onClick={activeReportTab === 'salesByProduct' ? fetchProductSalesReport : fetchReport}
+                    onClick={
+                      activeReportTab === 'salesByProduct'
+                        ? fetchProductSalesReport
+                        : activeReportTab === 'salesByPaymentMethod'
+                        ? fetchPaymentMethodSalesReport
+                        : activeReportTab === 'cashShifts'
+                        ? fetchCashShifts
+                        : fetchReport
+                    }
                     className="bg-charcoal-surface border border-aged-bronze/45 hover:border-champagne-gold hover:text-champagne-gold text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded transition-all cursor-pointer"
                   >
                     Filtrar
@@ -581,6 +1023,38 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                     />
                   </div>
                 </>
+              )}
+
+              {activeReportTab === 'salesByPaymentMethod' && (
+                <div className="flex items-center gap-2 bg-charcoal border border-aged-bronze/45 rounded p-1">
+                  <span className="text-[10px] text-text-secondary uppercase px-1">Sucursal:</span>
+                  <select
+                    value={paymentMethodFilterBranch}
+                    onChange={(e) => setPaymentMethodFilterBranch(e.target.value)}
+                    className="bg-transparent text-xs text-text-primary focus:outline-none px-1 cursor-pointer font-medium text-champagne-gold"
+                  >
+                    <option value="all">Todas</option>
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id} className="bg-onyx text-text-primary">{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {activeReportTab === 'cashShifts' && (
+                <div className="flex items-center gap-2 bg-charcoal border border-aged-bronze/45 rounded p-1">
+                  <span className="text-[10px] text-text-secondary uppercase px-1">Sucursal:</span>
+                  <select
+                    value={cashShiftsFilterBranch}
+                    onChange={(e) => setCashShiftsFilterBranch(e.target.value)}
+                    className="bg-transparent text-xs text-text-primary focus:outline-none px-1 cursor-pointer font-medium text-champagne-gold"
+                  >
+                    <option value="all">Todas</option>
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id} className="bg-onyx text-text-primary">{b.name}</option>
+                    ))}
+                  </select>
+                </div>
               )}
             </>
           ) : activeReportTab === 'stock' ? (
@@ -663,6 +1137,26 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
           }`}
         >
           Ventas por Producto
+        </button>
+        <button
+          onClick={() => setActiveReportTab('salesByPaymentMethod')}
+          className={`pb-3 text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer ${
+            activeReportTab === 'salesByPaymentMethod'
+              ? 'border-champagne-gold text-champagne-gold font-semibold'
+              : 'border-transparent text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          Métodos de Pago
+        </button>
+        <button
+          onClick={() => setActiveReportTab('cashShifts')}
+          className={`pb-3 text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer ${
+            activeReportTab === 'cashShifts'
+              ? 'border-champagne-gold text-champagne-gold font-semibold'
+              : 'border-transparent text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          Cortes y Turnos de Caja
         </button>
         <button
           onClick={() => setActiveReportTab('stock')}
@@ -943,6 +1437,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
         </div>
       ) : activeReportTab === 'salesByProduct' ? (
         renderSalesByProductTab()
+      ) : activeReportTab === 'salesByPaymentMethod' ? (
+        renderSalesByPaymentMethodTab()
+      ) : activeReportTab === 'cashShifts' ? (
+        renderCashShiftsTab()
       ) : activeReportTab === 'stock' ? (
         /* Stock Existence Report Tab */
         <div className="flex-1 overflow-hidden flex flex-col gap-4">
