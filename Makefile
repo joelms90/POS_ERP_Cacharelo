@@ -1,6 +1,6 @@
 # Makefile for Empire POS-ERP project
 
-.PHONY: help install db-up db-down db-status db-migrate db-seed db-rollback db-reset db-clean db-clean-prod db-clean-today db-clean-today-prod db-clean-old-history-prod db-clean-all-history-sales-prod dev-backend dev-frontend lint test infra-init infra-plan infra-apply infra-destroy backend-migrate backend-deploy backend-deploy-fast backend-status backend-logs landing-install landing-build landing-deploy landing-infra admin-build admin-deploy admin-deploy-gcs flutter-web-build flutter-web-dev flutter-web-serve flutter-web-deploy flutter-apk-build flutter-clean flutter-macos-build flutter-windows-build flutter-android-build flutter-desktop-releases flutter-all-releases flutter-release-info
+.PHONY: help install db-up db-down db-status db-migrate db-seed db-rollback db-reset db-clean db-clean-prod db-clean-today db-clean-today-prod db-clean-old-history-prod db-clean-all-history-sales-prod db-proxy dev-backend dev-frontend lint test infra-init infra-plan infra-apply provision-infra infra-destroy backend-migrate backend-deploy backend-deploy-fast backend-status backend-logs landing-install landing-build landing-deploy landing-infra admin-build admin-deploy admin-deploy-gcs flutter-web-build flutter-web-dev flutter-web-serve flutter-web-deploy flutter-apk-build flutter-clean flutter-macos-build flutter-windows-build flutter-android-build flutter-desktop-releases flutter-all-releases flutter-release-info
 
 # Default target: show help
 help:
@@ -26,6 +26,7 @@ help:
 	@echo "  db-clean-today-prod              Delete today's PRODUCTION sales data (CAREFUL!)"
 	@echo "  db-clean-old-history-prod        Delete old PRODUCTION history (keeps only today) (CAREFUL!)"
 	@echo "  db-clean-all-history-sales-prod  Delete ALL PRODUCTION sales history from all time (EXTREME!)"
+	@echo "  db-proxy                         Start Cloud SQL Auth Proxy locally for DBeaver access"
 	@echo ""
 	@echo "Run & Development Targets:"
 	@echo "  dev-backend      Run Express backend API with hot-reload"
@@ -39,6 +40,7 @@ help:
 	@echo "  infra-init       Initialize Terraform configuration"
 	@echo "  infra-plan       Generate and show a Terraform execution plan"
 	@echo "  infra-apply      Build or change infrastructure via Terraform"
+	@echo "  provision-infra  Provision all GCP resources (incl. Always Free VM) automatically"
 	@echo "  infra-destroy    Destroy Terraform-managed infrastructure"
 	@echo ""
 	@echo "Backend Deployment Targets:"
@@ -82,6 +84,19 @@ install:
 db-up:
 	@echo "Starting PostgreSQL Docker container..."
 	cd apps/sync_api && docker compose up -d
+
+db-proxy:
+	@echo "========================================="
+	@echo "🔑 DBeaver Connection Information"
+	@echo "========================================="
+	@echo "  • Host:          127.0.0.1"
+	@echo "  • Port:          5433"
+	@echo "  • Database Name: pos_db"
+	@echo "  • Username:      pos_user"
+	@echo "  • Password:      pos-secure-db-pass-2026!"
+	@echo "========================================="
+	@echo "🚀 Starting Google Cloud SQL Auth Proxy..."
+	@./cloud-sql-proxy fresh-sensor-497515-d3:us-central1:pos-db-instance --port 5433
 
 db-down:
 	@echo "Stopping PostgreSQL Docker container..."
@@ -374,6 +389,10 @@ infra-plan:
 infra-apply:
 	@echo "Applying Terraform changes..."
 	cd apps/sync_api/infra && terraform apply
+
+provision-infra:
+	@echo "Provisioning Google Cloud Infrastructure (Cloud SQL, Cloud Run, Always Free WebSocket VM)..."
+	cd apps/sync_api/infra && terraform apply -auto-approve
 
 infra-destroy:
 	@echo "Destroying Terraform infrastructure..."
