@@ -21,3 +21,9 @@ variable "admin_password" {
   sensitive   = true
   default     = "admin123"
 }
+
+variable "admin_email" {
+  description = "Email address to send monitoring alerts"
+  type        = string
+  default     = "joelms90@gmail.com"
+}

@@ -7,3 +7,6 @@ db_password = "pos-secure-db-pass-2026!"
 
 # Admin Access Password for Dashboard (highly sensitive - change this!)
 admin_password = "pos-secure-admin-pass-2026!"
+
+# Admin Email for Alerts
+admin_email = "joelms90@gmail.com"

@@ -20,7 +20,10 @@ resource "google_project_service" "services" {
     "sqladmin.googleapis.com",
     "artifactregistry.googleapis.com",
     "storage.googleapis.com",
-    "cloudbuild.googleapis.com"
+    "cloudbuild.googleapis.com",
+    "compute.googleapis.com",
+    "monitoring.googleapis.com",
+    "logging.googleapis.com"
   ])
   service            = each.key
   disable_on_destroy = false
@@ -214,4 +217,113 @@ resource "google_firestore_index" "inquiries_composite_index" {
     field_path = "createdAt"
     order      = "DESCENDING"
   }
+}
+
+# ==========================================
+# 11. Cloud Monitoring, Metrics & Alarms
+# ==========================================
+
+# Log-based metric to count sync gateway connection failures
+resource "google_logging_metric" "sync_error_metric" {
+  depends_on  = [google_project_service.services]
+  name        = "sync_server_errors"
+  filter      = "resource.type=\"cloud_run_revision\" AND (textPayload:\"PostgreSQL listener client connection error\" OR textPayload:\"Failed to connect PostgreSQL listener client\")"
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+    unit        = "1"
+  }
+}
+
+# Notification channel for email alerts
+resource "google_monitoring_notification_channel" "email_alert" {
+  depends_on   = [google_project_service.services]
+  display_name = "Sync API Alert Email"
+  type         = "email"
+  labels = {
+    email_address = var.admin_email
+  }
+}
+
+# Alert policy triggered by high connection failures
+resource "google_monitoring_alert_policy" "sync_error_alert" {
+  depends_on            = [google_logging_metric.sync_error_metric, google_monitoring_notification_channel.email_alert]
+  display_name          = "Sync Connection Failure Alert"
+  combiner              = "OR"
+  notification_channels = [google_monitoring_notification_channel.email_alert.name]
+
+  conditions {
+    display_name = "High Sync Connection Error Rate"
+    condition_threshold {
+      filter          = "metric.type=\"logging.googleapis.com/user/${google_logging_metric.sync_error_metric.name}\" AND resource.type=\"cloud_run_revision\""
+      duration        = "60s"
+      comparison      = "COMPARISON_GT"
+      threshold_value = 2.0
+      trigger {
+        count = 1
+      }
+      aggregations {
+        alignment_period   = "60s"
+        per_series_aligner = "ALIGN_RATE"
+      }
+    }
+  }
+
+  documentation {
+    content   = "The PostgreSQL LISTEN/NOTIFY client on the sync gateway is failing to connect or losing connectivity repeatedly. Please check Cloud Run logs for instance restarts or database connection state."
+    mime_type = "text/markdown"
+  }
+}
+
+# Custom Cloud Monitoring Dashboard
+resource "google_monitoring_dashboard" "sync_dashboard" {
+  depends_on   = [google_project_service.services]
+  dashboard_json = <<EOF
+{
+  "displayName": "WebSocket Sync Status & Performance",
+  "gridLayout": {
+    "columns": 2,
+    "widgets": [
+      {
+        "title": "Sync Connection Failures",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "metric.type=\"logging.googleapis.com/user/${google_logging_metric.sync_error_metric.name}\" AND resource.type=\"cloud_run_revision\"",
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_COUNT"
+                  }
+                }
+              },
+              "plotType": "LINE"
+            }
+          ]
+        }
+      },
+      {
+        "title": "Sync Gateway Logs Volume",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"pos-sync-api\"",
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_RATE"
+                  }
+                }
+              },
+              "plotType": "LINE"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
+EOF
 }
