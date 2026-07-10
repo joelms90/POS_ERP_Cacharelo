@@ -11,6 +11,7 @@ import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../services/secure_storage_service.dart';
+import 'sync_socket_service.dart';
 
 enum TableState { free, occupied, billing, cleaning }
 
@@ -272,16 +273,23 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> recentClosedSales = [];
 
 
-  // Shift controls (Cashier)
   bool isShiftOpen = false;
   double cashDrawerAmount = 0.0;
   double initialFloat = 0.0;
+  String? activeShiftId;
 
   // Offline & sync states
   bool isOnline = true;
+  SyncSocketService? _socketService;
+  SocketConnectionState socketConnectionState = SocketConnectionState.disconnected;
+  String? currentJwtToken;
+  Timer? _fallbackPollingTimer;
   int pendingSyncCount = 0;
   final List<Map<String, dynamic>> _pendingSaleSyncJobs = [];
   final Map<String, String> _activeOrderIdsByTableRemoteId = {};
+  final Set<String> _pendingKitchenStatusUpdates = {};
+  Timer? _kitchenSyncRetryTimer;
+  int _kitchenSyncRetryCount = 0;
 
   // Notification queue (for alerts on waiter screen)
   List<String> readyNotifications = [];
@@ -296,6 +304,7 @@ class AppState extends ChangeNotifier {
   String? terminalBranchName;
   String? terminalApiUrl;
   bool isTerminalConfigured = false;
+  String? lastSyncError;
   Map<String, Map<String, dynamic>> roomConfigs = {};
   TicketFiscalConfig ticketFiscalConfig = TicketFiscalConfig.defaults();
 
@@ -337,6 +346,20 @@ class AppState extends ChangeNotifier {
         terminalBusinessName = config['businessName'];
         terminalBranchName = config['branchName'];
         terminalApiUrl = config['apiUrl'];
+        
+        // Auto-migrate old Cloud Run API URLs to the secure VM API subdomain
+        if (terminalApiUrl != null && terminalApiUrl!.contains('umqpitkpoa-uc.a.run.app')) {
+          terminalApiUrl = 'https://pos-api.cacharelo.com/api';
+          await _secureStorageService.saveTerminalConfig(
+            businessId: terminalBusinessId ?? '',
+            branchId: terminalBranchId ?? '',
+            businessName: terminalBusinessName ?? '',
+            branchName: terminalBranchName ?? '',
+            apiUrl: terminalApiUrl!,
+          );
+          debugPrint('Migrated terminal config API URL to: $terminalApiUrl');
+        }
+        
         isTerminalConfigured = true;
       } else {
         isTerminalConfigured = false;
@@ -407,7 +430,7 @@ class AppState extends ChangeNotifier {
 
   Future<bool> configureTerminalWithCode(String branchId) async {
     try {
-      String baseUrl = 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+      String baseUrl = 'https://pos-api.cacharelo.com/api';
 
       http.Response response = await http
           .get(Uri.parse('$baseUrl/branches/$branchId'))
@@ -440,7 +463,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
       final String? businessId = terminalBusinessId;
       final String? branchId = terminalBranchId;
       if (businessId == null || branchId == null) return false;
@@ -478,7 +501,7 @@ class AppState extends ChangeNotifier {
     }
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
       final String bId =
           terminalBusinessId ?? 'd3b07384-d113-4a0e-a555-e5b12824bf01';
       final String brId = terminalBranchId ?? '';
@@ -555,8 +578,8 @@ class AppState extends ChangeNotifier {
       try {
         await fetchTablesDynamic();
         await syncActiveOrders();
-        // Sync table states last to ensure they override any stale data
         await syncTableStates();
+        await checkActiveShift();
         final cashierTxSync = await syncOfflineTransactions();
         if (!cashierTxSync) success = false;
       } catch (e) {
@@ -841,7 +864,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
       final String brId = terminalBranchId!;
 
       // Fetch branch configs dynamically (room configs, zoom, images)
@@ -1039,7 +1062,7 @@ class AppState extends ChangeNotifier {
     if (!isTerminalConfigured) return;
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
       final bool isLocalConfig =
           baseUrl.contains('localhost') ||
           baseUrl.contains('10.0.2.2') ||
@@ -1113,7 +1136,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
       final response = await http
           .get(Uri.parse('$baseUrl/orders/active?branchId=$terminalBranchId'))
           .timeout(const Duration(seconds: 10));
@@ -1126,7 +1149,7 @@ class AppState extends ChangeNotifier {
       final List<dynamic> activeOrders = jsonDecode(response.body);
       final activeTableIds = <String>{};
 
-      for (final rawOrder in activeOrders.whereType<Map>()) {
+      for (final rawOrder in activeOrders) {
         final order = Map<String, dynamic>.from(rawOrder);
         final tableId = order['tableId']?.toString();
         final orderId = order['id']?.toString();
@@ -1179,7 +1202,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
       final response = await http
           .get(Uri.parse('$baseUrl/kitchen/active?branchId=$terminalBranchId'))
           .timeout(const Duration(seconds: 10));
@@ -1194,22 +1217,29 @@ class AppState extends ChangeNotifier {
       };
 
       final List<dynamic> tickets = jsonDecode(response.body);
-      final List<KitchenOrder> newOrders = tickets
-          .whereType<Map>()
-          .map((rawTicket) {
-            final ticket = Map<String, dynamic>.from(rawTicket);
-            return KitchenOrder(
-              id: ticket['id']?.toString() ?? '',
-              tableLabel: ticket['tableLabel']?.toString() ?? 'Mesa',
-              items: _itemsFromCloud(ticket['items']),
-              timestamp:
-                  DateTime.tryParse(ticket['createdAt']?.toString() ?? '') ??
-                  DateTime.now(),
-              status: ticket['status']?.toString() ?? 'pending',
-            );
-          })
-          .where((order) => order.id.isNotEmpty)
-          .toList();
+      final List<KitchenOrder> newOrders = [];
+      for (final rawTicket in tickets) {
+        final ticket = Map<String, dynamic>.from(rawTicket);
+        final String id = ticket['id']?.toString() ?? '';
+        String status = ticket['status']?.toString() ?? 'pending';
+
+        if (_pendingKitchenStatusUpdates.contains(id)) {
+          final int existingIdx = kitchenOrders.indexWhere((o) => o.id == id);
+          if (existingIdx != -1) {
+            status = kitchenOrders[existingIdx].status;
+          }
+        }
+
+        newOrders.add(KitchenOrder(
+          id: id,
+          tableLabel: ticket['tableLabel']?.toString() ?? 'Mesa',
+          items: _itemsFromCloud(ticket['items']),
+          timestamp:
+              DateTime.tryParse(ticket['createdAt']?.toString() ?? '') ??
+              DateTime.now(),
+          status: status,
+        ));
+      }
 
       // Trigger notification if status changed to 'ready'
       for (final order in newOrders) {
@@ -1222,11 +1252,14 @@ class AppState extends ChangeNotifier {
         }
       }
 
+      lastSyncError = null;
       kitchenOrders = newOrders;
       notifyListeners();
       return true;
-    } catch (e) {
-      debugPrint('Error syncing kitchen orders: $e');
+    } catch (e, stack) {
+      lastSyncError = 'Error: $e\n$stack';
+      debugPrint('Error syncing kitchen orders: $e\n$stack');
+      notifyListeners();
       return false;
     }
   }
@@ -1238,7 +1271,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
 
       // Get last sync checkpoint timestamp
       final lastSyncedAt = await _getLastSyncCheckpoint();
@@ -1273,9 +1306,10 @@ class AppState extends ChangeNotifier {
       // Update local table states from the branchTables in the response
       final branchTables = changes['branchTables'] as List?;
       if (branchTables != null && branchTables.isNotEmpty) {
-        for (final tableData in branchTables.whereType<Map>()) {
-          final tableId = tableData['id']?.toString();
-          final tableState = tableData['state']?.toString();
+        for (final tableData in branchTables) {
+          final table = Map<String, dynamic>.from(tableData);
+          final tableId = table['id']?.toString();
+          final tableState = table['state']?.toString();
 
           if (tableId == null || tableState == null) continue;
 
@@ -1339,7 +1373,8 @@ class AppState extends ChangeNotifier {
   List<OrderItem> _itemsFromCloud(dynamic rawItems) {
     if (rawItems is! List) return [];
 
-    return rawItems.whereType<Map>().map((rawItem) {
+    return rawItems
+        .map((rawItem) {
       final item = Map<String, dynamic>.from(rawItem);
       final productId = item['productId']?.toString() ?? '';
       final menuItem = _menuItemById(
@@ -1454,7 +1489,7 @@ class AppState extends ChangeNotifier {
 
       http.Response response;
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
       try {
         response = await http
             .post(
@@ -1482,6 +1517,11 @@ class AppState extends ChangeNotifier {
           currentUserId = userData['id'];
           currentUserName = userData['name'];
           currentUserRole = _parseRole(userData['role']);
+          
+          currentJwtToken = data['accessToken'];
+          if (currentJwtToken != null) {
+            await _secureStorageService.saveJwtToken(currentJwtToken!);
+          }
 
           // Securely cache credentials locally
           await _secureStorageService.cacheUserOffline(
@@ -1491,6 +1531,7 @@ class AppState extends ChangeNotifier {
             role: userData['role'],
           );
 
+          _initWebSocket();
           unawaited(syncAllData());
           notifyListeners();
           return true;
@@ -1513,6 +1554,9 @@ class AppState extends ChangeNotifier {
             : null;
         currentUserName = offlineUser['name']!;
         currentUserRole = _parseRole(offlineUser['role']!);
+        
+        currentJwtToken = await _secureStorageService.getJwtToken();
+        _initWebSocket();
         unawaited(syncAllData());
         notifyListeners();
         return true;
@@ -1542,7 +1586,9 @@ class AppState extends ChangeNotifier {
     currentUserId = null;
     currentUserName = "";
     selectedTable = null;
-    notifyListeners();
+    currentJwtToken = null;
+    _secureStorageService.clearJwtToken();
+    disconnectWebSocket();
   }
 
   // Network Offline Simulation Toggle
@@ -1551,28 +1597,165 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Cashier Session Methods
-  void openShift(double floatAmount) {
-    isShiftOpen = true;
-    initialFloat = floatAmount;
-    cashDrawerAmount = floatAmount;
-    notifyListeners();
+  Future<void> checkActiveShift() async {
+    if (!isTerminalConfigured || terminalBranchId == null || currentUserId == null) return;
+    try {
+      final String baseUrl = terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+      final response = await http
+          .get(Uri.parse('$baseUrl/cash-shifts/active?branchId=$terminalBranchId&cashierId=$currentUserId'))
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        activeShiftId = data['id']?.toString();
+        initialFloat = double.tryParse(data['initialFloat']?.toString() ?? '') ?? 0.0;
+        cashDrawerAmount = double.tryParse(data['cashDrawerAmount']?.toString() ?? '') ?? 0.0;
+        isShiftOpen = data['status'] == 'open';
+      } else {
+        isShiftOpen = false;
+        activeShiftId = null;
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error checking active shift: $e');
+    }
   }
 
-  void closeShift() {
-    isShiftOpen = false;
-    initialFloat = 0.0;
-    notifyListeners();
+  Future<bool> openShift(double floatAmount) async {
+    if (!isTerminalConfigured || terminalBranchId == null || currentUserId == null) return false;
+    try {
+      final String baseUrl = terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+      final response = await http.post(
+        Uri.parse('$baseUrl/cash-shifts'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'cashierId': currentUserId,
+          'branchId': terminalBranchId,
+          'initialFloat': floatAmount.toStringAsFixed(2),
+        }),
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        activeShiftId = data['id']?.toString();
+        initialFloat = floatAmount;
+        cashDrawerAmount = floatAmount;
+        isShiftOpen = true;
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error opening shift: $e');
+      return false;
+    }
   }
 
-  void addCashDrop(double amount) {
-    cashDrawerAmount += amount;
-    notifyListeners();
+  Future<bool> addCashDrop(double amount, {String reason = 'Ingreso de caja'}) async {
+    if (activeShiftId == null) return false;
+    try {
+      final String baseUrl = terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+      final response = await http.post(
+        Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'type': 'cash-in',
+          'amount': amount.toStringAsFixed(2),
+          'reason': reason,
+        }),
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        if (data['shift'] != null) {
+          cashDrawerAmount = double.tryParse(data['shift']['cashDrawerAmount']?.toString() ?? '') ?? (cashDrawerAmount + amount);
+        } else {
+          cashDrawerAmount += amount;
+        }
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error adding cash drop: $e');
+      return false;
+    }
   }
 
-  void removeCashDrop(double amount) {
-    cashDrawerAmount = max(0.0, cashDrawerAmount - amount);
-    notifyListeners();
+  Future<bool> removeCashDrop(double amount, {String reason = 'Retiro de caja'}) async {
+    if (activeShiftId == null) return false;
+    try {
+      final String baseUrl = terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+      final response = await http.post(
+        Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'type': 'cash-out',
+          'amount': amount.toStringAsFixed(2),
+          'reason': reason,
+        }),
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        if (data['shift'] != null) {
+          cashDrawerAmount = double.tryParse(data['shift']['cashDrawerAmount']?.toString() ?? '') ?? max(0.0, cashDrawerAmount - amount);
+        } else {
+          cashDrawerAmount = max(0.0, cashDrawerAmount - amount);
+        }
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error removing cash withdrawal: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> closeShift(double actualAmount) async {
+    if (activeShiftId == null) return null;
+    try {
+      final String baseUrl = terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+      final response = await http.post(
+        Uri.parse('$baseUrl/cash-shifts/$activeShiftId/close'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'actualAmount': actualAmount.toStringAsFixed(2),
+        }),
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        isShiftOpen = false;
+        activeShiftId = null;
+        initialFloat = 0.0;
+        cashDrawerAmount = 0.0;
+        notifyListeners();
+        return Map<String, dynamic>.from(data['reconciliation'] ?? {});
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error closing shift: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getCashShiftAuditReport(String shiftId) async {
+    try {
+      final String baseUrl = terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+      final response = await http
+          .get(Uri.parse('$baseUrl/reports/cash-shifts/$shiftId/audit'))
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        return Map<String, dynamic>.from(jsonDecode(response.body));
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting cash shift audit: $e');
+      return null;
+    }
   }
 
   // Waiter Order submission
@@ -1738,7 +1921,7 @@ class AppState extends ChangeNotifier {
     if (orderId != null) {
       try {
         final String baseUrl =
-            terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+            terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
         await http
             .post(Uri.parse('$baseUrl/orders/$orderId/cancel'))
             .timeout(const Duration(seconds: 8));
@@ -1769,7 +1952,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
 
       var orderId = _activeOrderIdsByTableRemoteId[tableRemoteId!];
       if (orderId == null) {
@@ -1860,7 +2043,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
       await http
           .post(Uri.parse('$baseUrl/orders/$orderId/billing'))
           .timeout(const Duration(seconds: 10));
@@ -2165,7 +2348,7 @@ class AppState extends ChangeNotifier {
   }) async {
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
       final response = await http
           .post(
             Uri.parse('$baseUrl/orders/$orderId/payments'),
@@ -2219,7 +2402,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
       final String brId = terminalBranchId!;
 
       // Calculate next index
@@ -2303,7 +2486,7 @@ class AppState extends ChangeNotifier {
         terminalBranchId != null) {
       try {
         final String baseUrl =
-            terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+            terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
         final response = await http
             .patch(
               Uri.parse(
@@ -2328,6 +2511,11 @@ class AppState extends ChangeNotifier {
     final index = kitchenOrders.indexWhere((o) => o.id == orderId);
     if (index != -1) {
       kitchenOrders[index].status = newStatus;
+      _pendingKitchenStatusUpdates.add(orderId);
+      Timer(const Duration(seconds: 2), () {
+        _pendingKitchenStatusUpdates.remove(orderId);
+      });
+
       unawaited(_updateCloudKitchenTicketStatus(orderId, newStatus));
 
       if (newStatus == 'ready') {
@@ -2349,7 +2537,7 @@ class AppState extends ChangeNotifier {
     if (!isTerminalConfigured) return;
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
       final response = await http
           .patch(
             Uri.parse('$baseUrl/kitchen/tickets/$ticketId/status'),
@@ -2822,8 +3010,14 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> _pushSyncPayload(Map<String, dynamic> payload) async {
+    if (socketConnectionState == SocketConnectionState.connected && _socketService != null) {
+      final orderId = payload['id']?.toString() ?? _newUuid();
+      _socketService!.push(orderId, '', payload['payload'] ?? payload);
+      return false; // Leave in queue until socket ack arrives
+    }
+
     final baseUrl =
-        terminalApiUrl ?? 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api';
+        terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
     try {
       final response = await http
           .post(
@@ -3009,5 +3203,203 @@ class AppState extends ChangeNotifier {
       }
     }
     return lines.isEmpty ? [''] : lines;
+  }
+
+  // WebSocket Integration Methods
+
+  void _initWebSocket() {
+    _socketService?.dispose();
+    
+    final String baseUrl = terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+    final token = currentJwtToken;
+    final branchId = terminalBranchId;
+    final roleStr = currentUserRole == UserRole.waiter
+        ? 'waiter'
+        : currentUserRole == UserRole.cashier
+            ? 'cashier'
+            : currentUserRole == UserRole.kitchen
+                ? 'kitchen'
+                : 'none';
+    
+    if (token == null || branchId == null || roleStr == 'none') {
+      debugPrint('Skipping WebSocket init: missing credentials (token: ${token != null}, branchId: $branchId, role: $roleStr)');
+      return;
+    }
+    
+    _socketService = SyncSocketService(
+      apiUrl: baseUrl,
+      token: token,
+      branchId: branchId,
+      role: roleStr,
+      onBroadcastChangeReceived: (data) {
+        _handleWebSocketChange(data);
+      },
+      onResyncChangesReceived: (changes, serverTime) {
+        _handleWebSocketResync(changes, serverTime);
+      },
+      onAckReceived: (clientUuid, versionEn) {
+        _handleWebSocketAck(clientUuid, versionEn);
+      },
+      onStateChanged: (state) {
+        socketConnectionState = state;
+        if (state == SocketConnectionState.connected) {
+          isOnline = true;
+          _fallbackPollingTimer?.cancel();
+          _triggerResync();
+          unawaited(_syncPendingSaleJobs());
+        } else {
+          _startFallbackPolling();
+        }
+        notifyListeners();
+      },
+    );
+    
+    _socketService!.connect();
+  }
+
+  void _handleWebSocketChange(Map<String, dynamic> data) {
+    final changes = data['changes'] as List<dynamic>?;
+    if (changes == null) return;
+    
+    bool stateChanged = false;
+    for (final change in changes) {
+      if (change is! Map<String, dynamic>) continue;
+      final entity = change['entity']?.toString();
+      final entityId = change['entityId']?.toString();
+      final payload = change['payload'];
+      
+      if (entity == 'branchTables' && payload is Map) {
+        final tableIndex = tables.indexWhere((t) => t.remoteId == entityId);
+        if (tableIndex != -1) {
+          final newStateStr = payload['state']?.toString();
+          if (newStateStr != null) {
+            tables[tableIndex].state = _parseTableState(newStateStr);
+            stateChanged = true;
+          }
+        }
+      } else if (entity == 'orders' && payload is Map) {
+        final tableId = payload['tableId']?.toString();
+        final orderId = payload['id']?.toString();
+        final orderState = payload['state']?.toString();
+        
+        if (tableId != null && orderId != null) {
+          if (orderState == 'closed') {
+            _activeOrderIdsByTableRemoteId.remove(tableId);
+            final tableIndex = tables.indexWhere((t) => t.remoteId == tableId);
+            if (tableIndex != -1) {
+              tables[tableIndex].items = [];
+              tables[tableIndex].state = TableState.cleaning;
+              stateChanged = true;
+            }
+          } else {
+            _activeOrderIdsByTableRemoteId[tableId] = orderId;
+            stateChanged = true;
+          }
+        }
+      } else if (entity == 'kitchenOrders') {
+        _scheduleKitchenSyncFromWebSocket();
+      }
+    }
+    
+    if (stateChanged) {
+      notifyListeners();
+    }
+    
+    // Background pull sync to ensure operational data is 100% up to date
+    unawaited(syncActiveOrders(notify: false));
+    unawaited(syncTableStates(notify: false));
+  }
+
+  void _handleWebSocketResync(List<dynamic> changes, String serverTime) {
+    if (changes.isNotEmpty) {
+      _handleWebSocketChange({'changes': changes});
+    }
+    _secureStorageService.saveSyncCheckpoint(serverTime);
+  }
+
+  void _handleWebSocketAck(String clientUuid, String versionEn) {
+    _pendingSaleSyncJobs.removeWhere((job) => job['id'] == clientUuid);
+    _persistPendingSaleSyncJobs();
+  }
+
+  void _triggerResync() async {
+    final lastCheckpoint = await _secureStorageService.getSyncCheckpoint() ?? 
+        DateTime.now().subtract(const Duration(days: 1)).toUtc().toIso8601String();
+    _socketService?.triggerResync(lastCheckpoint);
+  }
+
+  void disconnectWebSocket() {
+    _socketService?.dispose();
+    _socketService = null;
+    socketConnectionState = SocketConnectionState.disconnected;
+    _fallbackPollingTimer?.cancel();
+    _fallbackPollingTimer = null;
+    notifyListeners();
+  }
+
+  void _startFallbackPolling() {
+    if (_fallbackPollingTimer?.isActive == true) return;
+    _fallbackPollingTimer?.cancel();
+    
+    _fallbackPollingTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
+      if (socketConnectionState == SocketConnectionState.connected) {
+        timer.cancel();
+        return;
+      }
+      debugPrint('WebSocket offline - executing REST fallback polling...');
+      try {
+        if (currentUserRole == UserRole.kitchen) {
+          await syncKitchenOrders();
+        } else {
+          await syncActiveOrders(notify: false);
+          await syncTableStates(notify: false);
+          if (currentUserRole == UserRole.waiter) {
+            await syncKitchenOrders();
+          }
+        }
+        isOnline = true;
+        notifyListeners();
+      } catch (e) {
+        debugPrint('REST fallback polling failed: $e');
+        isOnline = false;
+        notifyListeners();
+      }
+    });
+  }
+
+  void _scheduleKitchenSyncFromWebSocket() {
+    _kitchenSyncRetryTimer?.cancel();
+    
+    syncKitchenOrders().then((success) {
+      if (success) {
+        _kitchenSyncRetryCount = 0;
+        lastSyncError = null;
+      } else {
+        throw Exception('syncKitchenOrders returned false');
+      }
+    }).catchError((e) {
+      debugPrint('❌ WebSocket kitchen sync failed (attempt ${_kitchenSyncRetryCount + 1}/3): $e');
+      if (_kitchenSyncRetryCount < 3) {
+        final delay = Duration(seconds: 2 * (_kitchenSyncRetryCount + 1));
+        debugPrint('⏳ Retrying kitchen sync in ${delay.inSeconds}s...');
+        _kitchenSyncRetryTimer = Timer(delay, () {
+          _kitchenSyncRetryCount++;
+          _scheduleKitchenSyncFromWebSocket();
+        });
+      } else {
+        debugPrint('⛔ Kitchen sync failed after 3 retries, giving up');
+        lastSyncError = 'Kitchen sync failed after 3 retries';
+        _kitchenSyncRetryCount = 0;
+        notifyListeners();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _fallbackPollingTimer?.cancel();
+    _kitchenSyncRetryTimer?.cancel();
+    _socketService?.dispose();
+    super.dispose();
   }
 }

@@ -1,29 +1,73 @@
-import {
-  BadRequestException,
-  Injectable,
-  Inject,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef, OnModuleInit, BadRequestException } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../database/schema';
-import { sql, gt, eq, inArray } from 'drizzle-orm';
+import { sql, gt, eq, inArray, and } from 'drizzle-orm';
 import { PushSyncDto } from './dto/push-sync.dto';
 import { PullSyncDto } from './dto/pull-sync.dto';
 import { AckSyncDto } from './dto/ack-sync.dto';
+import { SyncGateway } from './sync.gateway';
 
 @Injectable()
-export class SyncService {
+export class SyncService implements OnModuleInit {
   private readonly logger = new Logger(SyncService.name);
 
   constructor(
     @Inject(DRIZZLE_CONNECTION)
     private readonly db: NodePgDatabase<typeof schema>,
+    @Inject(forwardRef(() => SyncGateway))
+    private readonly syncGateway: SyncGateway,
   ) {}
+
+  onModuleInit() {
+    // Schedule change log cleanups to run every 12 hours
+    setInterval(() => {
+      this.logger.log('Running scheduled cleanOldChangeLogs...');
+      this.cleanOldChangeLogs().catch((err) =>
+        this.logger.error('Failed to run scheduled cleanOldChangeLogs', err)
+      );
+    }, 12 * 60 * 60 * 1000); // 12 hours
+
+    // Run initial cleanup after startup settles
+    setTimeout(() => {
+      this.cleanOldChangeLogs().catch((err) =>
+        this.logger.error('Failed to run initial cleanOldChangeLogs', err)
+      );
+    }, 10000);
+  }
+
+  async getChangeLogSince(branchId: string, desde: string) {
+    const lastSyncedAt = new Date(desde);
+    return await this.db
+      .select()
+      .from(schema.changeLog)
+      .where(
+        and(
+          eq(schema.changeLog.branchId, branchId),
+          gt(schema.changeLog.versionAt, lastSyncedAt)
+        )
+      )
+      .orderBy(schema.changeLog.id);
+  }
+
+  async cleanOldChangeLogs(retentionDays = 3) {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+    try {
+      await this.db
+        .delete(schema.changeLog)
+        .where(sql`version_at < ${cutoffDate.toISOString()}`);
+    } catch (err) {
+      this.logger.error('Failed to clean old change logs', err);
+    }
+  }
 
   async push(pushSyncDto: PushSyncDto) {
     await this.validatePushReferences(pushSyncDto);
     const pushData = this.normalizePushPayload(pushSyncDto);
+
+    const logsToInsert: any[] = [];
+    const now = new Date();
 
     try {
       // Run push changes in a single atomic transaction
@@ -52,12 +96,29 @@ export class SyncService {
 
           // Update associated branchTables state
           for (const order of pushData.orders) {
+            logsToInsert.push({
+              entity: 'orders',
+              entityId: order.id,
+              branchId: order.branchId,
+              payload: order,
+              versionAt: now,
+            });
+
             if (order.tableId) {
               const tableState = order.state === 'closed' ? 'cleaning' : 'occupied';
               await tx
                 .update(schema.branchTables)
-                .set({ state: tableState, updatedAt: new Date() })
+                .set({ state: tableState, updatedAt: now })
                 .where(eq(schema.branchTables.id, order.tableId));
+
+              // Log the table state change
+              logsToInsert.push({
+                entity: 'branchTables',
+                entityId: order.tableId,
+                branchId: order.branchId,
+                payload: { id: order.tableId, state: tableState, updatedAt: now },
+                versionAt: now,
+              });
             }
           }
         }
@@ -82,6 +143,42 @@ export class SyncService {
                 version: sql`excluded.version`,
               },
             });
+
+          // Map orderId to branchId using the payload or querying the database
+          const orderIdToBranchId = new Map<string, string>();
+          if (pushData.orders) {
+            for (const o of pushData.orders) {
+              orderIdToBranchId.set(o.id, o.branchId);
+            }
+          }
+
+          // For any missing mapping, query from DB
+          const missingOrderIds = pushData.orderItems
+            .map((item) => item.orderId)
+            .filter((id) => !orderIdToBranchId.has(id));
+
+          if (missingOrderIds.length > 0) {
+            const dbOrders = await tx
+              .select({ id: schema.orders.id, branchId: schema.orders.branchId })
+              .from(schema.orders)
+              .where(inArray(schema.orders.id, missingOrderIds));
+            for (const o of dbOrders) {
+              orderIdToBranchId.set(o.id, o.branchId);
+            }
+          }
+
+          for (const item of pushData.orderItems) {
+            const bId = orderIdToBranchId.get(item.orderId);
+            if (bId) {
+              logsToInsert.push({
+                entity: 'orderItems',
+                entityId: item.id,
+                branchId: bId,
+                payload: item,
+                versionAt: now,
+              });
+            }
+          }
         }
 
         // 3. Upsert Payments (Immutable logs - do nothing on conflict)
@@ -119,7 +216,36 @@ export class SyncService {
             .values(pushData.cashTransactions)
             .onConflictDoNothing();
         }
+
+        // Write changes to changeLog table inside same transaction
+        if (logsToInsert.length > 0) {
+          await tx.insert(schema.changeLog).values(logsToInsert);
+        }
       });
+
+      // After transaction completes successfully, broadcast updates via WebSocket:
+      if (logsToInsert.length > 0) {
+        const branchGroupedLogs = new Map<string, any[]>();
+        for (const log of logsToInsert) {
+          if (!branchGroupedLogs.has(log.branchId)) {
+            branchGroupedLogs.set(log.branchId, []);
+          }
+          branchGroupedLogs.get(log.branchId)!.push({
+            id: '0', // placeholder
+            entity: log.entity,
+            entityId: log.entityId,
+            payload: log.payload,
+            versionAt: log.versionAt.toISOString(),
+          });
+        }
+
+        for (const [branchId, branchChanges] of branchGroupedLogs.entries()) {
+          this.syncGateway.broadcastChange(branchId, {
+            tipo: 'cambio',
+            changes: branchChanges,
+          });
+        }
+      }
     } catch (error) {
       this.logger.error(
         'Sync push transaction failed',
