@@ -304,13 +304,13 @@ resource "google_monitoring_dashboard" "sync_dashboard" {
         }
       },
       {
-        "title": "Sync Gateway Logs Volume",
+        "title": "Sync API Request Volume",
         "xyChart": {
           "dataSets": [
             {
               "timeSeriesQuery": {
                 "timeSeriesFilter": {
-                  "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"pos-sync-api\"",
+                  "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"pos-sync-api\"",
                   "aggregation": {
                     "alignmentPeriod": "60s",
                     "perSeriesAligner": "ALIGN_RATE"
