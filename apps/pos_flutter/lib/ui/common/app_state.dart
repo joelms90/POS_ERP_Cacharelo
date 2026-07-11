@@ -349,7 +349,7 @@ class AppState extends ChangeNotifier {
         
         // Auto-migrate old Cloud Run API URLs to the secure VM API subdomain
         if (terminalApiUrl != null && terminalApiUrl!.contains('umqpitkpoa-uc.a.run.app')) {
-          terminalApiUrl = 'https://pos-api.cacharelo.com/api';
+          terminalApiUrl = 'https://pos-sync-api-232144991863.us-central1.run.app/api';
           await _secureStorageService.saveTerminalConfig(
             businessId: terminalBusinessId ?? '',
             branchId: terminalBranchId ?? '',
@@ -430,7 +430,7 @@ class AppState extends ChangeNotifier {
 
   Future<bool> configureTerminalWithCode(String branchId) async {
     try {
-      String baseUrl = 'https://pos-api.cacharelo.com/api';
+      String baseUrl = 'https://pos-sync-api-232144991863.us-central1.run.app/api';
 
       http.Response response = await http
           .get(Uri.parse('$baseUrl/branches/$branchId'))
@@ -463,7 +463,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final String? businessId = terminalBusinessId;
       final String? branchId = terminalBranchId;
       if (businessId == null || branchId == null) return false;
@@ -501,7 +501,7 @@ class AppState extends ChangeNotifier {
     }
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final String bId =
           terminalBusinessId ?? 'd3b07384-d113-4a0e-a555-e5b12824bf01';
       final String brId = terminalBranchId ?? '';
@@ -864,7 +864,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final String brId = terminalBranchId!;
 
       // Fetch branch configs dynamically (room configs, zoom, images)
@@ -1062,7 +1062,7 @@ class AppState extends ChangeNotifier {
     if (!isTerminalConfigured) return;
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final bool isLocalConfig =
           baseUrl.contains('localhost') ||
           baseUrl.contains('10.0.2.2') ||
@@ -1136,7 +1136,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http
           .get(Uri.parse('$baseUrl/orders/active?branchId=$terminalBranchId'))
           .timeout(const Duration(seconds: 10));
@@ -1202,7 +1202,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http
           .get(Uri.parse('$baseUrl/kitchen/active?branchId=$terminalBranchId'))
           .timeout(const Duration(seconds: 10));
@@ -1271,7 +1271,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
 
       // Get last sync checkpoint timestamp
       final lastSyncedAt = await _getLastSyncCheckpoint();
@@ -1489,7 +1489,7 @@ class AppState extends ChangeNotifier {
 
       http.Response response;
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       try {
         response = await http
             .post(
@@ -1600,7 +1600,7 @@ class AppState extends ChangeNotifier {
   Future<void> checkActiveShift() async {
     if (!isTerminalConfigured || terminalBranchId == null || currentUserId == null) return;
     try {
-      final String baseUrl = terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http
           .get(Uri.parse('$baseUrl/cash-shifts/active?branchId=$terminalBranchId&cashierId=$currentUserId'))
           .timeout(const Duration(seconds: 8));
@@ -1624,7 +1624,7 @@ class AppState extends ChangeNotifier {
   Future<bool> openShift(double floatAmount) async {
     if (!isTerminalConfigured || terminalBranchId == null || currentUserId == null) return false;
     try {
-      final String baseUrl = terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http.post(
         Uri.parse('$baseUrl/cash-shifts'),
         headers: {'Content-Type': 'application/json'},
@@ -1654,7 +1654,7 @@ class AppState extends ChangeNotifier {
   Future<bool> addCashDrop(double amount, {String reason = 'Ingreso de caja'}) async {
     if (activeShiftId == null) return false;
     try {
-      final String baseUrl = terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http.post(
         Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
         headers: {'Content-Type': 'application/json'},
@@ -1685,7 +1685,7 @@ class AppState extends ChangeNotifier {
   Future<bool> removeCashDrop(double amount, {String reason = 'Retiro de caja'}) async {
     if (activeShiftId == null) return false;
     try {
-      final String baseUrl = terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http.post(
         Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
         headers: {'Content-Type': 'application/json'},
@@ -1716,7 +1716,7 @@ class AppState extends ChangeNotifier {
   Future<Map<String, dynamic>?> closeShift(double actualAmount) async {
     if (activeShiftId == null) return null;
     try {
-      final String baseUrl = terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http.post(
         Uri.parse('$baseUrl/cash-shifts/$activeShiftId/close'),
         headers: {'Content-Type': 'application/json'},
@@ -1743,7 +1743,7 @@ class AppState extends ChangeNotifier {
 
   Future<Map<String, dynamic>?> getCashShiftAuditReport(String shiftId) async {
     try {
-      final String baseUrl = terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http
           .get(Uri.parse('$baseUrl/reports/cash-shifts/$shiftId/audit'))
           .timeout(const Duration(seconds: 8));
@@ -1921,7 +1921,7 @@ class AppState extends ChangeNotifier {
     if (orderId != null) {
       try {
         final String baseUrl =
-            terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+            terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
         await http
             .post(Uri.parse('$baseUrl/orders/$orderId/cancel'))
             .timeout(const Duration(seconds: 8));
@@ -1952,7 +1952,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
 
       var orderId = _activeOrderIdsByTableRemoteId[tableRemoteId!];
       if (orderId == null) {
@@ -2043,7 +2043,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       await http
           .post(Uri.parse('$baseUrl/orders/$orderId/billing'))
           .timeout(const Duration(seconds: 10));
@@ -2348,7 +2348,7 @@ class AppState extends ChangeNotifier {
   }) async {
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http
           .post(
             Uri.parse('$baseUrl/orders/$orderId/payments'),
@@ -2402,7 +2402,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final String brId = terminalBranchId!;
 
       // Calculate next index
@@ -2486,7 +2486,7 @@ class AppState extends ChangeNotifier {
         terminalBranchId != null) {
       try {
         final String baseUrl =
-            terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+            terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
         final response = await http
             .patch(
               Uri.parse(
@@ -2537,7 +2537,7 @@ class AppState extends ChangeNotifier {
     if (!isTerminalConfigured) return;
     try {
       final String baseUrl =
-          terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http
           .patch(
             Uri.parse('$baseUrl/kitchen/tickets/$ticketId/status'),
@@ -3017,7 +3017,7 @@ class AppState extends ChangeNotifier {
     }
 
     final baseUrl =
-        terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+        terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
     try {
       final response = await http
           .post(
@@ -3210,7 +3210,7 @@ class AppState extends ChangeNotifier {
   void _initWebSocket() {
     _socketService?.dispose();
     
-    final String baseUrl = terminalApiUrl ?? 'https://pos-api.cacharelo.com/api';
+    final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
     final token = currentJwtToken;
     final branchId = terminalBranchId;
     final roleStr = currentUserRole == UserRole.waiter

@@ -6,7 +6,6 @@ import 'common/app_state.dart';
 import 'waiter/waiter_ordering_screen.dart';
 import 'cashier/cashier_dashboard_screen.dart';
 import 'kitchen/kitchen_dashboard_screen.dart';
-import 'widgets/offline_status_bar.dart';
 
 class LoginScreen extends StatefulWidget {
   final AppState state;
@@ -35,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
     text: 'Sucursal Centro',
   );
   final TextEditingController _apiUrlController = TextEditingController(
-    text: 'https://pos-sync-api-umqpitkpoa-uc.a.run.app/api',
+    text: 'https://pos-sync-api-232144991863.us-central1.run.app/api',
   );
 
   bool _showManualConfig = false;
@@ -50,6 +49,44 @@ class _LoginScreenState extends State<LoginScreen> {
     _branchNameController.dispose();
     _apiUrlController.dispose();
     super.dispose();
+  }
+
+  void _triggerSync() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: EmpireColors.obsidian),
+            ),
+            SizedBox(width: 12),
+            Text('Sincronizando datos con el servidor...', style: TextStyle(color: EmpireColors.obsidian, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        backgroundColor: EmpireColors.champagneGold,
+        duration: Duration(milliseconds: 1500),
+      ),
+    );
+
+    final bool success = await widget.state.syncAllData();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success 
+              ? 'Sincronización completa con éxito.'
+              : 'Sincronización incompleta. Revise su conexión de red.',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: success ? EmpireColors.successGreen : EmpireColors.errorRed,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   InputDecoration _inputDecoration(String label) {
@@ -447,12 +484,6 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top Offline Status bar
-            ListenableBuilder(
-              listenable: widget.state,
-              builder: (context, _) => OfflineStatusBar(state: widget.state),
-            ),
-
             Expanded(
               child: ListenableBuilder(
                 listenable: widget.state,
@@ -562,31 +593,69 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
 
                                       SizedBox(height: footerGap),
-                                      TextButton(
-                                        onPressed: () {
-                                          widget.state.deconfigureTerminal();
-                                        },
-                                        style: TextButton.styleFrom(
-                                          visualDensity: isCompactHeight
-                                              ? VisualDensity.compact
-                                              : VisualDensity.standard,
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: isCompactHeight ? 6 : 10,
+
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          TextButton(
+                                            onPressed: () {
+                                              widget.state.deconfigureTerminal();
+                                            },
+                                            style: TextButton.styleFrom(
+                                              visualDensity: isCompactHeight
+                                                  ? VisualDensity.compact
+                                                  : VisualDensity.standard,
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: isCompactHeight ? 6 : 10,
+                                              ),
+                                              minimumSize: Size.zero,
+                                              tapTargetSize:
+                                                  MaterialTapTargetSize.shrinkWrap,
+                                            ),
+                                            child: const Text(
+                                              'Vincular a otra Sucursal',
+                                              style: TextStyle(
+                                                color: Colors.white38,
+                                                fontSize: 11,
+                                                decoration:
+                                                    TextDecoration.underline,
+                                              ),
+                                            ),
                                           ),
-                                          minimumSize: Size.zero,
-                                          tapTargetSize:
-                                              MaterialTapTargetSize.shrinkWrap,
-                                        ),
-                                        child: const Text(
-                                          'Vincular a otra Sucursal',
-                                          style: TextStyle(
-                                            color: Colors.white38,
-                                            fontSize: 11,
-                                            decoration:
-                                                TextDecoration.underline,
+                                          const Text(
+                                            '|',
+                                            style: TextStyle(
+                                              color: Colors.white12,
+                                              fontSize: 11,
+                                            ),
                                           ),
-                                        ),
+                                          TextButton(
+                                            onPressed: _triggerSync,
+                                            style: TextButton.styleFrom(
+                                              visualDensity: isCompactHeight
+                                                  ? VisualDensity.compact
+                                                  : VisualDensity.standard,
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: isCompactHeight ? 6 : 10,
+                                              ),
+                                              minimumSize: Size.zero,
+                                              tapTargetSize:
+                                                  MaterialTapTargetSize.shrinkWrap,
+                                            ),
+                                            child: const Text(
+                                              'Sincronizar Terminal',
+                                              style: TextStyle(
+                                                color: EmpireColors.textGold,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                decoration:
+                                                    TextDecoration.underline,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
