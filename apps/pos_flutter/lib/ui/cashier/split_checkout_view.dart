@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui';
 import '../common/colors.dart';
 import '../common/app_state.dart';
 
@@ -359,14 +360,17 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Cambio a devolver',
-                  style: TextStyle(
-                    color: EmpireColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
+                const Expanded(
+                  child: Text(
+                    'Cambio a devolver',
+                    style: TextStyle(
+                      color: EmpireColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Text(
                   '\$${cashChange.toStringAsFixed(2)}',
                   style: const TextStyle(
@@ -590,259 +594,88 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
     );
   }
 
-  Widget _buildLeftSummaryPanel(BuildContext context) {
-    return Container(
-      color: EmpireColors.onyxSurface,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _buildSummaryRow(
+    String label,
+    String value, {
+    Color valueColor = EmpireColors.textPrimary,
+    double valueSize = 14,
+    FontWeight valueWeight = FontWeight.bold,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
         children: [
-          // Scrollable upper content
           Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Resumen de Pago',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: EmpireColors.champagneGold,
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Amount Summary Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: EmpireColors.charcoalSurface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: EmpireColors.agedBronzeDark,
-                        width: 1,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Subtotal
-                        const Text(
-                          'SUBTOTAL SUBCUENTA',
-                          style: TextStyle(
-                            color: EmpireColors.textSecondary,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '\$${currentSubtotal.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            color: EmpireColors.textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-
-                        if (selectedDiscount > 0) ...[
-                          const SizedBox(height: 12),
-                          Text(
-                            'DESCUENTO (${selectedDiscount.toInt()}%)',
-                            style: const TextStyle(
-                              color: EmpireColors.textSecondary,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '-\$${discountAmount.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              color: EmpireColors.errorRed,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-
-                        const SizedBox(height: 12),
-                        const Text(
-                          'IVA (16%)',
-                          style: TextStyle(
-                            color: EmpireColors.textSecondary,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '\$${currentTax.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            color: EmpireColors.textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-
-                        const Divider(
-                          color: EmpireColors.agedBronzeDark,
-                          height: 24,
-                        ),
-
-                        const Text(
-                          'TOTAL A COBRAR',
-                          style: TextStyle(
-                            color: EmpireColors.textGold,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            '\$${currentTotal.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              color: EmpireColors.champagneGold,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 20,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Payment method details summary
-                  if (selectedPaymentMethod == 'Efectivo') ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: EmpireColors.charcoalSurface.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: EmpireColors.agedBronzeDark.withOpacity(0.5),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'PAGO EN EFECTIVO',
-                            style: TextStyle(
-                              color: EmpireColors.textSecondary,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Recibido',
-                            style: TextStyle(
-                              color: EmpireColors.textSecondary,
-                              fontSize: 9,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '\$${(double.tryParse(_cashReceivedController.text) ?? 0.0).toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              color: EmpireColors.textPrimary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Cambio',
-                            style: TextStyle(
-                              color: EmpireColors.textSecondary,
-                              fontSize: 9,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '\$${cashChange.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              color: EmpireColors.successGreen,
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ] else if (selectedPaymentMethod == 'Tarjeta' &&
-                      _cardRefController.text.isNotEmpty) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: EmpireColors.charcoalSurface.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: EmpireColors.agedBronzeDark.withOpacity(0.5),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'PAGO CON TARJETA',
-                            style: TextStyle(
-                              color: EmpireColors.textSecondary,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Referencia',
-                            style: TextStyle(
-                              color: EmpireColors.textSecondary,
-                              fontSize: 9,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _cardRefController.text,
-                            style: const TextStyle(
-                              color: EmpireColors.textPrimary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                ],
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: EmpireColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _processPayment,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: EmpireColors.champagneGold,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+          Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              color: valueColor,
+              fontSize: valueSize,
+              fontWeight: valueWeight,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                'PROCESAR COBRO',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentSummaryCard() {
+    final received = double.tryParse(_cashReceivedController.text) ?? 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: EmpireColors.charcoalSurface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: EmpireColors.agedBronzeDark, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'RESUMEN DE PAGO',
+            style: TextStyle(
+              color: EmpireColors.textGold,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8,
             ),
+          ),
+          const SizedBox(height: 8),
+          _buildSummaryRow(
+              'Subtotal', '\$${currentSubtotal.toStringAsFixed(2)}'),
+          if (selectedDiscount > 0)
+            _buildSummaryRow(
+              'Descuento ${selectedDiscount.toInt()}%',
+              '-\$${discountAmount.toStringAsFixed(2)}',
+              valueColor: EmpireColors.errorRed,
+            ),
+          _buildSummaryRow('IVA (16%)', '\$${currentTax.toStringAsFixed(2)}'),
+          const Divider(color: EmpireColors.agedBronzeDark, height: 18),
+          _buildSummaryRow(
+            'Total',
+            '\$${currentTotal.toStringAsFixed(2)}',
+            valueColor: EmpireColors.champagneGold,
+            valueSize: 18,
+          ),
+          const Divider(color: EmpireColors.agedBronzeDark, height: 18),
+          _buildSummaryRow('Recibido', '\$${received.toStringAsFixed(2)}'),
+          _buildSummaryRow(
+            'Cambio',
+            '\$${cashChange.toStringAsFixed(2)}',
+            valueColor: EmpireColors.successGreen,
+            valueSize: 16,
           ),
         ],
       ),
@@ -1304,34 +1137,529 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildCheckoutHeader(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: EmpireColors.agedBronzeDark,
+            width: 1.5,
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Pagar Cuenta',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: EmpireColors.champagneGold,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Mesa: ${widget.table.label} • Total Original: \$${widget.table.total.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  color: EmpireColors.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          IconButton(
+            onPressed: widget.onCancel,
+            icon: const Icon(Icons.close, color: EmpireColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSplitMethodSelector() {
     return Row(
+      children: [
+        Expanded(
+          child: ChoiceChip(
+            label: const Text(
+              'DIVISIÓN EQUITATIVA',
+              textAlign: TextAlign.center,
+            ),
+            selected: isEqualSplit,
+            onSelected: (val) => setState(() => isEqualSplit = true),
+            selectedColor: EmpireColors.champagneGold,
+            backgroundColor: EmpireColors.charcoalSurface,
+            labelStyle: TextStyle(
+              color: isEqualSplit
+                  ? EmpireColors.obsidian
+                  : EmpireColors.textPrimary,
+              fontWeight: FontWeight.bold,
+              fontSize: 11,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ChoiceChip(
+            label: const Text('POR ARTÍCULOS', textAlign: TextAlign.center),
+            selected: !isEqualSplit,
+            onSelected: (val) => setState(() => isEqualSplit = false),
+            selectedColor: EmpireColors.champagneGold,
+            backgroundColor: EmpireColors.charcoalSurface,
+            labelStyle: TextStyle(
+              color: !isEqualSplit
+                  ? EmpireColors.obsidian
+                  : EmpireColors.textPrimary,
+              fontWeight: FontWeight.bold,
+              fontSize: 11,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEqualSplitControls() {
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Left Summary Panel (flex: 6) - replaces ShiftControlPanel (Turno de caja)
-        Expanded(
-          flex: 6,
-          child: Container(
-            decoration: const BoxDecoration(
-              color: EmpireColors.onyxSurface,
-              border: Border(
-                right: BorderSide(
-                  color: EmpireColors.agedBronzeDark,
-                  width: 1.5,
+        const Text(
+          'Dividir Cuenta (Número de Personas):',
+          style: TextStyle(
+            color: EmpireColors.textPrimary,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            IconButton(
+              onPressed: () {
+                if (splitCount > 1) {
+                  setState(() => splitCount--);
+                }
+              },
+              icon: const Icon(
+                Icons.remove_circle_outline,
+                color: EmpireColors.champagneGold,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                '$splitCount',
+                style: const TextStyle(
+                  color: EmpireColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
                 ),
               ),
             ),
-            child: _buildLeftSummaryPanel(context),
+            IconButton(
+              onPressed: () {
+                setState(() => splitCount++);
+              },
+              icon: const Icon(
+                Icons.add_circle_outline,
+                color: EmpireColors.champagneGold,
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Text(
+                'Total original dividido en $splitCount partes.',
+                style: const TextStyle(
+                  color: EmpireColors.textSecondary,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _buildOrderReviewPanel(),
+      ],
+    );
+  }
+
+  Widget _buildItemSplitControls() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Selecciona los artículos a cobrar en esta sub-cuenta:',
+          style: TextStyle(
+            color: EmpireColors.textPrimary,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
           ),
         ),
+        const SizedBox(height: 10),
+        if (widget.table.guestGenders.isNotEmpty) ...[
+          const Text(
+            'Seleccionar por Comensal:',
+            style: TextStyle(
+              color: EmpireColors.textGold,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 36,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: widget.table.guestGenders.length,
+              itemBuilder: (context, index) {
+                final guestLabel = 'P${index + 1}';
+                final gender = widget.table.guestGenders[index];
+                final emoji =
+                    gender == 'F' ? '👩' : (gender == 'K' ? '🧒' : '👨');
+                final guestItemsIndices = <int>[];
+                for (int i = 0; i < widget.table.items.length; i++) {
+                  if (widget.table.items[i].assignedGuest == guestLabel) {
+                    guestItemsIndices.add(i);
+                  }
+                }
+                final hasItems = guestItemsIndices.isNotEmpty;
+                final allSelected = hasItems &&
+                    guestItemsIndices.every(
+                      (idx) => selectedItemIndexes.contains(idx),
+                    );
 
-        // Right Checkout Panel (flex: 18) - the main content of Pagar Cuenta
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text('$guestLabel $emoji'),
+                    selected: allSelected,
+                    onSelected: (val) {
+                      setState(() {
+                        if (allSelected) {
+                          for (var idx in guestItemsIndices) {
+                            selectedItemIndexes.remove(idx);
+                          }
+                        } else {
+                          for (var idx in guestItemsIndices) {
+                            if (!selectedItemIndexes.contains(idx)) {
+                              selectedItemIndexes.add(idx);
+                            }
+                          }
+                        }
+                      });
+                    },
+                    selectedColor: EmpireColors.champagneGold,
+                    backgroundColor: EmpireColors.charcoalSurface,
+                    labelStyle: TextStyle(
+                      color: allSelected
+                          ? EmpireColors.obsidian
+                          : EmpireColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                    side: BorderSide(
+                      color: allSelected
+                          ? EmpireColors.champagneGold
+                          : EmpireColors.agedBronzeDark,
+                      width: 1,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        Container(
+          constraints: const BoxConstraints(maxHeight: 260),
+          decoration: BoxDecoration(
+            color: EmpireColors.charcoalSurface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: EmpireColors.agedBronzeDark, width: 1),
+          ),
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: widget.table.items.length,
+            itemBuilder: (context, index) {
+              final item = widget.table.items[index];
+              final isChecked = selectedItemIndexes.contains(index);
+              final assignedGuest = item.assignedGuest;
+
+              return Material(
+                color: EmpireColors.charcoalSurface,
+                child: CheckboxListTile(
+                  value: isChecked,
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.item.name,
+                          style: const TextStyle(
+                            color: EmpireColors.textPrimary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      if (assignedGuest != null) ...[
+                        const SizedBox(width: 8),
+                        _buildGuestBadge(assignedGuest),
+                      ],
+                    ],
+                  ),
+                  subtitle: Text(
+                    'Cantidad: ${item.quantity}',
+                    style: const TextStyle(
+                      color: EmpireColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                  secondary: Text(
+                    '\$${item.netTotalPrice.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: EmpireColors.textGold,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      if (val == true) {
+                        selectedItemIndexes.add(index);
+                      } else {
+                        selectedItemIndexes.remove(index);
+                      }
+                    });
+                  },
+                  activeColor: EmpireColors.champagneGold,
+                  checkColor: EmpireColors.obsidian,
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDiscountSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Aplicar Descuento Especial:',
+          style: TextStyle(
+            color: EmpireColors.textGold,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          children: discounts.map((disc) {
+            final isSelected = selectedDiscount == disc;
+            return ChoiceChip(
+              label: Text(disc == 0.0 ? 'Sin Descuento' : '${disc.toInt()}%'),
+              selected: isSelected,
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() => selectedDiscount = disc);
+                }
+              },
+              selectedColor: EmpireColors.champagneGold.withOpacity(0.2),
+              backgroundColor: EmpireColors.charcoalSurface,
+              labelStyle: TextStyle(
+                color: isSelected
+                    ? EmpireColors.champagneGold
+                    : EmpireColors.textPrimary,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 12,
+              ),
+              side: BorderSide(
+                color: isSelected
+                    ? EmpireColors.champagneGold
+                    : EmpireColors.agedBronzeDark,
+                width: 1,
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOrderDetailsColumn() {
+    return Container(
+      color: EmpireColors.onyxSurface,
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          _buildSplitMethodSelector(),
+          const SizedBox(height: 20),
+          if (isEqualSplit)
+            _buildEqualSplitControls()
+          else
+            _buildItemSplitControls(),
+          const SizedBox(height: 20),
+          _buildDiscountSelector(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentMethodSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Método de Pago:',
+          style: TextStyle(
+            color: EmpireColors.textPrimary,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: ChoiceChip(
+                avatar: const Icon(
+                  Icons.money,
+                  size: 16,
+                  color: EmpireColors.textPrimary,
+                ),
+                label: const Text('EFECTIVO'),
+                selected: selectedPaymentMethod == 'Efectivo',
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() => selectedPaymentMethod = 'Efectivo');
+                  }
+                },
+                selectedColor: EmpireColors.champagneGold.withOpacity(0.3),
+                backgroundColor: EmpireColors.charcoalSurface,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ChoiceChip(
+                avatar: const Icon(
+                  Icons.credit_card,
+                  size: 16,
+                  color: EmpireColors.textPrimary,
+                ),
+                label: const Text('TARJETA'),
+                selected: selectedPaymentMethod == 'Tarjeta',
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() => selectedPaymentMethod = 'Tarjeta');
+                  }
+                },
+                selectedColor: EmpireColors.champagneGold.withOpacity(0.3),
+                backgroundColor: EmpireColors.charcoalSurface,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentInputs() {
+    if (selectedPaymentMethod == 'Efectivo') {
+      return _buildCashPaymentInputs();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _cardRefController,
+          decoration: const InputDecoration(
+            labelText: 'Referencia de Terminal Bancaria',
+            hintText: 'Escriba el folio / hash del terminal',
+          ),
+          style: const TextStyle(color: EmpireColors.textPrimary),
+          onChanged: (value) => setState(() {}),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Para cobros offline, verifique la aprobación en la terminal e inserte el número de transacción.',
+          style: TextStyle(
+            color: EmpireColors.textSecondary,
+            fontSize: 11,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentColumn() {
+    return Container(
+      width: 380,
+      padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(
+        color: EmpireColors.onyxSurface,
+        border: Border(
+          left: BorderSide(color: EmpireColors.agedBronzeDark, width: 1.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildPaymentMethodSelector(),
+                  const SizedBox(height: 18),
+                  _buildPaymentInputs(),
+                  const SizedBox(height: 18),
+                  _buildPaymentSummaryCard(),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _processPayment,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: EmpireColors.champagneGold,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: const FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                'PROCESAR COBRO',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildCheckoutHeader(context),
         Expanded(
-          flex: 18,
-          child: Container(
-            color: EmpireColors.onyxSurface,
-            child: _buildRightCheckoutPanel(context),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: _buildOrderDetailsColumn()),
+              _buildPaymentColumn(),
+            ],
           ),
         ),
       ],
