@@ -24,6 +24,17 @@ async function main() {
     } else {
       console.log('ℹ️ Column "roles" already exists in "users" table.');
     }
+
+    const backfillRes = await client.query(`
+      UPDATE "users"
+      SET "roles" = jsonb_build_array("role")
+      WHERE "role" IS NOT NULL
+        AND (
+          "roles" IS NULL
+          OR "roles" = '[]'::jsonb
+        );
+    `);
+    console.log(`✅ Backfilled roles for ${backfillRes.rowCount} existing users.`);
     
     client.release();
   } catch (err) {
