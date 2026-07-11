@@ -182,7 +182,7 @@ export const UserForm: React.FC<UserFormProps> = ({
         />
       </FormField>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         {/* PIN Input */}
         <FormField
           label={isEditing ? 'Nuevo PIN (opcional)' : 'PIN de Acceso (4 dígitos)'}
@@ -202,32 +202,32 @@ export const UserForm: React.FC<UserFormProps> = ({
             disabled={isLoading}
           />
         </FormField>
-
-        {/* Role Selection */}
-        <div className="flex flex-col gap-2 w-full">
-          <label className="text-sm font-semibold tracking-wide text-text-secondary">
-            Roles del Empleado <span className="text-champagne-gold">*</span>
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {roleOptions.map(([value, label]) => (
-              <label
-                key={value}
-                className="flex items-center gap-2 px-3 py-2 bg-onyx-surface text-text-primary border border-aged-bronze rounded cursor-pointer select-none"
-              >
-                <input
-                  type="checkbox"
-                  checked={roles.includes(value as any)}
-                  onChange={() => toggleRole(value as any)}
-                  disabled={isLoading}
-                  className="accent-champagne-gold"
-                />
-                <span className="text-sm font-sans">{label}</span>
-              </label>
-            ))}
-          </div>
-          {rolesError && <span className="text-xs text-error-red font-medium">{rolesError}</span>}
-        </div>
       </div>
+
+      {/* Role Selection */}
+      <fieldset className="flex flex-col gap-3 w-full border border-aged-bronze/30 rounded p-4 bg-charcoal-surface/20">
+        <legend className="px-1 text-sm font-semibold tracking-wide text-text-secondary">
+          Roles del Empleado <span className="text-champagne-gold">*</span>
+        </legend>
+        <div className="flex flex-col gap-2">
+          {roleOptions.map(([value, label]) => (
+            <label
+              key={value}
+              className="flex min-h-11 items-center gap-3 px-3 py-2 bg-onyx-surface text-text-primary border border-aged-bronze/70 rounded cursor-pointer select-none transition-colors hover:border-champagne-gold/70"
+            >
+              <input
+                type="checkbox"
+                checked={roles.includes(value)}
+                onChange={() => toggleRole(value)}
+                disabled={isLoading}
+                className="h-4 w-4 shrink-0 accent-champagne-gold"
+              />
+              <span className="text-sm font-sans leading-5">{label}</span>
+            </label>
+          ))}
+        </div>
+        {rolesError && <span className="text-xs text-error-red font-medium">{rolesError}</span>}
+      </fieldset>
 
       {/* Branch Selection */}
       <div className="flex flex-col gap-1.5 w-full">
