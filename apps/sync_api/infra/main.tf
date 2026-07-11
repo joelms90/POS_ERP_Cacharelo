@@ -328,19 +328,4 @@ resource "google_monitoring_dashboard" "sync_dashboard" {
 EOF
 }
 
-# ==========================================
-# 12. Custom Domain Mapping for Cloud Run API
-# ==========================================
-resource "google_cloud_run_domain_mapping" "pos_api_domain" {
-  depends_on = [google_project_service.services]
-  location   = google_cloud_run_service.pos_api.location
-  name       = "pos-api.cacharelo.com"
 
-  metadata {
-    namespace = var.project_id
-  }
-
-  spec {
-    route_name = google_cloud_run_service.pos_api.name
-  }
-}
