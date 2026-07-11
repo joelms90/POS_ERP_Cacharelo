@@ -423,6 +423,17 @@ export const api = {
     return { success: true, user };
   },
 
+  async updateUser(
+    id: string,
+    employee: Partial<Omit<Employee, 'id' | 'businessId'>>,
+  ): Promise<{ success: boolean; user: Employee }> {
+    const response = await apiRequest<Employee>(`/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(employee),
+    });
+    return { success: true, user: response };
+  },
+
   /**
    * Delete user profile (revoke access)
    */

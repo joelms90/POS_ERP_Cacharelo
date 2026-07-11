@@ -13,6 +13,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ businessId }) => {
   const [users, setUsers] = useState<Employee[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
+  const [editingUser, setEditingUser] = useState<Employee | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
 
@@ -57,9 +58,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ businessId }) => {
   }, [fetchUsers]);
 
   // Callbacks for UserForm
-  const handleAddUserSuccess = (newUser: Employee) => {
-    setUsers((prev) => [...prev, newUser]);
-    showToast(`Empleado ${newUser.name} registrado con éxito.`, 'success');
+  const handleUserSaved = (savedUser: Employee) => {
+    if (editingUser) {
+      setUsers((prev) => prev.map((user) => user.id === savedUser.id ? savedUser : user));
+      setEditingUser(null);
+      showToast(`Empleado ${savedUser.name} actualizado con éxito.`, 'success');
+      fetchUsers(true);
+      return;
+    }
+
+    setUsers((prev) => [...prev, savedUser]);
+    showToast(`Empleado ${savedUser.name} registrado con éxito.`, 'success');
   };
 
   // Callbacks for UsersGrid
@@ -137,10 +146,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ businessId }) => {
           {/* Create User Form Block */}
           <div className="lg:col-span-1">
             <UserForm 
-              onSuccess={handleAddUserSuccess} 
+              onSuccess={handleUserSaved}
               onErrorToast={(msg) => showToast(msg, 'error')} 
               businessId={businessId} 
               branches={branches}
+              editingUser={editingUser}
+              onCancelEdit={() => setEditingUser(null)}
             />
           </div>
 
@@ -153,6 +164,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ businessId }) => {
             <UsersGrid
               users={users}
               branches={branches}
+              onEdit={setEditingUser}
               onDeleteSuccess={handleDeleteUserSuccess}
               onErrorToast={(msg) => showToast(msg, 'error')}
             />

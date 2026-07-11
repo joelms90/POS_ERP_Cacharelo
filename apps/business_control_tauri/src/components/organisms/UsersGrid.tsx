@@ -5,6 +5,7 @@ import { Badge } from '../atoms/Badge';
 interface UsersGridProps {
   users: Employee[];
   branches: Branch[];
+  onEdit: (user: Employee) => void;
   onDeleteSuccess: (id: string) => void;
   onErrorToast: (message: string) => void;
 }
@@ -12,6 +13,7 @@ interface UsersGridProps {
 export const UsersGrid: React.FC<UsersGridProps> = ({
   users,
   branches,
+  onEdit,
   onDeleteSuccess,
   onErrorToast,
 }) => {
@@ -159,15 +161,27 @@ export const UsersGrid: React.FC<UsersGridProps> = ({
                         </button>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => handleDeleteClick(user.id)}
-                        className="p-1.5 rounded-full border border-transparent hover:border-error-red/20 hover:bg-error-red/10 text-text-secondary hover:text-error-red transition-all duration-300 focus:outline-none"
-                        title="Eliminar acceso (Revocar)"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => onEdit(user)}
+                          className="p-1.5 rounded-full border border-transparent hover:border-champagne-gold/30 hover:bg-champagne-gold/10 text-text-secondary hover:text-champagne-gold transition-all duration-300 focus:outline-none"
+                          title="Editar empleado"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19.5 7.125L16.875 4.5" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(user.id)}
+                          className="p-1.5 rounded-full border border-transparent hover:border-error-red/20 hover:bg-error-red/10 text-text-secondary hover:text-error-red transition-all duration-300 focus:outline-none"
+                          title="Eliminar acceso (Revocar)"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>

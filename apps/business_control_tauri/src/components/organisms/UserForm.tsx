@@ -1,26 +1,73 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { api, Employee, Branch } from '../../services/api';
 import { Button } from '../atoms/Button';
 import { Input } from '../atoms/Input';
 import { FormField } from '../molecules/FormField';
+
+type PosEmployeeRole = 'waiter' | 'cashier' | 'kitchen';
 
 interface UserFormProps {
   onSuccess: (newUser: Employee) => void;
   onErrorToast: (message: string) => void;
   businessId: string;
   branches: Branch[];
+  editingUser?: Employee | null;
+  onCancelEdit?: () => void;
 }
 
-export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, businessId, branches }) => {
+const roleOptions: Array<[PosEmployeeRole, string]> = [
+  ['waiter', 'Mesero'],
+  ['cashier', 'Cajero'],
+  ['kitchen', 'Cocina'],
+];
+
+const getPosRoles = (user?: Employee | null): PosEmployeeRole[] => {
+  const source = user?.roles?.length ? user.roles : user?.role ? [user.role] : [];
+  const roles = source.filter((role): role is PosEmployeeRole =>
+    role === 'waiter' || role === 'cashier' || role === 'kitchen',
+  );
+  return roles.length > 0 ? roles : ['waiter'];
+};
+
+export const UserForm: React.FC<UserFormProps> = ({
+  onSuccess,
+  onErrorToast,
+  businessId,
+  branches,
+  editingUser,
+  onCancelEdit,
+}) => {
   const [name, setName] = useState('');
   const [pin, setPin] = useState('');
-  const [roles, setRoles] = useState<Array<'waiter' | 'cashier' | 'kitchen'>>(['waiter']);
+  const [roles, setRoles] = useState<PosEmployeeRole[]>(['waiter']);
   const [branchId, setBranchId] = useState('');
   
   const [nameError, setNameError] = useState<string | null>(null);
   const [pinError, setPinError] = useState<string | null>(null);
   const [rolesError, setRolesError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const isEditing = Boolean(editingUser);
+
+  useEffect(() => {
+    if (!editingUser) {
+      setName('');
+      setPin('');
+      setRoles(['waiter']);
+      setBranchId('');
+      setNameError(null);
+      setPinError(null);
+      setRolesError(null);
+      return;
+    }
+
+    setName(editingUser.name);
+    setPin('');
+    setRoles(getPosRoles(editingUser));
+    setBranchId(editingUser.branchId || '');
+    setNameError(null);
+    setPinError(null);
+    setRolesError(null);
+  }, [editingUser]);
 
   const validate = (): boolean => {
     let isValid = true;
@@ -38,9 +85,11 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
 
     // Validate PIN (exactly 4 digits, numeric)
     const pinRegex = /^[0-9]{4}$/;
-    if (!pin) {
+    if (!isEditing && !pin) {
       setPinError('El PIN es obligatorio.');
       isValid = false;
+    } else if (isEditing && !pin) {
+      setPinError(null);
     } else if (!pinRegex.test(pin)) {
       setPinError('El PIN debe ser un número de exactamente 4 dígitos.');
       isValid = false;
@@ -58,7 +107,7 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
     return isValid;
   };
 
-  const toggleRole = (role: 'waiter' | 'cashier' | 'kitchen') => {
+  const toggleRole = (role: PosEmployeeRole) => {
     setRoles((current) => {
       const next = current.includes(role)
         ? current.filter((item) => item !== role)
@@ -74,13 +123,17 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
 
     setIsLoading(true);
     try {
-      const response = await api.addUser({
+      const payload = {
         name: name.trim(),
-        pin,
         role: roles[0],
         roles,
         branchId: branchId || undefined,
-      }, businessId);
+        ...(pin ? { pin } : {}),
+      };
+
+      const response = isEditing && editingUser
+        ? await api.updateUser(editingUser.id, payload)
+        : await api.addUser({ ...payload, pin }, businessId);
 
       if (response.success && response.user) {
         onSuccess(response.user);
@@ -90,7 +143,7 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
         setRoles(['waiter']);
         setBranchId('');
       } else {
-        onErrorToast('No se pudo registrar el usuario.');
+        onErrorToast(isEditing ? 'No se pudo actualizar el usuario.' : 'No se pudo registrar el usuario.');
       }
     } catch (err: any) {
       onErrorToast(err.message || 'Error al conectar con el servidor.');
@@ -106,10 +159,12 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
     >
       <div className="border-b border-aged-bronze/20 pb-3">
         <h3 className="font-display text-lg text-champagne-gold tracking-wide uppercase">
-          Registrar Personal
+          {isEditing ? 'Editar Personal' : 'Registrar Personal'}
         </h3>
         <p className="text-xs text-text-secondary mt-0.5 font-sans">
-          Crea credenciales PIN de acceso para terminales POS.
+          {isEditing
+            ? 'Actualiza roles, sucursal o PIN de acceso para terminales POS.'
+            : 'Crea credenciales PIN de acceso para terminales POS.'}
         </p>
       </div>
 
@@ -129,7 +184,11 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* PIN Input */}
-        <FormField label="PIN de Acceso (4 dígitos)" error={pinError || undefined} required>
+        <FormField
+          label={isEditing ? 'Nuevo PIN (opcional)' : 'PIN de Acceso (4 dígitos)'}
+          error={pinError || undefined}
+          required={!isEditing}
+        >
           <Input
             type="text"
             maxLength={4}
@@ -139,7 +198,7 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
               setPin(val);
               if (pinError) setPinError(null);
             }}
-            placeholder="Ej. 4321"
+            placeholder={isEditing ? 'Dejar vacío para conservar' : 'Ej. 4321'}
             disabled={isLoading}
           />
         </FormField>
@@ -150,11 +209,7 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
             Roles del Empleado <span className="text-champagne-gold">*</span>
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {[
-              ['waiter', 'Mesero'],
-              ['cashier', 'Cajero'],
-              ['kitchen', 'Cocina'],
-            ].map(([value, label]) => (
+            {roleOptions.map(([value, label]) => (
               <label
                 key={value}
                 className="flex items-center gap-2 px-3 py-2 bg-onyx-surface text-text-primary border border-aged-bronze rounded cursor-pointer select-none"
@@ -201,17 +256,27 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span>Guardando...</span>
+            <span>{isEditing ? 'Actualizando...' : 'Guardando...'}</span>
           </>
         ) : (
           <>
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
             </svg>
-            <span>Crear Empleado</span>
+            <span>{isEditing ? 'Actualizar Empleado' : 'Crear Empleado'}</span>
           </>
         )}
       </Button>
+      {isEditing && (
+        <button
+          type="button"
+          onClick={onCancelEdit}
+          disabled={isLoading}
+          className="text-xs text-text-secondary hover:text-text-primary underline disabled:opacity-50"
+        >
+          Cancelar edición
+        </button>
+      )}
     </form>
   );
 };
