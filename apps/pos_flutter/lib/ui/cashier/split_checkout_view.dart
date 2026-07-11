@@ -383,6 +383,213 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
     );
   }
 
+  String _guestEmojiForAssignedGuest(String? assignedGuest) {
+    if (assignedGuest == null) return '👨';
+    final match = RegExp(r'P(\d+)').firstMatch(assignedGuest);
+    if (match == null) return '👨';
+
+    final idx = int.parse(match.group(1)!) - 1;
+    if (idx < 0 || idx >= widget.table.guestGenders.length) return '👨';
+
+    final gender = widget.table.guestGenders[idx];
+    return gender == 'F' ? '👩' : (gender == 'K' ? '🧒' : '👨');
+  }
+
+  Widget _buildGuestBadge(String assignedGuest) {
+    final guestEmoji = _guestEmojiForAssignedGuest(assignedGuest);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: EmpireColors.champagneGold.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: EmpireColors.champagneGold.withOpacity(0.3),
+        ),
+      ),
+      child: Text(
+        '$assignedGuest $guestEmoji',
+        style: const TextStyle(
+          color: EmpireColors.champagneGold,
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrderReviewPanel() {
+    final totalQuantity = widget.table.items.fold<int>(
+      0,
+      (sum, item) => sum + item.quantity,
+    );
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 140),
+      decoration: BoxDecoration(
+        color: EmpireColors.charcoalSurface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: EmpireColors.agedBronzeDark,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: const BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: EmpireColors.agedBronzeDark,
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.receipt_long,
+                  color: EmpireColors.champagneGold,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Artículos de la orden',
+                    style: TextStyle(
+                      color: EmpireColors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Text(
+                  '$totalQuantity artículos · \$${widget.table.total.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    color: EmpireColors.textGold,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            color: EmpireColors.onyxSurface.withOpacity(0.45),
+            child: Text(
+              'Esta división cobra 1 de $splitCount partes. Los artículos se muestran solo para revisión.',
+              style: const TextStyle(
+                color: EmpireColors.textSecondary,
+                fontSize: 11,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              padding: EdgeInsets.zero,
+              itemCount: widget.table.items.length,
+              separatorBuilder: (context, index) => const Divider(
+                height: 1,
+                color: EmpireColors.agedBronzeDark,
+              ),
+              itemBuilder: (context, index) {
+                final item = widget.table.items[index];
+                final assignedGuest = item.assignedGuest;
+                final detailLines = <String>[
+                  if (item.modifiers.isNotEmpty)
+                    'Modificadores: ${item.modifiers.join(', ')}',
+                  if (item.notes.trim().isNotEmpty)
+                    'Nota: ${item.notes.trim()}',
+                ];
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 28,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: EmpireColors.onyxSurface,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: EmpireColors.agedBronzeDark,
+                          ),
+                        ),
+                        child: Text(
+                          '${item.quantity}x',
+                          style: const TextStyle(
+                            color: EmpireColors.champagneGold,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.item.name,
+                                    style: const TextStyle(
+                                      color: EmpireColors.textPrimary,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                if (assignedGuest != null) ...[
+                                  const SizedBox(width: 8),
+                                  _buildGuestBadge(assignedGuest),
+                                ],
+                              ],
+                            ),
+                            if (detailLines.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                detailLines.join(' · '),
+                                style: const TextStyle(
+                                  color: EmpireColors.textSecondary,
+                                  fontSize: 11,
+                                  height: 1.25,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '\$${item.totalPrice.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          color: EmpireColors.textGold,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLeftSummaryPanel(BuildContext context) {
     return Container(
       color: EmpireColors.onyxSurface,
@@ -787,15 +994,18 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                       ),
                     ),
                     const SizedBox(width: 20),
-                    Text(
-                      'Total original dividido en $splitCount partes.',
-                      style: const TextStyle(
-                        color: EmpireColors.textSecondary,
-                        fontSize: 11,
+                    Expanded(
+                      child: Text(
+                        'Total original dividido en $splitCount partes.',
+                        style: const TextStyle(
+                          color: EmpireColors.textSecondary,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
                   ],
                 ),
+                _buildOrderReviewPanel(),
               ] else ...[
                 const Text(
                   'Selecciona los artículos a cobrar en esta sub-cuenta:',
@@ -904,22 +1114,6 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                       final isChecked = selectedItemIndexes.contains(index);
 
                       final assignedGuest = item.assignedGuest;
-                      String guestEmoji = '👨';
-                      if (assignedGuest != null) {
-                        final match = RegExp(
-                          r'P(\d+)',
-                        ).firstMatch(assignedGuest);
-                        if (match != null) {
-                          final idx = int.parse(match.group(1)!) - 1;
-                          if (idx >= 0 &&
-                              idx < widget.table.guestGenders.length) {
-                            final gender = widget.table.guestGenders[idx];
-                            guestEmoji = gender == 'F'
-                                ? '👩'
-                                : (gender == 'K' ? '🧒' : '👨');
-                          }
-                        }
-                      }
 
                       return Material(
                         color: EmpireColors.charcoalSurface,
@@ -938,29 +1132,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                               ),
                               if (assignedGuest != null) ...[
                                 const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: EmpireColors.champagneGold
-                                        .withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(
-                                      color: EmpireColors.champagneGold
-                                          .withOpacity(0.3),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    '$assignedGuest $guestEmoji',
-                                    style: const TextStyle(
-                                      color: EmpireColors.champagneGold,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
+                                _buildGuestBadge(assignedGuest),
                               ],
                             ],
                           ),

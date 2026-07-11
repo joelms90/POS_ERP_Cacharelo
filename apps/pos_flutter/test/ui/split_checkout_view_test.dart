@@ -119,6 +119,9 @@ void main() {
       await tester.tap(find.widgetWithText(OutlinedButton, 'Limpiar'));
       await tester.pumpAndSettle();
 
+      await tester.drag(find.byType(ListView).first, const Offset(0, -240));
+      await tester.pumpAndSettle();
+
       await tester.tap(find.text('+\$20'));
       await tester.tap(find.text('+\$50'));
       await tester.pumpAndSettle();
