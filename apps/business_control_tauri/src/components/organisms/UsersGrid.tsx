@@ -82,7 +82,7 @@ export const UsersGrid: React.FC<UsersGridProps> = ({
           </thead>
           <tbody className="divide-y divide-aged-bronze/10 text-sm">
             {users.map((user) => {
-              const roleInfo = (roleLabels as any)[user.role] || { text: user.role, variant: 'info' as const };
+              const userRoles = user.roles?.length ? user.roles : [user.role];
               const isConfirmingDelete = deletingId === user.id;
               const branch = branches.find((b) => b.id === user.branchId);
               const branchName = branch ? branch.name : 'Todas (General)';
@@ -100,8 +100,17 @@ export const UsersGrid: React.FC<UsersGridProps> = ({
                   </td>
 
                   {/* Role */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge variant={roleInfo.variant}>{roleInfo.text}</Badge>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap gap-1.5">
+                      {userRoles.map((role) => {
+                        const roleInfo = (roleLabels as any)[role] || { text: role, variant: 'info' as const };
+                        return (
+                          <Badge key={role} variant={roleInfo.variant}>
+                            {roleInfo.text}
+                          </Badge>
+                        );
+                      })}
+                    </div>
                   </td>
 
                   {/* PIN */}

@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, Length, IsUUID, IsEnum, Matches } from 'class-validator';
+import { ArrayMinSize, ArrayUnique, IsArray, IsString, IsEmail, IsOptional, Length, IsUUID, IsEnum, Matches } from 'class-validator';
 import type { UserRole } from '../../auth/roles';
 
 export const USER_ROLES = ['waiter', 'cashier', 'kitchen', 'admin', 'vendedor', 'owner', 'inventory_admin'] as const;
@@ -33,5 +33,16 @@ export class CreateUserDto {
   @IsEnum(USER_ROLES, {
     message: 'Role must be one of: waiter, cashier, kitchen, admin, vendedor, owner, inventory_admin',
   })
-  role: UserRole;
+  @IsOptional()
+  role?: UserRole;
+
+  @IsArray()
+  @ArrayMinSize(1, { message: 'At least one role must be selected' })
+  @ArrayUnique()
+  @IsEnum(USER_ROLES, {
+    each: true,
+    message: 'Roles must contain only: waiter, cashier, kitchen, admin, vendedor, owner, inventory_admin',
+  })
+  @IsOptional()
+  roles?: UserRole[];
 }

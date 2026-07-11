@@ -93,6 +93,7 @@ export class AuthService {
   }
 
   private async generateAuthTokens(user: any, deviceId: string) {
+    const roles = this.normalizeRoles(user.roles, user.role);
     const businessAccess = await this.usersRepository.findAdminAccessForUser(user.id);
     const normalizedAccess = businessAccess.length > 0
       ? businessAccess.map((access) => ({
@@ -100,14 +101,15 @@ export class AuthService {
           role: access.role,
         }))
       : user.businessId
-        ? [{ businessId: user.businessId, role: user.role }]
+        ? [{ businessId: user.businessId, role: roles[0] }]
         : [];
     const primaryBusinessId = user.businessId || normalizedAccess[0]?.businessId || null;
 
     const jwtPayload = {
       sub: user.id,
       name: user.name,
-      role: user.role,
+      role: roles[0],
+      roles,
       businessId: primaryBusinessId,
       businessAccess: normalizedAccess,
     };
@@ -145,10 +147,27 @@ export class AuthService {
       refreshToken,
       user: {
         ...sanitizedUser,
+        role: roles[0],
+        roles,
         businessId: primaryBusinessId,
         businessAccess: normalizedAccess,
       },
     };
+  }
+
+  private normalizeRoles(roles?: unknown, fallbackRole?: string): string[] {
+    const source = Array.isArray(roles) && roles.length > 0
+      ? roles
+      : fallbackRole
+        ? [fallbackRole]
+        : [];
+    return Array.from(
+      new Set(
+        source
+          .map((role) => role?.toString().trim())
+          .filter((role): role is string => Boolean(role)),
+      ),
+    );
   }
 
   private hashToken(token: string): string {

@@ -6,6 +6,7 @@ export interface Employee {
   email?: string;
   pin: string;
   role: 'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'owner' | 'inventory_admin';
+  roles?: Array<'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'owner' | 'inventory_admin'>;
 }
 
 export interface AdminUser {

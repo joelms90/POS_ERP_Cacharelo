@@ -59,10 +59,13 @@ class _LoginScreenState extends State<LoginScreen> {
             SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2, color: EmpireColors.obsidian),
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: EmpireColors.obsidian),
             ),
             SizedBox(width: 12),
-            Text('Sincronizando datos con el servidor...', style: TextStyle(color: EmpireColors.obsidian, fontWeight: FontWeight.bold)),
+            Text('Sincronizando datos con el servidor...',
+                style: TextStyle(
+                    color: EmpireColors.obsidian, fontWeight: FontWeight.bold)),
           ],
         ),
         backgroundColor: EmpireColors.champagneGold,
@@ -77,12 +80,14 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            success 
-              ? 'Sincronización completa con éxito.'
-              : 'Sincronización incompleta. Revise su conexión de red.',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            success
+                ? 'Sincronización completa con éxito.'
+                : 'Sincronización incompleta. Revise su conexión de red.',
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold),
           ),
-          backgroundColor: success ? EmpireColors.successGreen : EmpireColors.errorRed,
+          backgroundColor:
+              success ? EmpireColors.successGreen : EmpireColors.errorRed,
           duration: const Duration(seconds: 2),
         ),
       );
@@ -165,7 +170,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
               const SizedBox(height: 24),
-
               if (_activationError.isNotEmpty) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -187,7 +191,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
-
               if (!_showManualConfig) ...[
                 TextField(
                   controller: _jsonController,
@@ -290,7 +293,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ],
-
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () {
@@ -422,44 +424,20 @@ class _LoginScreenState extends State<LoginScreen> {
     final success = await widget.state.login(pin);
     if (success) {
       _handleClear();
-      Widget nextScreen;
-
-      switch (widget.state.currentUserRole) {
-        case UserRole.waiter:
-          nextScreen = WaiterOrderingScreen(state: widget.state);
-          break;
-        case UserRole.cashier:
-          nextScreen = CashierDashboardScreen(state: widget.state);
-          break;
-        case UserRole.kitchen:
-          nextScreen = KitchenDashboardScreen(state: widget.state);
-          break;
-        default:
+      if (widget.state.currentUserRole == UserRole.none &&
+          widget.state.availableUserRoles.length > 1) {
+        final selectedRole =
+            await _showRoleSelectionDialog(widget.state.availableUserRoles);
+        if (selectedRole == null) {
+          widget.state.logout();
           return;
+        }
+        if (!widget.state.completeLoginWithRole(selectedRole)) {
+          return;
+        }
       }
 
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-                  const begin = Offset(0.0, 1.0);
-                  const end = Offset.zero;
-                  const curve = Curves.easeInOutQuart;
-                  var tween = Tween(
-                    begin: begin,
-                    end: end,
-                  ).chain(CurveTween(curve: curve));
-                  return SlideTransition(
-                    position: animation.drive(tween),
-                    child: child,
-                  );
-                },
-            transitionDuration: const Duration(milliseconds: 600),
-          ),
-        );
-      }
+      _navigateForCurrentRole();
     } else {
       setState(() {
         hasError = true;
@@ -474,6 +452,113 @@ class _LoginScreenState extends State<LoginScreen> {
           });
         }
       });
+    }
+  }
+
+  void _navigateForCurrentRole() {
+    Widget nextScreen;
+
+    switch (widget.state.currentUserRole) {
+      case UserRole.waiter:
+        nextScreen = WaiterOrderingScreen(state: widget.state);
+        break;
+      case UserRole.cashier:
+        nextScreen = CashierDashboardScreen(state: widget.state);
+        break;
+      case UserRole.kitchen:
+        nextScreen = KitchenDashboardScreen(state: widget.state);
+        break;
+      default:
+        return;
+    }
+
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            const begin = Offset(0.0, 1.0);
+            const end = Offset.zero;
+            const curve = Curves.easeInOutQuart;
+            var tween = Tween(
+              begin: begin,
+              end: end,
+            ).chain(CurveTween(curve: curve));
+            return SlideTransition(
+              position: animation.drive(tween),
+              child: child,
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 600),
+        ),
+      );
+    }
+  }
+
+  Future<UserRole?> _showRoleSelectionDialog(List<UserRole> roles) {
+    return showDialog<UserRole>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: EmpireColors.onyxSurface,
+          title: const Text(
+            'Selecciona tu rol',
+            style: TextStyle(color: EmpireColors.textGold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: roles
+                .where((role) => role != UserRole.none)
+                .map(
+                  (role) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(role),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: EmpireColors.champagneGold,
+                          foregroundColor: EmpireColors.obsidian,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: Text(
+                          _roleLabel(role),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: EmpireColors.textSecondary),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _roleLabel(UserRole role) {
+    switch (role) {
+      case UserRole.waiter:
+        return 'Mesero';
+      case UserRole.cashier:
+        return 'Cajero';
+      case UserRole.kitchen:
+        return 'Cocina';
+      case UserRole.none:
+        return 'Sin rol';
     }
   }
 
@@ -595,11 +680,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                       SizedBox(height: footerGap),
 
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           TextButton(
                                             onPressed: () {
-                                              widget.state.deconfigureTerminal();
+                                              widget.state
+                                                  .deconfigureTerminal();
                                             },
                                             style: TextButton.styleFrom(
                                               visualDensity: isCompactHeight
@@ -607,11 +694,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                                   : VisualDensity.standard,
                                               padding: EdgeInsets.symmetric(
                                                 horizontal: 12,
-                                                vertical: isCompactHeight ? 6 : 10,
+                                                vertical:
+                                                    isCompactHeight ? 6 : 10,
                                               ),
                                               minimumSize: Size.zero,
                                               tapTargetSize:
-                                                  MaterialTapTargetSize.shrinkWrap,
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
                                             ),
                                             child: const Text(
                                               'Vincular a otra Sucursal',
@@ -638,11 +727,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                                   : VisualDensity.standard,
                                               padding: EdgeInsets.symmetric(
                                                 horizontal: 12,
-                                                vertical: isCompactHeight ? 6 : 10,
+                                                vertical:
+                                                    isCompactHeight ? 6 : 10,
                                               ),
                                               minimumSize: Size.zero,
                                               tapTargetSize:
-                                                  MaterialTapTargetSize.shrinkWrap,
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
                                             ),
                                             child: const Text(
                                               'Sincronizar Terminal',
@@ -712,9 +803,9 @@ class _LoginScreenState extends State<LoginScreen> {
               Text(
                 'Cacharelo Restaurant',
                 style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                  fontSize: 40,
-                  letterSpacing: 2,
-                ),
+                      fontSize: 40,
+                      letterSpacing: 2,
+                    ),
               ),
               const SizedBox(height: 12),
               Container(
@@ -726,9 +817,9 @@ class _LoginScreenState extends State<LoginScreen> {
               Text(
                 'Sistema de Punto de Venta y Gestión de Recursos. Diseñado con autoría local para operación continua offline.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: EmpireColors.textSecondary,
-                  height: 1.6,
-                ),
+                      color: EmpireColors.textSecondary,
+                      height: 1.6,
+                    ),
               ),
               const SizedBox(height: 40),
               Row(
@@ -774,8 +865,8 @@ class _LoginScreenState extends State<LoginScreen> {
               color: hasError
                   ? EmpireColors.errorRed
                   : (isActive
-                        ? EmpireColors.champagneGold
-                        : EmpireColors.agedBronze),
+                      ? EmpireColors.champagneGold
+                      : EmpireColors.agedBronze),
               width: 2,
             ),
             boxShadow: isActive

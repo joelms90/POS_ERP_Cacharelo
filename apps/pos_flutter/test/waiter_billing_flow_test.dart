@@ -17,9 +17,8 @@ class FakeSecureStorageService extends SecureStorageService {
 
   @override
   Future<void> savePendingSaleSyncJobs(List<Map<String, dynamic>> jobs) async {
-    pendingSaleSyncJobs = jobs
-        .map((job) => Map<String, dynamic>.from(job))
-        .toList();
+    pendingSaleSyncJobs =
+        jobs.map((job) => Map<String, dynamic>.from(job)).toList();
   }
 
   @override
@@ -32,7 +31,7 @@ class FakeSecureStorageService extends SecureStorageService {
   Future<Map<String, String>?> getSavedPrinter() async => null;
 
   @override
-  Future<Map<String, String>?> verifyOfflineCredentials(String pin) async =>
+  Future<Map<String, dynamic>?> verifyOfflineCredentials(String pin) async =>
       null;
 }
 
@@ -230,9 +229,8 @@ void main() {
       expect(fakeStorage.pendingSaleSyncJobs, hasLength(1));
       expect(state.pendingSyncCount, 1);
 
-      final payload =
-          fakeStorage.pendingSaleSyncJobs.single['payload']
-              as Map<String, dynamic>;
+      final payload = fakeStorage.pendingSaleSyncJobs.single['payload']
+          as Map<String, dynamic>;
       final order = (payload['orders'] as List).single as Map<String, dynamic>;
       final payment =
           (payload['payments'] as List).single as Map<String, dynamic>;

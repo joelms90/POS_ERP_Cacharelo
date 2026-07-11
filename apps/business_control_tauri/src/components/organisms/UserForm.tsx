@@ -14,11 +14,12 @@ interface UserFormProps {
 export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, businessId, branches }) => {
   const [name, setName] = useState('');
   const [pin, setPin] = useState('');
-  const [role, setRole] = useState<'waiter' | 'cashier' | 'kitchen'>('waiter');
+  const [roles, setRoles] = useState<Array<'waiter' | 'cashier' | 'kitchen'>>(['waiter']);
   const [branchId, setBranchId] = useState('');
   
   const [nameError, setNameError] = useState<string | null>(null);
   const [pinError, setPinError] = useState<string | null>(null);
+  const [rolesError, setRolesError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const validate = (): boolean => {
@@ -47,7 +48,24 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
       setPinError(null);
     }
 
+    if (roles.length === 0) {
+      setRolesError('Selecciona al menos un rol.');
+      isValid = false;
+    } else {
+      setRolesError(null);
+    }
+
     return isValid;
+  };
+
+  const toggleRole = (role: 'waiter' | 'cashier' | 'kitchen') => {
+    setRoles((current) => {
+      const next = current.includes(role)
+        ? current.filter((item) => item !== role)
+        : [...current, role];
+      if (next.length > 0) setRolesError(null);
+      return next;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,7 +77,8 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
       const response = await api.addUser({
         name: name.trim(),
         pin,
-        role,
+        role: roles[0],
+        roles,
         branchId: branchId || undefined,
       }, businessId);
 
@@ -68,7 +87,7 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
         // Clear fields
         setName('');
         setPin('');
-        setRole('waiter');
+        setRoles(['waiter']);
         setBranchId('');
       } else {
         onErrorToast('No se pudo registrar el usuario.');
@@ -126,20 +145,32 @@ export const UserForm: React.FC<UserFormProps> = ({ onSuccess, onErrorToast, bus
         </FormField>
 
         {/* Role Selection */}
-        <div className="flex flex-col gap-1.5 w-full">
+        <div className="flex flex-col gap-2 w-full">
           <label className="text-sm font-semibold tracking-wide text-text-secondary">
-            Rol del Empleado <span className="text-champagne-gold">*</span>
+            Roles del Empleado <span className="text-champagne-gold">*</span>
           </label>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as any)}
-            disabled={isLoading}
-            className="w-full px-4 py-2 bg-onyx-surface text-text-primary border border-aged-bronze focus:border-champagne-gold focus:ring-champagne-gold/50 rounded font-sans focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-          >
-            <option value="waiter">Mesero (Waiter)</option>
-            <option value="cashier">Cajero (Cashier)</option>
-            <option value="kitchen">Pantalla Cocina (Kitchen)</option>
-          </select>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {[
+              ['waiter', 'Mesero'],
+              ['cashier', 'Cajero'],
+              ['kitchen', 'Cocina'],
+            ].map(([value, label]) => (
+              <label
+                key={value}
+                className="flex items-center gap-2 px-3 py-2 bg-onyx-surface text-text-primary border border-aged-bronze rounded cursor-pointer select-none"
+              >
+                <input
+                  type="checkbox"
+                  checked={roles.includes(value as any)}
+                  onChange={() => toggleRole(value as any)}
+                  disabled={isLoading}
+                  className="accent-champagne-gold"
+                />
+                <span className="text-sm font-sans">{label}</span>
+              </label>
+            ))}
+          </div>
+          {rolesError && <span className="text-xs text-error-red font-medium">{rolesError}</span>}
         </div>
       </div>
 

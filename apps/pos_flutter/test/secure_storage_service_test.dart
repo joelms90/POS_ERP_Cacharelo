@@ -106,6 +106,7 @@ void main() {
       expect(credsAfter, isNotNull);
       expect(credsAfter!['name'], equals('Carlos (Chef)'));
       expect(credsAfter['role'], equals('kitchen'));
+      expect(credsAfter['roles'], equals(['kitchen']));
     });
 
     test('clearCachedCredentials clears the cache', () async {

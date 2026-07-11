@@ -55,6 +55,11 @@ const statusLabel = (status?: string) => {
   }
 };
 
+const userHasRole = (user: Employee, role: string) => {
+  const roles = user.roles?.length ? user.roles : [user.role];
+  return roles.includes(role as any);
+};
+
 export const PosSimulatorPage: React.FC<PosSimulatorPageProps> = ({ businessId }) => {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState('');
@@ -108,7 +113,8 @@ export const PosSimulatorPage: React.FC<PosSimulatorPageProps> = ({ businessId }
       ]);
 
       setTables(tableData);
-      setWaiters(userData.filter((user) => user.role === 'waiter'));
+      const activeWaiters = userData.filter((user) => userHasRole(user, 'waiter'));
+      setWaiters(activeWaiters);
       setActiveOrders(orderData);
       setKitchenTickets(ticketData);
 
@@ -116,7 +122,7 @@ export const PosSimulatorPage: React.FC<PosSimulatorPageProps> = ({ businessId }
         setSelectedTableId(tableData[0].id);
       }
       if (!selectedWaiterId) {
-        const firstWaiter = userData.find((user) => user.role === 'waiter');
+        const firstWaiter = activeWaiters[0];
         if (firstWaiter) setSelectedWaiterId(firstWaiter.id);
       }
     } catch (error: any) {

@@ -5,7 +5,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 import * as bcrypt from 'bcrypt';
-import { ADMIN_ROLES } from '../auth/roles';
+import { ADMIN_ROLES, UserRole } from '../auth/roles';
 
 @Injectable()
 export class UsersService {
@@ -25,7 +25,8 @@ export class UsersService {
   }
 
   async create(createUserDto: CreateUserDto) {
-    const { businessId, branchId, pin, email, password, ...rest } = createUserDto;
+    const { businessId, branchId, pin, email, password, role, roles, ...rest } = createUserDto;
+    const normalizedRoles = this.normalizeRoles(roles, role);
 
     // Enforce unique email if provided
     if (email) {
@@ -60,6 +61,8 @@ export class UsersService {
       email: email || null,
       pin: pinHash,
       passwordHash: passwordHash || null,
+      role: normalizedRoles[0],
+      roles: normalizedRoles,
     });
 
     return this.sanitizeUser(newUser);
@@ -108,8 +111,13 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    const { branchId, pin, email, password, ...rest } = updateUserDto;
+    const { branchId, pin, email, password, role, roles, ...rest } = updateUserDto;
     const updates: any = { ...rest };
+    const normalizedRoles = roles !== undefined
+      ? this.normalizeRoles(roles, role ?? user.role)
+      : role !== undefined
+        ? this.normalizeRoles(undefined, role)
+        : undefined;
 
     if (
       user.role === 'owner' &&
@@ -125,6 +133,11 @@ export class UsersService {
 
     if (branchId !== undefined) {
       updates.branchId = branchId || null;
+    }
+
+    if (normalizedRoles) {
+      updates.role = normalizedRoles[0];
+      updates.roles = normalizedRoles;
     }
 
     // Handle email updates uniqueness
@@ -234,7 +247,10 @@ export class UsersService {
   private sanitizeUser(user: any) {
     if (!user) return null;
     const { passwordHash, pin, ...sanitized } = user;
-    return sanitized;
+    return {
+      ...sanitized,
+      roles: this.normalizeRoles(sanitized.roles, sanitized.role),
+    };
   }
 
   private sanitizeAdminUser(user: any, accessRows: any[]) {
@@ -280,5 +296,24 @@ export class UsersService {
       });
     }
     return Array.from(unique.values());
+  }
+
+  private normalizeRoles(roles?: unknown, fallbackRole?: string): UserRole[] {
+    const source = Array.isArray(roles) && roles.length > 0
+      ? roles
+      : fallbackRole
+        ? [fallbackRole]
+        : [];
+    const normalized = Array.from(
+      new Set(
+        source
+          .map((role) => role?.toString().trim())
+          .filter((role): role is UserRole => Boolean(role)),
+      ),
+    );
+    if (normalized.length === 0) {
+      throw new BadRequestException('At least one role must be selected');
+    }
+    return normalized;
   }
 }

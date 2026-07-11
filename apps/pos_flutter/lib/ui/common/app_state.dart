@@ -35,7 +35,7 @@ class TableModel {
   int guests;
   double discountPercentage;
   List<String>
-  guestGenders; // Tracks genders of guests: 'M' (Male), 'F' (Female), 'K' (Kid)
+      guestGenders; // Tracks genders of guests: 'M' (Male), 'F' (Female), 'K' (Kid)
 
   TableModel({
     required this.id,
@@ -52,12 +52,19 @@ class TableModel {
     this.guestGenders = const ['M'],
   });
 
-  double get subtotal => double.parse(items.fold<double>(0.0, (sum, item) => sum + double.parse(item.totalPrice.toStringAsFixed(2))).toStringAsFixed(2));
-  double get discountAmount => double.parse((subtotal * (discountPercentage / 100.0)).toStringAsFixed(2));
-  double get total => double.parse((subtotal - discountAmount).toStringAsFixed(2));
-  double get netSubtotal => double.parse((subtotal / ivaFactor).toStringAsFixed(2));
+  double get subtotal => double.parse(items
+      .fold<double>(0.0,
+          (sum, item) => sum + double.parse(item.totalPrice.toStringAsFixed(2)))
+      .toStringAsFixed(2));
+  double get discountAmount => double.parse(
+      (subtotal * (discountPercentage / 100.0)).toStringAsFixed(2));
+  double get total =>
+      double.parse((subtotal - discountAmount).toStringAsFixed(2));
+  double get netSubtotal =>
+      double.parse((subtotal / ivaFactor).toStringAsFixed(2));
   double get netTotal => double.parse((total / ivaFactor).toStringAsFixed(2));
-  double get netDiscountAmount => double.parse((netSubtotal - netTotal).toStringAsFixed(2));
+  double get netDiscountAmount =>
+      double.parse((netSubtotal - netTotal).toStringAsFixed(2));
   double get includedTax => double.parse((total - netTotal).toStringAsFixed(2));
 
   TableModel copyWith({
@@ -120,8 +127,10 @@ class OrderItem {
     this.isSent = false,
   });
 
-  double get totalPrice => double.parse(((item.price + (modifiers.length * 1.5)) * quantity).toStringAsFixed(2));
-  double get netTotalPrice => double.parse((totalPrice / ivaFactor).toStringAsFixed(2));
+  double get totalPrice => double.parse(
+      ((item.price + (modifiers.length * 1.5)) * quantity).toStringAsFixed(2));
+  double get netTotalPrice =>
+      double.parse((totalPrice / ivaFactor).toStringAsFixed(2));
 
   OrderItem copyWith({
     int? quantity,
@@ -210,9 +219,8 @@ class TicketFiscalConfig {
           : 'Cafeteria Cacharelo',
       legalName: 'Cafeteria Cacharelo S.A. de C.V.',
       fiscalId: 'CACX010101ABC',
-      branchName: branchName?.isNotEmpty == true
-          ? branchName!
-          : 'Sucursal Demo',
+      branchName:
+          branchName?.isNotEmpty == true ? branchName! : 'Sucursal Demo',
       branchAddress: 'Av. Principal 123, Centro, Mexico',
       phone: '555-1234',
       receiptPrefix: 'CCH',
@@ -230,8 +238,7 @@ class TicketFiscalConfig {
           json['legalName']?.toString() ?? 'Cafeteria Cacharelo S.A. de C.V.',
       fiscalId: json['fiscalId']?.toString() ?? 'CACX010101ABC',
       branchName: json['branchName']?.toString() ?? 'Sucursal Demo',
-      branchAddress:
-          json['branchAddress']?.toString() ??
+      branchAddress: json['branchAddress']?.toString() ??
           'Av. Principal 123, Centro, Mexico',
       phone: json['phone']?.toString(),
       receiptPrefix: json['receiptPrefix']?.toString() ?? 'CCH',
@@ -242,21 +249,22 @@ class TicketFiscalConfig {
   }
 
   Map<String, dynamic> toJson() => {
-    'sellerDisplayName': sellerDisplayName,
-    'legalName': legalName,
-    'fiscalId': fiscalId,
-    'branchName': branchName,
-    'branchAddress': branchAddress,
-    'phone': phone,
-    'receiptPrefix': receiptPrefix,
-    'taxMode': taxMode,
-    'footerText': footerText,
-    'syncedAt': syncedAt?.toIso8601String(),
-  };
+        'sellerDisplayName': sellerDisplayName,
+        'legalName': legalName,
+        'fiscalId': fiscalId,
+        'branchName': branchName,
+        'branchAddress': branchAddress,
+        'phone': phone,
+        'receiptPrefix': receiptPrefix,
+        'taxMode': taxMode,
+        'footerText': footerText,
+        'syncedAt': syncedAt?.toIso8601String(),
+      };
 }
 
 class AppState extends ChangeNotifier {
   UserRole currentUserRole = UserRole.none;
+  List<UserRole> availableUserRoles = const [];
   String? currentUserId;
   String currentUserName = "";
 
@@ -272,7 +280,6 @@ class AppState extends ChangeNotifier {
   // Recent closed sales history
   List<Map<String, dynamic>> recentClosedSales = [];
 
-
   bool isShiftOpen = false;
   double cashDrawerAmount = 0.0;
   double initialFloat = 0.0;
@@ -281,7 +288,8 @@ class AppState extends ChangeNotifier {
   // Offline & sync states
   bool isOnline = true;
   SyncSocketService? _socketService;
-  SocketConnectionState socketConnectionState = SocketConnectionState.disconnected;
+  SocketConnectionState socketConnectionState =
+      SocketConnectionState.disconnected;
   String? currentJwtToken;
   Timer? _fallbackPollingTimer;
   int pendingSyncCount = 0;
@@ -317,7 +325,7 @@ class AppState extends ChangeNotifier {
   final SecureStorageService _secureStorageService;
 
   AppState({SecureStorageService? secureStorageService})
-    : _secureStorageService = secureStorageService ?? SecureStorageService() {
+      : _secureStorageService = secureStorageService ?? SecureStorageService() {
     _initMockData();
     initializationFuture = () async {
       await loadTerminalConfig();
@@ -346,10 +354,12 @@ class AppState extends ChangeNotifier {
         terminalBusinessName = config['businessName'];
         terminalBranchName = config['branchName'];
         terminalApiUrl = config['apiUrl'];
-        
+
         // Auto-migrate old Cloud Run API URLs to the secure VM API subdomain
-        if (terminalApiUrl != null && terminalApiUrl!.contains('umqpitkpoa-uc.a.run.app')) {
-          terminalApiUrl = 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+        if (terminalApiUrl != null &&
+            terminalApiUrl!.contains('umqpitkpoa-uc.a.run.app')) {
+          terminalApiUrl =
+              'https://pos-sync-api-232144991863.us-central1.run.app/api';
           await _secureStorageService.saveTerminalConfig(
             businessId: terminalBusinessId ?? '',
             branchId: terminalBranchId ?? '',
@@ -359,7 +369,7 @@ class AppState extends ChangeNotifier {
           );
           debugPrint('Migrated terminal config API URL to: $terminalApiUrl');
         }
-        
+
         isTerminalConfigured = true;
       } else {
         isTerminalConfigured = false;
@@ -430,7 +440,8 @@ class AppState extends ChangeNotifier {
 
   Future<bool> configureTerminalWithCode(String branchId) async {
     try {
-      String baseUrl = 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      String baseUrl =
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
 
       http.Response response = await http
           .get(Uri.parse('$baseUrl/branches/$branchId'))
@@ -462,8 +473,8 @@ class AppState extends ChangeNotifier {
     if (!isTerminalConfigured) return false;
 
     try {
-      final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final String? businessId = terminalBusinessId;
       final String? branchId = terminalBranchId;
       if (businessId == null || branchId == null) return false;
@@ -500,17 +511,16 @@ class AppState extends ChangeNotifier {
       return false;
     }
     try {
-      final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final String bId =
           terminalBusinessId ?? 'd3b07384-d113-4a0e-a555-e5b12824bf01';
       final String brId = terminalBranchId ?? '';
 
       final url = '$baseUrl/auth/operators?businessId=$bId&branchId=$brId';
       debugPrint('Syncing operators from: $url');
-      final response = await http
-          .get(Uri.parse(url))
-          .timeout(const Duration(seconds: 10));
+      final response =
+          await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
 
       debugPrint('SyncOperators response status: ${response.statusCode}');
       if (response.statusCode == 200) {
@@ -764,9 +774,11 @@ class AppState extends ChangeNotifier {
 
   Future<void> loadTablesFromJson() async {
     try {
-      final jsonString = await rootBundle.loadString(
-        'assets/floor_plan_mesa.json',
-      ).timeout(const Duration(seconds: 1), onTimeout: () => '[]');
+      final jsonString = await rootBundle
+          .loadString(
+            'assets/floor_plan_mesa.json',
+          )
+          .timeout(const Duration(seconds: 1), onTimeout: () => '[]');
       final List<dynamic> data = json.decode(jsonString);
 
       final Map<int, TableModel> currentTablesMap = {
@@ -782,9 +794,8 @@ class AppState extends ChangeNotifier {
         final double x = (item['x'] as num).toDouble();
         final double y = (item['y'] as num).toDouble();
 
-        final TableShape shape = shapeStr == 'circle'
-            ? TableShape.circle
-            : TableShape.square;
+        final TableShape shape =
+            shapeStr == 'circle' ? TableShape.circle : TableShape.square;
 
         final existing = currentTablesMap[id];
         if (existing != null) {
@@ -863,8 +874,8 @@ class AppState extends ChangeNotifier {
     }
 
     try {
-      final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final String brId = terminalBranchId!;
 
       // Fetch branch configs dynamically (room configs, zoom, images)
@@ -904,9 +915,8 @@ class AppState extends ChangeNotifier {
           );
           final List<dynamic> refList = json.decode(jsonString);
           for (var ref in refList) {
-            final String normLabel = (ref['label'] as String)
-                .trim()
-                .toLowerCase();
+            final String normLabel =
+                (ref['label'] as String).trim().toLowerCase();
             layoutCoords[normLabel] = {
               'x': (ref['x'] as num).toDouble(),
               'y': (ref['y'] as num).toDouble(),
@@ -1061,10 +1071,9 @@ class AppState extends ChangeNotifier {
   Future<void> fetchMenuDynamic() async {
     if (!isTerminalConfigured) return;
     try {
-      final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
-      final bool isLocalConfig =
-          baseUrl.contains('localhost') ||
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final bool isLocalConfig = baseUrl.contains('localhost') ||
           baseUrl.contains('10.0.2.2') ||
           baseUrl.contains('127.0.0.1');
 
@@ -1135,8 +1144,8 @@ class AppState extends ChangeNotifier {
     if (!isTerminalConfigured || terminalBranchId == null) return false;
 
     try {
-      final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http
           .get(Uri.parse('$baseUrl/orders/active?branchId=$terminalBranchId'))
           .timeout(const Duration(seconds: 10));
@@ -1181,7 +1190,8 @@ class AppState extends ChangeNotifier {
           // Table had items but is not in active orders anymore
           // Clear the items (state will be updated by syncTableStates)
           tables[i].items = [];
-          debugPrint('Cleared items from table ${table.label} (no longer has active order)');
+          debugPrint(
+              'Cleared items from table ${table.label} (no longer has active order)');
         }
       }
 
@@ -1201,8 +1211,8 @@ class AppState extends ChangeNotifier {
     if (!isTerminalConfigured || terminalBranchId == null) return false;
 
     try {
-      final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http
           .get(Uri.parse('$baseUrl/kitchen/active?branchId=$terminalBranchId'))
           .timeout(const Duration(seconds: 10));
@@ -1234,8 +1244,7 @@ class AppState extends ChangeNotifier {
           id: id,
           tableLabel: ticket['tableLabel']?.toString() ?? 'Mesa',
           items: _itemsFromCloud(ticket['items']),
-          timestamp:
-              DateTime.tryParse(ticket['createdAt']?.toString() ?? '') ??
+          timestamp: DateTime.tryParse(ticket['createdAt']?.toString() ?? '') ??
               DateTime.now(),
           status: status,
         ));
@@ -1245,7 +1254,8 @@ class AppState extends ChangeNotifier {
       for (final order in newOrders) {
         final oldStatus = oldStatuses[order.id];
         if (order.status == 'ready' && oldStatus != 'ready') {
-          final String notificationText = '¡Pedido listo para la ${order.tableLabel}!';
+          final String notificationText =
+              '¡Pedido listo para la ${order.tableLabel}!';
           if (!readyNotifications.contains(notificationText)) {
             readyNotifications.add(notificationText);
           }
@@ -1282,8 +1292,8 @@ class AppState extends ChangeNotifier {
     if (!isTerminalConfigured || terminalBranchId == null) return false;
 
     try {
-      final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
 
       // Get last sync checkpoint timestamp
       final lastSyncedAt = await _getLastSyncCheckpoint();
@@ -1385,8 +1395,7 @@ class AppState extends ChangeNotifier {
   List<OrderItem> _itemsFromCloud(dynamic rawItems) {
     if (rawItems is! List) return [];
 
-    return rawItems
-        .map((rawItem) {
+    return rawItems.map((rawItem) {
       final item = Map<String, dynamic>.from(rawItem);
       final productId = item['productId']?.toString() ?? '';
       final menuItem = _menuItemById(
@@ -1395,11 +1404,9 @@ class AppState extends ChangeNotifier {
       );
       final quantity = (item['quantity'] as num?)?.toInt() ?? 1;
       final grossUnitPrice =
-          double.tryParse(item['price']?.toString() ?? '') ??
-          menuItem.price;
-      final assignedGuest = item['assignedGuest'] == null
-          ? null
-          : 'P${item['assignedGuest']}';
+          double.tryParse(item['price']?.toString() ?? '') ?? menuItem.price;
+      final assignedGuest =
+          item['assignedGuest'] == null ? null : 'P${item['assignedGuest']}';
       final notes = item['notes']?.toString() ?? '';
 
       return OrderItem(
@@ -1485,6 +1492,8 @@ class AppState extends ChangeNotifier {
 
   // Auth Operations (Query backend, fallback to offline local cache)
   Future<bool> login(String pin) async {
+    currentUserRole = UserRole.none;
+    availableUserRoles = const [];
     try {
       final String bId =
           terminalBusinessId ?? 'd3b07384-d113-4a0e-a555-e5b12824bf01';
@@ -1500,8 +1509,8 @@ class AppState extends ChangeNotifier {
       }
 
       http.Response response;
-      final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
       try {
         response = await http
             .post(
@@ -1526,10 +1535,11 @@ class AppState extends ChangeNotifier {
         final data = jsonDecode(response.body);
         if (data['success'] == true || data['user'] != null) {
           final userData = data['user'];
+          final roles = _parseRoles(userData['roles'], userData['role']);
           currentUserId = userData['id'];
           currentUserName = userData['name'];
-          currentUserRole = _parseRole(userData['role']);
-          
+          availableUserRoles = roles;
+
           currentJwtToken = data['accessToken'];
           if (currentJwtToken != null) {
             await _secureStorageService.saveJwtToken(currentJwtToken!);
@@ -1540,11 +1550,17 @@ class AppState extends ChangeNotifier {
             id: userData['id'],
             name: userData['name'],
             pin: pin,
-            role: userData['role'],
+            role: roles.first.name,
+            roles: roles.map((role) => role.name).toList(),
           );
 
-          _initWebSocket();
-          unawaited(syncAllData());
+          if (roles.length > 1 && !roles.contains(currentUserRole)) {
+            currentUserRole = UserRole.none;
+            notifyListeners();
+            return true;
+          }
+
+          completeLoginWithRole(roles.first);
           notifyListeners();
           return true;
         }
@@ -1561,15 +1577,20 @@ class AppState extends ChangeNotifier {
         pin,
       );
       if (offlineUser != null) {
-        currentUserId = offlineUser['id']?.isNotEmpty == true
-            ? offlineUser['id']
-            : null;
+        currentUserId =
+            offlineUser['id']?.isNotEmpty == true ? offlineUser['id'] : null;
         currentUserName = offlineUser['name']!;
-        currentUserRole = _parseRole(offlineUser['role']!);
-        
+        final roles = _parseRoles(offlineUser['roles'], offlineUser['role']);
+        availableUserRoles = roles;
+
         currentJwtToken = await _secureStorageService.getJwtToken();
-        _initWebSocket();
-        unawaited(syncAllData());
+        if (roles.length > 1 && !roles.contains(currentUserRole)) {
+          currentUserRole = UserRole.none;
+          notifyListeners();
+          return true;
+        }
+
+        completeLoginWithRole(roles.first);
         notifyListeners();
         return true;
       }
@@ -1578,6 +1599,22 @@ class AppState extends ChangeNotifier {
     }
 
     return false;
+  }
+
+  bool completeLoginWithRole(UserRole selectedRole) {
+    if (selectedRole == UserRole.none) return false;
+    if (availableUserRoles.isNotEmpty &&
+        !availableUserRoles.contains(selectedRole)) {
+      return false;
+    }
+    currentUserRole = selectedRole;
+    if (availableUserRoles.isEmpty) {
+      availableUserRoles = [selectedRole];
+    }
+    _initWebSocket();
+    unawaited(syncAllData());
+    notifyListeners();
+    return true;
   }
 
   UserRole _parseRole(String roleStr) {
@@ -1593,8 +1630,28 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  List<UserRole> _parseRoles(dynamic roles, dynamic fallbackRole) {
+    final parsed = <UserRole>[];
+    if (roles is List) {
+      for (final role in roles) {
+        final parsedRole = _parseRole(role?.toString() ?? '');
+        if (parsedRole != UserRole.none && !parsed.contains(parsedRole)) {
+          parsed.add(parsedRole);
+        }
+      }
+    }
+    if (parsed.isEmpty && fallbackRole != null) {
+      final parsedRole = _parseRole(fallbackRole.toString());
+      if (parsedRole != UserRole.none) {
+        parsed.add(parsedRole);
+      }
+    }
+    return parsed.isEmpty ? [UserRole.none] : parsed;
+  }
+
   void logout() {
     currentUserRole = UserRole.none;
+    availableUserRoles = const [];
     currentUserId = null;
     currentUserName = "";
     selectedTable = null;
@@ -1610,18 +1667,26 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> checkActiveShift() async {
-    if (!isTerminalConfigured || terminalBranchId == null || currentUserId == null) return;
+    if (!isTerminalConfigured ||
+        terminalBranchId == null ||
+        currentUserId == null) {
+      return;
+    }
     try {
-      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http
-          .get(Uri.parse('$baseUrl/cash-shifts/active?branchId=$terminalBranchId&cashierId=$currentUserId'))
+          .get(Uri.parse(
+              '$baseUrl/cash-shifts/active?branchId=$terminalBranchId&cashierId=$currentUserId'))
           .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
         activeShiftId = data['id']?.toString();
-        initialFloat = double.tryParse(data['initialFloat']?.toString() ?? '') ?? 0.0;
-        cashDrawerAmount = double.tryParse(data['cashDrawerAmount']?.toString() ?? '') ?? 0.0;
+        initialFloat =
+            double.tryParse(data['initialFloat']?.toString() ?? '') ?? 0.0;
+        cashDrawerAmount =
+            double.tryParse(data['cashDrawerAmount']?.toString() ?? '') ?? 0.0;
         isShiftOpen = data['status'] == 'open';
       } else {
         isShiftOpen = false;
@@ -1634,18 +1699,25 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> openShift(double floatAmount) async {
-    if (!isTerminalConfigured || terminalBranchId == null || currentUserId == null) return false;
+    if (!isTerminalConfigured ||
+        terminalBranchId == null ||
+        currentUserId == null) {
+      return false;
+    }
     try {
-      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
-      final response = await http.post(
-        Uri.parse('$baseUrl/cash-shifts'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'cashierId': currentUserId,
-          'branchId': terminalBranchId,
-          'initialFloat': floatAmount.toStringAsFixed(2),
-        }),
-      ).timeout(const Duration(seconds: 8));
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/cash-shifts'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'cashierId': currentUserId,
+              'branchId': terminalBranchId,
+              'initialFloat': floatAmount.toStringAsFixed(2),
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
@@ -1663,24 +1735,30 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<bool> addCashDrop(double amount, {String reason = 'Ingreso de caja'}) async {
+  Future<bool> addCashDrop(double amount,
+      {String reason = 'Ingreso de caja'}) async {
     if (activeShiftId == null) return false;
     try {
-      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
-      final response = await http.post(
-        Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'type': 'cash-in',
-          'amount': amount.toStringAsFixed(2),
-          'reason': reason,
-        }),
-      ).timeout(const Duration(seconds: 8));
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'type': 'cash-in',
+              'amount': amount.toStringAsFixed(2),
+              'reason': reason,
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
         if (data['shift'] != null) {
-          cashDrawerAmount = double.tryParse(data['shift']['cashDrawerAmount']?.toString() ?? '') ?? (cashDrawerAmount + amount);
+          cashDrawerAmount = double.tryParse(
+                  data['shift']['cashDrawerAmount']?.toString() ?? '') ??
+              (cashDrawerAmount + amount);
         } else {
           cashDrawerAmount += amount;
         }
@@ -1694,24 +1772,30 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<bool> removeCashDrop(double amount, {String reason = 'Retiro de caja'}) async {
+  Future<bool> removeCashDrop(double amount,
+      {String reason = 'Retiro de caja'}) async {
     if (activeShiftId == null) return false;
     try {
-      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
-      final response = await http.post(
-        Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'type': 'cash-out',
-          'amount': amount.toStringAsFixed(2),
-          'reason': reason,
-        }),
-      ).timeout(const Duration(seconds: 8));
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'type': 'cash-out',
+              'amount': amount.toStringAsFixed(2),
+              'reason': reason,
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
         if (data['shift'] != null) {
-          cashDrawerAmount = double.tryParse(data['shift']['cashDrawerAmount']?.toString() ?? '') ?? max(0.0, cashDrawerAmount - amount);
+          cashDrawerAmount = double.tryParse(
+                  data['shift']['cashDrawerAmount']?.toString() ?? '') ??
+              max(0.0, cashDrawerAmount - amount);
         } else {
           cashDrawerAmount = max(0.0, cashDrawerAmount - amount);
         }
@@ -1728,14 +1812,17 @@ class AppState extends ChangeNotifier {
   Future<Map<String, dynamic>?> closeShift(double actualAmount) async {
     if (activeShiftId == null) return null;
     try {
-      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
-      final response = await http.post(
-        Uri.parse('$baseUrl/cash-shifts/$activeShiftId/close'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'actualAmount': actualAmount.toStringAsFixed(2),
-        }),
-      ).timeout(const Duration(seconds: 8));
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/cash-shifts/$activeShiftId/close'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'actualAmount': actualAmount.toStringAsFixed(2),
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
@@ -1755,7 +1842,8 @@ class AppState extends ChangeNotifier {
 
   Future<Map<String, dynamic>?> getCashShiftAuditReport(String shiftId) async {
     try {
-      final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http
           .get(Uri.parse('$baseUrl/reports/cash-shifts/$shiftId/audit'))
           .timeout(const Duration(seconds: 8));
@@ -1789,9 +1877,8 @@ class AppState extends ChangeNotifier {
       final newItems = cartItems.where((i) => !i.isSent).toList();
 
       // Mark all cart items as sent
-      final updatedItems = cartItems
-          .map((i) => i.copyWith(isSent: true))
-          .toList();
+      final updatedItems =
+          cartItems.map((i) => i.copyWith(isSent: true)).toList();
 
       tables[index].items = updatedItems;
       tables[index].guests = guestsCount;
@@ -1932,8 +2019,8 @@ class AppState extends ChangeNotifier {
 
     if (orderId != null) {
       try {
-        final String baseUrl =
-            terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+        final String baseUrl = terminalApiUrl ??
+            'https://pos-sync-api-232144991863.us-central1.run.app/api';
         await http
             .post(Uri.parse('$baseUrl/orders/$orderId/cancel'))
             .timeout(const Duration(seconds: 8));
@@ -1963,8 +2050,8 @@ class AppState extends ChangeNotifier {
     if (newItems.isEmpty) return;
 
     try {
-      final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
 
       var orderId = _activeOrderIdsByTableRemoteId[tableRemoteId!];
       if (orderId == null) {
@@ -2036,15 +2123,15 @@ class AppState extends ChangeNotifier {
   }
 
   Map<String, dynamic> _cloudOrderItemPayload(OrderItem item) => {
-    'productId': _productRemoteIdForItem(item),
-    'quantity': item.quantity,
-    'price': (item.totalPrice / item.quantity).toStringAsFixed(2),
-    'assignedGuest': _assignedGuestNumber(item.assignedGuest),
-    'notes': [
-      if (item.modifiers.isNotEmpty) item.modifiers.join(', '),
-      if (item.notes.trim().isNotEmpty) item.notes.trim(),
-    ].join(' | '),
-  };
+        'productId': _productRemoteIdForItem(item),
+        'quantity': item.quantity,
+        'price': (item.totalPrice / item.quantity).toStringAsFixed(2),
+        'assignedGuest': _assignedGuestNumber(item.assignedGuest),
+        'notes': [
+          if (item.modifiers.isNotEmpty) item.modifiers.join(', '),
+          if (item.notes.trim().isNotEmpty) item.notes.trim(),
+        ].join(' | '),
+      };
 
   Future<void> _requestCloudBilling(TableModel table) async {
     final tableRemoteId = _remoteIdForTable(table);
@@ -2054,8 +2141,8 @@ class AppState extends ChangeNotifier {
     if (orderId == null) return;
 
     try {
-      final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
       await http
           .post(Uri.parse('$baseUrl/orders/$orderId/billing'))
           .timeout(const Duration(seconds: 10));
@@ -2068,8 +2155,7 @@ class AppState extends ChangeNotifier {
     final prefix = ticketFiscalConfig.receiptPrefix.trim().isEmpty
         ? 'CCH'
         : ticketFiscalConfig.receiptPrefix.trim().toUpperCase();
-    final stamp =
-        '${timestamp.year.toString().padLeft(4, '0')}'
+    final stamp = '${timestamp.year.toString().padLeft(4, '0')}'
         '${timestamp.month.toString().padLeft(2, '0')}'
         '${timestamp.day.toString().padLeft(2, '0')}-'
         '${timestamp.hour.toString().padLeft(2, '0')}'
@@ -2188,9 +2274,9 @@ class AppState extends ChangeNotifier {
 
   String _normalizeTicketFooter(String footerText) {
     return footerText.trim().replaceAll(
-      RegExp(r'\.\s+IVA incluido', caseSensitive: false),
-      '.\nIVA incluido',
-    );
+          RegExp(r'\.\s+IVA incluido', caseSensitive: false),
+          '.\nIVA incluido',
+        );
   }
 
   // Checkout process
@@ -2217,7 +2303,7 @@ class AppState extends ChangeNotifier {
       if (isEqualSplit && splitCount != null && splitCount > 1) {
         // Equal split payment: 1 part of splitCount
         finalTotal = t.total / splitCount;
-        
+
         // Construct a mock TableModel to represent the partial payment on the receipt
         tableSnapshot = t.copyWith(
           label: '${t.label} (División 1/$splitCount)',
@@ -2236,9 +2322,12 @@ class AppState extends ChangeNotifier {
         );
       } else if (itemIndicesToPay != null && itemIndicesToPay.isNotEmpty) {
         // Split by items: only pay selected items
-        final selectedItems = itemIndicesToPay.map((idx) => t.items[idx].copyWith()).toList();
-        finalTotal = selectedItems.fold<double>(0.0, (sum, item) => sum + item.totalPrice) * (1 - (discount / 100.0));
-        
+        final selectedItems =
+            itemIndicesToPay.map((idx) => t.items[idx].copyWith()).toList();
+        finalTotal = selectedItems.fold<double>(
+                0.0, (sum, item) => sum + item.totalPrice) *
+            (1 - (discount / 100.0));
+
         tableSnapshot = t.copyWith(
           label: '${t.label} (Parcial)',
           items: selectedItems,
@@ -2313,11 +2402,13 @@ class AppState extends ChangeNotifier {
         // It's a partial equal split: do not reset the table!
         // Just keep the table open in billing state
         t.state = TableState.billing;
-        debugPrint('Processed equal split payment of \$${finalTotal.toStringAsFixed(2)}. Table remains open.');
+        debugPrint(
+            'Processed equal split payment of \$${finalTotal.toStringAsFixed(2)}. Table remains open.');
       } else if (itemIndicesToPay != null && itemIndicesToPay.isNotEmpty) {
         // Split by items: remove paid items from the table!
         // We sort indices in descending order to avoid shift issues during removal
-        final sortedIndices = List<int>.from(itemIndicesToPay)..sort((a, b) => b.compareTo(a));
+        final sortedIndices = List<int>.from(itemIndicesToPay)
+          ..sort((a, b) => b.compareTo(a));
         for (final idx in sortedIndices) {
           t.items.removeAt(idx);
         }
@@ -2331,7 +2422,8 @@ class AppState extends ChangeNotifier {
         } else {
           // If items are still left, keep it open/billing
           t.state = TableState.billing;
-          debugPrint('Split by items payment done. ${t.items.length} items remaining on table ${t.label}.');
+          debugPrint(
+              'Split by items payment done. ${t.items.length} items remaining on table ${t.label}.');
         }
       } else {
         // Full checkout: close the table completely
@@ -2359,8 +2451,8 @@ class AppState extends ChangeNotifier {
     required String refCode,
   }) async {
     try {
-      final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http
           .post(
             Uri.parse('$baseUrl/orders/$orderId/payments'),
@@ -2393,7 +2485,8 @@ class AppState extends ChangeNotifier {
   Future<TableModel?> createToGoTable() async {
     if (!isTerminalConfigured || terminalBranchId == null) {
       // Local fallback if offline/no configuration
-      final int nextId = tables.where((t) => t.zone == 'Para Llevar').length + 1;
+      final int nextId =
+          tables.where((t) => t.zone == 'Para Llevar').length + 1;
       final newTable = TableModel(
         id: 'Llevar #$nextId'.hashCode,
         remoteId: 'local_togo_$nextId',
@@ -2413,8 +2506,8 @@ class AppState extends ChangeNotifier {
     }
 
     try {
-      final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final String brId = terminalBranchId!;
 
       // Calculate next index
@@ -2468,7 +2561,8 @@ class AppState extends ChangeNotifier {
 
   Future<TableModel?> startToGoOrder() async {
     // 1. Look for a free table in 'Para Llevar' zone
-    final freeTableIndex = tables.indexWhere((t) => t.zone == 'Para Llevar' && t.state == TableState.free);
+    final freeTableIndex = tables.indexWhere(
+        (t) => t.zone == 'Para Llevar' && t.state == TableState.free);
     if (freeTableIndex != -1) {
       tables[freeTableIndex].state = TableState.occupied;
       tables[freeTableIndex].items = [];
@@ -2497,8 +2591,8 @@ class AppState extends ChangeNotifier {
         isTerminalConfigured &&
         terminalBranchId != null) {
       try {
-        final String baseUrl =
-            terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+        final String baseUrl = terminalApiUrl ??
+            'https://pos-sync-api-232144991863.us-central1.run.app/api';
         final response = await http
             .patch(
               Uri.parse(
@@ -2548,8 +2642,8 @@ class AppState extends ChangeNotifier {
   ) async {
     if (!isTerminalConfigured) return;
     try {
-      final String baseUrl =
-          terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
       final response = await http
           .patch(
             Uri.parse('$baseUrl/kitchen/tickets/$ticketId/status'),
@@ -2771,7 +2865,8 @@ class AppState extends ChangeNotifier {
         onLayout: (format) async => pdf.save(),
       );
 
-      debugPrint('Successfully printed to desktop printer: $connectedPrinterName');
+      debugPrint(
+          'Successfully printed to desktop printer: $connectedPrinterName');
       return true;
     } catch (e) {
       debugPrint('Error printing to desktop printer: $e');
@@ -2981,9 +3076,8 @@ class AppState extends ChangeNotifier {
             'orderId': orderId,
             'amount': total.toStringAsFixed(2),
             'paymentMethod': _normalizePaymentMethod(paymentMethod),
-            'referenceCode': refCode.isEmpty || refCode == 'Efectivo'
-                ? null
-                : refCode,
+            'referenceCode':
+                refCode.isEmpty || refCode == 'Efectivo' ? null : refCode,
             'createdAt': timestamp,
           },
         ],
@@ -3022,14 +3116,15 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> _pushSyncPayload(Map<String, dynamic> payload) async {
-    if (socketConnectionState == SocketConnectionState.connected && _socketService != null) {
+    if (socketConnectionState == SocketConnectionState.connected &&
+        _socketService != null) {
       final orderId = payload['id']?.toString() ?? _newUuid();
       _socketService!.push(orderId, '', payload['payload'] ?? payload);
       return false; // Leave in queue until socket ack arrives
     }
 
-    final baseUrl =
-        terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+    final baseUrl = terminalApiUrl ??
+        'https://pos-sync-api-232144991863.us-central1.run.app/api';
     try {
       final response = await http
           .post(
@@ -3072,9 +3167,9 @@ class AppState extends ChangeNotifier {
     for (final operator in operators) {
       if (operator is! Map<String, dynamic>) continue;
       final name = operator['name']?.toString();
-      final role = operator['role']?.toString();
+      final roles = _parseRoles(operator['roles'], operator['role']);
       final id = operator['id']?.toString();
-      if (role == null || _parseRole(role) != currentUserRole || !_isUuid(id)) {
+      if (!roles.contains(currentUserRole) || !_isUuid(id)) {
         continue;
       }
 
@@ -3221,8 +3316,9 @@ class AppState extends ChangeNotifier {
 
   void _initWebSocket() {
     _socketService?.dispose();
-    
-    final String baseUrl = terminalApiUrl ?? 'https://pos-sync-api-232144991863.us-central1.run.app/api';
+
+    final String baseUrl = terminalApiUrl ??
+        'https://pos-sync-api-232144991863.us-central1.run.app/api';
     final token = currentJwtToken;
     final branchId = terminalBranchId;
     final roleStr = currentUserRole == UserRole.waiter
@@ -3232,12 +3328,13 @@ class AppState extends ChangeNotifier {
             : currentUserRole == UserRole.kitchen
                 ? 'kitchen'
                 : 'none';
-    
+
     if (token == null || branchId == null || roleStr == 'none') {
-      debugPrint('Skipping WebSocket init: missing credentials (token: ${token != null}, branchId: $branchId, role: $roleStr)');
+      debugPrint(
+          'Skipping WebSocket init: missing credentials (token: ${token != null}, branchId: $branchId, role: $roleStr)');
       return;
     }
-    
+
     _socketService = SyncSocketService(
       apiUrl: baseUrl,
       token: token,
@@ -3265,21 +3362,21 @@ class AppState extends ChangeNotifier {
         notifyListeners();
       },
     );
-    
+
     _socketService!.connect();
   }
 
   void _handleWebSocketChange(Map<String, dynamic> data) {
     final changes = data['changes'] as List<dynamic>?;
     if (changes == null) return;
-    
+
     bool stateChanged = false;
     for (final change in changes) {
       if (change is! Map<String, dynamic>) continue;
       final entity = change['entity']?.toString();
       final entityId = change['entityId']?.toString();
       final payload = change['payload'];
-      
+
       if (entity == 'branchTables' && payload is Map) {
         final tableIndex = tables.indexWhere((t) => t.remoteId == entityId);
         if (tableIndex != -1) {
@@ -3293,7 +3390,7 @@ class AppState extends ChangeNotifier {
         final tableId = payload['tableId']?.toString();
         final orderId = payload['id']?.toString();
         final orderState = payload['state']?.toString();
-        
+
         if (tableId != null && orderId != null) {
           if (orderState == 'closed') {
             _activeOrderIdsByTableRemoteId.remove(tableId);
@@ -3312,11 +3409,11 @@ class AppState extends ChangeNotifier {
         _scheduleKitchenSyncFromWebSocket();
       }
     }
-    
+
     if (stateChanged) {
       notifyListeners();
     }
-    
+
     // Background pull sync to ensure operational data is 100% up to date
     unawaited(syncActiveOrders(notify: false));
     unawaited(syncTableStates(notify: false));
@@ -3335,8 +3432,11 @@ class AppState extends ChangeNotifier {
   }
 
   void _triggerResync() async {
-    final lastCheckpoint = await _secureStorageService.getSyncCheckpoint() ?? 
-        DateTime.now().subtract(const Duration(days: 1)).toUtc().toIso8601String();
+    final lastCheckpoint = await _secureStorageService.getSyncCheckpoint() ??
+        DateTime.now()
+            .subtract(const Duration(days: 1))
+            .toUtc()
+            .toIso8601String();
     _socketService?.triggerResync(lastCheckpoint);
   }
 
@@ -3352,8 +3452,9 @@ class AppState extends ChangeNotifier {
   void _startFallbackPolling() {
     if (_fallbackPollingTimer?.isActive == true) return;
     _fallbackPollingTimer?.cancel();
-    
-    _fallbackPollingTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
+
+    _fallbackPollingTimer =
+        Timer.periodic(const Duration(seconds: 15), (timer) async {
       if (socketConnectionState == SocketConnectionState.connected) {
         timer.cancel();
         return;
@@ -3364,7 +3465,8 @@ class AppState extends ChangeNotifier {
         if (currentUserRole == UserRole.kitchen) {
           syncSucceeded = await syncKitchenOrders();
         } else {
-          syncSucceeded = await syncActiveOrders(notify: false) && syncSucceeded;
+          syncSucceeded =
+              await syncActiveOrders(notify: false) && syncSucceeded;
           syncSucceeded = await syncTableStates(notify: false) && syncSucceeded;
           if (currentUserRole == UserRole.waiter) {
             syncSucceeded = await syncKitchenOrders() && syncSucceeded;
@@ -3382,7 +3484,7 @@ class AppState extends ChangeNotifier {
 
   void _scheduleKitchenSyncFromWebSocket() {
     _kitchenSyncRetryTimer?.cancel();
-    
+
     syncKitchenOrders().then((success) {
       if (success) {
         _kitchenSyncRetryCount = 0;
@@ -3391,7 +3493,8 @@ class AppState extends ChangeNotifier {
         throw Exception('syncKitchenOrders returned false');
       }
     }).catchError((e) {
-      debugPrint('❌ WebSocket kitchen sync failed (attempt ${_kitchenSyncRetryCount + 1}/3): $e');
+      debugPrint(
+          '❌ WebSocket kitchen sync failed (attempt ${_kitchenSyncRetryCount + 1}/3): $e');
       if (_kitchenSyncRetryCount < 3) {
         final delay = Duration(seconds: 2 * (_kitchenSyncRetryCount + 1));
         debugPrint('⏳ Retrying kitchen sync in ${delay.inSeconds}s...');

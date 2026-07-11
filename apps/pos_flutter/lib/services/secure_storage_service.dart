@@ -20,20 +20,22 @@ class SecureStorageService {
   static const String _ticketFiscalConfigKey = 'ticket_fiscal_config';
 
   SecureStorageService({FlutterSecureStorage? secureStorage})
-    : _secureStorage = secureStorage ?? const FlutterSecureStorage() {
+      : _secureStorage = secureStorage ?? const FlutterSecureStorage() {
     _initFuture = _initializeStorage();
   }
 
   Future<void> _initializeStorage() async {
     // On macOS desktop, try to use secure storage first, but fall back to SharedPreferences if keychain fails
-    if (!kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
+    if (!kIsWeb &&
+        (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
       try {
         // Test if secure storage is accessible
         await _secureStorage.read(key: 'test_key');
         _useSharedPreferences = false;
       } catch (e) {
         // Keychain access failed, use SharedPreferences
-        debugPrint('Keychain access failed on desktop, using SharedPreferences: $e');
+        debugPrint(
+            'Keychain access failed on desktop, using SharedPreferences: $e');
         _useSharedPreferences = true;
         _prefs = await SharedPreferences.getInstance();
       }
@@ -51,7 +53,8 @@ class SecureStorageService {
     try {
       return await _secureStorage.read(key: key);
     } catch (e) {
-      debugPrint('Secure storage read failed for $key, falling back to SharedPreferences: $e');
+      debugPrint(
+          'Secure storage read failed for $key, falling back to SharedPreferences: $e');
       _useSharedPreferences = true;
       _prefs ??= await SharedPreferences.getInstance();
       return _prefs!.getString(key);
@@ -70,7 +73,8 @@ class SecureStorageService {
     try {
       await _secureStorage.write(key: key, value: value);
     } catch (e) {
-      debugPrint('Secure storage write failed for $key, falling back to SharedPreferences: $e');
+      debugPrint(
+          'Secure storage write failed for $key, falling back to SharedPreferences: $e');
       _useSharedPreferences = true;
       _prefs ??= await SharedPreferences.getInstance();
       await _prefs!.setString(key, value);
@@ -89,7 +93,8 @@ class SecureStorageService {
     try {
       await _secureStorage.delete(key: key);
     } catch (e) {
-      debugPrint('Secure storage delete failed for $key, falling back to SharedPreferences: $e');
+      debugPrint(
+          'Secure storage delete failed for $key, falling back to SharedPreferences: $e');
       _useSharedPreferences = true;
       _prefs ??= await SharedPreferences.getInstance();
       await _prefs!.remove(key);
@@ -141,8 +146,10 @@ class SecureStorageService {
     required String name,
     required String pin,
     required String role,
+    List<String>? roles,
   }) async {
     final hashedPin = await hashPin(pin);
+    final normalizedRoles = _normalizeRoles(roles, role);
     final usersJson = await _read(_usersCacheKey);
     List<dynamic> users = [];
     if (usersJson != null) {
@@ -156,7 +163,13 @@ class SecureStorageService {
     // Remove existing user with the same name to avoid duplication
     users.removeWhere((u) => u['name'] == name);
 
-    users.add({'id': id, 'name': name, 'pinHash': hashedPin, 'role': role});
+    users.add({
+      'id': id,
+      'name': name,
+      'pinHash': hashedPin,
+      'role': normalizedRoles.first,
+      'roles': normalizedRoles,
+    });
 
     await _write(_usersCacheKey, jsonEncode(users));
   }
@@ -176,16 +189,18 @@ class SecureStorageService {
     for (var op in operators) {
       final String name = op['name'] ?? '';
       final String role = op['role'] ?? '';
+      final List<String> roles = _normalizeRoles(op['roles'], role);
       final String pinHash = op['pinHash'] ?? ''; // BCrypt hash from backend
       final String? id = op['id'];
 
-      if (name.isNotEmpty && pinHash.isNotEmpty) {
+      if (name.isNotEmpty && pinHash.isNotEmpty && roles.isNotEmpty) {
         users.removeWhere((u) => u['name'] == name);
         users.add({
           'id': id,
           'name': name,
           'pinHash': pinHash,
-          'role': role,
+          'role': roles.first,
+          'roles': roles,
           'isBcrypt': true,
         });
       }
@@ -195,7 +210,7 @@ class SecureStorageService {
   }
 
   // Verify a PIN offline by hashing it and checking it against the secure storage cache
-  Future<Map<String, String>?> verifyOfflineCredentials(String pin) async {
+  Future<Map<String, dynamic>?> verifyOfflineCredentials(String pin) async {
     final hashedPin = await hashPin(pin);
     final usersJson = await _read(_usersCacheKey);
     if (usersJson == null) return null;
@@ -218,10 +233,12 @@ class SecureStorageService {
         }
 
         if (pinMatches) {
+          final roles = _normalizeRoles(user['roles'], user['role'] as String?);
           return {
             'id': user['id'] as String? ?? '',
             'name': user['name'] as String,
-            'role': user['role'] as String,
+            'role': roles.first,
+            'roles': roles,
           };
         }
       }
@@ -229,6 +246,23 @@ class SecureStorageService {
       return null;
     }
     return null;
+  }
+
+  List<String> _normalizeRoles(dynamic roles, String? fallbackRole) {
+    final values = <String>[];
+    if (roles is List) {
+      values.addAll(
+        roles
+            .map((role) => role?.toString().trim() ?? '')
+            .where((role) => role.isNotEmpty),
+      );
+    }
+    if (values.isEmpty &&
+        fallbackRole != null &&
+        fallbackRole.trim().isNotEmpty) {
+      values.add(fallbackRole.trim());
+    }
+    return values.toSet().toList();
   }
 
   // Clear all cached credentials
