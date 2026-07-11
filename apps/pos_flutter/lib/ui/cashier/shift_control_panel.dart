@@ -14,19 +14,53 @@ class ShiftControlPanel extends StatefulWidget {
 class _ShiftControlPanelState extends State<ShiftControlPanel> {
   final TextEditingController _floatController = TextEditingController();
   final TextEditingController _dropController = TextEditingController();
+  final TextEditingController _countedCashController = TextEditingController();
 
   @override
   void dispose() {
     _floatController.dispose();
     _dropController.dispose();
+    _countedCashController.dispose();
     super.dispose();
   }
 
-  void _openShift() {
+  void _openShift() async {
     final double? amount = double.tryParse(_floatController.text);
     if (amount != null && amount >= 0) {
-      widget.state.openShift(amount);
-      _floatController.clear();
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(color: EmpireColors.champagneGold),
+        ),
+      );
+
+      final success = await widget.state.openShift(amount);
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (success) {
+        _floatController.clear();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: EmpireColors.successGreen,
+              content: Text('¡Turno de caja abierto con éxito!'),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: EmpireColors.errorRed,
+              content: Text('Error al abrir el turno de caja. Valida tu conexión.'),
+            ),
+          );
+        }
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -37,24 +71,49 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
     }
   }
 
-  void _performCashDrop(bool isAdd) {
+  void _performCashDrop(bool isAdd) async {
     final double? amount = double.tryParse(_dropController.text);
     if (amount != null && amount > 0) {
-      if (isAdd) {
-        widget.state.addCashDrop(amount);
-      } else {
-        widget.state.removeCashDrop(amount);
-      }
-      _dropController.clear();
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: EmpireColors.successGreen,
-          content: Text(
-            'Transacción de caja realizada: \$${amount.toStringAsFixed(2)}',
-          ),
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(color: EmpireColors.champagneGold),
         ),
       );
+
+      final String reason = isAdd ? 'Ingreso de caja manual' : 'Retiro de caja manual';
+      final bool success = isAdd
+          ? await widget.state.addCashDrop(amount, reason: reason)
+          : await widget.state.removeCashDrop(amount, reason: reason);
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (success) {
+        _dropController.clear();
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: EmpireColors.successGreen,
+              content: Text(
+                'Transacción de caja realizada: \$${amount.toStringAsFixed(2)}',
+              ),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: EmpireColors.errorRed,
+              content: Text('Error al registrar transacción. Valida tu conexión.'),
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -103,32 +162,260 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
     );
   }
 
-  void _printCorte(String type) {
-    // Simulate printing X or Z report
-    final reportTitle = 'Corte $type - Resumen de Turno';
-    final reportDetails =
-        'Caja Activa\nFecha: ${DateTime.now().toLocal()}\nFondo Inicial: \$${widget.state.initialFloat.toStringAsFixed(2)}\nTotal Ventas Efectivo: \$${(widget.state.cashDrawerAmount - widget.state.initialFloat).toStringAsFixed(2)}\nOperador: ${widget.state.currentUserName}';
+  void _showCierreDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: EmpireColors.obsidian,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: EmpireColors.errorRed, width: 1.5),
+        ),
+        title: const Text(
+          'Cierre de Caja (Corte Z)',
+          style: TextStyle(
+            color: EmpireColors.champagneGold,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Por favor, cuenta el efectivo físico en caja e ingresa el monto para conciliar.',
+              style: TextStyle(color: EmpireColors.textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _countedCashController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Efectivo Contado (\$)',
+                hintText: '0.00',
+              ),
+              style: const TextStyle(color: EmpireColors.textPrimary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              'CANCELAR',
+              style: TextStyle(color: EmpireColors.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final double? amount = double.tryParse(_countedCashController.text);
+              if (amount != null && amount >= 0) {
+                Navigator.of(context).pop();
+                _performCierre(amount);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    backgroundColor: EmpireColors.errorRed,
+                    content: Text('Ingresa un monto de efectivo válido.'),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: EmpireColors.errorRed),
+            child: const Text('CERRAR CAJA'),
+          ),
+        ],
+      ),
+    );
+  }
 
-    widget.state.enqueuePrintJob(
-      PrintJob(
-        id: 'report_${DateTime.now().millisecondsSinceEpoch}',
-        title: reportTitle,
-        details: reportDetails,
-        target: 'Caja',
-        timestamp: DateTime.now(),
+  void _performCierre(double actualAmount) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: EmpireColors.champagneGold),
       ),
     );
 
-    if (type == 'Z') {
-      widget.state.closeShift();
+    final Map<String, dynamic>? recon = await widget.state.closeShift(actualAmount);
+
+    if (mounted) {
+      Navigator.of(context).pop();
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: EmpireColors.successGreen,
-        content: Text('¡Corte $type enviado a la impresora de caja!'),
+    if (recon != null) {
+      _countedCashController.clear();
+
+      final initialFloatVal = double.tryParse(recon['initialFloat']?.toString() ?? '0') ?? 0.0;
+      final totalCashSalesVal = double.tryParse(recon['totalCashSales']?.toString() ?? '0') ?? 0.0;
+      final totalCashInVal = double.tryParse(recon['totalCashIn']?.toString() ?? '0') ?? 0.0;
+      final totalCashOutVal = double.tryParse(recon['totalCashOut']?.toString() ?? '0') ?? 0.0;
+      final expectedAmountVal = double.tryParse(recon['expectedAmount']?.toString() ?? '0') ?? 0.0;
+      final actualAmountVal = double.tryParse(recon['actualAmount']?.toString() ?? '0') ?? 0.0;
+      final discrepancyVal = double.tryParse(recon['discrepancy']?.toString() ?? '0') ?? 0.0;
+
+      final reportDetails = 'Corte Z - Cierre de Caja\n'
+          'Fecha: ${DateTime.now().toLocal()}\n'
+          'Fondo Inicial: \$${initialFloatVal.toStringAsFixed(2)}\n'
+          'Ventas Efectivo: \$${totalCashSalesVal.toStringAsFixed(2)}\n'
+          'Ingresos Turno: \$${totalCashInVal.toStringAsFixed(2)}\n'
+          'Retiros Turno: \$${totalCashOutVal.toStringAsFixed(2)}\n'
+          'Esperado en Caja: \$${expectedAmountVal.toStringAsFixed(2)}\n'
+          'Físico Reportado: \$${actualAmountVal.toStringAsFixed(2)}\n'
+          'Diferencia: \$${discrepancyVal.toStringAsFixed(2)}\n'
+          'Operador: ${widget.state.currentUserName}';
+
+      widget.state.enqueuePrintJob(
+        PrintJob(
+          id: 'report_z_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Corte Z - Cierre de Caja',
+          details: reportDetails,
+          target: 'Caja',
+          timestamp: DateTime.now(),
+        ),
+      );
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: EmpireColors.obsidian,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: EmpireColors.champagneGold, width: 1.5),
+            ),
+            title: const Text(
+              'Resumen de Cierre de Caja (Corte Z)',
+              style: TextStyle(
+                color: EmpireColors.champagneGold,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: SingleChildScrollView(
+              child: Text(
+                reportDetails,
+                style: const TextStyle(
+                  color: EmpireColors.textPrimary,
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  height: 1.6,
+                ),
+              ),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('ENTENDIDO'),
+              ),
+            ],
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: EmpireColors.errorRed,
+            content: Text('Error al cerrar el turno de caja.'),
+          ),
+        );
+      }
+    }
+  }
+
+  void _printCorteX() async {
+    final shiftId = widget.state.activeShiftId;
+    if (shiftId == null) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: EmpireColors.champagneGold),
       ),
     );
+
+    final Map<String, dynamic>? auditData = await widget.state.getCashShiftAuditReport(shiftId);
+
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+
+    if (auditData != null) {
+      final summary = auditData['summary'] ?? {};
+      final initialFloatVal = double.tryParse(auditData['shiftInfo']?['initialFloat']?.toString() ?? '0') ?? 0.0;
+      final totalCashSalesVal = double.tryParse(summary['cashSales']?.toString() ?? '0') ?? 0.0;
+      final totalCashInVal = double.tryParse(summary['totalCashIn']?.toString() ?? '0') ?? 0.0;
+      final totalCashOutVal = double.tryParse(summary['totalCashOut']?.toString() ?? '0') ?? 0.0;
+      final expectedCashVal = double.tryParse(summary['expectedCash']?.toString() ?? '0') ?? 0.0;
+
+      final reportDetails = 'Corte X - Arqueo Parcial\n'
+          'Fecha: ${DateTime.now().toLocal()}\n'
+          'Fondo Inicial: \$${initialFloatVal.toStringAsFixed(2)}\n'
+          'Ventas Efectivo: \$${totalCashSalesVal.toStringAsFixed(2)}\n'
+          'Ingresos Turno: \$${totalCashInVal.toStringAsFixed(2)}\n'
+          'Retiros Turno: \$${totalCashOutVal.toStringAsFixed(2)}\n'
+          'Esperado en Caja: \$${expectedCashVal.toStringAsFixed(2)}\n'
+          'Operador: ${widget.state.currentUserName}';
+
+      widget.state.enqueuePrintJob(
+        PrintJob(
+          id: 'report_x_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Corte X - Resumen Parcial',
+          details: reportDetails,
+          target: 'Caja',
+          timestamp: DateTime.now(),
+        ),
+      );
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: EmpireColors.obsidian,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: EmpireColors.champagneGold, width: 1.5),
+            ),
+            title: const Text(
+              'Resumen de Turno Parcial (Corte X)',
+              style: TextStyle(
+                color: EmpireColors.champagneGold,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: SingleChildScrollView(
+              child: Text(
+                reportDetails,
+                style: const TextStyle(
+                  color: EmpireColors.textPrimary,
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  height: 1.6,
+                ),
+              ),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('ENTENDIDO'),
+              ),
+            ],
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: EmpireColors.errorRed,
+            content: Text('Error al obtener reporte de caja parcial.'),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -291,13 +578,13 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
               ),
             ),
             const SizedBox(height: 10),
-            OutlinedButton(
-              onPressed: () => _printCorte('X'),
+             OutlinedButton(
+              onPressed: _printCorteX,
               child: const Text('CORTEX (PARCIAL)'),
             ),
             const SizedBox(height: 10),
             OutlinedButton(
-              onPressed: () => _printCorte('Z'),
+              onPressed: _showCierreDialog,
               style: OutlinedButton.styleFrom(
                 foregroundColor: EmpireColors.errorRed,
                 side: const BorderSide(

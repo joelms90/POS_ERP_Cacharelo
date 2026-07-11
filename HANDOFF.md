@@ -2,53 +2,55 @@
 
 ## 1. Header & Metadata
 - **Project Name**: `/Users/joelmorales/web/POS-ERP`
-- **Date & Time**: 2026-06-29T23:18:00-06:00
+- **Date & Time**: 2026-07-09T18:56:00-06:00
 - **Last Agent**: Antigravity (Google DeepMind)
 
 ---
 
 ## 2. Executive Summary
-In this session, we successfully built the production recipes (Bill of Materials) and assembly execution systems, resolved authentication discrepancies, and built a POS Terminal QR Link Activation flow:
-1. **Recipes (BOM) REST module**:
-   - Created the `RecipesModule` in the NestJS sync API backend.
-   - Built endpoints: `GET /recipes?productId=...` and `POST /recipes` to read/write ingredient components and quantity mappings.
-   - Integrated transaction-based updates in [recipes.repository.ts](./apps/sync_api/src/modules/recipes/repositories/recipes.repository.ts) to clean and overwrite ingredient settings.
-2. **Production Run / Assembly module**:
-   - Created the `/api/inventory/production` endpoints to query logs and process dish assembly.
-   - Implemented real-time Bill of Materials validation verifying stock levels of each ingredient in the destination warehouse before permitting assembly.
-   - Processed stock deduction of ingredients and finished goods increment inside a single, secure database transaction.
-3. **Tauri UI Assembly Page**:
-   - Created [AssemblyPage.tsx](./apps/business_control_tauri/src/pages/AssemblyPage.tsx) featuring a dynamic tab selector for recipe definitions and production run execution.
-   - Included real-time stock checks against warehouses and an error log interface.
-   - Integrated the "Producción (Recetas)" item in [AdminLayout.tsx](./apps/business_control_tauri/src/components/templates/AdminLayout.tsx) side navigation.
-4. **POS Setup QR link generation**:
-   - Implemented "Vincular Terminal POS" action buttons inside [BranchesPage.tsx](./apps/business_control_tauri/src/pages/BranchesPage.tsx) to generate branch activation QR codes and fallback copyable activation JSON.
-5. **POS Flutter Client Syncing & Camera Scanning**:
-   - Modified [app_state.dart](./apps/pos_flutter/lib/ui/common/app_state.dart) to change the static menu list to a mutable structure.
-   - Added `fetchMenuDynamic` and updated PIN authentication to query the correct business and sucursal dynamic API server endpoint `/api/auth/tablet-login`.
-   - Integrated the `mobile_scanner` library inside [login_screen.dart](./apps/pos_flutter/lib/ui/login_screen.dart) and created a native `QrScannerDialog` camera scanner view. It lets users configure their POS terminals automatically by scanning the GCS dashboard's QR activation code.
-
-All updates are compiled, committed, and deployed.
+In this session, we resolved critical compilation errors in the NestJS backend and Tauri frontend, implemented the **Payment Method Sales Report** and the **Cash Shift Audit / Corte de Caja (X/Z) Report**, and created a helper Makefile command to easily connect local DBeaver clients to the production Cloud SQL database.
 
 ---
 
 ## 3. Current Status & Progress
 
 ### Completed Tasks
-1. **Recipes & Production Runs REST API**:
-   - Deployed live to Cloud Run on us-central1.
-2. **Tauri Admin Assembly View & POS Setup QR Codes**:
-   - Compiled and deployed static assets live to the GCS bucket.
-3. **Flutter POS Catalog & Auth Syncing**:
-   - Added dynamic category-to-product mapping to cache menu items.
-   - Added native camera QR code scanning and configuration storage fallback options.
+1. **TypeScript Compilation Fixes**:
+   - Fixed the `bigserial` configuration mode type error in the `changeLog` schema (`schema.ts`).
+   - Fixed the `getProductSalesReport` query in `reports.service.ts` to join the `branches` table and filter by `branches.businessId` (since `orders` does not contain a direct `businessId` column).
+2. **Cache Poisoning Resolution**:
+   - Added cache-busting headers (`Cache-Control: no-cache, no-store`, `Pragma: no-cache`) and set `cache: 'no-store'` inside the frontend's `apiRequest` function (`api.ts`). This prevents the browser cache from serving poisoned `404 Not Found` responses upon receiving server `304 Not Modified` codes.
+3. **Payment Method Sales Report**:
+   - Added NestJS service methods and exposed `/api/reports/sales/payment-methods` endpoint.
+   - Designed and built the "Métodos de Pago" tab in `ReportsPage.tsx` showing cash, card, and total receipt summaries, along with grid tables, CSV export, and PDF printing.
+4. **Corte y Arqueo de Caja (Cash Shifts) Audit Report**:
+   - Implemented `getCashShiftsList` and `getCashShiftAuditReport` services in NestJS backend.
+   - Exposed `GET /reports/cash-shifts` and `GET /reports/cash-shifts/:id/audit` endpoints.
+   - Designed a double-panel split view for the "Cortes y Turnos de Caja" tab in the Tauri React dashboard. The left side handles the turnos list, and the right side displays the detailed audit balance sheet (Corte X for active shifts, Corte Z with discrepancy reports and transactional logs for closed shifts).
+5. **Makefile db-proxy Target**:
+   - Created the `make db-proxy` command which displays all DBeaver connection credentials and launches the local `cloud-sql-proxy` wrapper on port `5433` for easy remote administration.
+
+### File Changes (Commits in this session)
+* [apps/sync_api/src/database/schema.ts](./apps/sync_api/src/database/schema.ts)
+* [apps/sync_api/src/modules/reports/reports.service.ts](./apps/sync_api/src/modules/reports/reports.service.ts)
+* [apps/sync_api/src/modules/reports/reports.controller.ts](./apps/sync_api/src/modules/reports/reports.controller.ts)
+* [apps/sync_api/src/modules/reports/reports.service.spec.ts](./apps/sync_api/src/modules/reports/reports.service.spec.ts)
+* [apps/business_control_tauri/src/services/api.ts](./apps/business_control_tauri/src/services/api.ts)
+* [apps/business_control_tauri/src/pages/ReportsPage.tsx](./apps/business_control_tauri/src/pages/ReportsPage.tsx)
+* [Makefile](./Makefile)
 
 ---
 
 ## 4. Remaining Tasks & Next Steps
 
-1. **Implement Stock Transfers (Traspasos) UI & Endpoints**:
-   - Build `/api/inventory/transfers` to move stock between different Warehouses and Branches.
-   - Add the `TransfersPage.tsx` interface in the admin panel to execute transfers.
-2. **Receipts Provider Association**:
-   - Connect providers selection and purchase logs inside the POS cashier interface.
+1. **Verify Backend Deployment & UI Live Syncing**:
+   - Verify that the production backend has been deployed successfully using `make backend-deploy-fast` and that the new "Métodos de Pago" and "Cortes y Turnos de Caja" reports display correctly in the production URL.
+2. **Link Cash Shifts from Flutter POS**:
+   - Confirm and verify the synchronization of cash shifts and cash transactions from the Flutter Mesero/Cajero POS client application via WebSocket connection, ensuring that opening/closing cash drawers populates the admin panels accurately.
+
+---
+
+## 5. Technical Context & Key Decisions
+- **Drizzle SQL Joins**: Rather than adding redundant columns directly to tables, relationships are resolved by joining `branches` in reports, which maintains relational integrity.
+- **Cache Control**: API request cache is set to `no-store` to bypass any caching layers (e.g. browser, local webviews, proxies), avoiding mismatch issues with `304 Not Modified` and `404 Not Found` cached responses.
+- **DBeaver Helper**: The local `cloud-sql-proxy` is run as a Makefile target to connect local SQL GUI clients safely over a secure tunnel.

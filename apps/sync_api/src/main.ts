@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { runMigrations } from './database/migrate';
 import { ValidationPipe } from '@nestjs/common';
 import { json, urlencoded } from 'express';
+import { WsAdapter } from '@nestjs/platform-ws';
 
 async function bootstrap() {
   // In production, migrations should be run separately via Cloud Run Jobs
@@ -19,6 +20,7 @@ async function bootstrap() {
   }
 
   const app = await NestFactory.create(AppModule);
+  app.useWebSocketAdapter(new WsAdapter(app));
 
   // Increase body parser payload limits for layout images
   app.use(json({ limit: '50mb' }));

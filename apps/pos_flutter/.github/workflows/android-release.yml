@@ -1,0 +1,122 @@
+name: Flutter Android Release Build
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+jobs:
+  build-android:
+    name: Build Android Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Build Android APK
+        run: flutter build apk --release
+
+      - name: Build Android App Bundle (AAB)
+        run: flutter build appbundle --release
+
+      - name: Get APK info
+        id: apk_info
+        run: |
+          APK_SIZE=$(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1)
+          AAB_SIZE=$(du -h build/app/outputs/bundle/release/app-release.aab | cut -f1)
+          echo "apk_size=$APK_SIZE" >> $GITHUB_OUTPUT
+          echo "aab_size=$AAB_SIZE" >> $GITHUB_OUTPUT
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pos_flutter_android_apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+      - name: Upload AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pos_flutter_android_aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: Authenticate to Google Cloud
+        if: github.ref == 'refs/heads/main'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/232144991863/locations/global/workloadIdentityPools/github-actions/providers/github-provider'
+          service_account: 'github-actions-pos-flutter@fresh-sensor-497515-d3.iam.gserviceaccount.com'
+
+      - name: Set up Cloud SDK
+        if: github.ref == 'refs/heads/main'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload APK to Cloud Storage (Latest)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          gcloud storage cp build/app/outputs/flutter-apk/app-release.apk gs://cacharelo-pos-releases/android/pos_flutter_android_latest.apk
+
+      - name: Upload AAB to Cloud Storage (Latest)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          gcloud storage cp build/app/outputs/bundle/release/app-release.aab gs://cacharelo-pos-releases/android/pos_flutter_android_latest.aab
+
+      - name: Upload Versioned Builds to Cloud Storage
+        if: github.ref == 'refs/heads/main'
+        run: |
+          DATE=$(date +"%Y%m%d-%H%M%S")
+          VERSION="v1.0.0-$DATE"
+          gcloud storage cp build/app/outputs/flutter-apk/app-release.apk gs://cacharelo-pos-releases/android/pos_flutter_android_$VERSION.apk
+          gcloud storage cp build/app/outputs/bundle/release/app-release.aab gs://cacharelo-pos-releases/android/pos_flutter_android_$VERSION.aab
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        id: version
+
+      - name: Create build summary
+        run: |
+          echo "### 🎉 Android Build Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Date:** $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📦 **Download Options:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. **GitHub Artifacts:** Check 'Artifacts' section below" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "2. **APK (Latest):** https://storage.googleapis.com/cacharelo-pos-releases/android/pos_flutter_android_latest.apk" >> $GITHUB_STEP_SUMMARY
+            echo "3. **AAB (Latest):** https://storage.googleapis.com/cacharelo-pos-releases/android/pos_flutter_android_latest.aab" >> $GITHUB_STEP_SUMMARY
+            if [ -n "${{ steps.version.outputs.VERSION }}" ]; then
+              echo "4. **Versioned APK:** https://storage.googleapis.com/cacharelo-pos-releases/android/pos_flutter_android_${{ steps.version.outputs.VERSION }}.apk" >> $GITHUB_STEP_SUMMARY
+              echo "5. **Versioned AAB:** https://storage.googleapis.com/cacharelo-pos-releases/android/pos_flutter_android_${{ steps.version.outputs.VERSION }}.aab" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Sizes:**" >> $GITHUB_STEP_SUMMARY
+          echo "- 📱 APK: ${{ steps.apk_info.outputs.apk_size }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 AAB: ${{ steps.apk_info.outputs.aab_size }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Installation:**" >> $GITHUB_STEP_SUMMARY
+          echo "- **APK:** Download and install directly on Android devices" >> $GITHUB_STEP_SUMMARY
+          echo "- **AAB:** Upload to Google Play Store for distribution" >> $GITHUB_STEP_SUMMARY

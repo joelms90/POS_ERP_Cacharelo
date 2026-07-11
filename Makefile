@@ -425,7 +425,7 @@ backend-migrate:
 		cd apps/sync_api && \
 		DATABASE_URL="postgresql://pos_user:pos-secure-db-pass-2026!@localhost:5433/pos_db" \
 		NODE_ENV=production \
-		pnpm run migrate ; \
+		pnpm tsx scripts/manual-create-changelog.ts ; \
 		EXIT_CODE=$$? ; \
 		echo "Stopping proxy..." && \
 		kill $$PROXY_PID 2>/dev/null || true ; \

@@ -114,10 +114,10 @@ export class AuthService {
 
     const secret = process.env.JWT_SECRET || 'dev_jwt_secret_key';
 
-    // Access Token: 15m
+    // Access Token: 30d
     const accessToken = this.jwtService.sign(jwtPayload, {
       secret,
-      expiresIn: '15m',
+      expiresIn: '30d',
     });
 
     // Refresh Token: 7d

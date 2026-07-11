@@ -111,6 +111,23 @@ void main() {
       // Change = 20.00 - 13.50 = 6.50
       expect(find.text('\$6.50'), findsNWidgets(2));
 
+      // 5. Quick cash buttons should set exact, add denominations, and clear.
+      await tester.tap(find.text('Exacto \$13.50'));
+      await tester.pumpAndSettle();
+      expect(find.text('\$0.00'), findsAtLeastNWidgets(1));
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Limpiar'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('+\$20'));
+      await tester.tap(find.text('+\$50'));
+      await tester.pumpAndSettle();
+      expect(find.text('\$56.50'), findsNWidgets(2));
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Limpiar'));
+      await tester.pumpAndSettle();
+      expect(find.text('\$0.00'), findsAtLeastNWidgets(1));
+
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
     },

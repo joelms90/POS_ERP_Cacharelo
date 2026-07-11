@@ -1,7 +1,7 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read:
-specs/005-waiter-billing-flow/plan.md
+specs/010-multi-role-users/plan.md
 <!-- SPECKIT END -->
 
 # UI Responsiveness Guidelines

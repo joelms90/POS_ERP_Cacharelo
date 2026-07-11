@@ -1,0 +1,93 @@
+name: Flutter Windows Release Build
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+jobs:
+  build-windows:
+    name: Build Windows Release
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Build Windows Release
+        run: flutter build windows --release
+
+      - name: Create Windows ZIP archive
+        working-directory: build/windows/x64/runner/Release
+        run: |
+          7z a -tzip ../../../../../pos_flutter_windows_x64.zip *
+
+      - name: Upload Windows Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pos_flutter_windows_x64_release
+          path: pos_flutter_windows_x64.zip
+          retention-days: 30
+
+      - name: Authenticate to Google Cloud
+        if: github.ref == 'refs/heads/main'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/232144991863/locations/global/workloadIdentityPools/github-actions/providers/github-provider'
+          service_account: 'github-actions-pos-flutter@fresh-sensor-497515-d3.iam.gserviceaccount.com'
+
+      - name: Set up Cloud SDK
+        if: github.ref == 'refs/heads/main'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload to Cloud Storage (Latest)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          gcloud storage cp pos_flutter_windows_x64.zip gs://cacharelo-pos-releases/windows/pos_flutter_windows_latest.zip
+
+      - name: Upload to Cloud Storage (Versioned)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          $date = Get-Date -Format "yyyyMMdd-HHmmss"
+          $version = "v1.0.0-$date"
+          gcloud storage cp pos_flutter_windows_x64.zip gs://cacharelo-pos-releases/windows/pos_flutter_windows_$version.zip
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        id: version
+
+      - name: Create build summary
+        run: |
+          echo "### 🎉 Windows Build Complete!" >> $env:GITHUB_STEP_SUMMARY
+          echo "" >> $env:GITHUB_STEP_SUMMARY
+          echo "**Build Date:** $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" >> $env:GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $env:GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $env:GITHUB_STEP_SUMMARY
+          echo "" >> $env:GITHUB_STEP_SUMMARY
+          echo "📦 **Download Options:**" >> $env:GITHUB_STEP_SUMMARY
+          echo "1. **GitHub Artifact:** Click on 'Artifacts' section below" >> $env:GITHUB_STEP_SUMMARY
+          if ("${{ github.ref }}" -eq "refs/heads/main") {
+            echo "2. **Public URL (Latest):** https://storage.googleapis.com/cacharelo-pos-releases/windows/pos_flutter_windows_latest.zip" >> $env:GITHUB_STEP_SUMMARY
+            if ("${{ steps.version.outputs.VERSION }}") {
+              echo "3. **Versioned URL:** https://storage.googleapis.com/cacharelo-pos-releases/windows/pos_flutter_windows_${{ steps.version.outputs.VERSION }}.zip" >> $env:GITHUB_STEP_SUMMARY
+            }
+          }
+          echo "" >> $env:GITHUB_STEP_SUMMARY
+          echo "**Package Contents:**" >> $env:GITHUB_STEP_SUMMARY
+          echo "- ✅ pos_flutter.exe (main executable)" >> $env:GITHUB_STEP_SUMMARY
+          echo "- ✅ All required DLL files" >> $env:GITHUB_STEP_SUMMARY
+          echo "- ✅ Data folder with Flutter assets" >> $env:GITHUB_STEP_SUMMARY
+          echo "" >> $env:GITHUB_STEP_SUMMARY
+          echo "**Installation:** Extract ZIP and run pos_flutter.exe" >> $env:GITHUB_STEP_SUMMARY

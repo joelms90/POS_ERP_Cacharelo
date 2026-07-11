@@ -1257,11 +1257,23 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e, stack) {
-      lastSyncError = 'Error: $e\n$stack';
-      debugPrint('Error syncing kitchen orders: $e\n$stack');
+      if (_isTransientSyncFailure(e)) {
+        isOnline = false;
+        debugPrint('Transient kitchen sync failure: $e');
+      } else {
+        lastSyncError = 'Error: $e\n$stack';
+        debugPrint('Error syncing kitchen orders: $e\n$stack');
+      }
       notifyListeners();
       return false;
     }
+  }
+
+  bool _isTransientSyncFailure(Object error) {
+    return error is TimeoutException ||
+        error is SocketException ||
+        error is HttpException ||
+        error is http.ClientException;
   }
 
   /// Syncs table states from the backend using the pull sync endpoint.
@@ -3348,16 +3360,17 @@ class AppState extends ChangeNotifier {
       }
       debugPrint('WebSocket offline - executing REST fallback polling...');
       try {
+        bool syncSucceeded = true;
         if (currentUserRole == UserRole.kitchen) {
-          await syncKitchenOrders();
+          syncSucceeded = await syncKitchenOrders();
         } else {
-          await syncActiveOrders(notify: false);
-          await syncTableStates(notify: false);
+          syncSucceeded = await syncActiveOrders(notify: false) && syncSucceeded;
+          syncSucceeded = await syncTableStates(notify: false) && syncSucceeded;
           if (currentUserRole == UserRole.waiter) {
-            await syncKitchenOrders();
+            syncSucceeded = await syncKitchenOrders() && syncSucceeded;
           }
         }
-        isOnline = true;
+        isOnline = syncSucceeded;
         notifyListeners();
       } catch (e) {
         debugPrint('REST fallback polling failed: $e');
@@ -3388,7 +3401,10 @@ class AppState extends ChangeNotifier {
         });
       } else {
         debugPrint('⛔ Kitchen sync failed after 3 retries, giving up');
-        lastSyncError = 'Kitchen sync failed after 3 retries';
+        if (lastSyncError != null) {
+          lastSyncError = 'Kitchen sync failed after 3 retries\n$lastSyncError';
+        }
+        isOnline = false;
         _kitchenSyncRetryCount = 0;
         notifyListeners();
       }

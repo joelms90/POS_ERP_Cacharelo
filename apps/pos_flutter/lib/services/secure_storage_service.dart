@@ -243,7 +243,7 @@ class SecureStorageService {
     try {
       final List<dynamic> decoded = jsonDecode(jobsJson);
       return decoded
-          .whereType<Map>()
+          .where((job) => job is Map)
           .map((job) => Map<String, dynamic>.from(job))
           .toList();
     } catch (e) {
@@ -365,6 +365,19 @@ class SecureStorageService {
 
   Future<String?> getSyncCheckpoint() async {
     return await _read('last_table_sync_checkpoint');
+  }
+
+  // JWT Token caching
+  Future<void> saveJwtToken(String token) async {
+    await _write('jwt_access_token', token);
+  }
+
+  Future<String?> getJwtToken() async {
+    return await _read('jwt_access_token');
+  }
+
+  Future<void> clearJwtToken() async {
+    await _delete('jwt_access_token');
   }
 
   // Utility functions for Hex conversions

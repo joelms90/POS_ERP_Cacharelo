@@ -54,8 +54,23 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
 
             return Column(
               children: [
-                // Top status bar
                 OfflineStatusBar(state: widget.state),
+
+                if (widget.state.lastSyncError != null)
+                  Container(
+                    width: double.infinity,
+                    color: EmpireColors.errorRed,
+                    padding: const EdgeInsets.all(12),
+                    child: SelectableText(
+                      'FALLO DE CONEXIÓN/PARSEO KDS:\n${widget.state.lastSyncError!}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
 
                 // Header
                 _buildHeader(context, pendingCount, preparingCount, readyCount),

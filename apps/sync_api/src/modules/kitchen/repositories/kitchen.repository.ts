@@ -19,6 +19,23 @@ export class KitchenRepository {
     return results[0] || null;
   }
 
+  async findBranchIdForOrder(orderId: string): Promise<string | null> {
+    const results = await this.db
+      .select({ branchId: schema.orders.branchId })
+      .from(schema.orders)
+      .where(eq(schema.orders.id, orderId));
+    return results[0]?.branchId || null;
+  }
+
+  async findBranchIdForTicket(ticketId: string): Promise<string | null> {
+    const results = await this.db
+      .select({ branchId: schema.orders.branchId })
+      .from(schema.kitchenTickets)
+      .innerJoin(schema.orders, eq(schema.kitchenTickets.orderId, schema.orders.id))
+      .where(eq(schema.kitchenTickets.id, ticketId));
+    return results[0]?.branchId || null;
+  }
+
   async findActiveTicketsByBranch(branchId: string) {
     // 1. Get all active kitchen tickets (status pending, preparing, ready)
     const tickets = await this.db

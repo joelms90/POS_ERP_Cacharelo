@@ -76,6 +76,7 @@ export const users = pgTable('users', {
   passwordHash: varchar('password_hash', { length: 255 }),
   pin: varchar('pin', { length: 255 }).notNull(), // Checked for uniqueness per business
   role: varchar('role', { length: 20 }).notNull(), // waiter, cashier, kitchen, admin
+  roles: jsonb('roles').$type<string[]>().default([]).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

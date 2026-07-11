@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../common/colors.dart';
 import '../common/app_state.dart';
 
@@ -47,15 +48,23 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
     }
   }
 
-  double get currentSubtotal => double.parse((currentGrossSubtotal / ivaFactor).toStringAsFixed(2));
-  double get discountAmount => double.parse((currentSubtotal * (selectedDiscount / 100.0)).toStringAsFixed(2));
-  double get currentTotal => double.parse((currentGrossSubtotal * (1 - (selectedDiscount / 100.0))).toStringAsFixed(2));
-  double get currentTax => double.parse((currentTotal - (currentSubtotal - discountAmount)).toStringAsFixed(2));
+  double get currentSubtotal =>
+      double.parse((currentGrossSubtotal / ivaFactor).toStringAsFixed(2));
+  double get discountAmount => double.parse(
+      (currentSubtotal * (selectedDiscount / 100.0)).toStringAsFixed(2));
+  double get currentTotal =>
+      double.parse((currentGrossSubtotal * (1 - (selectedDiscount / 100.0)))
+          .toStringAsFixed(2));
+  double get currentTax => double.parse(
+      (currentTotal - (currentSubtotal - discountAmount)).toStringAsFixed(2));
 
   double get cashChange {
     final double cash = double.tryParse(_cashReceivedController.text) ?? 0.0;
     return cash > currentTotal ? cash - currentTotal : 0.0;
   }
+
+  double get cashReceived =>
+      double.tryParse(_cashReceivedController.text) ?? 0.0;
 
   @override
   void dispose() {
@@ -96,7 +105,9 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
 
     // Capture whether this checkout is a partial split check
     final bool isPartialEqual = isEqualSplit && splitCount > 1;
-    final bool isPartialItems = !isEqualSplit && selectedItemIndexes.isNotEmpty && selectedItemIndexes.length < widget.table.items.length;
+    final bool isPartialItems = !isEqualSplit &&
+        selectedItemIndexes.isNotEmpty &&
+        selectedItemIndexes.length < widget.table.items.length;
 
     // Process the payment
     widget.state.checkoutTable(
@@ -124,7 +135,8 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: EmpireColors.successGreen,
-          content: Text('Pago parcial registrado con éxito. Quedan $splitCount partes por cobrar.'),
+          content: Text(
+              'Pago parcial registrado con éxito. Quedan $splitCount partes por cobrar.'),
         ),
       );
     } else if (isPartialItems) {
@@ -134,13 +146,241 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           backgroundColor: EmpireColors.successGreen,
-          content: Text('Artículos pagados con éxito. Continúe con los artículos restantes.'),
+          content: Text(
+              'Artículos pagados con éxito. Continúe con los artículos restantes.'),
         ),
       );
     } else {
       // Full payment complete (either equal split final part, or last items, or full single ticket payment)
       widget.onSuccess();
     }
+  }
+
+  void _setCashReceived(double amount) {
+    final formattedAmount = amount.toStringAsFixed(2);
+    _cashReceivedController.value = TextEditingValue(
+      text: formattedAmount,
+      selection: TextSelection.collapsed(offset: formattedAmount.length),
+    );
+    setState(() {});
+  }
+
+  void _addCashReceived(double amount) {
+    _setCashReceived(cashReceived + amount);
+  }
+
+  ButtonStyle _cashActionButtonStyle({
+    required Color backgroundColor,
+    required Color foregroundColor,
+    Color? borderColor,
+  }) {
+    return OutlinedButton.styleFrom(
+      backgroundColor: backgroundColor,
+      foregroundColor: foregroundColor,
+      side: BorderSide(
+        color: borderColor ?? backgroundColor,
+        width: 1.5,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      textStyle: const TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: 14,
+      ),
+    );
+  }
+
+  Widget _buildCashQuickButton({
+    required String label,
+    required VoidCallback onPressed,
+    required ButtonStyle style,
+    IconData? icon,
+  }) {
+    return SizedBox(
+      height: 52,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: icon == null ? const SizedBox.shrink() : Icon(icon, size: 18),
+        label: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label),
+        ),
+        style: style,
+      ),
+    );
+  }
+
+  Widget _buildCashPaymentInputs() {
+    final denominationStyle = _cashActionButtonStyle(
+      backgroundColor: EmpireColors.charcoalSurface,
+      foregroundColor: EmpireColors.textPrimary,
+      borderColor: EmpireColors.agedBronze,
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: EmpireColors.charcoalSurface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: EmpireColors.champagneGold, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.touch_app,
+                color: EmpireColors.champagneGold,
+                size: 22,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Monto Recibido',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: EmpireColors.champagneGold,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _cashReceivedController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}$')),
+            ],
+            decoration: InputDecoration(
+              labelText: 'Monto Recibido',
+              prefixText: '\$ ',
+              hintText: 'Toca para editar',
+              filled: true,
+              fillColor: EmpireColors.obsidian,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 20,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: EmpireColors.champagneGold,
+                  width: 2,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: EmpireColors.champagneGoldLight,
+                  width: 2.5,
+                ),
+              ),
+              suffixIcon: IconButton(
+                tooltip: 'Limpiar monto recibido',
+                onPressed: () => _setCashReceived(0),
+                icon: const Icon(
+                  Icons.backspace_outlined,
+                  color: EmpireColors.textSecondary,
+                ),
+              ),
+            ),
+            style: const TextStyle(
+              color: EmpireColors.textPrimary,
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+            ),
+            onChanged: (val) => setState(() {}),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _buildCashQuickButton(
+                  label: 'Exacto \$${currentTotal.toStringAsFixed(2)}',
+                  icon: Icons.price_check,
+                  onPressed: () => _setCashReceived(currentTotal),
+                  style: _cashActionButtonStyle(
+                    backgroundColor: EmpireColors.champagneGold,
+                    foregroundColor: EmpireColors.obsidian,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildCashQuickButton(
+                  label: 'Limpiar',
+                  icon: Icons.refresh,
+                  onPressed: () => _setCashReceived(0),
+                  style: _cashActionButtonStyle(
+                    backgroundColor: EmpireColors.onyxSurface,
+                    foregroundColor: EmpireColors.textPrimary,
+                    borderColor: EmpireColors.agedBronze,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Sumar billetes recibidos',
+            style: TextStyle(
+              color: EmpireColors.textSecondary,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [20, 50, 100, 200, 500]
+                .map(
+                  (amount) => SizedBox(
+                    width: 108,
+                    child: _buildCashQuickButton(
+                      label: '+\$$amount',
+                      onPressed: () => _addCashReceived(amount.toDouble()),
+                      style: denominationStyle,
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: EmpireColors.onyxSurface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: EmpireColors.agedBronzeDark),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Cambio a devolver',
+                  style: TextStyle(
+                    color: EmpireColors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  '\$${cashChange.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    color: EmpireColors.successGreen,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildLeftSummaryPanel(BuildContext context) {
@@ -159,9 +399,9 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                   Text(
                     'Resumen de Pago',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: EmpireColors.champagneGold,
-                      fontWeight: FontWeight.bold,
-                    ),
+                          color: EmpireColors.champagneGold,
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 20),
 
@@ -426,9 +666,9 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                   Text(
                     'Pagar Cuenta',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: EmpireColors.champagneGold,
-                      fontWeight: FontWeight.bold,
-                    ),
+                          color: EmpireColors.champagneGold,
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -598,8 +838,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                           }
                         }
                         final hasItems = guestItemsIndices.isNotEmpty;
-                        final allSelected =
-                            hasItems &&
+                        final allSelected = hasItems &&
                             guestItemsIndices.every(
                               (idx) => selectedItemIndexes.contains(idx),
                             );
@@ -790,9 +1029,8 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                       color: isSelected
                           ? EmpireColors.champagneGold
                           : EmpireColors.textPrimary,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
                       fontSize: 12,
                     ),
                     side: BorderSide(
@@ -867,40 +1105,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
 
               // Payment inputs
               if (selectedPaymentMethod == 'Efectivo') ...[
-                TextField(
-                  controller: _cashReceivedController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(
-                    labelText: 'Monto Recibido',
-                    prefixText: '\$ ',
-                    hintText: '0.00',
-                  ),
-                  style: const TextStyle(color: EmpireColors.textPrimary),
-                  onChanged: (val) => setState(() {}),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Cambio a devolver:',
-                      style: TextStyle(
-                        color: EmpireColors.textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
-                    Text(
-                      '\$${cashChange.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: EmpireColors.successGreen,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
+                _buildCashPaymentInputs(),
               ] else ...[
                 TextField(
                   controller: _cardRefController,

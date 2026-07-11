@@ -1,12 +1,17 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Inject, forwardRef } from '@nestjs/common';
 import { OrdersRepository } from './repositories/orders.repository';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { AddOrderItemsDto } from './dto/add-order-items.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { SyncGateway } from '../sync/sync.gateway';
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly ordersRepository: OrdersRepository) {}
+  constructor(
+    private readonly ordersRepository: OrdersRepository,
+    @Inject(forwardRef(() => SyncGateway))
+    private readonly syncGateway: SyncGateway,
+  ) {}
 
   async create(createOrderDto: CreateOrderDto) {
     const { items, ...orderData } = createOrderDto;
@@ -20,13 +25,26 @@ export class OrdersService {
       isSent: false,
     }));
 
-    return this.ordersRepository.create(
+    const result = await this.ordersRepository.create(
       {
         ...orderData,
         state: 'open',
       },
       itemsToInsert,
     );
+
+    // Broadcast table state change (occupied) and new order
+    if (result.branchId) {
+      this.syncGateway.broadcastChange(result.branchId, {
+        tipo: 'cambio',
+        changes: [
+          { entity: 'orders', entityId: result.id, payload: { id: result.id, tableId: result.tableId, state: result.state } },
+          { entity: 'branchTables', entityId: result.tableId, payload: { state: 'occupied' } }
+        ]
+      });
+    }
+
+    return result;
   }
 
   async findOne(id: string) {
@@ -71,11 +89,23 @@ export class OrdersService {
     const newTaxVal = newSubtotalVal * 0.16;
     const newTotalVal = newSubtotalVal - currentDiscount + newTaxVal;
 
-    return this.ordersRepository.addItems(orderId, itemsToInsert, {
+    const result = await this.ordersRepository.addItems(orderId, itemsToInsert, {
       subtotal: newSubtotalVal.toFixed(2),
       tax: newTaxVal.toFixed(2),
       total: newTotalVal.toFixed(2),
     });
+
+    // Broadcast items update
+    if (result.branchId) {
+      this.syncGateway.broadcastChange(result.branchId, {
+        tipo: 'cambio',
+        changes: [
+          { entity: 'orders', entityId: result.id, payload: { id: result.id, tableId: result.tableId, state: result.state } }
+        ]
+      });
+    }
+
+    return result;
   }
 
   async requestBilling(orderId: string) {
@@ -84,7 +114,20 @@ export class OrdersService {
       throw new ConflictException(`Cannot request billing for an order in state: ${order.state}`);
     }
 
-    return this.ordersRepository.updateOrderAndTableState(orderId, 'billing', 'billing');
+    const result = await this.ordersRepository.updateOrderAndTableState(orderId, 'billing', 'billing');
+
+    // Broadcast table state change (billing)
+    if (result.branchId) {
+      this.syncGateway.broadcastChange(result.branchId, {
+        tipo: 'cambio',
+        changes: [
+          { entity: 'orders', entityId: result.id, payload: { id: result.id, tableId: result.tableId, state: 'billing' } },
+          { entity: 'branchTables', entityId: result.tableId, payload: { state: 'billing' } }
+        ]
+      });
+    }
+
+    return result;
   }
 
   async processPayment(orderId: string, createPaymentDto: CreatePaymentDto) {
@@ -96,12 +139,25 @@ export class OrdersService {
 
     const { amount, paymentMethod, referenceCode } = createPaymentDto;
 
-    return this.ordersRepository.createPayment(orderId, {
+    const result = await this.ordersRepository.createPayment(orderId, {
       orderId,
       amount,
       paymentMethod,
       referenceCode: referenceCode || null,
     });
+
+    // Broadcast payment state changes and table transitions (e.g. cleaning)
+    if (order.branchId) {
+      this.syncGateway.broadcastChange(order.branchId, {
+        tipo: 'cambio',
+        changes: [
+          { entity: 'orders', entityId: order.id, payload: { id: order.id, tableId: order.tableId, state: result.orderState } },
+          { entity: 'branchTables', entityId: order.tableId, payload: { state: result.tableState } }
+        ]
+      });
+    }
+
+    return result;
   }
 
   async cancelOrder(orderId: string) {
@@ -109,6 +165,20 @@ export class OrdersService {
     if (order.state === 'closed' || order.state === 'cancelled') {
       throw new ConflictException(`Cannot cancel an order in state: ${order.state}`);
     }
-    return this.ordersRepository.updateOrderAndTableState(orderId, 'cancelled', 'free');
+    
+    const result = await this.ordersRepository.updateOrderAndTableState(orderId, 'cancelled', 'free');
+
+    // Broadcast cancellation and table release (free)
+    if (result.branchId) {
+      this.syncGateway.broadcastChange(result.branchId, {
+        tipo: 'cambio',
+        changes: [
+          { entity: 'orders', entityId: result.id, payload: { id: result.id, tableId: result.tableId, state: 'cancelled' } },
+          { entity: 'branchTables', entityId: result.tableId, payload: { state: 'free' } }
+        ]
+      });
+    }
+
+    return result;
   }
 }

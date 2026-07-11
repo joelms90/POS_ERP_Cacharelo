@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../common/colors.dart';
 import '../common/app_state.dart';
+import '../common/sync_socket_service.dart';
 
 class OfflineStatusBar extends StatelessWidget {
   final AppState state;
@@ -38,15 +39,41 @@ class OfflineStatusBar extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            success 
-              ? 'Sincronización completa con éxito.'
-              : 'Sincronización incompleta. Revise su conexión de red.',
+            success ? 'Sincronización completa con éxito.' : 'Sincronización incompleta. Revise su conexión de red.',
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           backgroundColor: success ? EmpireColors.successGreen : EmpireColors.errorRed,
           duration: const Duration(seconds: 2),
         ),
       );
+    }
+  }
+
+  Color _getStatusColor(SocketConnectionState connectionState, bool isOnline) {
+    if (!isOnline) return EmpireColors.errorRed;
+    switch (connectionState) {
+      case SocketConnectionState.connected:
+        return EmpireColors.successGreen;
+      case SocketConnectionState.connecting:
+        return EmpireColors.warningOrange;
+      case SocketConnectionState.degradedRest:
+        return EmpireColors.textGold;
+      case SocketConnectionState.disconnected:
+        return EmpireColors.errorRed;
+    }
+  }
+
+  String _getStatusText(SocketConnectionState connectionState, bool isOnline) {
+    if (!isOnline) return 'TRABAJANDO FUERA DE LÍNEA';
+    switch (connectionState) {
+      case SocketConnectionState.connected:
+        return 'SISTEMA ONLINE (WS)';
+      case SocketConnectionState.connecting:
+        return 'CONECTANDO AL SERVIDOR...';
+      case SocketConnectionState.degradedRest:
+        return 'CONEXIÓN DEGRADADA (REST)';
+      case SocketConnectionState.disconnected:
+        return 'TRABAJANDO FUERA DE LÍNEA';
     }
   }
 
@@ -62,9 +89,7 @@ class OfflineStatusBar extends StatelessWidget {
         color: EmpireColors.onyxSurface,
         border: Border(
           bottom: BorderSide(
-            color: state.isOnline
-                ? EmpireColors.agedBronzeDark
-                : EmpireColors.warningOrange.withOpacity(0.5),
+            color: state.isOnline ? EmpireColors.agedBronzeDark : EmpireColors.warningOrange.withOpacity(0.5),
             width: 1,
           ),
         ),
@@ -80,16 +105,10 @@ class OfflineStatusBar extends StatelessWidget {
                 height: 8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: state.isOnline
-                      ? EmpireColors.successGreen
-                      : EmpireColors.warningOrange,
+                  color: _getStatusColor(state.socketConnectionState, state.isOnline),
                   boxShadow: [
                     BoxShadow(
-                      color:
-                          (state.isOnline
-                                  ? EmpireColors.successGreen
-                                  : EmpireColors.warningOrange)
-                              .withOpacity(0.5),
+                      color: _getStatusColor(state.socketConnectionState, state.isOnline).withOpacity(0.5),
                       blurRadius: 6,
                       spreadRadius: 2,
                     ),
@@ -98,11 +117,9 @@ class OfflineStatusBar extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Text(
-                state.isOnline ? 'SISTEMA ONLINE' : 'TRABAJANDO FUERA DE LÍNEA',
+                _getStatusText(state.socketConnectionState, state.isOnline),
                 style: TextStyle(
-                  color: state.isOnline
-                      ? EmpireColors.textPrimary
-                      : EmpireColors.textGold,
+                  color: state.isOnline ? EmpireColors.textPrimary : EmpireColors.textGold,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1,
@@ -187,52 +204,6 @@ class OfflineStatusBar extends StatelessWidget {
                 tooltip: 'Sincronizar Datos',
               ),
               const SizedBox(width: 12),
-
-              // Simulator Mode Switch
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                decoration: BoxDecoration(
-                  color: EmpireColors.obsidian,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: EmpireColors.agedBronzeDark,
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(left: 8.0, right: 4.0),
-                      child: Text(
-                        'SIMULAR',
-                        style: TextStyle(
-                          color: EmpireColors.textSecondary,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Switch(
-                      value: state.isOnline,
-                      onChanged: (val) {
-                        state.toggleConnection();
-                        if (state.isOnline) {
-                          state.syncOfflineTransactions();
-                        }
-                      },
-                      activeColor: EmpireColors.successGreen,
-                      activeTrackColor: EmpireColors.successGreen.withOpacity(
-                        0.2,
-                      ),
-                      inactiveThumbColor: EmpireColors.errorRed,
-                      inactiveTrackColor: EmpireColors.errorRed.withOpacity(
-                        0.2,
-                      ),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         ],

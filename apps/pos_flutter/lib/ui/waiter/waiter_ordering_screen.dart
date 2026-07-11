@@ -64,9 +64,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
           currentCart = List.from(table.items);
         }
         isCartOpen = false;
-        activeGenders = table.guestGenders.isEmpty
-            ? ['M']
-            : List.from(table.guestGenders);
+        activeGenders = table.guestGenders.isEmpty ? ['M'] : List.from(table.guestGenders);
         selectedGuestIndex = 0;
       }
     });
@@ -104,9 +102,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            success 
-              ? 'Sincronización completa con éxito.'
-              : 'Sincronización incompleta. Revise su conexión de red.',
+            success ? 'Sincronización completa con éxito.' : 'Sincronización incompleta. Revise su conexión de red.',
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           backgroundColor: success ? EmpireColors.successGreen : EmpireColors.errorRed,
@@ -126,6 +122,10 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
       default:
         return '👨';
     }
+  }
+
+  static int _compareAlphabetically(String a, String b) {
+    return a.toLowerCase().compareTo(b.toLowerCase());
   }
 
   @override
@@ -150,13 +150,8 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
               });
             }
 
-            final tablesInZone = widget.state.tables
-                .where((t) => t.zone == selectedZone)
-                .toList();
-            final categories = AppState.menu
-                .map((item) => item.category)
-                .toSet()
-                .toList();
+            final tablesInZone = widget.state.tables.where((t) => t.zone == selectedZone).toList();
+            final categories = AppState.menu.map((item) => item.category).toSet().toList()..sort(_compareAlphabetically);
 
             return Stack(
               children: [
@@ -175,96 +170,90 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                             child: activeOrderingTable == null
                                 ? _buildFloorMap(tablesInZone)
                                 : (isCartOpen
-                                      ? CartSidebar(
-                                          table: activeOrderingTable!,
-                                          initialItems: currentCart,
-                                          activeGenders: activeGenders,
-                                          onRemoveGuest: _handleRemoveGuest,
-                                          onBillingRequested: () async {
-                                            final result = await showDialog<String>(
-                                              context: context,
-                                              builder: (context) => PaymentFlowDialog(
-                                                table: activeOrderingTable!,
-                                                state: widget.state,
-                                              ),
-                                            );
-                                            if (result != null) {
-                                              if (!context.mounted) return;
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(
-                                                  backgroundColor: EmpireColors.successGreen,
-                                                  content: Text(
-                                                    result == 'efectivo'
-                                                        ? 'Mesa ${activeOrderingTable!.label} marcada POR COBRAR y pre-cuenta enviada a caja.'
-                                                        : 'Cobro con tarjeta completado. Mesa ${activeOrderingTable!.label} en limpieza.',
-                                                  ),
-                                                ),
-                                              );
-                                              if (activeOrderingTable != null) {
-                                                _draftCarts.remove((activeOrderingTable!.id ?? activeOrderingTable!.label).toString());
-                                              }
-                                              setState(() {
-                                                activeOrderingTable = null;
-                                                currentCart = [];
-                                                isCartOpen = false;
-                                              });
-                                            }
-                                          },
-                                          onBackToMenu: () => setState(
-                                            () => isCartOpen = false,
-                                          ),
-                                          onConfirm: (finalItems, guests, shouldPrint) {
-                                            widget.state.submitOrder(
-                                              activeOrderingTable!.id,
-                                              finalItems,
-                                              guests,
-                                              activeGenders,
-                                              printComanda: shouldPrint,
-                                            );
-
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
+                                    ? CartSidebar(
+                                        table: activeOrderingTable!,
+                                        initialItems: currentCart,
+                                        activeGenders: activeGenders,
+                                        onRemoveGuest: _handleRemoveGuest,
+                                        onBillingRequested: () async {
+                                          final result = await showDialog<String>(
+                                            context: context,
+                                            builder: (context) => PaymentFlowDialog(
+                                              table: activeOrderingTable!,
+                                              state: widget.state,
+                                            ),
+                                          );
+                                          if (result != null) {
+                                            if (!context.mounted) return;
+                                            ScaffoldMessenger.of(context).showSnackBar(
                                               SnackBar(
-                                                backgroundColor:
-                                                    EmpireColors.successGreen,
+                                                backgroundColor: EmpireColors.successGreen,
                                                 content: Text(
-                                                  shouldPrint
-                                                      ? '¡Pedido confirmado para la ${activeOrderingTable!.label}! Comanda enviada e imprimiendo...'
-                                                      : '¡Pedido confirmado para la ${activeOrderingTable!.label}! Comanda enviada.',
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
+                                                  result == 'efectivo' ? 'Mesa ${activeOrderingTable!.label} marcada POR COBRAR y pre-cuenta enviada a caja.' : 'Cobro con tarjeta completado. Mesa ${activeOrderingTable!.label} en limpieza.',
                                                 ),
                                               ),
                                             );
+                                            if (activeOrderingTable != null) {
+                                              _draftCarts.remove((activeOrderingTable!.id ?? activeOrderingTable!.label).toString());
+                                            }
+                                            setState(() {
+                                              activeOrderingTable = null;
+                                              currentCart = [];
+                                              isCartOpen = false;
+                                            });
+                                          }
+                                        },
+                                        onBackToMenu: () => setState(
+                                          () => isCartOpen = false,
+                                        ),
+                                        onConfirm: (finalItems, guests, shouldPrint) {
+                                          widget.state.submitOrder(
+                                            activeOrderingTable!.id,
+                                            finalItems,
+                                            guests,
+                                            activeGenders,
+                                            printComanda: shouldPrint,
+                                          );
 
-                                            if (activeOrderingTable != null) {
-                                              _draftCarts.remove((activeOrderingTable!.id ?? activeOrderingTable!.label).toString());
-                                            }
-                                            setState(() {
-                                              activeOrderingTable = null;
-                                              currentCart = [];
-                                              isCartOpen = false;
-                                            });
-                                          },
-                                          onCancel: () {
-                                            if (activeOrderingTable != null) {
-                                              _draftCarts.remove((activeOrderingTable!.id ?? activeOrderingTable!.label).toString());
-                                            }
-                                            setState(() {
-                                              activeOrderingTable = null;
-                                              currentCart = [];
-                                              isCartOpen = false;
-                                            });
-                                          },
-                                        )
-                                      : _buildMenuSection(categories)),
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              backgroundColor: EmpireColors.successGreen,
+                                              content: Text(
+                                                shouldPrint ? '¡Pedido confirmado para la ${activeOrderingTable!.label}! Comanda enviada e imprimiendo...' : '¡Pedido confirmado para la ${activeOrderingTable!.label}! Comanda enviada.',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          );
+
+                                          if (activeOrderingTable != null) {
+                                            _draftCarts.remove((activeOrderingTable!.id ?? activeOrderingTable!.label).toString());
+                                          }
+                                          setState(() {
+                                            activeOrderingTable = null;
+                                            currentCart = [];
+                                            isCartOpen = false;
+                                          });
+                                        },
+                                        onCancel: () {
+                                          if (activeOrderingTable != null) {
+                                            _draftCarts.remove((activeOrderingTable!.id ?? activeOrderingTable!.label).toString());
+                                          }
+                                          setState(() {
+                                            activeOrderingTable = null;
+                                            currentCart = [];
+                                            isCartOpen = false;
+                                          });
+                                        },
+                                      )
+                                    : _buildMenuSection(categories)),
                           ),
 
                           // Right side: Info sidebar (only when no table is selected and toggled open)
-                          if (activeOrderingTable == null && isInfoSidebarOpen)
-                            Expanded(flex: 1, child: _buildInfoSidebar()),
+                          if (activeOrderingTable == null && isInfoSidebarOpen) Expanded(flex: 1, child: _buildInfoSidebar()),
                         ],
                       ),
                     ),
@@ -288,8 +277,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                         ),
                         child: PrinterMonitorPanel(
                           state: widget.state,
-                          onClose: () =>
-                              setState(() => isPrinterQueueOpen = false),
+                          onClose: () => setState(() => isPrinterQueueOpen = false),
                         ),
                       ),
                     ),
@@ -385,9 +373,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                     });
                   },
                   itemBuilder: (BuildContext context) {
-                    final zonesList = widget.state.tables.isNotEmpty
-                        ? widget.state.tables.map((t) => t.zone).toSet().toList()
-                        : ['Salón Principal', 'Terraza', 'Bar'];
+                    final zonesList = widget.state.tables.isNotEmpty ? widget.state.tables.map((t) => t.zone).toSet().toList() : ['Salón Principal', 'Terraza', 'Bar'];
                     if (!zonesList.contains('Para Llevar')) {
                       zonesList.add('Para Llevar');
                     }
@@ -397,9 +383,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                         child: Text(
                           zone,
                           style: TextStyle(
-                            color: zone == selectedZone
-                                ? EmpireColors.champagneGold
-                                : EmpireColors.textPrimary,
+                            color: zone == selectedZone ? EmpireColors.champagneGold : EmpireColors.textPrimary,
                             fontWeight: zone == selectedZone ? FontWeight.bold : FontWeight.normal,
                           ),
                         ),
@@ -474,23 +458,17 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
               IconButton(
                 icon: Icon(
                   Icons.table_bar,
-                  color: activeOrderingTable == null
-                      ? EmpireColors.champagneGold
-                      : EmpireColors.textSecondary,
+                  color: activeOrderingTable == null ? EmpireColors.champagneGold : EmpireColors.textSecondary,
                 ),
                 tooltip: 'Distribución de Mesas',
-                onPressed: activeOrderingTable == null
-                    ? null
-                    : () => _selectOrderingTable(null),
+                onPressed: activeOrderingTable == null ? null : () => _selectOrderingTable(null),
               ),
               if (activeOrderingTable == null) ...[
                 const SizedBox(width: 8),
                 IconButton(
                   icon: Icon(
                     Icons.help_outline,
-                    color: isInfoSidebarOpen
-                        ? EmpireColors.champagneGold
-                        : EmpireColors.textSecondary,
+                    color: isInfoSidebarOpen ? EmpireColors.champagneGold : EmpireColors.textSecondary,
                   ),
                   tooltip: 'Estado de Sala / Ayuda',
                   onPressed: () {
@@ -505,9 +483,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                 IconButton(
                   icon: Icon(
                     Icons.shopping_basket,
-                    color: isCartOpen
-                        ? EmpireColors.champagneGold
-                        : EmpireColors.textSecondary,
+                    color: isCartOpen ? EmpireColors.champagneGold : EmpireColors.textSecondary,
                   ),
                   tooltip: 'Detalle de Comanda',
                   onPressed: () {
@@ -530,9 +506,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
               // --- SUB-GROUP 2: Status & Tools ---
               Icon(
                 widget.state.isOnline ? Icons.wifi : Icons.wifi_off,
-                color: widget.state.isOnline
-                    ? EmpireColors.successGreen
-                    : EmpireColors.warningOrange,
+                color: widget.state.isOnline ? EmpireColors.successGreen : EmpireColors.warningOrange,
                 size: 20,
               ),
               const SizedBox(width: 12),
@@ -576,9 +550,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                     IconButton(
                       icon: Icon(
                         Icons.print,
-                        color: hasFailedPrinters
-                            ? EmpireColors.errorRed
-                            : EmpireColors.champagneGold,
+                        color: hasFailedPrinters ? EmpireColors.errorRed : EmpireColors.champagneGold,
                       ),
                       tooltip: 'Monitor de Impresoras',
                       onPressed: () {
@@ -626,15 +598,13 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                       widget.state.logout();
                       Navigator.of(context).pushReplacement(
                         MaterialPageRoute(
-                          builder: (context) =>
-                              LoginScreen(state: widget.state),
+                          builder: (context) => LoginScreen(state: widget.state),
                         ),
                       );
                     } else if (value == 'printer') {
                       showDialog(
                         context: context,
-                        builder: (context) =>
-                            PrinterSettingsDialog(state: widget.state),
+                        builder: (context) => PrinterSettingsDialog(state: widget.state),
                       );
                     }
                   },
@@ -657,54 +627,6 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                             ),
                           ),
                         ],
-                      ),
-                    ),
-                    const PopupMenuDivider(height: 1),
-                    // Connection Simulator Switch in dropdown
-                    PopupMenuItem<String>(
-                      enabled:
-                          false, // Make it non-clickable as a whole menu item, so the switch is interactive
-                      child: StatefulBuilder(
-                        builder: (context, setStateDropdown) {
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Row(
-                                children: [
-                                  Icon(
-                                    Icons.sync_alt,
-                                    color: EmpireColors.textSecondary,
-                                    size: 18,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Simular Conexión',
-                                    style: TextStyle(
-                                      color: EmpireColors.textPrimary,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Switch(
-                                value: widget.state.isOnline,
-                                onChanged: (val) {
-                                  widget.state.toggleConnection();
-                                  if (widget.state.isOnline) {
-                                    widget.state.syncOfflineTransactions();
-                                  }
-                                  setState(() {});
-                                  setStateDropdown(() {});
-                                },
-                                activeColor: EmpireColors.successGreen,
-                                activeTrackColor: EmpireColors.successGreen
-                                    .withOpacity(0.2),
-                                materialTapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
-                              ),
-                            ],
-                          );
-                        },
                       ),
                     ),
                     const PopupMenuDivider(height: 1),
@@ -886,9 +808,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                       final totalAmount = table.total;
 
                       // Check if any kitchen ticket for this table is active
-                      final ticketsForTable = widget.state.kitchenOrders
-                          .where((o) => o.tableLabel.toLowerCase() == table.label.toLowerCase())
-                          .toList();
+                      final ticketsForTable = widget.state.kitchenOrders.where((o) => o.tableLabel.toLowerCase() == table.label.toLowerCase()).toList();
 
                       String statusText = 'PREPARANDO';
                       Color statusColor = EmpireColors.successGreen;
@@ -930,9 +850,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                           side: BorderSide(
-                            color: isHighlighted
-                                ? EmpireColors.champagneGold
-                                : EmpireColors.agedBronzeDark,
+                            color: isHighlighted ? EmpireColors.champagneGold : EmpireColors.agedBronzeDark,
                             width: 1.2,
                           ),
                         ),
@@ -950,23 +868,17 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: isHighlighted
-                                            ? EmpireColors.champagneGold.withOpacity(0.1)
-                                            : EmpireColors.agedBronzeDark.withOpacity(0.2),
+                                        color: isHighlighted ? EmpireColors.champagneGold.withOpacity(0.1) : EmpireColors.agedBronzeDark.withOpacity(0.2),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: isHighlighted
-                                              ? EmpireColors.champagneGold
-                                              : EmpireColors.agedBronzeDark,
+                                          color: isHighlighted ? EmpireColors.champagneGold : EmpireColors.agedBronzeDark,
                                           width: 1,
                                         ),
                                       ),
                                       child: Text(
                                         table.label.toUpperCase(),
                                         style: TextStyle(
-                                          color: isHighlighted
-                                              ? EmpireColors.champagneGold
-                                              : EmpireColors.textPrimary,
+                                          color: isHighlighted ? EmpireColors.champagneGold : EmpireColors.textPrimary,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 12,
                                         ),
@@ -1061,10 +973,8 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
     final String? base64Image = config['image'] as String?;
     final double zoom = (config['zoom'] ?? 1.0).toDouble();
 
-    final double maxTableY = tables.isEmpty
-        ? 1.0
-        : tables.map((t) => t.y).reduce((a, b) => a > b ? a : b);
-    
+    final double maxTableY = tables.isEmpty ? 1.0 : tables.map((t) => t.y).reduce((a, b) => a > b ? a : b);
+
     final double canvasHeight = (config['canvasHeight'] ?? ((maxTableY * 1000.0).clamp(900.0, 3000.0) + 120.0)).toDouble();
     const double canvasWidth = 900.0;
 
@@ -1224,14 +1134,10 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: isSelected
-                                ? EmpireColors.champagneGold
-                                : EmpireColors.charcoalSurface,
+                            color: isSelected ? EmpireColors.champagneGold : EmpireColors.charcoalSurface,
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: isSelected
-                                  ? EmpireColors.champagneGold
-                                  : EmpireColors.agedBronzeDark,
+                              color: isSelected ? EmpireColors.champagneGold : EmpireColors.agedBronzeDark,
                               width: 1.2,
                             ),
                           ),
@@ -1241,9 +1147,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                               Text(
                                 'P${index + 1}',
                                 style: TextStyle(
-                                  color: isSelected
-                                      ? EmpireColors.obsidian
-                                      : EmpireColors.textPrimary,
+                                  color: isSelected ? EmpireColors.obsidian : EmpireColors.textPrimary,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12,
                                 ),
@@ -1338,9 +1242,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
               color: EmpireColors.charcoalSurface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: searchProductQuery.isNotEmpty
-                    ? EmpireColors.champagneGold
-                    : EmpireColors.agedBronzeDark,
+                color: searchProductQuery.isNotEmpty ? EmpireColors.champagneGold : EmpireColors.agedBronzeDark,
                 width: 1,
               ),
             ),
@@ -1393,14 +1295,13 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
   }
 
   Widget _buildMenuSection(List<String> categories) {
-    final filteredMenuItems = AppState.menu
-        .where((i) {
-          if (searchProductQuery.isNotEmpty) {
-            return i.name.toLowerCase().contains(searchProductQuery.toLowerCase());
-          }
-          return i.category == selectedMenuCategory;
-        })
-        .toList();
+    final filteredMenuItems = AppState.menu.where((i) {
+      if (searchProductQuery.isNotEmpty) {
+        return i.name.toLowerCase().contains(searchProductQuery.toLowerCase());
+      }
+      return i.category == selectedMenuCategory;
+    }).toList()
+      ..sort((a, b) => _compareAlphabetically(a.name, b.name));
 
     return Column(
       children: [
@@ -1428,16 +1329,12 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                   selectedColor: EmpireColors.champagneGold,
                   backgroundColor: EmpireColors.onyxSurface,
                   labelStyle: TextStyle(
-                    color: isSelected
-                        ? EmpireColors.obsidian
-                        : EmpireColors.textPrimary,
+                    color: isSelected ? EmpireColors.obsidian : EmpireColors.textPrimary,
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
                   ),
                   side: BorderSide(
-                    color: isSelected
-                        ? EmpireColors.champagneGold
-                        : EmpireColors.agedBronzeDark,
+                    color: isSelected ? EmpireColors.champagneGold : EmpireColors.agedBronzeDark,
                     width: 1,
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1494,14 +1391,9 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
   void _openModifierDialog(MenuItem item) async {
     // Check if item already exists in cart for the CURRENT active guest to prefill (unsent only)
     final existingIndex = currentCart.indexWhere(
-      (i) =>
-          i.item.id == item.id &&
-          i.assignedGuest == 'P${selectedGuestIndex + 1}' &&
-          !i.isSent,
+      (i) => i.item.id == item.id && i.assignedGuest == 'P${selectedGuestIndex + 1}' && !i.isSent,
     );
-    final existingItem = existingIndex != -1
-        ? currentCart[existingIndex]
-        : null;
+    final existingItem = existingIndex != -1 ? currentCart[existingIndex] : null;
 
     final OrderItem? result = await showDialog<OrderItem>(
       context: context,
@@ -1517,10 +1409,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
       setState(() {
         // Find if there is already an item in the cart with the same item.id and the same result.assignedGuest (unsent only)
         final duplicateIndex = currentCart.indexWhere(
-          (i) =>
-              i.item.id == result.item.id &&
-              i.assignedGuest == result.assignedGuest &&
-              !i.isSent,
+          (i) => i.item.id == result.item.id && i.assignedGuest == result.assignedGuest && !i.isSent,
         );
 
         if (duplicateIndex != -1 && duplicateIndex != existingIndex) {
@@ -1529,11 +1418,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
           currentCart[duplicateIndex] = existing.copyWith(
             quantity: existing.quantity + result.quantity,
             modifiers: result.modifiers,
-            notes: result.notes.isNotEmpty
-                ? (existing.notes.isNotEmpty
-                      ? '${existing.notes}\n${result.notes}'
-                      : result.notes)
-                : existing.notes,
+            notes: result.notes.isNotEmpty ? (existing.notes.isNotEmpty ? '${existing.notes}\n${result.notes}' : result.notes) : existing.notes,
           );
           if (existingIndex != -1) {
             // Remove the old one since it was moved/merged
@@ -1663,8 +1548,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                         color: EmpireColors.textPrimary,
                         fontWeight: FontWeight.bold,
                       ),
-                      onPressed: () =>
-                          Navigator.of(dialogContext).pop('reassign_$idx'),
+                      onPressed: () => Navigator.of(dialogContext).pop('reassign_$idx'),
                     );
                   }).toList(),
                 ),
@@ -1713,20 +1597,14 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
         final mergedList = <OrderItem>[];
         for (final item in currentCart) {
           final existingIdx = mergedList.indexWhere(
-            (i) =>
-                i.item.id == item.item.id &&
-                i.assignedGuest == item.assignedGuest,
+            (i) => i.item.id == item.item.id && i.assignedGuest == item.assignedGuest,
           );
           if (existingIdx != -1) {
             final existing = mergedList[existingIdx];
             mergedList[existingIdx] = existing.copyWith(
               quantity: existing.quantity + item.quantity,
               modifiers: item.modifiers, // use the newer modifiers
-              notes: item.notes.isNotEmpty
-                  ? (existing.notes.isNotEmpty
-                        ? '${existing.notes}\n${item.notes}'
-                        : item.notes)
-                  : existing.notes,
+              notes: item.notes.isNotEmpty ? (existing.notes.isNotEmpty ? '${existing.notes}\n${item.notes}' : item.notes) : existing.notes,
             );
           } else {
             mergedList.add(item);
@@ -1746,15 +1624,9 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
   }
 
   Widget _buildInfoSidebar() {
-    final occupiedCount = widget.state.tables
-        .where((t) => t.state == TableState.occupied)
-        .length;
-    final billingCount = widget.state.tables
-        .where((t) => t.state == TableState.billing)
-        .length;
-    final freeCount = widget.state.tables
-        .where((t) => t.state == TableState.free)
-        .length;
+    final occupiedCount = widget.state.tables.where((t) => t.state == TableState.occupied).length;
+    final billingCount = widget.state.tables.where((t) => t.state == TableState.billing).length;
+    final freeCount = widget.state.tables.where((t) => t.state == TableState.free).length;
 
     return Container(
       color: EmpireColors.onyxSurface,
@@ -1766,9 +1638,9 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
             Text(
               'Estado de Sala',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: EmpireColors.champagneGold,
-                fontWeight: FontWeight.bold,
-              ),
+                    color: EmpireColors.champagneGold,
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 16),
             _buildInfoStatCard(
@@ -1833,9 +1705,9 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
             Text(
               'Cuentas Recientes',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: EmpireColors.champagneGold,
-                fontWeight: FontWeight.bold,
-              ),
+                    color: EmpireColors.champagneGold,
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 12),
             if (widget.state.recentClosedSales.isEmpty)
