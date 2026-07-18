@@ -204,10 +204,10 @@ export interface Provider {
 export interface PurchaseOrderItem {
   id?: string;
   productId: string;
-  quantity: number;
-  estimatedUnitCost: number;
-  actualUnitCost?: number;
-  actualQuantity?: number;
+  quantityOrdered: number;
+  unitCostEstimated: number;
+  quantityReceived?: number;
+  unitCostActual?: number;
   productName?: string;
 }
 

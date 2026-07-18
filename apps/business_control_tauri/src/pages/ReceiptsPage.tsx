@@ -125,14 +125,14 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
       }
 
       const items = po.items.map((item) => {
-        const ordered = item.quantity;
-        const previouslyReceived = item.actualQuantity || 0;
+        const ordered = item.quantityOrdered;
+        const previouslyReceived = item.quantityReceived || 0;
         const remainingQty = Math.max(0, ordered - previouslyReceived);
         return {
           productId: item.productId,
           productName: item.productName || 'Producto sin nombre',
           quantity: remainingQty,
-          unitCost: item.actualUnitCost || item.estimatedUnitCost || 0,
+          unitCost: item.unitCostActual || item.unitCostEstimated || 0,
         };
       });
       setItemsList(items);

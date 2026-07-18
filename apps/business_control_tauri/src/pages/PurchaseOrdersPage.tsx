@@ -45,6 +45,9 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
+  const [editingPoId, setEditingPoId] = useState<string | null>(null);
+  const [viewingPo, setViewingPo] = useState<PurchaseOrder | null>(null);
+
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
@@ -93,6 +96,7 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
 
   const resetForm = () => {
     setIsCreating(false);
+    setEditingPoId(null);
     setOrderNumber('');
     setProviderId('');
     setWarehouseId('');
@@ -216,21 +220,32 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
     }
 
     try {
-      const created = await api.createPurchaseOrder({
-        businessId,
-        providerId,
-        warehouseId,
-        orderNumber,
-        createdBy: userId,
-        notes: notes || undefined,
-        items: items.map((it) => ({
-          productId: it.productId,
-          quantity: it.quantity,
-          estimatedUnitCost: it.estimatedUnitCost,
-        })),
-      });
-      setPurchaseOrders([created, ...purchaseOrders]);
-      showToast('Orden de compra creada exitosamente.', 'success');
+      if (editingPoId) {
+        const updated = await api.updatePurchaseOrder(editingPoId, {
+          providerId,
+          warehouseId,
+          orderNumber,
+          notes: notes || undefined,
+        } as any);
+        setPurchaseOrders(purchaseOrders.map((po) => (po.id === editingPoId ? { ...po, ...updated } : po)));
+        showToast('Orden de compra actualizada.', 'success');
+      } else {
+        const created = await api.createPurchaseOrder({
+          businessId,
+          providerId,
+          warehouseId,
+          orderNumber,
+          createdBy: userId,
+          notes: notes || undefined,
+          items: items.map((it) => ({
+            productId: it.productId,
+            quantity: it.quantity,
+            estimatedUnitCost: it.estimatedUnitCost,
+          })),
+        });
+        setPurchaseOrders([created, ...purchaseOrders]);
+        showToast('Orden de compra creada exitosamente.', 'success');
+      }
       resetForm();
     } catch (err) {
       showToast('Error al crear la orden de compra.', 'error');
@@ -246,6 +261,45 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
       } catch (err) {
         showToast('Error al actualizar la orden.', 'error');
       }
+    }
+  };
+
+  const handleViewDetails = async (id: string) => {
+    try {
+      setLoading(true);
+      const po = await api.getPurchaseOrder(id);
+      setViewingPo(po);
+    } catch (err) {
+      showToast('Error al cargar detalles de la orden.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartEdit = async (po: PurchaseOrder) => {
+    setIsCreating(true);
+    setEditingPoId(po.id);
+    setOrderNumber(po.poNumber);
+    setProviderId(po.providerId);
+    setWarehouseId(po.warehouseId);
+    setNotes(po.notes || '');
+
+    try {
+      const poWithItems = await api.getPurchaseOrder(po.id);
+      if (poWithItems.items) {
+        setItems(
+          poWithItems.items.map((item) => ({
+            productId: item.productId,
+            productName: item.productName || 'Insumo',
+            quantity: item.quantityOrdered,
+            estimatedUnitCost: item.unitCostEstimated,
+          }))
+        );
+      } else {
+        setItems([]);
+      }
+    } catch {
+      setItems([]);
     }
   };
 
@@ -407,26 +461,45 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                               <td className="px-6 py-4 text-center">{getStatusBadge(po.status)}</td>
                               <td className="px-6 py-4 text-center font-mono text-xs text-champagne-gold">{itemCount}</td>
                               <td className="px-6 py-4 text-right">
-                                <div className="inline-flex gap-2">
+                                <div className="inline-flex gap-1">
+                                  <button
+                                    onClick={() => handleViewDetails(po.id)}
+                                    className="text-text-secondary hover:text-champagne-gold transition-colors p-1 rounded hover:bg-champagne-gold/5"
+                                    title="Ver detalle"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                  </button>
                                   {po.status === 'draft' && (
-                                    <button
-                                      onClick={() => handleMarkAsSent(po.id)}
-                                      className="text-blue-400 hover:text-blue-300 transition-colors text-xs px-2 py-1 rounded hover:bg-blue-400/5"
-                                      title="Marcar como enviada"
-                                    >
-                                      Enviar
-                                    </button>
-                                  )}
-                                  {po.status === 'draft' && (
-                                    <button
-                                      onClick={() => handleDelete(po.id)}
-                                      className="text-error-red/80 hover:text-error-red transition-colors p-1 rounded hover:bg-error-red/5"
-                                      title="Eliminar"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                      </svg>
-                                    </button>
+                                    <>
+                                      <button
+                                        onClick={() => handleStartEdit(po)}
+                                        className="text-text-secondary hover:text-champagne-gold transition-colors p-1 rounded hover:bg-champagne-gold/5"
+                                        title="Editar orden"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                      </button>
+                                      <button
+                                        onClick={() => handleMarkAsSent(po.id)}
+                                        className="text-blue-400 hover:text-blue-300 transition-colors text-xs px-2 py-1 rounded hover:bg-blue-400/5"
+                                        title="Marcar como enviada"
+                                      >
+                                        Enviar
+                                      </button>
+                                      <button
+                                        onClick={() => handleDelete(po.id)}
+                                        className="text-error-red/80 hover:text-error-red transition-colors p-1 rounded hover:bg-error-red/5"
+                                        title="Eliminar"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                      </button>
+                                    </>
                                   )}
                                 </div>
                               </td>
@@ -464,7 +537,7 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
         {isCreating && (
           <div className="w-full lg:w-96 bg-onyx-surface border border-aged-bronze/40 rounded-lg p-4 lg:p-6 shadow-xl lg:h-full overflow-y-auto">
             <Heading level={3} className="!text-base !border-none !pb-0 text-champagne-gold mb-4">
-              Nueva Orden de Compra
+              {editingPoId ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'}
             </Heading>
             <form onSubmit={handleSubmit} className="space-y-4">
               <FormField label="Número de Orden" required>
@@ -702,10 +775,76 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
               )}
 
               <div className="flex gap-2 pt-2">
-                <Button type="submit" className="flex-1">Crear Orden</Button>
+                <Button type="submit" className="flex-1">{editingPoId ? 'Actualizar Orden' : 'Crear Orden'}</Button>
                 <Button type="button" onClick={resetForm} className="flex-1">Cancelar</Button>
               </div>
             </form>
+          </div>
+        )}
+
+        {/* Detail Modal */}
+        {viewingPo && (
+          <div className="fixed inset-0 bg-obsidian/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in font-sans">
+            <div className="bg-onyx-surface border border-aged-bronze/35 rounded-xl max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-6 border-b border-aged-bronze/25 flex items-center justify-between">
+                <div>
+                  <Heading level={2} className="!text-champagne-gold !border-none !pb-0 font-light font-sans text-lg">
+                    Detalle de Orden: {viewingPo.poNumber}
+                  </Heading>
+                  <div className="flex gap-4 mt-1 text-xs text-text-secondary">
+                    <span>Proveedor: {providers.find((p) => p.id === viewingPo.providerId)?.name || '—'}</span>
+                    <span>Bodega: {warehouses.find((w) => w.id === viewingPo.warehouseId)?.name || '—'}</span>
+                    <span>Estado: {getStatusBadge(viewingPo.status)}</span>
+                  </div>
+                  {viewingPo.notes && (
+                    <p className="text-xs text-text-secondary mt-1 italic">Notas: {viewingPo.notes}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setViewingPo(null)}
+                  className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="overflow-y-auto p-6">
+                {viewingPo.items && viewingPo.items.length > 0 ? (
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-charcoal-surface/60 border-b border-aged-bronze/35 text-[11px] font-semibold text-text-secondary uppercase tracking-wider">
+                        <th className="px-4 py-3">Producto</th>
+                        <th className="px-4 py-3 text-right">Cant. Pedida</th>
+                        <th className="px-4 py-3 text-right">Cant. Recibida</th>
+                        <th className="px-4 py-3 text-right">Costo Est.</th>
+                        <th className="px-4 py-3 text-right">Costo Real</th>
+                        <th className="px-4 py-3 text-right">Subtotal Est.</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-aged-bronze/20">
+                      {viewingPo.items.map((item) => (
+                        <tr key={item.id || item.productId} className="hover:bg-charcoal-surface/20">
+                          <td className="px-4 py-3 font-medium text-text-primary">{item.productName || '—'}</td>
+                          <td className="px-4 py-3 text-right font-mono">{item.quantityOrdered}</td>
+                          <td className="px-4 py-3 text-right font-mono text-champagne-gold">{item.quantityReceived || 0}</td>
+                          <td className="px-4 py-3 text-right font-mono">${item.unitCostEstimated}</td>
+                          <td className="px-4 py-3 text-right font-mono text-champagne-gold">${item.unitCostActual || '—'}</td>
+                          <td className="px-4 py-3 text-right font-mono text-champagne-gold font-semibold">
+                            ${((item.unitCostActual || item.unitCostEstimated) * item.quantityOrdered).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-8 text-text-secondary/50 text-xs">
+                    Esta orden no tiene productos registrados.
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
