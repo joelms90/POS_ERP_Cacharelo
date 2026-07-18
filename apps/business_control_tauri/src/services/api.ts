@@ -249,6 +249,7 @@ export interface BranchRequisition {
   createdAt: string;
   updatedAt: string;
   items?: BranchRequisitionItem[];
+  itemCount?: number;
   fromBranchName?: string;
   toWarehouseName?: string;
   requestedByName?: string;

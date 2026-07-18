@@ -35,11 +35,13 @@ export class RequisitionsRepository {
   }
 
   async findByBranch(branchId: string) {
-    return this.db
+    const requisitions = await this.db
       .select()
       .from(schema.branchRequisitions)
       .where(eq(schema.branchRequisitions.fromBranchId, branchId))
       .orderBy(schema.branchRequisitions.createdAt);
+
+    return this.attachItemCounts(requisitions);
   }
 
   async findAll(businessId: string) {
@@ -49,6 +51,10 @@ export class RequisitionsRepository {
       .where(eq(schema.branchRequisitions.businessId, businessId))
       .orderBy(schema.branchRequisitions.createdAt);
 
+    return this.attachItemCounts(requisitions);
+  }
+
+  private async attachItemCounts(requisitions: any[]) {
     if (requisitions.length === 0) return [];
 
     const reqIds = requisitions.map((r) => r.id);
@@ -71,7 +77,7 @@ export class RequisitionsRepository {
   }
 
   async findPendingForBusiness(businessId: string) {
-    return this.db
+    const requisitions = await this.db
       .select()
       .from(schema.branchRequisitions)
       .where(
@@ -81,6 +87,8 @@ export class RequisitionsRepository {
         ),
       )
       .orderBy(schema.branchRequisitions.createdAt);
+
+    return this.attachItemCounts(requisitions);
   }
 
   async create(data: {

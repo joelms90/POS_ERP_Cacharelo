@@ -491,7 +491,7 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
                           <tr key={req.id} className="hover:bg-charcoal-surface/20 transition-colors">
                             <td className="px-6 py-4 font-medium text-text-primary text-xs">{branchName}</td>
                             <td className="px-6 py-4 text-text-secondary text-xs">{whName}</td>
-                            <td className="px-6 py-4 text-center font-mono text-xs text-champagne-gold">{req.items?.length || 0}</td>
+                            <td className="px-6 py-4 text-center font-mono text-xs text-champagne-gold">{req.itemCount || 0}</td>
                             <td className="px-6 py-4 text-center">{getStatusBadge(req.status)}</td>
                             <td className="px-6 py-4 text-text-secondary text-xs max-w-[150px] truncate">{req.notes || '—'}</td>
                             <td className="px-6 py-4 text-right">
@@ -546,7 +546,7 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
                 <p><span className="text-text-secondary">Sucursal:</span> {branches.find(b => b.id === selectedRequisition.fromBranchId)?.name || '—'}</p>
                 <p><span className="text-text-secondary">Bodega:</span> {warehouses.find(w => w.id === selectedRequisition.toWarehouseId)?.name || '—'}</p>
                 <p><span className="text-text-secondary">Notas:</span> {selectedRequisition.notes || '—'}</p>
-                <p><span className="text-text-secondary">Items:</span> {selectedRequisition.items?.length || 0}</p>
+                <p><span className="text-text-secondary">Items:</span> {selectedRequisition.itemCount || 0}</p>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">Notas de aprobación / razón de rechazo</label>

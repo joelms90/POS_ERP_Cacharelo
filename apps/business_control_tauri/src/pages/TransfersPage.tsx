@@ -379,7 +379,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                     const branchName = branches.find(b => b.id === req.fromBranchId)?.name || 'Sucursal';
                     return (
                       <option key={req.id} value={req.id}>
-                        {branchName} — {req.items?.length || 0} items
+                        {branchName} — {req.itemCount || req.items?.length || 0} items
                       </option>
                     );
                   })}

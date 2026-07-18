@@ -21,7 +21,7 @@ export class RequisitionsController {
 
   // Encargado can view their branch's requisitions
   @Get('branch/:branchId')
-  @Roles(ENCARGADO_ROLE)
+  @Roles(ENCARGADO_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE)
   async findByBranch(@Param('branchId') branchId: string) {
     return this.requisitionsService.findByBranch(branchId);
   }
