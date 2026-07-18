@@ -601,8 +601,8 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
                     {viewingReqItems.map((item) => (
                       <tr key={item.id || item.productId}>
                         <td className="px-4 py-3 font-medium text-text-primary">{item.productName || '—'}</td>
-                        <td className="px-4 py-3 text-right font-mono">{item.requestedQuantity}</td>
-                        <td className="px-4 py-3 text-right font-mono text-champagne-gold">{item.approvedQuantity || 0}</td>
+                        <td className="px-4 py-3 text-right font-mono">{item.quantityRequested}</td>
+                        <td className="px-4 py-3 text-right font-mono text-champagne-gold">{item.quantityApproved || 0}</td>
                       </tr>
                     ))}
                   </tbody>

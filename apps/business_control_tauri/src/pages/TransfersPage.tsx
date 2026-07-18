@@ -57,6 +57,10 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
   const [selectedProductId, setSelectedProductId] = useState('');
   const [itemQuantity, setItemQuantity] = useState('1');
 
+  // Inline editing
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingQuantity, setEditingQuantity] = useState('');
+
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { id, message, type }]);
@@ -183,6 +187,29 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
     setItemsList(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handleStartEditing = (index: number) => {
+    setEditingIndex(index);
+    setEditingQuantity(itemsList[index].quantity.toString());
+  };
+
+  const handleSaveEdit = (index: number) => {
+    const qty = parseFloat(editingQuantity);
+    if (isNaN(qty) || qty <= 0) {
+      showToast('La cantidad debe ser mayor a cero.', 'warning');
+      return;
+    }
+    const newItems = [...itemsList];
+    newItems[index].quantity = qty;
+    setItemsList(newItems);
+    setEditingIndex(null);
+    setEditingQuantity('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingIndex(null);
+    setEditingQuantity('');
+  };
+
   const handleLoadRequisition = async (reqId: string) => {
     if (!reqId) {
       setIsLinkedToRequisition(false);
@@ -207,7 +234,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
       if (req.items && req.items.length > 0) {
         const items = req.items.map((item) => {
           const prod = products.find(p => p.id === item.productId);
-          const qty = parseFloat(String(item.approvedQuantity || item.requestedQuantity || '0'));
+          const qty = parseFloat(String(item.quantityApproved || item.quantityRequested || '0'));
           return {
             productId: item.productId,
             productName: prod?.name || item.productName || 'Insumo',
@@ -567,15 +594,54 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                       itemsList.map((item, index) => (
                           <tr key={item.productId} className="hover:bg-charcoal-surface/20">
                             <td className="py-3 px-3 font-medium text-text-primary">{item.productName}</td>
-                            <td className="py-3 px-3 text-center font-semibold font-mono">{item.quantity}</td>
+                            <td className="py-3 px-3 text-center font-semibold font-mono">
+                              {editingIndex === index ? (
+                                <div className="flex items-center justify-center gap-1">
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    min="0.001"
+                                    value={editingQuantity}
+                                    onChange={(e) => setEditingQuantity(e.target.value)}
+                                    className="w-24 bg-charcoal border border-aged-bronze/45 rounded px-2 py-1 text-xs text-text-primary text-center"
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleSaveEdit(index);
+                                      if (e.key === 'Escape') handleCancelEdit();
+                                    }}
+                                  />
+                                  <button type="button" onClick={() => handleSaveEdit(index)}
+                                    className="text-success-green hover:text-success-green/80 p-1">
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  </button>
+                                  <button type="button" onClick={handleCancelEdit}
+                                    className="text-text-secondary hover:text-text-primary p-1">
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              ) : (
+                                item.quantity
+                              )}
+                            </td>
                             <td className="py-3 px-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveItem(index)}
-                                className="text-red-400 hover:text-red-300 font-bold"
-                              >
-                                Quitar
-                              </button>
+                              <div className="flex items-center justify-center gap-1">
+                                <button type="button" onClick={() => handleStartEditing(index)}
+                                  className="text-champagne-gold/70 hover:text-champagne-gold p-1" title="Editar cantidad">
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                <button type="button" onClick={() => handleRemoveItem(index)}
+                                  className="text-red-400 hover:text-red-300 font-bold" title="Quitar">
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         )

@@ -231,8 +231,8 @@ export interface PurchaseOrder {
 export interface BranchRequisitionItem {
   id?: string;
   productId: string;
-  requestedQuantity: number;
-  approvedQuantity?: number;
+  quantityRequested: number;
+  quantityApproved?: number;
   productName?: string;
 }
 
