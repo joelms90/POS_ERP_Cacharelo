@@ -18,7 +18,7 @@ import { TicketSettingsPage } from './pages/TicketSettingsPage';
 import { PosSimulatorPage } from './pages/PosSimulatorPage';
 import { AdministratorsPage } from './pages/AdministratorsPage';
 import { PurchaseOrdersPage } from './pages/PurchaseOrdersPage';
-import { RequisitionsApprovalPage } from './pages/RequisitionsApprovalPage';
+import { RequisitionsPage } from './pages/RequisitionsPage';
 import { api } from './services/api';
 
 export type AdminTab = 'administrators' | 'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers' | 'purchase-orders' | 'requisitions' | 'help' | 'reports' | 'ticket-settings' | 'pos-simulator';
@@ -115,7 +115,7 @@ function App() {
         {activeTab === 'assembly' && <AssemblyPage businessId={activeBusinessId} />}
         {activeTab === 'transfers' && <TransfersPage businessId={activeBusinessId} />}
         {activeTab === 'purchase-orders' && user && <PurchaseOrdersPage businessId={activeBusinessId} userId={user.id} />}
-        {activeTab === 'requisitions' && <RequisitionsApprovalPage businessId={activeBusinessId} />}
+        {activeTab === 'requisitions' && user && <RequisitionsPage businessId={activeBusinessId} userId={user.id} userRole={user.role} />}
         {activeTab === 'help' && <HelpPage />}
         {activeTab === 'reports' && <ReportsPage businessId={activeBusinessId} />}
         {activeTab === 'ticket-settings' && <TicketSettingsPage businessId={activeBusinessId} />}

@@ -4,7 +4,7 @@ import { Button } from '../atoms/Button';
 import { Input } from '../atoms/Input';
 import { FormField } from '../molecules/FormField';
 
-type PosEmployeeRole = 'waiter' | 'cashier' | 'kitchen';
+type PosEmployeeRole = 'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'encargado' | 'empleado';
 
 interface UserFormProps {
   onSuccess: (newUser: Employee) => void;
@@ -19,12 +19,17 @@ const roleOptions: Array<[PosEmployeeRole, string]> = [
   ['waiter', 'Mesero'],
   ['cashier', 'Cajero'],
   ['kitchen', 'Cocina'],
+  ['admin', 'Admin POS'],
+  ['vendedor', 'Vendedor'],
+  ['encargado', 'Encargado'],
+  ['empleado', 'Empleado'],
 ];
 
 const getPosRoles = (user?: Employee | null): PosEmployeeRole[] => {
   const source = user?.roles?.length ? user.roles : user?.role ? [user.role] : [];
+  const posRoleValues: PosEmployeeRole[] = ['waiter', 'cashier', 'kitchen', 'admin', 'vendedor', 'encargado', 'empleado'];
   const roles = source.filter((role): role is PosEmployeeRole =>
-    role === 'waiter' || role === 'cashier' || role === 'kitchen',
+    posRoleValues.includes(role as PosEmployeeRole),
   );
   return roles.length > 0 ? roles : ['waiter'];
 };

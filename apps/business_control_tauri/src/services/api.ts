@@ -5,8 +5,8 @@ export interface Employee {
   name: string;
   email?: string;
   pin: string;
-  role: 'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'encargado' | 'owner' | 'inventory_admin';
-  roles?: Array<'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'encargado' | 'owner' | 'inventory_admin'>;
+  role: 'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'encargado' | 'empleado' | 'owner' | 'inventory_admin';
+  roles?: Array<'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'encargado' | 'empleado' | 'owner' | 'inventory_admin'>;
 }
 
 export interface AdminUser {
@@ -26,7 +26,7 @@ export interface AuthUser {
   branchId?: string;
   name: string;
   email?: string;
-  role: 'owner' | 'inventory_admin' | 'admin' | 'waiter' | 'cashier' | 'kitchen' | 'vendedor' | 'encargado';
+  role: 'owner' | 'inventory_admin' | 'admin' | 'waiter' | 'cashier' | 'kitchen' | 'vendedor' | 'encargado' | 'empleado';
   businessAccess?: Array<{ businessId: string; role: 'owner' | 'inventory_admin' }>;
 }
 
@@ -242,7 +242,7 @@ export interface BranchRequisition {
   fromBranchId: string;
   toWarehouseId: string;
   requestedById: string;
-  status: 'pending' | 'approved' | 'rejected' | 'completed';
+    status: 'pending' | 'pending_approval' | 'approved' | 'rejected' | 'completed';
   notes?: string;
   approvalNotes?: string;
   approvedById?: string;
@@ -1281,8 +1281,26 @@ export const api = {
     return apiRequest<BranchRequisition>(`/requisitions/${id}`);
   },
 
+  async createRequisition(data: {
+    businessId: string;
+    fromBranchId: string;
+    toWarehouseId: string;
+    createdBy: string;
+    notes?: string;
+    items: Array<{ productId: string; quantityRequested: number }>;
+  }): Promise<BranchRequisition> {
+    return apiRequest<BranchRequisition>('/requisitions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getBranchRequisitions(branchId: string): Promise<BranchRequisition[]> {
+    return apiRequest<BranchRequisition[]>(`/requisitions/branch/${branchId}`);
+  },
+
   async updateRequisitionStatus(id: string, data: {
-    status: 'pending' | 'approved' | 'rejected' | 'completed';
+  status: 'pending' | 'pending_approval' | 'approved' | 'rejected' | 'completed';
     notes?: string;
   }): Promise<BranchRequisition> {
     return apiRequest<BranchRequisition>(`/requisitions/${id}/status`, {
