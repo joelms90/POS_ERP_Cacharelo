@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
-import { eq, and, isNull, sql } from 'drizzle-orm';
+import { eq, and, isNull, count, inArray } from 'drizzle-orm';
 
 @Injectable()
 export class PurchaseOrdersRepository {
@@ -12,15 +12,8 @@ export class PurchaseOrdersRepository {
   ) {}
 
   async findAll(businessId: string) {
-    const results = await this.db
-      .select({
-        purchaseOrder: schema.purchaseOrders,
-        itemCount: sql<number>`COALESCE((
-          SELECT COUNT(*)::int
-          FROM ${schema.purchaseOrderItems}
-          WHERE ${schema.purchaseOrderItems.poId} = ${schema.purchaseOrders.id}
-        ), 0)`.mapWith(Number),
-      })
+    const orders = await this.db
+      .select()
       .from(schema.purchaseOrders)
       .where(
         and(
@@ -30,9 +23,24 @@ export class PurchaseOrdersRepository {
       )
       .orderBy(schema.purchaseOrders.createdAt);
 
-    return results.map((r) => ({
-      ...r.purchaseOrder,
-      itemCount: r.itemCount,
+    if (orders.length === 0) return [];
+
+    const orderIds = orders.map((o) => o.id);
+
+    const itemCounts = await this.db
+      .select({
+        poId: schema.purchaseOrderItems.poId,
+        itemCount: count(schema.purchaseOrderItems.id),
+      })
+      .from(schema.purchaseOrderItems)
+      .where(inArray(schema.purchaseOrderItems.poId, orderIds))
+      .groupBy(schema.purchaseOrderItems.poId);
+
+    const countMap = new Map(itemCounts.map((ic) => [ic.poId, Number(ic.itemCount)]));
+
+    return orders.map((o) => ({
+      ...o,
+      itemCount: countMap.get(o.id) || 0,
     }));
   }
 
