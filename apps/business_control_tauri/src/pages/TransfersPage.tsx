@@ -207,7 +207,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
       if (req.items && req.items.length > 0) {
         const items = req.items.map((item) => {
           const prod = products.find(p => p.id === item.productId);
-          const qty = item.approvedQuantity || item.requestedQuantity;
+          const qty = parseFloat(String(item.approvedQuantity || item.requestedQuantity || '0'));
           return {
             productId: item.productId,
             productName: prod?.name || item.productName || 'Insumo',
@@ -249,7 +249,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
         notes: notes.trim() || undefined,
         items: itemsList.map(item => ({
           productId: item.productId,
-          quantity: item.quantity,
+          quantity: parseFloat(String(item.quantity)) || 0,
         })),
       };
 
@@ -281,9 +281,6 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
       setIsSubmitting(false);
     }
   };
-
-  // Calculate total draft transfer cost
-  const totalDraftCost = itemsList.reduce((acc, item) => acc + (parseFloat(item.cost) * item.quantity), 0);
 
   return (
     <div className="flex flex-col h-full gap-6 animate-fade-in text-text-primary">
@@ -555,28 +552,22 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                   <thead>
                     <tr className="border-b border-aged-bronze/20 text-xs font-semibold text-text-secondary uppercase">
                       <th className="py-2.5 px-3">Descripción</th>
-                      <th className="py-2.5 px-3 text-right">Costo Unitario</th>
                       <th className="py-2.5 px-3 text-center">Cantidad</th>
-                      <th className="py-2.5 px-3 text-right">Costo Total</th>
                       <th className="py-2.5 px-3 text-center">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-aged-bronze/10 text-xs">
                     {itemsList.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-text-secondary italic">
+                        <td colSpan={3} className="py-8 text-center text-text-secondary italic">
                           No hay productos añadidos al borrador del traspaso.
                         </td>
                       </tr>
                     ) : (
-                      itemsList.map((item, index) => {
-                        const total = parseFloat(item.cost) * item.quantity;
-                        return (
+                      itemsList.map((item, index) => (
                           <tr key={item.productId} className="hover:bg-charcoal-surface/20">
                             <td className="py-3 px-3 font-medium text-text-primary">{item.productName}</td>
-                            <td className="py-3 px-3 text-right font-mono">${item.cost}</td>
                             <td className="py-3 px-3 text-center font-semibold font-mono">{item.quantity}</td>
-                            <td className="py-3 px-3 text-right font-mono text-champagne-gold font-semibold">${total.toFixed(2)}</td>
                             <td className="py-3 px-3 text-center">
                               <button
                                 type="button"
@@ -587,20 +578,12 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                               </button>
                             </td>
                           </tr>
-                        );
-                      })
+                        )
+                      )
                     )}
                   </tbody>
                 </table>
               </div>
-
-              {/* Footer draft total */}
-              {itemsList.length > 0 && (
-                <div className="border-t border-aged-bronze/20 pt-4 flex justify-between items-center">
-                  <span className="text-xs text-text-secondary uppercase">Total Estimado del Traspaso</span>
-                  <span className="text-lg font-bold font-mono text-champagne-gold">${totalDraftCost.toFixed(2)}</span>
-                </div>
-              )}
             </div>
           </div>
         )}
