@@ -17,13 +17,15 @@ import { ReportsPage } from './pages/ReportsPage';
 import { TicketSettingsPage } from './pages/TicketSettingsPage';
 import { PosSimulatorPage } from './pages/PosSimulatorPage';
 import { AdministratorsPage } from './pages/AdministratorsPage';
+import { PurchaseOrdersPage } from './pages/PurchaseOrdersPage';
+import { RequisitionsApprovalPage } from './pages/RequisitionsApprovalPage';
 import { api } from './services/api';
 
-export type AdminTab = 'administrators' | 'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers' | 'help' | 'reports' | 'ticket-settings' | 'pos-simulator';
+export type AdminTab = 'administrators' | 'personal' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers' | 'purchase-orders' | 'requisitions' | 'help' | 'reports' | 'ticket-settings' | 'pos-simulator';
 
 export const roleTabs: Record<string, AdminTab[]> = {
-  owner: ['administrators', 'personal', 'branches', 'ticket-settings', 'pos-simulator', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'transfers', 'reports', 'inquiries', 'help'],
-  inventory_admin: ['inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'help'],
+  owner: ['administrators', 'personal', 'branches', 'ticket-settings', 'pos-simulator', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'transfers', 'purchase-orders', 'requisitions', 'reports', 'inquiries', 'help'],
+  inventory_admin: ['inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'purchase-orders', 'requisitions', 'help'],
 };
 
 function App() {
@@ -112,6 +114,8 @@ function App() {
         {activeTab === 'categories' && <CategoriesPage businessId={activeBusinessId} />}
         {activeTab === 'assembly' && <AssemblyPage businessId={activeBusinessId} />}
         {activeTab === 'transfers' && <TransfersPage businessId={activeBusinessId} />}
+        {activeTab === 'purchase-orders' && user && <PurchaseOrdersPage businessId={activeBusinessId} userId={user.id} />}
+        {activeTab === 'requisitions' && <RequisitionsApprovalPage businessId={activeBusinessId} />}
         {activeTab === 'help' && <HelpPage />}
         {activeTab === 'reports' && <ReportsPage businessId={activeBusinessId} />}
         {activeTab === 'ticket-settings' && <TicketSettingsPage businessId={activeBusinessId} />}
