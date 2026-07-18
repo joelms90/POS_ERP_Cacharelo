@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 
 @Injectable()
 export class PurchaseOrdersRepository {
@@ -12,8 +12,15 @@ export class PurchaseOrdersRepository {
   ) {}
 
   async findAll(businessId: string) {
-    return this.db
-      .select()
+    const results = await this.db
+      .select({
+        purchaseOrder: schema.purchaseOrders,
+        itemCount: sql<number>`COALESCE((
+          SELECT COUNT(*)::int
+          FROM ${schema.purchaseOrderItems}
+          WHERE ${schema.purchaseOrderItems.poId} = ${schema.purchaseOrders.id}
+        ), 0)`.mapWith(Number),
+      })
       .from(schema.purchaseOrders)
       .where(
         and(
@@ -22,6 +29,11 @@ export class PurchaseOrdersRepository {
         ),
       )
       .orderBy(schema.purchaseOrders.createdAt);
+
+    return results.map((r) => ({
+      ...r.purchaseOrder,
+      itemCount: r.itemCount,
+    }));
   }
 
   async findById(id: string) {

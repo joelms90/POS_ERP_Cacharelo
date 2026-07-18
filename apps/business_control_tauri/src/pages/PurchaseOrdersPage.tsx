@@ -395,7 +395,7 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                         return filtered.map((po) => {
                           const providerName = providers.find(p => p.id === po.providerId)?.name || '—';
                           const warehouseName = warehouses.find(w => w.id === po.warehouseId)?.name || '—';
-                          const itemCount = po.items?.length || 0;
+                          const itemCount = po.itemCount || 0;
 
                           return (
                             <tr key={po.id} className="hover:bg-charcoal-surface/20 transition-colors">

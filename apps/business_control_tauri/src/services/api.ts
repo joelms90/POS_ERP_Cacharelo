@@ -223,6 +223,7 @@ export interface PurchaseOrder {
   createdAt: string;
   updatedAt: string;
   items?: PurchaseOrderItem[];
+  itemCount?: number;
   providerName?: string;
   warehouseName?: string;
 }
