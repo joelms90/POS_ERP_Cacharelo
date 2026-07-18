@@ -324,7 +324,7 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
               </Heading>
               <form onSubmit={handleSubmitRequisition} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Sucursal Origen</label>
+                  <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Sucursal que Solicita</label>
                   <select value={fromBranchId} onChange={(e) => setFromBranchId(e.target.value)}
                     className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-sm"
                     required

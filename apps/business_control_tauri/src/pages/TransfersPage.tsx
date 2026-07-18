@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { api, Warehouse } from '../services/api';
+import { api, Warehouse, BranchRequisition } from '../services/api';
 import { Button } from '../components/atoms/Button';
 import { Heading } from '../components/atoms/Heading';
 import { Input } from '../components/atoms/Input';
@@ -48,6 +48,11 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
   const [notes, setNotes] = useState('');
   const [itemsList, setItemsList] = useState<Array<{ productId: string; productName: string; quantity: number; cost: string }>>([]);
   
+  // Requisition integration
+  const [approvedRequisitions, setApprovedRequisitions] = useState<BranchRequisition[]>([]);
+  const [selectedRequisitionId, setSelectedRequisitionId] = useState('');
+  const [isLinkedToRequisition, setIsLinkedToRequisition] = useState(false);
+
   // Add item form states
   const [selectedProductId, setSelectedProductId] = useState('');
   const [itemQuantity, setItemQuantity] = useState('1');
@@ -64,17 +69,19 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
   const loadInitialData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [whData, prodData, transData, branchData] = await Promise.all([
+      const [whData, prodData, transData, branchData, reqData] = await Promise.all([
         api.getWarehouses(businessId),
         api.getProducts(businessId),
         api.getTransfers(businessId),
         api.getBranches(businessId),
+        api.getAllRequisitions(businessId),
       ]);
       
       setWarehouses(whData);
       setProducts(prodData);
       setTransfers(transData);
       setBranches(branchData);
+      setApprovedRequisitions(reqData.filter(r => r.status === 'approved'));
 
       if (whData.length > 0) {
         setFromId(whData[0].id);
@@ -176,6 +183,47 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
     setItemsList(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handleLoadRequisition = async (reqId: string) => {
+    if (!reqId) {
+      setIsLinkedToRequisition(false);
+      return;
+    }
+
+    try {
+      const req = await api.getRequisition(reqId);
+      if (!req) return;
+
+      setIsLinkedToRequisition(true);
+
+      // Set source = warehouse (toWarehouseId in req)
+      setFromType('warehouse');
+      setFromId(req.toWarehouseId);
+
+      // Set destination = branch (fromBranchId in req)
+      setToType('branch');
+      setToId(req.fromBranchId);
+
+      // Load items with quantities
+      if (req.items && req.items.length > 0) {
+        const items = req.items.map((item) => {
+          const prod = products.find(p => p.id === item.productId);
+          const qty = item.approvedQuantity || item.requestedQuantity;
+          return {
+            productId: item.productId,
+            productName: prod?.name || item.productName || 'Insumo',
+            quantity: qty,
+            cost: prod?.cost || '0',
+          };
+        });
+        setItemsList(items);
+        showToast(`Requisición cargada con ${items.length} productos.`, 'success');
+      }
+    } catch (err) {
+      showToast('Error al cargar requisición.', 'error');
+      setIsLinkedToRequisition(false);
+    }
+  };
+
   const handleSubmitTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (itemsList.length === 0) {
@@ -206,11 +254,23 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
       };
 
       await api.recordTransfer(payload, businessId);
+
+      // If linked to a requisition, mark it as completed
+      if (isLinkedToRequisition && selectedRequisitionId) {
+        try {
+          await api.updateRequisitionStatus(selectedRequisitionId, { status: 'completed', notes: 'Traspaso ejecutado.' });
+        } catch {
+          // Non-critical: transfer succeeded even if requisition update fails
+        }
+      }
+
       showToast('Traspaso enviado con éxito. Stock actualizado.', 'success');
       
       // Reset form
       setItemsList([]);
       setNotes('');
+      setSelectedRequisitionId('');
+      setIsLinkedToRequisition(false);
       
       // Reload history
       const transData = await api.getTransfers(businessId);
@@ -300,6 +360,41 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Create form */}
             <form onSubmit={handleSubmitTransfer} className="lg:col-span-1 bg-onyx-surface p-6 rounded-lg border border-aged-bronze/20 flex flex-col gap-4">
+              {/* Requisition Loader */}
+              <div className="bg-charcoal-surface/40 border border-aged-bronze/15 rounded p-3">
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+                  Cargar desde Requisición (opcional)
+                </label>
+                <select
+                  value={selectedRequisitionId}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedRequisitionId(val);
+                    handleLoadRequisition(val);
+                  }}
+                  className="w-full bg-charcoal border border-aged-bronze/45 rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-champagne-gold"
+                >
+                  <option value="">Sin requisición (manual)</option>
+                  {approvedRequisitions.map((req) => {
+                    const branchName = branches.find(b => b.id === req.fromBranchId)?.name || 'Sucursal';
+                    return (
+                      <option key={req.id} value={req.id}>
+                        {branchName} — {req.items?.length || 0} items
+                      </option>
+                    );
+                  })}
+                </select>
+                {isLinkedToRequisition && (
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedRequisitionId(''); setIsLinkedToRequisition(false); setItemsList([]); }}
+                    className="mt-2 text-xs text-champagne-gold hover:underline"
+                  >
+                    Desvincular requisición
+                  </button>
+                )}
+              </div>
+
               <span className="text-sm font-semibold text-champagne-gold uppercase tracking-wider">
                 Configuración del Traspaso
               </span>

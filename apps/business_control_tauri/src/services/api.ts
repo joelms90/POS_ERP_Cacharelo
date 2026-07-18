@@ -1273,6 +1273,10 @@ export const api = {
   /**
    * Branch Requisitions
    */
+  async getAllRequisitions(businessId: string): Promise<BranchRequisition[]> {
+    return apiRequest<BranchRequisition[]>(`/requisitions?businessId=${businessId}`);
+  },
+
   async getPendingRequisitions(businessId: string): Promise<BranchRequisition[]> {
     return apiRequest<BranchRequisition[]>(`/requisitions/pending?businessId=${businessId}`);
   },
