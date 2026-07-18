@@ -5,8 +5,8 @@ export interface Employee {
   name: string;
   email?: string;
   pin: string;
-  role: 'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'owner' | 'inventory_admin';
-  roles?: Array<'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'owner' | 'inventory_admin'>;
+  role: 'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'encargado' | 'owner' | 'inventory_admin';
+  roles?: Array<'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'encargado' | 'owner' | 'inventory_admin'>;
 }
 
 export interface AdminUser {
@@ -26,7 +26,7 @@ export interface AuthUser {
   branchId?: string;
   name: string;
   email?: string;
-  role: 'owner' | 'inventory_admin' | 'admin' | 'waiter' | 'cashier' | 'kitchen' | 'vendedor';
+  role: 'owner' | 'inventory_admin' | 'admin' | 'waiter' | 'cashier' | 'kitchen' | 'vendedor' | 'encargado';
   businessAccess?: Array<{ businessId: string; role: 'owner' | 'inventory_admin' }>;
 }
 
@@ -199,6 +199,58 @@ export interface Provider {
   address?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface PurchaseOrderItem {
+  id?: string;
+  productId: string;
+  quantity: number;
+  estimatedUnitCost: number;
+  actualUnitCost?: number;
+  actualQuantity?: number;
+  productName?: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  businessId: string;
+  providerId: string;
+  warehouseId: string;
+  poNumber: string;
+  status: 'draft' | 'sent' | 'received' | 'partially_received' | 'cancelled';
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  items?: PurchaseOrderItem[];
+  providerName?: string;
+  warehouseName?: string;
+}
+
+export interface BranchRequisitionItem {
+  id?: string;
+  productId: string;
+  requestedQuantity: number;
+  approvedQuantity?: number;
+  productName?: string;
+}
+
+export interface BranchRequisition {
+  id: string;
+  businessId: string;
+  fromBranchId: string;
+  toWarehouseId: string;
+  requestedById: string;
+  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  notes?: string;
+  approvalNotes?: string;
+  approvedById?: string;
+  createdAt: string;
+  updatedAt: string;
+  items?: BranchRequisitionItem[];
+  fromBranchName?: string;
+  toWarehouseName?: string;
+  requestedByName?: string;
 }
 
 const DEFAULT_API_URL = 'http://localhost:3000/api';
@@ -1152,6 +1204,90 @@ export const api = {
 
   async getCashShiftAuditReport(id: string): Promise<CashShiftAuditReport> {
     return apiRequest<CashShiftAuditReport>(`/reports/cash-shifts/${id}/audit`);
+  },
+
+  /**
+   * Purchase Orders
+   */
+  async getPurchaseOrders(businessId: string): Promise<PurchaseOrder[]> {
+    return apiRequest<PurchaseOrder[]>(`/purchase-orders?businessId=${businessId}`);
+  },
+
+  async getPurchaseOrder(id: string): Promise<PurchaseOrder> {
+    return apiRequest<PurchaseOrder>(`/purchase-orders/${id}`);
+  },
+
+  async createPurchaseOrder(data: {
+    businessId: string;
+    providerId: string;
+    warehouseId: string;
+    orderNumber: string;
+    createdBy: string;
+    notes?: string;
+    items: Array<{
+      productId: string;
+      quantity: number;
+      estimatedUnitCost: number;
+    }>;
+  }): Promise<PurchaseOrder> {
+    return apiRequest<PurchaseOrder>('/purchase-orders', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updatePurchaseOrder(id: string, data: Partial<PurchaseOrder>): Promise<PurchaseOrder> {
+    return apiRequest<PurchaseOrder>(`/purchase-orders/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deletePurchaseOrder(id: string): Promise<void> {
+    return apiRequest<void>(`/purchase-orders/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async markPurchaseOrderAsSent(id: string): Promise<PurchaseOrder> {
+    return apiRequest<PurchaseOrder>(`/purchase-orders/${id}/send`, {
+      method: 'POST',
+    });
+  },
+
+  async receivePurchaseOrder(id: string, data: {
+    items: Array<{
+      productId: string;
+      quantityReceived: number;
+      unitCostActual: number;
+    }>;
+    notes?: string;
+  }): Promise<{ success: boolean; status: string; purchaseOrder: PurchaseOrder }> {
+    return apiRequest<{ success: boolean; status: string; purchaseOrder: PurchaseOrder }>(`/purchase-orders/${id}/receive`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Branch Requisitions
+   */
+  async getPendingRequisitions(businessId: string): Promise<BranchRequisition[]> {
+    return apiRequest<BranchRequisition[]>(`/requisitions/pending?businessId=${businessId}`);
+  },
+
+  async getRequisition(id: string): Promise<BranchRequisition> {
+    return apiRequest<BranchRequisition>(`/requisitions/${id}`);
+  },
+
+  async updateRequisitionStatus(id: string, data: {
+    status: 'pending' | 'approved' | 'rejected' | 'completed';
+    notes?: string;
+  }): Promise<BranchRequisition> {
+    return apiRequest<BranchRequisition>(`/requisitions/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   },
 };
 

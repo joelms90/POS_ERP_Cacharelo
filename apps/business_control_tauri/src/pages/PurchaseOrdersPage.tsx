@@ -373,7 +373,7 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                           const provName = providers.find(p => p.id === po.providerId)?.name || '';
                           const matchesSearch =
                             !q ||
-                            po.orderNumber.toLowerCase().includes(q) ||
+                            po.poNumber.toLowerCase().includes(q) ||
                             provName.toLowerCase().includes(q);
                           const matchesStatus =
                             statusFilter === 'all' || po.status === statusFilter;
@@ -400,7 +400,7 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                           return (
                             <tr key={po.id} className="hover:bg-charcoal-surface/20 transition-colors">
                               <td className="px-6 py-4 font-medium text-text-primary">
-                                <span className="font-mono">{po.orderNumber}</span>
+                                <span className="font-mono">{po.poNumber}</span>
                               </td>
                               <td className="px-6 py-4 text-text-secondary text-xs">{providerName}</td>
                               <td className="px-6 py-4 text-text-secondary text-xs">{warehouseName}</td>
@@ -445,7 +445,7 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                       const filtered = purchaseOrders.filter((po) => {
                         const q = searchQuery.toLowerCase();
                         const provName = providers.find(p => p.id === po.providerId)?.name || '';
-                        return (!q || po.orderNumber.toLowerCase().includes(q) || provName.toLowerCase().includes(q)) &&
+                        return (!q || po.poNumber.toLowerCase().includes(q) || provName.toLowerCase().includes(q)) &&
                           (statusFilter === 'all' || po.status === statusFilter);
                       });
                       return `Mostrando ${filtered.length} de ${purchaseOrders.length} órdenes`;
