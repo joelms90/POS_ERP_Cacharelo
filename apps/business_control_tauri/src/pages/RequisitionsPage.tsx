@@ -112,11 +112,11 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
-    if (!loading && branches.length > 0) {
+    if (branches.length > 0) {
       if (activeTab === 'my') fetchMyRequisitions();
       else if (activeTab === 'approve') fetchPendingRequisitions();
     }
-  }, [activeTab, branches, loading]);
+  }, [activeTab, branches.length]);
 
   const resetForm = () => {
     setFromBranchId(branches.length > 0 ? branches[0].id : '');
