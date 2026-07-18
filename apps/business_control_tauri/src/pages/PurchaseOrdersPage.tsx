@@ -42,6 +42,9 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
   const [editingQuantity, setEditingQuantity] = useState('');
   const [editingCost, setEditingCost] = useState('');
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
@@ -286,8 +289,8 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
 
       <div className="flex flex-col lg:flex-row gap-6 min-h-fit lg:h-full max-w-7xl mx-auto w-full">
         {/* Left Side: Purchase Orders List */}
-        <div className="flex-1 bg-onyx-surface border border-aged-bronze/40 rounded-lg p-4 lg:p-6 flex flex-col lg:h-full overflow-hidden shadow-xl">
-          <div className="flex justify-between items-center mb-6">
+        <div className="flex-1 flex flex-col gap-4 lg:h-full overflow-hidden">
+          <div className="flex justify-between items-center">
             <Heading level={2} className="!text-lg sm:!text-2xl !border-none !pb-0 text-champagne-gold">
               Órdenes de Compra
             </Heading>
@@ -297,7 +300,7 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
           </div>
 
           {error && (
-            <div className="bg-error-red/10 border border-error-red/30 text-error-red rounded p-3 text-xs mb-4">
+            <div className="bg-error-red/10 border border-error-red/30 text-error-red rounded p-3 text-xs">
               {error}
             </div>
           )}
@@ -314,53 +317,146 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
               <span>No hay órdenes de compra registradas</span>
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto border border-aged-bronze/20 rounded-md">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-charcoal-surface border-b border-aged-bronze/30 text-text-secondary uppercase tracking-wider text-[10px]">
-                    <th className="p-4 font-semibold">Número</th>
-                    <th className="p-4 font-semibold">Proveedor</th>
-                    <th className="p-4 font-semibold">Bodega</th>
-                    <th className="p-4 font-semibold">Estado</th>
-                    <th className="p-4 font-semibold text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-aged-bronze/10">
-                  {purchaseOrders.map((po) => (
-                    <tr key={po.id} className="hover:bg-charcoal-surface/30 transition-colors">
-                      <td className="p-4 font-medium text-text-primary">{po.orderNumber}</td>
-                      <td className="p-4 text-text-secondary">{po.providerName || '-'}</td>
-                      <td className="p-4 text-text-secondary">{po.warehouseName || '-'}</td>
-                      <td className="p-4">{getStatusBadge(po.status)}</td>
-                      <td className="p-4 text-right">
-                        <div className="inline-flex gap-2">
-                          {po.status === 'draft' && (
-                            <button
-                              onClick={() => handleMarkAsSent(po.id)}
-                              className="text-blue-400 hover:text-blue-300 transition-colors text-xs px-2 py-1"
-                              title="Marcar como enviada"
-                            >
-                              Enviar
-                            </button>
-                          )}
-                          {po.status === 'draft' && (
-                            <button
-                              onClick={() => handleDelete(po.id)}
-                              className="text-error-red hover:text-error-red/80 transition-colors p-1"
-                              title="Eliminar"
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* Search and Filters Bar */}
+              <div className="flex flex-col md:flex-row gap-4 bg-onyx-surface border border-aged-bronze/40 rounded p-4 shadow-md shadow-black/10 items-center justify-between">
+                <div className="w-full md:w-72 relative">
+                  <Input
+                    type="text"
+                    placeholder="Buscar por número o proveedor..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                  <svg className="w-4 h-4 text-text-secondary absolute left-3.5 top-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-text-secondary whitespace-nowrap">Estado:</span>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="px-3 py-1.5 bg-charcoal-surface border border-aged-bronze focus:border-champagne-gold rounded font-sans text-xs text-text-primary transition-all duration-300 focus:outline-none cursor-pointer"
+                    >
+                      <option value="all">Todos los Estados</option>
+                      <option value="draft">Borrador</option>
+                      <option value="sent">Enviada</option>
+                      <option value="partially_received">Parcial</option>
+                      <option value="received">Recibida</option>
+                      <option value="cancelled">Cancelada</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Orders Table Card */}
+              <div className="flex-1 bg-onyx-surface border border-aged-bronze/40 rounded shadow-md shadow-black/20 overflow-hidden flex flex-col min-h-0">
+                <div className="overflow-x-auto flex-1">
+                  <table className="w-full text-left border-collapse select-text">
+                    <thead>
+                      <tr className="bg-charcoal-surface/60 border-b border-aged-bronze/35 text-[11px] font-semibold text-text-secondary uppercase tracking-wider">
+                        <th className="px-6 py-4">Número</th>
+                        <th className="px-6 py-4">Proveedor</th>
+                        <th className="px-6 py-4">Bodega</th>
+                        <th className="px-6 py-4 text-center">Estado</th>
+                        <th className="px-6 py-4 text-center">Items</th>
+                        <th className="px-6 py-4 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-aged-bronze/20 text-sm">
+                      {(() => {
+                        const filtered = purchaseOrders.filter((po) => {
+                          const q = searchQuery.toLowerCase();
+                          const provName = providers.find(p => p.id === po.providerId)?.name || '';
+                          const matchesSearch =
+                            !q ||
+                            po.orderNumber.toLowerCase().includes(q) ||
+                            provName.toLowerCase().includes(q);
+                          const matchesStatus =
+                            statusFilter === 'all' || po.status === statusFilter;
+                          return matchesSearch && matchesStatus;
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={6} className="px-6 py-12 text-center text-text-secondary italic">
+                                {searchQuery || statusFilter !== 'all'
+                                  ? 'No se encontraron órdenes que coincidan con la búsqueda.'
+                                  : 'No hay órdenes de compra registradas.'}
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return filtered.map((po) => {
+                          const providerName = providers.find(p => p.id === po.providerId)?.name || '—';
+                          const warehouseName = warehouses.find(w => w.id === po.warehouseId)?.name || '—';
+                          const itemCount = po.items?.length || 0;
+
+                          return (
+                            <tr key={po.id} className="hover:bg-charcoal-surface/20 transition-colors">
+                              <td className="px-6 py-4 font-medium text-text-primary">
+                                <span className="font-mono">{po.orderNumber}</span>
+                              </td>
+                              <td className="px-6 py-4 text-text-secondary text-xs">{providerName}</td>
+                              <td className="px-6 py-4 text-text-secondary text-xs">{warehouseName}</td>
+                              <td className="px-6 py-4 text-center">{getStatusBadge(po.status)}</td>
+                              <td className="px-6 py-4 text-center font-mono text-xs text-champagne-gold">{itemCount}</td>
+                              <td className="px-6 py-4 text-right">
+                                <div className="inline-flex gap-2">
+                                  {po.status === 'draft' && (
+                                    <button
+                                      onClick={() => handleMarkAsSent(po.id)}
+                                      className="text-blue-400 hover:text-blue-300 transition-colors text-xs px-2 py-1 rounded hover:bg-blue-400/5"
+                                      title="Marcar como enviada"
+                                    >
+                                      Enviar
+                                    </button>
+                                  )}
+                                  {po.status === 'draft' && (
+                                    <button
+                                      onClick={() => handleDelete(po.id)}
+                                      className="text-error-red/80 hover:text-error-red transition-colors p-1 rounded hover:bg-error-red/5"
+                                      title="Eliminar"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Table Footer Stats Bar */}
+                <div className="bg-charcoal-surface/40 border-t border-aged-bronze/35 px-6 py-3 flex items-center justify-between text-xs text-text-secondary">
+                  <span>
+                    {(() => {
+                      const filtered = purchaseOrders.filter((po) => {
+                        const q = searchQuery.toLowerCase();
+                        const provName = providers.find(p => p.id === po.providerId)?.name || '';
+                        return (!q || po.orderNumber.toLowerCase().includes(q) || provName.toLowerCase().includes(q)) &&
+                          (statusFilter === 'all' || po.status === statusFilter);
+                      });
+                      return `Mostrando ${filtered.length} de ${purchaseOrders.length} órdenes`;
+                    })()}
+                  </span>
+                  <span className="font-mono">
+                    Borradores: {purchaseOrders.filter(po => po.status === 'draft').length}
+                  </span>
+                </div>
+              </div>
+            </>
           )}
         </div>
 
