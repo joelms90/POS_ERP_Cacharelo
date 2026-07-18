@@ -128,9 +128,10 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
         const ordered = item.quantityOrdered;
         const previouslyReceived = item.quantityReceived || 0;
         const remainingQty = Math.max(0, ordered - previouslyReceived);
+        const prodName = products.find((p) => p.id === item.productId)?.name || item.productName || 'Producto sin nombre';
         return {
           productId: item.productId,
-          productName: item.productName || 'Producto sin nombre',
+          productName: prodName,
           quantity: remainingQty,
           unitCost: item.unitCostActual || item.unitCostEstimated || 0,
         };

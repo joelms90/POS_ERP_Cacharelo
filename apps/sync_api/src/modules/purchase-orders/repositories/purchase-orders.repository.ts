@@ -62,13 +62,20 @@ export class PurchaseOrdersRepository {
     if (!order) return null;
 
     const items = await this.db
-      .select()
+      .select({
+        purchaseOrderItem: schema.purchaseOrderItems,
+        productName: schema.products.name,
+      })
       .from(schema.purchaseOrderItems)
+      .leftJoin(schema.products, eq(schema.purchaseOrderItems.productId, schema.products.id))
       .where(eq(schema.purchaseOrderItems.poId, id));
 
     return {
       ...order,
-      items,
+      items: items.map((i) => ({
+        ...i.purchaseOrderItem,
+        productName: i.productName,
+      })),
     };
   }
 
