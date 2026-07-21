@@ -24,13 +24,20 @@ export class RequisitionsRepository {
     if (!requisition) return null;
 
     const items = await this.db
-      .select()
+      .select({
+        requisitionItem: schema.branchRequisitionItems,
+        productName: schema.products.name,
+      })
       .from(schema.branchRequisitionItems)
+      .leftJoin(schema.products, eq(schema.branchRequisitionItems.productId, schema.products.id))
       .where(eq(schema.branchRequisitionItems.requisitionId, id));
 
     return {
       ...requisition,
-      items,
+      items: items.map((i) => ({
+        ...i.requisitionItem,
+        productName: i.productName,
+      })),
     };
   }
 
