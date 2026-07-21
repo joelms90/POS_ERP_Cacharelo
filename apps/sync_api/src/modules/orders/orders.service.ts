@@ -137,17 +137,18 @@ export class OrdersService {
       throw new ConflictException(`Cannot process payment for a ${order.state} order.`);
     }
 
-    const { amount, paymentMethod, referenceCode } = createPaymentDto;
+    const { amount, paymentMethod, referenceCode, paidOrderItemIds } = createPaymentDto;
 
     const result = await this.ordersRepository.createPayment(orderId, {
       orderId,
       amount,
       paymentMethod,
       referenceCode: referenceCode || null,
+      paidOrderItemIds,
     });
 
     // Broadcast payment state changes and table transitions (e.g. cleaning)
-    if (order.branchId) {
+    if (order.branchId && result) {
       this.syncGateway.broadcastChange(order.branchId, {
         tipo: 'cambio',
         changes: [
