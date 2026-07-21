@@ -1300,8 +1300,11 @@ export const api = {
     });
   },
 
-  async getBranchRequisitions(branchId: string): Promise<BranchRequisition[]> {
-    return apiRequest<BranchRequisition[]>(`/requisitions/branch/${branchId}`);
+  async getBranchRequisitions(branchId: string, businessId?: string): Promise<BranchRequisition[]> {
+    const url = businessId
+      ? `/requisitions/branch/${branchId}?businessId=${businessId}`
+      : `/requisitions/branch/${branchId}`;
+    return apiRequest<BranchRequisition[]>(url);
   },
 
   async updateRequisitionStatus(id: string, data: {

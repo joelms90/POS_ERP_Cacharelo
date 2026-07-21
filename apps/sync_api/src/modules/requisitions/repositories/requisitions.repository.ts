@@ -34,11 +34,15 @@ export class RequisitionsRepository {
     };
   }
 
-  async findByBranch(branchId: string) {
+  async findByBranch(branchId: string, businessId?: string) {
+    const conditions = [eq(schema.branchRequisitions.fromBranchId, branchId)];
+    if (businessId) {
+      conditions.push(eq(schema.branchRequisitions.businessId, businessId));
+    }
     const requisitions = await this.db
       .select()
       .from(schema.branchRequisitions)
-      .where(eq(schema.branchRequisitions.fromBranchId, branchId))
+      .where(and(...conditions))
       .orderBy(schema.branchRequisitions.createdAt);
 
     return this.attachItemCounts(requisitions);

@@ -11,8 +11,8 @@ export class RequisitionsService {
     return this.requisitionsRepository.create(createRequisitionDto);
   }
 
-  async findByBranch(branchId: string) {
-    return this.requisitionsRepository.findByBranch(branchId);
+  async findByBranch(branchId: string, businessId?: string) {
+    return this.requisitionsRepository.findByBranch(branchId, businessId);
   }
 
   async findPendingForBusiness(businessId: string) {

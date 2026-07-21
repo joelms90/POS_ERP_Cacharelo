@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Query, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import { RequisitionsService } from './requisitions.service';
 import { CreateRequisitionDto } from './dto/create-requisition.dto';
 import { UpdateRequisitionStatusDto } from './dto/update-requisition-status.dto';
@@ -12,35 +12,61 @@ import { ENCARGADO_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE } from '../auth/roles'
 export class RequisitionsController {
   constructor(private readonly requisitionsService: RequisitionsService) {}
 
-  // Encargado can create requisitions
+  private getUserBusinessIds(req: any): string[] {
+    const user = req.user;
+    if (!user) throw new ForbiddenException('No user context');
+    const ids: string[] = [];
+    if (user.businessId) ids.push(user.businessId);
+    if (user.businessAccess) {
+      for (const access of user.businessAccess) {
+        if (access.businessId && !ids.includes(access.businessId)) {
+          ids.push(access.businessId);
+        }
+      }
+    }
+    return ids;
+  }
+
+  private validateBusinessAccess(req: any, targetBusinessId: string) {
+    const ids = this.getUserBusinessIds(req);
+    if (ids.length === 0) return;
+    if (!ids.includes(targetBusinessId)) {
+      throw new ForbiddenException('No tienes acceso a este negocio');
+    }
+  }
+
   @Post()
   @Roles(ENCARGADO_ROLE)
-  async create(@Body() createRequisitionDto: CreateRequisitionDto) {
+  async create(@Body() createRequisitionDto: CreateRequisitionDto, @Req() req: any) {
+    this.validateBusinessAccess(req, createRequisitionDto.businessId);
     return this.requisitionsService.create(createRequisitionDto);
   }
 
-  // Encargado can view their branch's requisitions
   @Get('branch/:branchId')
   @Roles(ENCARGADO_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE)
-  async findByBranch(@Param('branchId') branchId: string) {
-    return this.requisitionsService.findByBranch(branchId);
+  async findByBranch(
+    @Param('branchId') branchId: string,
+    @Query('businessId') businessId: string,
+    @Req() req: any,
+  ) {
+    if (businessId) this.validateBusinessAccess(req, businessId);
+    return this.requisitionsService.findByBranch(branchId, businessId);
   }
 
-  // Inventory admin can view all pending requisitions
   @Get('pending')
   @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE)
-  async findPending(@Query('businessId') businessId: string) {
+  async findPending(@Query('businessId') businessId: string, @Req() req: any) {
+    this.validateBusinessAccess(req, businessId);
     return this.requisitionsService.findPendingForBusiness(businessId);
   }
 
-  // List all requisitions by business (for traspasos integration)
   @Get()
   @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE)
-  async findAll(@Query('businessId') businessId: string) {
+  async findAll(@Query('businessId') businessId: string, @Req() req: any) {
+    this.validateBusinessAccess(req, businessId);
     return this.requisitionsService.findAll(businessId);
   }
 
-  // Inventory admin can approve/reject requisitions
   @Patch(':id/status')
   @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE)
   async updateStatus(
@@ -52,7 +78,11 @@ export class RequisitionsController {
 
   @Get(':id')
   @Roles(ENCARGADO_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE)
-  async findOne(@Param('id') id: string) {
-    return this.requisitionsService.findOne(id);
+  async findOne(@Param('id') id: string, @Req() req: any) {
+    const requisition = await this.requisitionsService.findOne(id);
+    if (requisition) {
+      this.validateBusinessAccess(req, requisition.businessId);
+    }
+    return requisition;
   }
 }

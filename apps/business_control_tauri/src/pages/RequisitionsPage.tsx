@@ -87,7 +87,7 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
     try {
       const defaultBranchId = branches.length > 0 ? branches[0].id : '';
       if (defaultBranchId) {
-        const data = await api.getBranchRequisitions(defaultBranchId);
+        const data = await api.getBranchRequisitions(defaultBranchId, businessId);
         setRequisitions(data);
       }
     } catch (err: any) {
