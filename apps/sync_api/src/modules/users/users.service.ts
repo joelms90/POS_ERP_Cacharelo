@@ -93,10 +93,12 @@ export class UsersService {
       throw new BadRequestException('email and password are required for Business Control admins');
     }
 
+    const pin = createUserDto.pin || this.generateRandomPin();
+
     const newUser = await this.create({
       ...createUserDto,
       branchId: undefined,
-      pin: createUserDto.pin || '0000',
+      pin,
     });
     await this.usersRepository.replaceAdminAccess(
       newUser.id,
@@ -296,6 +298,10 @@ export class UsersService {
       });
     }
     return Array.from(unique.values());
+  }
+
+  private generateRandomPin(): string {
+    return String(Math.floor(1000 + Math.random() * 9000));
   }
 
   private normalizeRoles(roles?: unknown, fallbackRole?: string): UserRole[] {
