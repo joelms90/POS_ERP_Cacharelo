@@ -59,7 +59,7 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const isApprover = userRole === 'owner' || userRole === 'inventory_admin';
+  const isApprover = userRole === 'owner' || userRole === 'inventory_admin' || userRole === 'support_tech';
 
   const fetchData = useCallback(async () => {
     setLoading(true);

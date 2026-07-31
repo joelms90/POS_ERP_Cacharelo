@@ -5,8 +5,8 @@ export interface Employee {
   name: string;
   email?: string;
   pin: string;
-  role: 'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'encargado' | 'empleado' | 'owner' | 'inventory_admin';
-  roles?: Array<'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'encargado' | 'empleado' | 'owner' | 'inventory_admin'>;
+  role: 'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'encargado' | 'empleado' | 'owner' | 'inventory_admin' | 'support_tech';
+  roles?: Array<'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'encargado' | 'empleado' | 'owner' | 'inventory_admin' | 'support_tech'>;
 }
 
 export interface AdminUser {
@@ -14,8 +14,8 @@ export interface AdminUser {
   businessId?: string;
   name: string;
   email: string;
-  role: 'owner' | 'inventory_admin';
-  businessAccess: Array<{ businessId: string; role: 'owner' | 'inventory_admin' }>;
+  role: 'owner' | 'inventory_admin' | 'support_tech';
+  businessAccess: Array<{ businessId: string; role: 'owner' | 'inventory_admin' | 'support_tech' }>;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -26,8 +26,8 @@ export interface AuthUser {
   branchId?: string;
   name: string;
   email?: string;
-  role: 'owner' | 'inventory_admin' | 'admin' | 'waiter' | 'cashier' | 'kitchen' | 'vendedor' | 'encargado' | 'empleado';
-  businessAccess?: Array<{ businessId: string; role: 'owner' | 'inventory_admin' }>;
+  role: 'owner' | 'inventory_admin' | 'support_tech' | 'admin' | 'waiter' | 'cashier' | 'kitchen' | 'vendedor' | 'encargado' | 'empleado';
+  businessAccess?: Array<{ businessId: string; role: 'owner' | 'inventory_admin' | 'support_tech' }>;
 }
 
 export interface Warehouse {
@@ -428,8 +428,8 @@ export const api = {
     name: string;
     email: string;
     password: string;
-    role: 'owner' | 'inventory_admin';
-    businessAccess?: Array<{ businessId: string; role: 'owner' | 'inventory_admin' }>;
+    role: 'owner' | 'inventory_admin' | 'support_tech';
+    businessAccess?: Array<{ businessId: string; role: 'owner' | 'inventory_admin' | 'support_tech' }>;
   }): Promise<AdminUser> {
     return apiRequest<AdminUser>('/admin-users', {
       method: 'POST',

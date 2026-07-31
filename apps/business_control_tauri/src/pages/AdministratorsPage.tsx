@@ -9,7 +9,7 @@ interface AdministratorsPageProps {
   businessId: string;
 }
 
-type AdminRole = 'owner' | 'inventory_admin';
+type AdminRole = 'owner' | 'inventory_admin' | 'support_tech';
 
 const businessOptions = [
   { id: 'd3b07384-d113-4a0e-a555-e5b12824bf01', name: 'Cafetería' },
@@ -21,8 +21,11 @@ const businessOptions = [
 const businessName = (id: string) =>
   businessOptions.find((business) => business.id === id)?.name || id.slice(0, 8);
 
-const roleLabel = (role: AdminRole) =>
-  role === 'owner' ? 'Owner' : 'Soporte Técnico';
+const roleLabel = (role: AdminRole) => {
+  if (role === 'owner') return 'Owner';
+  if (role === 'support_tech') return 'Soporte Técnico';
+  return 'Administrador de Inventario';
+};
 
 export const AdministratorsPage: React.FC<AdministratorsPageProps> = ({ businessId }) => {
   const [admins, setAdmins] = useState<AdminUser[]>([]);
@@ -212,7 +215,8 @@ export const AdministratorsPage: React.FC<AdministratorsPageProps> = ({ business
               disabled={saving}
               className="px-3 py-2 bg-charcoal-surface text-text-primary border border-aged-bronze/40 focus:border-champagne-gold rounded text-sm focus:outline-none"
             >
-              <option value="inventory_admin">Soporte Técnico</option>
+              <option value="inventory_admin">Administrador de Inventario</option>
+              <option value="support_tech">Soporte Técnico</option>
               <option value="owner">Owner</option>
             </select>
           </label>

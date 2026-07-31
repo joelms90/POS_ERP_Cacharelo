@@ -447,7 +447,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
               <select
                 value={activeBusinessId}
                 onChange={(e) => onBusinessChange(e.target.value)}
-                disabled={currentUser?.role === 'inventory_admin' && businessOptions.length <= 1}
+                disabled={currentUser?.role === 'inventory_admin' && businessOptions.length <= 1 || currentUser?.role === 'support_tech' && businessOptions.length <= 1}
                 className="bg-transparent text-xs text-champagne-gold font-sans font-medium focus:outline-none cursor-pointer hover:text-champagne-gold/80 transition-colors"
               >
                 {businessOptions.map((option) => (
