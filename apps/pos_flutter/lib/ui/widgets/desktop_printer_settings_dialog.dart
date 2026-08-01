@@ -19,25 +19,11 @@ class _DesktopPrinterSettingsDialogState
   List<Printer> _printers = [];
   bool _isLoading = false;
   String? _errorMessage;
-  Printer? _selectedPrinter;
 
   @override
   void initState() {
     super.initState();
     _loadPrinters();
-    _loadSavedPrinter();
-  }
-
-  Future<void> _loadSavedPrinter() async {
-    final savedPrinterName = widget.state.connectedPrinterName;
-    if (savedPrinterName != null) {
-      setState(() {
-        _selectedPrinter = Printer(
-          url: savedPrinterName,
-          name: savedPrinterName,
-        );
-      });
-    }
   }
 
   Future<void> _loadPrinters() async {
@@ -75,22 +61,11 @@ class _DesktopPrinterSettingsDialogState
         ),
       ),
     );
-
-    if (success) {
-      setState(() {
-        _selectedPrinter = printer;
-      });
-    }
   }
 
   Future<void> _handleDisconnect() async {
     await widget.state.disconnectPrinter();
     if (!mounted) return;
-
-    setState(() {
-      _selectedPrinter = null;
-    });
-
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         backgroundColor: EmpireColors.successGreen,
@@ -261,6 +236,11 @@ class _DesktopPrinterSettingsDialogState
                   const SizedBox(height: 16),
                 ],
 
+                if (isConnected) ...[
+                  _buildReceiveRemoteJobsSwitch(),
+                  const SizedBox(height: 16),
+                ],
+
                 // Info banner
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -372,9 +352,8 @@ class _DesktopPrinterSettingsDialogState
                                     ),
                                   ),
                                   child: ListTile(
-                                    contentPadding:
-                                        const EdgeInsets.symmetric(
-                                            horizontal: 16, vertical: 4),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 4),
                                     leading: Icon(
                                       printer.isDefault
                                           ? Icons.star
@@ -408,8 +387,7 @@ class _DesktopPrinterSettingsDialogState
                                               foregroundColor:
                                                   EmpireColors.errorRed,
                                               side: const BorderSide(
-                                                  color:
-                                                      EmpireColors.errorRed),
+                                                  color: EmpireColors.errorRed),
                                               padding:
                                                   const EdgeInsets.symmetric(
                                                       horizontal: 12),
@@ -455,6 +433,50 @@ class _DesktopPrinterSettingsDialogState
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildReceiveRemoteJobsSwitch() {
+    final canUse = widget.state.isTerminalConfigured &&
+        widget.state.currentUserRole != UserRole.none;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: EmpireColors.onyxSurface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: widget.state.receiveRemotePrintJobs
+              ? EmpireColors.successGreen.withOpacity(0.5)
+              : EmpireColors.agedBronzeDark,
+        ),
+      ),
+      child: SwitchListTile(
+        value: widget.state.receiveRemotePrintJobs,
+        onChanged: canUse ? widget.state.setReceiveRemotePrintJobs : null,
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        activeColor: EmpireColors.successGreen,
+        title: const Text(
+          'Recibir comandas de otros dispositivos',
+          style: TextStyle(
+            color: EmpireColors.textPrimary,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+        ),
+        subtitle: Text(
+          canUse
+              ? (widget.state.receiveRemotePrintJobs
+                  ? 'Esta caja está disponible para imprimir comandas.'
+                  : 'Actívalo para que meseros puedan elegir esta caja.')
+              : 'Configura la sucursal e inicia sesión para activar esta estación.',
+          style: const TextStyle(
+            color: EmpireColors.textSecondary,
+            fontSize: 11,
+          ),
+        ),
       ),
     );
   }

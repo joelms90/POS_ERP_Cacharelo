@@ -11,12 +11,14 @@ class BluetoothSettingsDialog extends StatefulWidget {
   const BluetoothSettingsDialog({super.key, required this.state});
 
   @override
-  State<BluetoothSettingsDialog> createState() => _BluetoothSettingsDialogState();
+  State<BluetoothSettingsDialog> createState() =>
+      _BluetoothSettingsDialogState();
 }
 
 class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
   List<BluetoothInfo> _devices = [];
   bool _isScanning = false;
+  bool _isRefreshingStations = false;
   bool _isBluetoothEnabled = false;
   bool _hasPermissions = false;
   String? _errorMessage;
@@ -25,6 +27,35 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
   void initState() {
     super.initState();
     _checkStatusAndScan();
+    _refreshPrintStations();
+  }
+
+  Future<void> _refreshPrintStations({bool showError = false}) async {
+    setState(() => _isRefreshingStations = true);
+    final success = await widget.state.refreshOnlinePrintStations();
+    if (!mounted) return;
+    setState(() => _isRefreshingStations = false);
+
+    if (showError && !success && widget.state.onlinePrintStations.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: EmpireColors.warningOrange,
+          content: Text('No se pudieron consultar las cajas disponibles.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _selectPrintStation(PrintStation station) async {
+    await widget.state.saveLastSelectedPrintStation(station.stationId);
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: EmpireColors.successGreen,
+        content: Text('Caja seleccionada: ${station.deviceName}'),
+      ),
+    );
   }
 
   Future<void> _checkStatusAndScan() async {
@@ -35,7 +66,8 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
 
     try {
       // 1. Check/Request permissions on Android
-      bool permissionGranted = await PrintBluetoothThermal.isPermissionBluetoothGranted;
+      bool permissionGranted =
+          await PrintBluetoothThermal.isPermissionBluetoothGranted;
       if (!permissionGranted && Platform.isAndroid) {
         final statusConnect = await Permission.bluetoothConnect.request();
         final statusScan = await Permission.bluetoothScan.request();
@@ -46,7 +78,8 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
       if (!permissionGranted) {
         setState(() {
           _isScanning = false;
-          _errorMessage = 'Permisos de Bluetooth no concedidos. Por favor, permítelos en la configuración.';
+          _errorMessage =
+              'Permisos de Bluetooth no concedidos. Por favor, permítelos en la configuración.';
         });
         return;
       }
@@ -60,29 +93,34 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
       if (!bluetoothOn) {
         setState(() {
           _isScanning = false;
-          _errorMessage = 'El Bluetooth está apagado. Por favor, enciéndalo en su dispositivo.';
+          _errorMessage =
+              'El Bluetooth está apagado. Por favor, enciéndalo en su dispositivo.';
         });
         return;
       }
 
       // 3. Scan/Fetch paired devices
-      final List<BluetoothInfo> list = await PrintBluetoothThermal.pairedBluetooths;
+      final List<BluetoothInfo> list =
+          await PrintBluetoothThermal.pairedBluetooths;
       setState(() {
         _devices = list;
         _isScanning = false;
       });
     } catch (e) {
-      final isMissingPlugin = e.toString().contains('MissingPluginException') || 
-                              e.toString().contains('No implementation found');
+      final isMissingPlugin = e.toString().contains('MissingPluginException') ||
+          e.toString().contains('No implementation found');
       if (isMissingPlugin) {
         setState(() {
           _devices = [
-            BluetoothInfo(name: 'Impresora M58-LL (Simulada)', macAdress: '00:11:22:33:44:55'),
+            BluetoothInfo(
+                name: 'Impresora M58-LL (Simulada)',
+                macAdress: '00:11:22:33:44:55'),
           ];
           _hasPermissions = true;
           _isBluetoothEnabled = true;
           _isScanning = false;
-          _errorMessage = 'Entorno de simulador o canal no implementado. Se habilitó una Impresora M58-LL Simulada para pruebas. (Nota: Si es un dispositivo real, detenga la app y ejecute un build completo/reconstrucción).';
+          _errorMessage =
+              'Entorno de simulador o canal no implementado. Se habilitó una Impresora M58-LL Simulada para pruebas. (Nota: Si es un dispositivo real, detenga la app y ejecute un build completo/reconstrucción).';
         });
       } else {
         setState(() {
@@ -94,12 +132,14 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
   }
 
   Future<void> _handleConnect(BluetoothInfo device) async {
-    final success = await widget.state.connectToPrinter(device.macAdress, device.name);
+    final success =
+        await widget.state.connectToPrinter(device.macAdress, device.name);
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: success ? EmpireColors.successGreen : EmpireColors.errorRed,
+        backgroundColor:
+            success ? EmpireColors.successGreen : EmpireColors.errorRed,
         content: Text(
           success
               ? 'Conectado exitosamente a ${device.name}'
@@ -127,14 +167,22 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
     final printJob = PrintJob(
       id: 'test_${DateTime.now().millisecondsSinceEpoch}',
       title: 'Prueba de Impresión',
-      details: widget.state.formatCenter('*** TICKET DE PRUEBA ***') + '\n' +
-               widget.state.formatCenter('M58-LL THERMAL PRINTER') + '\n' +
-               widget.state.formatDivider() + '\n' +
-               widget.state.formatRow('Estado:', 'ONLINE') + '\n' +
-               widget.state.formatRow('Conectado a:', widget.state.connectedPrinterName ?? 'Impresora') + '\n' +
-               widget.state.formatDivider() + '\n' +
-               widget.state.formatCenter('Conexión Bluetooth Exitosa!') + '\n' +
-               widget.state.formatCenter(DateTime.now().toString().substring(0, 19)),
+      details: widget.state.formatCenter('*** TICKET DE PRUEBA ***') +
+          '\n' +
+          widget.state.formatCenter('M58-LL THERMAL PRINTER') +
+          '\n' +
+          widget.state.formatDivider() +
+          '\n' +
+          widget.state.formatRow('Estado:', 'ONLINE') +
+          '\n' +
+          widget.state.formatRow('Conectado a:',
+              widget.state.connectedPrinterName ?? 'Impresora') +
+          '\n' +
+          widget.state.formatDivider() +
+          '\n' +
+          widget.state.formatCenter('Conexión Bluetooth Exitosa!') +
+          '\n' +
+          widget.state.formatCenter(DateTime.now().toString().substring(0, 19)),
       target: 'Caja',
       timestamp: DateTime.now(),
     );
@@ -145,7 +193,8 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
     final wasPrinted = printJob.status == 'printed';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: wasPrinted ? EmpireColors.successGreen : EmpireColors.errorRed,
+        backgroundColor:
+            wasPrinted ? EmpireColors.successGreen : EmpireColors.errorRed,
         content: Text(
           wasPrinted
               ? '¡Ticket de prueba enviado a la impresora!'
@@ -169,7 +218,7 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
           final isConnected = widget.state.connectedPrinterMac != null;
 
           return Container(
-            constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+            constraints: const BoxConstraints(maxWidth: 520, maxHeight: 720),
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -200,13 +249,15 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(EmpireColors.champagneGold),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              EmpireColors.champagneGold),
                         ),
                       )
                     else
                       IconButton(
                         onPressed: _checkStatusAndScan,
-                        icon: const Icon(Icons.refresh, color: EmpireColors.champagneGold),
+                        icon: const Icon(Icons.refresh,
+                            color: EmpireColors.champagneGold),
                         tooltip: 'Buscar Dispositivos',
                       ),
                   ],
@@ -220,11 +271,13 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
                     decoration: BoxDecoration(
                       color: EmpireColors.successGreen.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: EmpireColors.successGreen.withOpacity(0.5)),
+                      border: Border.all(
+                          color: EmpireColors.successGreen.withOpacity(0.5)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.check_circle, color: EmpireColors.successGreen, size: 20),
+                        const Icon(Icons.check_circle,
+                            color: EmpireColors.successGreen, size: 20),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
@@ -250,18 +303,25 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
                           ),
                         ),
                         ElevatedButton(
-                          onPressed: widget.state.isConnectingPrinter ? null : _handleTestPrint,
+                          onPressed: widget.state.isConnectingPrinter
+                              ? null
+                              : _handleTestPrint,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: EmpireColors.champagneGold,
                             foregroundColor: EmpireColors.obsidian,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 8),
                             minimumSize: Size.zero,
                           ),
-                          child: const Text('PROBAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          child: const Text('PROBAR',
+                              style: TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  _buildReceiveRemoteJobsSwitch(),
                   const SizedBox(height: 16),
                 ],
 
@@ -272,16 +332,19 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
                     decoration: BoxDecoration(
                       color: EmpireColors.errorRed.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: EmpireColors.errorRed.withOpacity(0.5)),
+                      border: Border.all(
+                          color: EmpireColors.errorRed.withOpacity(0.5)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline, color: EmpireColors.errorRed, size: 20),
+                        const Icon(Icons.error_outline,
+                            color: EmpireColors.errorRed, size: 20),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: const TextStyle(color: EmpireColors.textPrimary, fontSize: 12),
+                            style: const TextStyle(
+                                color: EmpireColors.textPrimary, fontSize: 12),
                           ),
                         ),
                       ],
@@ -289,6 +352,9 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
                   ),
                   const SizedBox(height: 16),
                 ],
+
+                _buildPrintStationSection(),
+                const SizedBox(height: 16),
 
                 // Device List Title
                 const Text(
@@ -307,7 +373,8 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
                   child: _isScanning
                       ? const Center(
                           child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(EmpireColors.champagneGold),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                EmpireColors.champagneGold),
                           ),
                         )
                       : (_devices.isEmpty
@@ -317,69 +384,103 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
                                     ? 'No se encontraron dispositivos vinculados.\nPor favor vincule su impresora M58-LL en los ajustes del sistema.'
                                     : 'Bluetooth inactivo o sin permisos.',
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(color: EmpireColors.textSecondary, fontSize: 13),
+                                style: const TextStyle(
+                                    color: EmpireColors.textSecondary,
+                                    fontSize: 13),
                               ),
                             )
                           : ListView.builder(
                               itemCount: _devices.length,
                               itemBuilder: (context, index) {
                                 final device = _devices[index];
-                                final isCurrent = widget.state.connectedPrinterMac == device.macAdress;
+                                final isCurrent =
+                                    widget.state.connectedPrinterMac ==
+                                        device.macAdress;
 
                                 return Card(
                                   color: EmpireColors.charcoalSurface,
-                                  margin: const EdgeInsets.symmetric(vertical: 6),
+                                  margin:
+                                      const EdgeInsets.symmetric(vertical: 6),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                     side: BorderSide(
-                                      color: isCurrent ? EmpireColors.champagneGold : EmpireColors.agedBronzeDark,
+                                      color: isCurrent
+                                          ? EmpireColors.champagneGold
+                                          : EmpireColors.agedBronzeDark,
                                       width: isCurrent ? 1.5 : 1,
                                     ),
                                   ),
                                   child: ListTile(
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 4),
                                     title: Text(
                                       device.name,
                                       style: TextStyle(
-                                        color: isCurrent ? EmpireColors.champagneGold : EmpireColors.textPrimary,
+                                        color: isCurrent
+                                            ? EmpireColors.champagneGold
+                                            : EmpireColors.textPrimary,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
                                       ),
                                     ),
                                     subtitle: Text(
                                       device.macAdress,
-                                      style: const TextStyle(color: EmpireColors.textSecondary, fontSize: 11),
+                                      style: const TextStyle(
+                                          color: EmpireColors.textSecondary,
+                                          fontSize: 11),
                                     ),
                                     trailing: isCurrent
                                         ? OutlinedButton(
-                                            onPressed: widget.state.isConnectingPrinter ? null : _handleDisconnect,
+                                            onPressed:
+                                                widget.state.isConnectingPrinter
+                                                    ? null
+                                                    : _handleDisconnect,
                                             style: OutlinedButton.styleFrom(
-                                              foregroundColor: EmpireColors.errorRed,
-                                              side: const BorderSide(color: EmpireColors.errorRed),
-                                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                                              foregroundColor:
+                                                  EmpireColors.errorRed,
+                                              side: const BorderSide(
+                                                  color: EmpireColors.errorRed),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 12),
                                             ),
-                                            child: const Text('DESCONECTAR', style: TextStyle(fontSize: 11)),
+                                            child: const Text('DESCONECTAR',
+                                                style: TextStyle(fontSize: 11)),
                                           )
                                         : ElevatedButton(
-                                            onPressed: widget.state.isConnectingPrinter
+                                            onPressed: widget
+                                                    .state.isConnectingPrinter
                                                 ? null
                                                 : () => _handleConnect(device),
                                             style: ElevatedButton.styleFrom(
-                                              backgroundColor: EmpireColors.agedBronze,
-                                              foregroundColor: EmpireColors.textPrimary,
-                                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                                              backgroundColor:
+                                                  EmpireColors.agedBronze,
+                                              foregroundColor:
+                                                  EmpireColors.textPrimary,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 16),
                                             ),
-                                            child: widget.state.isConnectingPrinter &&
-                                                    widget.state.connectedPrinterMac == device.macAdress
+                                            child: widget.state
+                                                        .isConnectingPrinter &&
+                                                    widget.state
+                                                            .connectedPrinterMac ==
+                                                        device.macAdress
                                                 ? const SizedBox(
                                                     width: 14,
                                                     height: 14,
-                                                    child: CircularProgressIndicator(
+                                                    child:
+                                                        CircularProgressIndicator(
                                                       strokeWidth: 2,
-                                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                      valueColor:
+                                                          AlwaysStoppedAnimation<
+                                                                  Color>(
+                                                              Colors.white),
                                                     ),
                                                   )
-                                                : const Text('CONECTAR', style: TextStyle(fontSize: 11)),
+                                                : const Text('CONECTAR',
+                                                    style: TextStyle(
+                                                        fontSize: 11)),
                                           ),
                                   ),
                                 );
@@ -397,12 +498,198 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     side: const BorderSide(color: EmpireColors.agedBronze),
                   ),
-                  child: const Text('CERRAR', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text('CERRAR',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildPrintStationSection() {
+    final stations = widget.state.onlinePrintStations;
+    final selectedStationId = widget.state.lastSelectedPrintStationId;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: EmpireColors.onyxSurface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: EmpireColors.agedBronzeDark),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.point_of_sale,
+                  color: EmpireColors.champagneGold, size: 18),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'CAJA PARA COMANDAS',
+                  style: TextStyle(
+                    color: EmpireColors.textGold,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: _isRefreshingStations
+                    ? null
+                    : () => _refreshPrintStations(showError: true),
+                icon: _isRefreshingStations
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              EmpireColors.champagneGold),
+                        ),
+                      )
+                    : const Icon(Icons.refresh,
+                        color: EmpireColors.champagneGold, size: 18),
+                tooltip: 'Actualizar cajas',
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (stations.isEmpty)
+            const Text(
+              'No hay cajas con impresora disponibles.',
+              style: TextStyle(color: EmpireColors.textSecondary, fontSize: 12),
+            )
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 150),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: stations.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final station = stations[index];
+                  final isSelected = station.stationId == selectedStationId;
+
+                  return InkWell(
+                    onTap: () => _selectPrintStation(station),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? EmpireColors.champagneGold.withOpacity(0.12)
+                            : EmpireColors.charcoalSurface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected
+                              ? EmpireColors.champagneGold
+                              : EmpireColors.agedBronzeDark,
+                          width: isSelected ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isSelected
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            color: isSelected
+                                ? EmpireColors.champagneGold
+                                : EmpireColors.textSecondary,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  station.deviceName,
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? EmpireColors.champagneGold
+                                        : EmpireColors.textPrimary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  station.operatorName?.isNotEmpty == true
+                                      ? '${station.operatorName} - ${station.printerName}'
+                                      : station.printerName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: EmpireColors.textSecondary,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.wifi,
+                              color: EmpireColors.successGreen, size: 16),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReceiveRemoteJobsSwitch() {
+    final canUse = widget.state.isTerminalConfigured &&
+        widget.state.currentUserRole != UserRole.none;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: EmpireColors.onyxSurface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: widget.state.receiveRemotePrintJobs
+              ? EmpireColors.successGreen.withOpacity(0.5)
+              : EmpireColors.agedBronzeDark,
+        ),
+      ),
+      child: SwitchListTile(
+        value: widget.state.receiveRemotePrintJobs,
+        onChanged: canUse ? widget.state.setReceiveRemotePrintJobs : null,
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        activeColor: EmpireColors.successGreen,
+        title: const Text(
+          'Recibir comandas de otros dispositivos',
+          style: TextStyle(
+            color: EmpireColors.textPrimary,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+        ),
+        subtitle: Text(
+          canUse
+              ? (widget.state.receiveRemotePrintJobs
+                  ? 'Este dispositivo está disponible para imprimir comandas.'
+                  : 'Actívalo para usar esta impresora como estación.')
+              : 'Configura la sucursal e inicia sesión para activar esta estación.',
+          style: const TextStyle(
+            color: EmpireColors.textSecondary,
+            fontSize: 11,
+          ),
+        ),
       ),
     );
   }

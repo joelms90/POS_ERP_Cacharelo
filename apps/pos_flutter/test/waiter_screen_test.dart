@@ -102,7 +102,8 @@ void main() {
       // Open zone popup menu to verify zones exist
       await tester.tap(find.text('Salón Principal'));
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('Salón Principal'), findsNWidgets(2)); // Header + popup item
+      expect(find.text('Salón Principal'),
+          findsNWidgets(2)); // Header + popup item
       expect(find.text('Terraza'), findsOneWidget);
       expect(find.text('Bar'), findsOneWidget);
       // Close popup by tapping outside
@@ -406,9 +407,14 @@ void main() {
   testWidgets(
     'WaiterOrderingScreen does not double-print already sent items flow test',
     (WidgetTester tester) async {
-      final state = AppState();
+      final fakeStorage = FakeSecureStorage();
+      final secureStorageService = SecureStorageService(
+        secureStorage: fakeStorage,
+      );
+      final state = AppState(secureStorageService: secureStorageService);
       state.currentUserRole = UserRole.waiter;
       state.currentUserName = 'Juan (Mesero)';
+      await state.connectToPrinter('00:11:22:33:44:55', 'Test Printer');
 
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
@@ -439,8 +445,8 @@ void main() {
       await tester.tap(find.text('CONFIRMAR PEDIDO'));
       await tester.pumpAndSettle();
       expect(find.text('Confirmar Envío'), findsOneWidget);
-      expect(find.text('ENVIAR COMANDA (SIN IMPRIMIR)'), findsOneWidget);
-      await tester.tap(find.text('ENVIAR COMANDA (SIN IMPRIMIR)'));
+      expect(find.text('ENVIAR E IMPRIMIR COMANDA'), findsOneWidget);
+      await tester.tap(find.text('ENVIAR E IMPRIMIR COMANDA'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -472,8 +478,8 @@ void main() {
       await tester.tap(find.text('CONFIRMAR PEDIDO'));
       await tester.pumpAndSettle();
       expect(find.text('Confirmar Envío'), findsOneWidget);
-      expect(find.text('ENVIAR COMANDA (SIN IMPRIMIR)'), findsOneWidget);
-      await tester.tap(find.text('ENVIAR COMANDA (SIN IMPRIMIR)'));
+      expect(find.text('ENVIAR E IMPRIMIR COMANDA'), findsOneWidget);
+      await tester.tap(find.text('ENVIAR E IMPRIMIR COMANDA'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -544,6 +550,87 @@ void main() {
     expect(state.printJobs.first.details, contains('Mesa 1'));
     expect(state.printJobs.first.details, contains('Persona 1'));
     expect(state.printJobs.first.status, 'printed');
+
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+
+  testWidgets(
+      'WaiterOrderingScreen table checkout/cleaning and reuse clears cart items',
+      (
+    WidgetTester tester,
+  ) async {
+    final state = AppState();
+    state.currentUserRole = UserRole.waiter;
+    state.currentUserName = 'Juan (Mesero)';
+
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(
+          useMaterial3: true,
+          splashFactory: NoSplash.splashFactory,
+        ),
+        home: WaiterOrderingScreen(state: state),
+      ),
+    );
+
+    // 1. Select Mesa 1
+    await tester.tap(find.text('Mesa 1'));
+    await tester.pumpAndSettle();
+
+    // 2. Add Lasagna Bolognesa
+    await tester.tap(find.text('Lasagna Bolognesa'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('AGREGAR ÍTEM'));
+    await tester.pumpAndSettle();
+
+    // 3. Confirm/Submit order
+    await tester.tap(find.textContaining('VER COMANDA'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('CONFIRMAR PEDIDO'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ENVIAR COMANDA (SIN IMPRIMIR)'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Mesa 1 is now occupied. Let's verify it has 1 item.
+    final table1 = state.tables.firstWhere((t) => t.label == 'Mesa 1');
+    expect(table1.items.length, 1);
+
+    // 4. Pay the table (checkout)
+    state.checkoutTable(
+      table1.id,
+      discount: 0,
+      paymentMethod: 'Efectivo',
+      refCode: 'Efectivo',
+      cashReceived: 50.0,
+      cashChange: 0.0,
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Table should now be in cleaning state and have 0 items.
+    expect(table1.state, TableState.cleaning);
+    expect(table1.items.isEmpty, true);
+
+    // 5. Clean the table (Waiter marks as free by tapping it)
+    await tester.tap(find.text('Mesa 1'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Verify it changed to free
+    expect(table1.state, TableState.free);
+
+    // 6. Select Mesa 1 again
+    await tester.tap(find.text('Mesa 1'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // 7. Verify the new cart starts completely empty
+    expect(find.textContaining('VER COMANDA (0)'), findsOneWidget);
 
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();

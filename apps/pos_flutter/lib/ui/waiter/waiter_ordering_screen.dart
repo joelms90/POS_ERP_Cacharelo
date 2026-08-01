@@ -58,7 +58,10 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
       } else {
         // 2. Load the draft cart for the new table, or fall back to already synced items
         final String newKey = (table.id ?? table.label).toString();
-        if (_draftCarts.containsKey(newKey)) {
+        if (table.state == TableState.free || table.state == TableState.cleaning) {
+          _draftCarts.remove(newKey);
+          currentCart = [];
+        } else if (_draftCarts.containsKey(newKey)) {
           currentCart = List.from(_draftCarts[newKey]!);
         } else {
           currentCart = List.from(table.items);
@@ -152,6 +155,15 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
 
             final tablesInZone = widget.state.tables.where((t) => t.zone == selectedZone).toList();
             final categories = AppState.menu.map((item) => item.category).toSet().toList()..sort(_compareAlphabetically);
+            if (categories.isNotEmpty && !categories.contains(selectedMenuCategory)) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  setState(() {
+                    selectedMenuCategory = categories.first;
+                  });
+                }
+              });
+            }
 
             return Stack(
               children: [
@@ -171,6 +183,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                 ? _buildFloorMap(tablesInZone)
                                 : (isCartOpen
                                     ? CartSidebar(
+                                        state: widget.state,
                                         table: activeOrderingTable!,
                                         initialItems: currentCart,
                                         activeGenders: activeGenders,
@@ -206,22 +219,28 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                         onBackToMenu: () => setState(
                                           () => isCartOpen = false,
                                         ),
-                                        onConfirm: (finalItems, guests, shouldPrint) {
+                                        onConfirm: (finalItems, guests, printSelection) {
                                           widget.state.submitOrder(
                                             activeOrderingTable!.id,
                                             finalItems,
                                             guests,
                                             activeGenders,
-                                            printComanda: shouldPrint,
+                                            printMode: printSelection.mode,
+                                            targetStationId: printSelection.stationId,
                                           );
 
+                                          final printMessage = printSelection.mode == ComandaPrintMode.none
+                                              ? 'Comanda enviada.'
+                                              : printSelection.mode == ComandaPrintMode.local
+                                                  ? 'Comanda enviada e imprimiendo...'
+                                                  : 'Comanda enviada a caja para impresión.';
                                           ScaffoldMessenger.of(
                                             context,
                                           ).showSnackBar(
                                             SnackBar(
                                               backgroundColor: EmpireColors.successGreen,
                                               content: Text(
-                                                shouldPrint ? '¡Pedido confirmado para la ${activeOrderingTable!.label}! Comanda enviada e imprimiendo...' : '¡Pedido confirmado para la ${activeOrderingTable!.label}! Comanda enviada.',
+                                                '¡Pedido confirmado para la ${activeOrderingTable!.label}! $printMessage',
                                                 style: const TextStyle(
                                                   fontWeight: FontWeight.bold,
                                                 ),
@@ -492,6 +511,9 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                 ),
               ],
 
+              const SizedBox(width: 8),
+              _buildReadyOrdersHeaderButton(context),
+
               const SizedBox(width: 12),
 
               // --- Divider ---
@@ -508,14 +530,6 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                 widget.state.isOnline ? Icons.wifi : Icons.wifi_off,
                 color: widget.state.isOnline ? EmpireColors.successGreen : EmpireColors.warningOrange,
                 size: 20,
-              ),
-              const SizedBox(width: 12),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                icon: const Icon(Icons.sync, color: EmpireColors.textGold, size: 20),
-                tooltip: 'Sincronizar Datos',
-                onPressed: () => _triggerSync(context),
               ),
               if (!widget.state.isOnline) ...[
                 const SizedBox(width: 8),
@@ -606,9 +620,32 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                         context: context,
                         builder: (context) => PrinterSettingsDialog(state: widget.state),
                       );
+                    } else if (value == 'sync') {
+                      _triggerSync(context);
                     }
                   },
                   itemBuilder: (BuildContext context) => [
+                    const PopupMenuItem<String>(
+                      value: 'sync',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.sync,
+                            color: EmpireColors.champagneGold,
+                            size: 18,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Sincronizar Datos',
+                            style: TextStyle(
+                              color: EmpireColors.textPrimary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(height: 1),
                     const PopupMenuItem<String>(
                       value: 'printer',
                       child: Row(
@@ -1833,6 +1870,182 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildReadyOrdersHeaderButton(BuildContext context) {
+    final readyOrders = widget.state.kitchenOrders
+        .where((o) => o.status == 'ready')
+        .toList();
+
+    final count = readyOrders.length;
+
+    return Stack(
+      children: [
+        IconButton(
+          icon: Icon(
+            Icons.room_service,
+            color: count > 0 ? EmpireColors.successGreen : EmpireColors.textSecondary,
+          ),
+          tooltip: 'Pedidos Listos para Entregar',
+          onPressed: () => _showReadyOrdersDialog(context),
+        ),
+        if (count > 0)
+          Positioned(
+            right: 4,
+            top: 4,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: EmpireColors.successGreen,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 16,
+                minHeight: 16,
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _showReadyOrdersDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return ListenableBuilder(
+          listenable: widget.state,
+          builder: (context, _) {
+            final readyOrders = widget.state.kitchenOrders
+                .where((o) => o.status == 'ready')
+                .toList();
+
+            return AlertDialog(
+              backgroundColor: EmpireColors.onyxSurface,
+              surfaceTintColor: Colors.transparent,
+              title: const Row(
+                children: [
+                  Icon(Icons.room_service, color: EmpireColors.successGreen),
+                  SizedBox(width: 10),
+                  Text(
+                    'Pedidos Listos para Entregar',
+                    style: TextStyle(
+                      color: EmpireColors.champagneGold,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 480,
+                child: readyOrders.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle_outline, color: EmpireColors.textSecondary, size: 48),
+                            SizedBox(height: 12),
+                            Text(
+                              'No hay pedidos pendientes de entregar.',
+                              style: TextStyle(color: EmpireColors.textSecondary, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: readyOrders.length,
+                        separatorBuilder: (_, __) => const Divider(color: EmpireColors.agedBronzeDark),
+                        itemBuilder: (context, idx) {
+                          final order = readyOrders[idx];
+                          final isBarra = order.station == 'barra';
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            order.tableLabel,
+                                            style: const TextStyle(
+                                              color: EmpireColors.champagneGold,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: isBarra ? Colors.cyan.withOpacity(0.2) : Colors.amber.withOpacity(0.2),
+                                              borderRadius: BorderRadius.circular(4),
+                                              border: Border.all(color: isBarra ? Colors.cyan : Colors.amber, width: 0.8),
+                                            ),
+                                            child: Text(
+                                              isBarra ? '🍹 BARRA' : '🍳 COCINA',
+                                              style: TextStyle(
+                                                color: isBarra ? Colors.cyan : Colors.amber,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        order.items.map((i) => '${i.quantity}x ${i.item.name}').join(', '),
+                                        style: const TextStyle(color: EmpireColors.textPrimary, fontSize: 13),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                ElevatedButton.icon(
+                                  icon: const Icon(Icons.check, size: 16, color: Colors.white),
+                                  label: const Text('ENTREGADO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: EmpireColors.successGreen,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                  onPressed: () {
+                                    widget.state.updateKitchenOrderStatus(order.id, 'served');
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Cerrar', style: TextStyle(color: EmpireColors.textSecondary)),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

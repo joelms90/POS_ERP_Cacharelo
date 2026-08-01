@@ -11,16 +11,34 @@ import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../services/secure_storage_service.dart';
+import '../../models/local_requisition.dart';
 import 'sync_socket_service.dart';
 
 enum TableState { free, occupied, billing, cleaning }
 
 enum TableShape { circle, square }
 
-enum UserRole { waiter, cashier, kitchen, none }
+enum UserRole { waiter, cashier, kitchen, encargado, responsable, none }
 
 const double ivaRate = 0.16;
 const double ivaFactor = 1 + ivaRate;
+
+// Model for tracking individual partial payments
+class PartialPayment {
+  final double amount;
+  final String paymentMethod;
+  final String refCode;
+  final DateTime timestamp;
+  final String description; // e.g., "Pago 1 de 3" or "Artículos: Café, Pan"
+
+  PartialPayment({
+    required this.amount,
+    required this.paymentMethod,
+    required this.refCode,
+    required this.timestamp,
+    required this.description,
+  });
+}
 
 class TableModel {
   final int id;
@@ -36,6 +54,13 @@ class TableModel {
   double discountPercentage;
   List<String>
       guestGenders; // Tracks genders of guests: 'M' (Male), 'F' (Female), 'K' (Kid)
+  List<PartialPayment>
+      partialPayments; // Track partial payments for final ticket
+
+  // Payment session state (persists across widget rebuilds)
+  String? activePaymentType; // 'simple', 'equalSplit', 'byItems'
+  int paymentsMadeInSession; // Number of partial payments made
+  int? originalSplitCountInSession; // Original split count (for equal split)
 
   TableModel({
     required this.id,
@@ -50,6 +75,10 @@ class TableModel {
     this.guests = 0,
     this.discountPercentage = 0.0,
     this.guestGenders = const ['M'],
+    this.partialPayments = const [],
+    this.activePaymentType,
+    this.paymentsMadeInSession = 0,
+    this.originalSplitCountInSession,
   });
 
   double get subtotal => double.parse(items
@@ -74,6 +103,7 @@ class TableModel {
     int? guests,
     double? discountPercentage,
     List<String>? guestGenders,
+    List<PartialPayment>? partialPayments,
   }) {
     return TableModel(
       id: id,
@@ -88,6 +118,7 @@ class TableModel {
       guests: guests ?? this.guests,
       discountPercentage: discountPercentage ?? this.discountPercentage,
       guestGenders: guestGenders ?? List.from(this.guestGenders),
+      partialPayments: partialPayments ?? List.from(this.partialPayments),
     );
   }
 }
@@ -117,6 +148,7 @@ class OrderItem {
   String notes;
   String? assignedGuest; // e.g. 'P1'
   bool isSent;
+  String? remoteId;
 
   OrderItem({
     required this.item,
@@ -125,6 +157,7 @@ class OrderItem {
     this.notes = '',
     this.assignedGuest,
     this.isSent = false,
+    this.remoteId,
   });
 
   double get totalPrice => double.parse(
@@ -138,6 +171,7 @@ class OrderItem {
     String? notes,
     String? assignedGuest,
     bool? isSent,
+    String? remoteId,
   }) {
     return OrderItem(
       item: item,
@@ -146,6 +180,7 @@ class OrderItem {
       notes: notes ?? this.notes,
       assignedGuest: assignedGuest ?? this.assignedGuest,
       isSent: isSent ?? this.isSent,
+      remoteId: remoteId ?? this.remoteId,
     );
   }
 }
@@ -156,6 +191,7 @@ class KitchenOrder {
   final List<OrderItem> items;
   final DateTime timestamp;
   String status; // 'pending', 'preparing', 'ready', 'served'
+  final String station; // 'cocina', 'barra'
 
   KitchenOrder({
     required this.id,
@@ -163,6 +199,7 @@ class KitchenOrder {
     required this.items,
     required this.timestamp,
     this.status = 'pending',
+    this.station = 'cocina',
   });
 }
 
@@ -182,6 +219,125 @@ class PrintJob {
     this.status = 'queued',
     required this.timestamp,
   });
+}
+
+enum ComandaPrintMode { none, local, remoteStation }
+
+class ComandaPrintSelection {
+  final ComandaPrintMode mode;
+  final String? stationId;
+
+  const ComandaPrintSelection({
+    required this.mode,
+    this.stationId,
+  });
+
+  static const none = ComandaPrintSelection(mode: ComandaPrintMode.none);
+  static const local = ComandaPrintSelection(mode: ComandaPrintMode.local);
+}
+
+class PrintStation {
+  final String stationId;
+  final String deviceName;
+  final String? operatorId;
+  final String? operatorName;
+  final String printerName;
+  final UserRole role;
+  final DateTime lastSeenAt;
+  final bool canPrintComandas;
+  final bool online;
+
+  const PrintStation({
+    required this.stationId,
+    required this.deviceName,
+    this.operatorId,
+    this.operatorName,
+    required this.printerName,
+    required this.role,
+    required this.lastSeenAt,
+    required this.canPrintComandas,
+    required this.online,
+  });
+
+  factory PrintStation.fromJson(Map<String, dynamic> json) {
+    final lastSeenAt =
+        DateTime.tryParse(json['lastSeenAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+    final rawOnline = json['online'];
+    final inferredOnline = DateTime.now().difference(lastSeenAt).inSeconds < 60;
+    return PrintStation(
+      stationId: json['stationId']?.toString() ?? json['id']?.toString() ?? '',
+      deviceName: json['deviceName']?.toString() ?? 'Caja',
+      operatorId: json['operatorId']?.toString(),
+      operatorName: json['operatorName']?.toString(),
+      printerName: json['printerName']?.toString() ?? '',
+      role: _roleFromJson(json['role']?.toString()),
+      lastSeenAt: lastSeenAt,
+      canPrintComandas: json['canPrintComandas'] != false,
+      online: rawOnline is bool ? rawOnline : inferredOnline,
+    );
+  }
+
+  Map<String, dynamic> toJson({
+    required String branchId,
+  }) =>
+      {
+        'stationId': stationId,
+        'branchId': branchId,
+        'deviceName': deviceName,
+        'role': role.name,
+        'operatorId': operatorId,
+        'operatorName': operatorName,
+        'printerName': printerName,
+        'canPrintComandas': canPrintComandas,
+        'lastSeenAt': lastSeenAt.toUtc().toIso8601String(),
+      };
+
+  static UserRole _roleFromJson(String? role) {
+    switch ((role ?? '').toLowerCase()) {
+      case 'cashier':
+        return UserRole.cashier;
+      case 'encargado':
+        return UserRole.encargado;
+      case 'responsable':
+        return UserRole.responsable;
+      case 'waiter':
+        return UserRole.waiter;
+      case 'kitchen':
+        return UserRole.kitchen;
+      default:
+        return UserRole.none;
+    }
+  }
+}
+
+class RemotePrintJob {
+  final String id;
+  final String targetStationId;
+  final String title;
+  final String details;
+  final String target;
+  final String status;
+
+  const RemotePrintJob({
+    required this.id,
+    required this.targetStationId,
+    required this.title,
+    required this.details,
+    required this.target,
+    required this.status,
+  });
+
+  factory RemotePrintJob.fromJson(Map<String, dynamic> json) {
+    return RemotePrintJob(
+      id: json['id']?.toString() ?? '',
+      targetStationId: json['targetStationId']?.toString() ?? '',
+      title: json['title']?.toString() ?? 'Impresion remota',
+      details: json['details']?.toString() ?? '',
+      target: json['target']?.toString() ?? 'Caja',
+      status: json['status']?.toString() ?? 'queued',
+    );
+  }
 }
 
 class TicketFiscalConfig {
@@ -298,6 +454,9 @@ class AppState extends ChangeNotifier {
   final Set<String> _pendingKitchenStatusUpdates = {};
   Timer? _kitchenSyncRetryTimer;
   int _kitchenSyncRetryCount = 0;
+  Timer? _printStationHeartbeatTimer;
+  Timer? _remotePrintPollingTimer;
+  final Set<String> _remotePrintJobsInFlight = {};
 
   // Notification queue (for alerts on waiter screen)
   List<String> readyNotifications = [];
@@ -316,33 +475,50 @@ class AppState extends ChangeNotifier {
   Map<String, Map<String, dynamic>> roomConfigs = {};
   TicketFiscalConfig ticketFiscalConfig = TicketFiscalConfig.defaults();
 
+  List<Map<String, dynamic>> cachedIngredients = [];
+  List<Map<String, dynamic>> cachedWarehouses = [];
+
   // Bluetooth printer connection state
   String? connectedPrinterMac;
   String? connectedPrinterName;
   bool isConnectingPrinter = false;
   Future<void>? initializationFuture;
+  String? localStationId;
+  List<PrintStation> onlinePrintStations = [];
+  String? lastSelectedPrintStationId;
+  bool receiveRemotePrintJobs = false;
 
   final SecureStorageService _secureStorageService;
+  SecureStorageService get secureStorageService => _secureStorageService;
 
   AppState({SecureStorageService? secureStorageService})
       : _secureStorageService = secureStorageService ?? SecureStorageService() {
     _initMockData();
     initializationFuture = () async {
+      localStationId = await _secureStorageService.getOrCreateLocalStationId();
+      lastSelectedPrintStationId =
+          await _secureStorageService.getLastPrintStationId();
+      receiveRemotePrintJobs =
+          await _secureStorageService.getReceiveRemotePrintJobs();
       await loadTerminalConfig();
       await loadTicketFiscalConfig();
       await _loadRecentClosedSales();
+      cachedIngredients = await _secureStorageService.getCachedIngredients();
+      cachedWarehouses = await _secureStorageService.getCachedWarehouses();
       if (isTerminalConfigured) {
         await _loadPendingSaleSyncJobs();
         await syncTicketSettings();
         await fetchMenuDynamic();
+        await syncWarehouses();
         await fetchTablesDynamic();
       } else {
         await _loadPendingSaleSyncJobs();
         await loadTablesFromJson();
       }
+      await _autoConnectPrinter();
+      _refreshPrintStationLifecycle();
     }();
     _seedDefaultUsersOffline();
-    _autoConnectPrinter();
   }
 
   Future<void> loadTerminalConfig() async {
@@ -422,6 +598,7 @@ class AppState extends ChangeNotifier {
     );
 
     await fetchMenuDynamic();
+    await syncWarehouses();
     await syncTicketSettings();
     notifyListeners();
   }
@@ -559,8 +736,10 @@ class AppState extends ChangeNotifier {
 
       try {
         await fetchMenuDynamic();
+        await syncWarehouses();
       } catch (e) {
-        debugPrint('syncAllData: fetchMenuDynamic failed with error: $e');
+        debugPrint(
+            'syncAllData: fetchMenuDynamic/syncWarehouses failed with error: $e');
         success = false;
       }
     }
@@ -1110,9 +1289,7 @@ class AppState extends ChangeNotifier {
 
         final List<MenuItem> loadedMenu = [];
         for (var prod in prodData) {
-          if (prod['isSellable'] != false &&
-              prod['isIngredient'] != true &&
-              prod['isActive'] != false) {
+          if (prod['isSellable'] == true && prod['isActive'] != false) {
             loadedMenu.add(
               MenuItem(
                 id: prod['id'],
@@ -1126,6 +1303,19 @@ class AppState extends ChangeNotifier {
           }
         }
 
+        final List<Map<String, dynamic>> ingredients = [];
+        for (var prod in prodData) {
+          if (prod['isIngredient'] == true && prod['isActive'] != false) {
+            ingredients.add({
+              'id': prod['id'],
+              'name': prod['name'],
+              'sku': prod['sku'] ?? '',
+            });
+          }
+        }
+        cachedIngredients = ingredients;
+        await _secureStorageService.saveCachedIngredients(ingredients);
+
         if (loadedMenu.isNotEmpty) {
           menu.clear();
           menu.addAll(loadedMenu);
@@ -1138,6 +1328,36 @@ class AppState extends ChangeNotifier {
       isOnline = false;
       notifyListeners();
     }
+  }
+
+  Future<bool> syncWarehouses() async {
+    if (!isTerminalConfigured) return false;
+    try {
+      final String baseUrl = terminalApiUrl ??
+          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      final String bId =
+          terminalBusinessId ?? 'd3b07384-d113-4a0e-a555-e5b12824bf01';
+      final response = await http
+          .get(Uri.parse('$baseUrl/warehouses?businessId=$bId'))
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        final List<Map<String, dynamic>> list = data
+            .map((item) => {
+                  'id': item['id'],
+                  'name': item['name'],
+                })
+            .toList();
+        cachedWarehouses = list;
+        await _secureStorageService.saveCachedWarehouses(list);
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Error syncing warehouses: $e');
+    }
+    return false;
   }
 
   Future<bool> syncActiveOrders({bool notify = true}) async {
@@ -1156,6 +1376,27 @@ class AppState extends ChangeNotifier {
       }
 
       final List<dynamic> activeOrders = jsonDecode(response.body);
+
+      // Check if there are active orders for tables not currently in local memory
+      bool hasUnknownTables = false;
+      for (final rawOrder in activeOrders) {
+        final order = Map<String, dynamic>.from(rawOrder);
+        final tableId = order['tableId']?.toString();
+        if (_isUuid(tableId)) {
+          final exists = tables.any((t) => t.remoteId == tableId);
+          if (!exists) {
+            hasUnknownTables = true;
+            break;
+          }
+        }
+      }
+
+      if (hasUnknownTables) {
+        debugPrint(
+            'syncActiveOrders: Found unknown tables in active orders list. Fetching dynamic tables...');
+        await fetchTablesDynamic();
+      }
+
       final activeTableIds = <String>{};
 
       for (final rawOrder in activeOrders) {
@@ -1247,6 +1488,7 @@ class AppState extends ChangeNotifier {
           timestamp: DateTime.tryParse(ticket['createdAt']?.toString() ?? '') ??
               DateTime.now(),
           status: status,
+          station: ticket['station']?.toString() ?? 'cocina',
         ));
       }
 
@@ -1328,6 +1570,25 @@ class AppState extends ChangeNotifier {
       // Update local table states from the branchTables in the response
       final branchTables = changes['branchTables'] as List?;
       if (branchTables != null && branchTables.isNotEmpty) {
+        bool hasUnknownTables = false;
+        for (final tableData in branchTables) {
+          final table = Map<String, dynamic>.from(tableData);
+          final tableId = table['id']?.toString();
+          if (tableId != null) {
+            final exists = tables.any((t) => t.remoteId == tableId);
+            if (!exists) {
+              hasUnknownTables = true;
+              break;
+            }
+          }
+        }
+
+        if (hasUnknownTables) {
+          debugPrint(
+              'syncTableStates: Found unknown tables in changes. Fetching dynamic tables...');
+          await fetchTablesDynamic();
+        }
+
         for (final tableData in branchTables) {
           final table = Map<String, dynamic>.from(tableData);
           final tableId = table['id']?.toString();
@@ -1337,7 +1598,15 @@ class AppState extends ChangeNotifier {
 
           final tableIndex = tables.indexWhere((t) => t.remoteId == tableId);
           if (tableIndex != -1) {
-            tables[tableIndex].state = _parseTableState(tableState);
+            final newState = _parseTableState(tableState);
+            tables[tableIndex].state = newState;
+            if (newState == TableState.free ||
+                newState == TableState.cleaning) {
+              tables[tableIndex].items = [];
+              tables[tableIndex].guests = 0;
+              tables[tableIndex].discountPercentage = 0;
+              tables[tableIndex].guestGenders = const ['M'];
+            }
           }
         }
 
@@ -1410,6 +1679,7 @@ class AppState extends ChangeNotifier {
       final notes = item['notes']?.toString() ?? '';
 
       return OrderItem(
+        remoteId: item['id']?.toString(),
         item: MenuItem(
           id: menuItem.id,
           name: menuItem.name,
@@ -1612,6 +1882,7 @@ class AppState extends ChangeNotifier {
       availableUserRoles = [selectedRole];
     }
     _initWebSocket();
+    _refreshPrintStationLifecycle();
     unawaited(syncAllData());
     notifyListeners();
     return true;
@@ -1625,6 +1896,10 @@ class AppState extends ChangeNotifier {
         return UserRole.cashier;
       case 'kitchen':
         return UserRole.kitchen;
+      case 'encargado':
+        return UserRole.encargado;
+      case 'responsable':
+        return UserRole.responsable;
       default:
         return UserRole.none;
     }
@@ -1657,6 +1932,7 @@ class AppState extends ChangeNotifier {
     selectedTable = null;
     currentJwtToken = null;
     _secureStorageService.clearJwtToken();
+    _stopPrintStationLifecycle();
     disconnectWebSocket();
   }
 
@@ -1865,6 +2141,8 @@ class AppState extends ChangeNotifier {
     int guestsCount,
     List<String> genders, {
     bool printComanda = false,
+    ComandaPrintMode printMode = ComandaPrintMode.none,
+    String? targetStationId,
   }) {
     if (cartItems.isEmpty) {
       unawaited(cancelActiveOrder(tableId));
@@ -1897,6 +2175,9 @@ class AppState extends ChangeNotifier {
 
         final dateStr = DateTime.now().toString().substring(0, 16);
 
+        final effectivePrintMode =
+            printComanda ? ComandaPrintMode.local : printMode;
+
         if (hasKitchenItems) {
           final buffer = StringBuffer();
           buffer.writeln(formatCenter('=== COMANDA COCINA ==='));
@@ -1927,7 +2208,7 @@ class AppState extends ChangeNotifier {
           buffer.writeln(formatDivider());
           buffer.writeln('');
 
-          enqueuePrintJob(
+          _routeComandaPrintJob(
             PrintJob(
               id: '${newJobId}_k',
               title: 'Comanda Cocina - ${tables[index].label}',
@@ -1935,7 +2216,8 @@ class AppState extends ChangeNotifier {
               target: 'Cocina',
               timestamp: DateTime.now(),
             ),
-            forcePhysical: printComanda,
+            printMode: effectivePrintMode,
+            targetStationId: targetStationId,
           );
         }
 
@@ -1967,7 +2249,7 @@ class AppState extends ChangeNotifier {
           buffer.writeln(formatDivider());
           buffer.writeln('');
 
-          enqueuePrintJob(
+          _routeComandaPrintJob(
             PrintJob(
               id: '${newJobId}_b',
               title: 'Comanda Barra - ${tables[index].label}',
@@ -1975,7 +2257,8 @@ class AppState extends ChangeNotifier {
               target: 'Barra',
               timestamp: DateTime.now(),
             ),
-            forcePhysical: printComanda,
+            printMode: effectivePrintMode,
+            targetStationId: targetStationId,
           );
         }
 
@@ -1993,6 +2276,27 @@ class AppState extends ChangeNotifier {
       }
 
       notifyListeners();
+    }
+  }
+
+  void _routeComandaPrintJob(
+    PrintJob job, {
+    required ComandaPrintMode printMode,
+    String? targetStationId,
+  }) {
+    switch (printMode) {
+      case ComandaPrintMode.none:
+        return;
+      case ComandaPrintMode.local:
+        unawaited(enqueuePrintJob(job, forcePhysical: true));
+        return;
+      case ComandaPrintMode.remoteStation:
+        if (targetStationId == null || targetStationId.isEmpty) {
+          debugPrint('Remote comanda print skipped: missing targetStationId');
+          return;
+        }
+        unawaited(enqueueRemotePrintJob(job, targetStationId));
+        return;
     }
   }
 
@@ -2289,6 +2593,7 @@ class AppState extends ChangeNotifier {
     double? cashChange,
     bool isEqualSplit = false,
     int? splitCount,
+    int? originalSplitCount,
     List<int>? itemIndicesToPay,
   }) {
     final index = tables.indexWhere((t) => t.id == tableId);
@@ -2300,19 +2605,23 @@ class AppState extends ChangeNotifier {
       double finalTotal;
       TableModel tableSnapshot;
 
-      if (isEqualSplit && splitCount != null && splitCount > 1) {
+      if (isEqualSplit && splitCount != null) {
         // Equal split payment: 1 part of splitCount
-        finalTotal = t.total / splitCount;
+        final divisor = originalSplitCount ?? splitCount;
+        finalTotal = t.total / divisor;
 
         // Construct a mock TableModel to represent the partial payment on the receipt
+        final currentPart = originalSplitCount != null
+            ? (originalSplitCount - splitCount + 1)
+            : 1;
         tableSnapshot = t.copyWith(
-          label: '${t.label} (División 1/$splitCount)',
+          label: '${t.label} (División $currentPart/$divisor)',
           items: [
             OrderItem(
               item: MenuItem(
                 id: 'partial_payment',
-                name: 'Pago Parcial (1/$splitCount)',
-                price: t.subtotal / splitCount,
+                name: 'Pago Parcial ($currentPart/$divisor)',
+                price: t.subtotal / divisor,
                 category: 'Pago',
               ),
               quantity: 1,
@@ -2348,25 +2657,97 @@ class AppState extends ChangeNotifier {
         cashDrawerAmount += finalTotal;
       }
 
-      final printDetails = _generateFinalCustomerTicket(
-        tableSnapshot,
-        discount: discount,
-        paymentMethod: paymentMethod,
-        refCode: refCode,
-        closedAt: closedAt,
-        cashReceived: cashReceived,
-        cashChange: cashChange,
-      );
+      // Check if this is a completed equal split payment from the new flow
+      final isCompletedEqualSplit = isEqualSplit &&
+          originalSplitCount != null &&
+          originalSplitCount > 1 &&
+          splitCount == 1; // Final payment indicator
 
-      enqueuePrintJob(
-        PrintJob(
-          id: 'rec_${DateTime.now().millisecondsSinceEpoch}',
-          title: 'Ticket - ${tableSnapshot.label}',
-          details: printDetails,
-          target: 'Caja',
-          timestamp: DateTime.now(),
-        ),
-      );
+      String printDetails; // Declare here so it's accessible later
+
+      if (isCompletedEqualSplit) {
+        // Generate individual tickets for each person
+        final amountPerPerson = t.total / originalSplitCount;
+
+        for (int i = 1; i <= originalSplitCount; i++) {
+          final personSnapshot = t.copyWith(
+            label: '${t.label} (Pago $i de $originalSplitCount)',
+            items: [
+              OrderItem(
+                item: MenuItem(
+                  id: 'split_payment_$i',
+                  name: 'División Equitativa ($i/$originalSplitCount)',
+                  price: t.subtotal / originalSplitCount,
+                  category: 'Pago',
+                ),
+                quantity: 1,
+                isSent: true,
+              ),
+            ],
+          );
+
+          final personTicket = _generateFinalCustomerTicket(
+            personSnapshot,
+            discount: discount,
+            paymentMethod:
+                'Efectivo', // Individual tickets show as cash for simplicity
+            refCode: 'División $i/$originalSplitCount',
+            closedAt: closedAt,
+            cashReceived: null,
+            cashChange: null,
+          );
+
+          enqueuePrintJob(
+            PrintJob(
+              id: 'split_${i}_${DateTime.now().millisecondsSinceEpoch}',
+              title: 'Ticket ${t.label} - Pago $i de $originalSplitCount',
+              details: personTicket,
+              target: 'Caja',
+              timestamp: DateTime.now(),
+            ),
+          );
+        }
+
+        // Add all individual payments to partialPayments for the summary
+        t.partialPayments = []; // Clear any existing
+        for (int i = 1; i <= originalSplitCount; i++) {
+          t.partialPayments.add(PartialPayment(
+            amount: amountPerPerson,
+            paymentMethod: 'División Equitativa',
+            refCode: 'Pago $i',
+            timestamp: closedAt,
+            description: 'Pago $i de $originalSplitCount',
+          ));
+        }
+
+        // Generate final summary ticket
+        _printFinalSummaryTicket(t, closedAt);
+
+        // For recent sales, use the summary ticket
+        printDetails =
+            'División Equitativa: $originalSplitCount pagos de \$${amountPerPerson.toStringAsFixed(2)}';
+      } else {
+        // Regular ticket printing for non-split or partial payments
+        printDetails = _generateFinalCustomerTicket(
+          tableSnapshot,
+          discount: discount,
+          paymentMethod: paymentMethod,
+          refCode: refCode,
+          closedAt: closedAt,
+          cashReceived: cashReceived,
+          cashChange: cashChange,
+        );
+
+        enqueuePrintJob(
+          PrintJob(
+            id: 'rec_${DateTime.now().millisecondsSinceEpoch}',
+            title: 'Ticket - ${tableSnapshot.label}',
+            details: printDetails,
+            target: 'Caja',
+            timestamp: DateTime.now(),
+          ),
+        );
+      }
 
       _addRecentClosedSale(
         id: 'sale_${DateTime.now().millisecondsSinceEpoch}',
@@ -2376,6 +2757,14 @@ class AppState extends ChangeNotifier {
         printDetails: printDetails,
       );
 
+      List<String>? paidOrderItemIds;
+      if (itemIndicesToPay != null && itemIndicesToPay.isNotEmpty) {
+        paidOrderItemIds = itemIndicesToPay
+            .map((idx) => t.items[idx].remoteId)
+            .whereType<String>()
+            .toList();
+      }
+
       final cloudOrderId = _activeCloudOrderIdForTable(t);
       if (cloudOrderId != null) {
         unawaited(
@@ -2384,6 +2773,7 @@ class AppState extends ChangeNotifier {
             amount: finalTotal,
             paymentMethod: paymentMethod,
             refCode: refCode,
+            paidOrderItemIds: paidOrderItemIds,
           ),
         );
       } else {
@@ -2397,7 +2787,33 @@ class AppState extends ChangeNotifier {
         );
       }
 
-      // Update the original table state based on what remains:
+      // Track partial payment for final summary ticket
+      final isPartialPayment =
+          (isEqualSplit && splitCount != null && splitCount > 1) ||
+              (itemIndicesToPay != null &&
+                  itemIndicesToPay.isNotEmpty &&
+                  t.items.isNotEmpty);
+
+      if (isPartialPayment) {
+        // Add this payment to the partial payments list
+        final currentPaymentNumber = t.partialPayments.length + 1;
+        final totalParts = originalSplitCount ?? splitCount ?? 1;
+        final paymentDescription = isEqualSplit
+            ? 'Pago $currentPaymentNumber de $totalParts'
+            : 'Pago parcial ${itemIndicesToPay?.length ?? 0} artículo(s)';
+
+        t.partialPayments = [
+          ...t.partialPayments,
+          PartialPayment(
+            amount: finalTotal,
+            paymentMethod: paymentMethod,
+            refCode: refCode,
+            timestamp: closedAt,
+            description: paymentDescription,
+          ),
+        ];
+      }
+
       if (isEqualSplit && splitCount != null && splitCount > 1) {
         // It's a partial equal split: do not reset the table!
         // Just keep the table open in billing state
@@ -2415,9 +2831,15 @@ class AppState extends ChangeNotifier {
 
         // If no items are left, close the table!
         if (t.items.isEmpty) {
-          t.state = TableState.cleaning;
+          // This was the final partial payment - print summary ticket!
+          if (t.partialPayments.isNotEmpty) {
+            _printFinalSummaryTicket(t, closedAt);
+          }
+          t.state =
+              (t.zone == 'Para Llevar') ? TableState.free : TableState.cleaning;
           t.guests = 0;
           t.discountPercentage = 0;
+          t.partialPayments = [];
           debugPrint('All items paid. Closing table ${t.label}.');
         } else {
           // If items are still left, keep it open/billing
@@ -2426,16 +2848,98 @@ class AppState extends ChangeNotifier {
               'Split by items payment done. ${t.items.length} items remaining on table ${t.label}.');
         }
       } else {
+        // Check if this is the final payment of an equal split
+        if (isEqualSplit && t.partialPayments.isNotEmpty) {
+          // This was the last equal split payment - print summary ticket!
+          _printFinalSummaryTicket(t, closedAt);
+        }
+
         // Full checkout: close the table completely
-        t.state = TableState.cleaning;
+        t.state =
+            (t.zone == 'Para Llevar') ? TableState.free : TableState.cleaning;
         t.items = [];
         t.guests = 0;
         t.discountPercentage = 0;
+        t.partialPayments = [];
         debugPrint('Full checkout completed. Closing table ${t.label}.');
       }
 
       notifyListeners();
     }
+  }
+
+  // Generate and print final summary ticket for split/partial payments
+  void _printFinalSummaryTicket(TableModel table, DateTime closedAt) {
+    if (table.partialPayments.isEmpty) return;
+
+    final config = ticketFiscalConfig;
+    final operationNumber = _generateOperationNumber(closedAt);
+    final dateStr = closedAt.toString().substring(0, 16);
+    final buffer = StringBuffer();
+
+    // Header
+    buffer.writeln(formatCenter('RESUMEN FINAL - CUENTA DIVIDIDA'));
+    buffer.write(formatCenterLines(config.sellerDisplayName));
+    buffer.write(formatCenterLines(config.legalName));
+    buffer.write(formatCenterLines('RFC: ${config.fiscalId}'));
+    buffer.write(formatCenterLines(config.branchName));
+    buffer.write(formatCenterLines(config.branchAddress));
+    if (config.phone != null && config.phone!.trim().isNotEmpty) {
+      buffer.write(formatCenterLines('Tel: ${config.phone}'));
+    }
+    buffer.writeln(formatDivider());
+    buffer.writeln(formatRow('Operacion:', operationNumber));
+    buffer.writeln(formatRow('Fecha:', dateStr));
+    buffer.writeln(formatRow('Mesa:', table.label));
+    buffer.writeln(formatRow('Atendio:', currentUserName));
+    buffer.writeln(formatDivider());
+
+    // Partial payments list
+    buffer.writeln(formatCenter('DETALLE DE PAGOS'));
+    buffer.writeln(formatDivider());
+
+    double grandTotal = 0.0;
+    for (var i = 0; i < table.partialPayments.length; i++) {
+      final payment = table.partialPayments[i];
+      buffer.writeln(formatRow(payment.description, ''));
+      buffer.writeln(formatRow('  ${payment.paymentMethod}',
+          '\$${payment.amount.toStringAsFixed(2)}'));
+      if (payment.refCode.isNotEmpty && payment.refCode != 'Efectivo') {
+        buffer.writeln(formatRow('  Ref:', payment.refCode));
+      }
+      if (i < table.partialPayments.length - 1) {
+        buffer.writeln(formatDivider(char: '-'));
+      }
+      grandTotal += payment.amount;
+    }
+
+    buffer.writeln(formatDivider(char: '='));
+    buffer.writeln(
+        formatRow('TOTAL GENERAL:', '\$${grandTotal.toStringAsFixed(2)}'));
+    buffer.writeln(formatDivider(char: '='));
+
+    buffer.write(formatCenterLines('Gracias por su preferencia'));
+    buffer.writeln('');
+    if (config.footerText != null && config.footerText!.trim().isNotEmpty) {
+      buffer
+          .write(formatCenterLines(_normalizeTicketFooter(config.footerText!)));
+    }
+    buffer.writeln('');
+    buffer.writeln('');
+
+    // Print the summary ticket
+    enqueuePrintJob(
+      PrintJob(
+        id: 'summary_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Resumen Final - ${table.label}',
+        details: buffer.toString(),
+        target: 'Caja',
+        timestamp: DateTime.now(),
+      ),
+    );
+
+    debugPrint(
+        'Final summary ticket printed for ${table.label} with ${table.partialPayments.length} partial payments.');
   }
 
   String? _activeCloudOrderIdForTable(TableModel table) {
@@ -2449,6 +2953,7 @@ class AppState extends ChangeNotifier {
     required double amount,
     required String paymentMethod,
     required String refCode,
+    List<String>? paidOrderItemIds,
   }) async {
     try {
       final String baseUrl = terminalApiUrl ??
@@ -2462,6 +2967,8 @@ class AppState extends ChangeNotifier {
               'paymentMethod': _normalizePaymentMethod(paymentMethod),
               if (refCode.isNotEmpty && refCode != 'Efectivo')
                 'referenceCode': refCode,
+              if (paidOrderItemIds != null && paidOrderItemIds.isNotEmpty)
+                'paidOrderItemIds': paidOrderItemIds,
             }),
           )
           .timeout(const Duration(seconds: 10));
@@ -2473,7 +2980,12 @@ class AppState extends ChangeNotifier {
         return;
       }
 
-      _activeOrderIdsByTableRemoteId.removeWhere((_, id) => id == orderId);
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+      final bool isFullyPaid = responseData['isFullyPaid'] == true;
+
+      if (isFullyPaid) {
+        _activeOrderIdsByTableRemoteId.removeWhere((_, id) => id == orderId);
+      }
 
       // Sync table states after successful payment to update other devices
       await syncTableStates(notify: true);
@@ -2583,6 +3095,10 @@ class AppState extends ChangeNotifier {
 
     // Update local state immediately for UI responsiveness
     tables[index].state = TableState.free;
+    tables[index].items = [];
+    tables[index].guests = 0;
+    tables[index].discountPercentage = 0;
+    tables[index].guestGenders = const ['M'];
     notifyListeners();
 
     // Update backend to sync state across devices
@@ -2666,6 +3182,309 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get hasConfiguredPrinter => connectedPrinterMac != null;
+
+  bool get canAdvertisePrintStation =>
+      !kIsWeb &&
+      receiveRemotePrintJobs &&
+      currentUserRole != UserRole.none &&
+      connectedPrinterName != null &&
+      terminalBranchId != null;
+
+  Future<void> setReceiveRemotePrintJobs(bool enabled) async {
+    receiveRemotePrintJobs = enabled;
+    await _secureStorageService.saveReceiveRemotePrintJobs(enabled);
+    _refreshPrintStationLifecycle();
+    notifyListeners();
+  }
+
+  PrintStation? get lastSelectedOnlinePrintStation {
+    final stationId = lastSelectedPrintStationId;
+    if (stationId == null) return null;
+    for (final station in onlinePrintStations) {
+      if (station.stationId == stationId && station.online) {
+        return station;
+      }
+    }
+    return null;
+  }
+
+  Future<void> saveLastSelectedPrintStation(String stationId) async {
+    lastSelectedPrintStationId = stationId;
+    await _secureStorageService.saveLastPrintStationId(stationId);
+    notifyListeners();
+  }
+
+  String get _printStationBaseUrl =>
+      terminalApiUrl ??
+      'https://pos-sync-api-232144991863.us-central1.run.app/api';
+
+  Map<String, String> get _jsonAuthHeaders {
+    final headers = {'Content-Type': 'application/json'};
+    final token = currentJwtToken;
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
+  Future<bool> refreshOnlinePrintStations() async {
+    if (!isTerminalConfigured || terminalBranchId == null) {
+      onlinePrintStations = [];
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      final uri = Uri.parse(
+        '$_printStationBaseUrl/print-stations?branchId=$terminalBranchId',
+      );
+      final response = await http
+          .get(uri, headers: _jsonAuthHeaders)
+          .timeout(const Duration(seconds: 6));
+      if (response.statusCode != 200) {
+        debugPrint(
+          'refreshOnlinePrintStations failed ${response.statusCode}: ${response.body}',
+        );
+        return false;
+      }
+
+      final decoded = jsonDecode(response.body);
+      final List<dynamic> rawStations =
+          decoded is List ? decoded : decoded['items'] ?? [];
+      onlinePrintStations = rawStations
+          .whereType<Map>()
+          .map((item) => PrintStation.fromJson(Map<String, dynamic>.from(item)))
+          .where(
+            (station) =>
+                station.stationId.isNotEmpty &&
+                station.online &&
+                station.printerName.isNotEmpty &&
+                station.canPrintComandas,
+          )
+          .toList();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error refreshing online print stations: $e');
+      return false;
+    }
+  }
+
+  Future<bool> sendPrintStationHeartbeat() async {
+    if (!canAdvertisePrintStation) return false;
+    final stationId = localStationId ??
+        await _secureStorageService.getOrCreateLocalStationId();
+    localStationId = stationId;
+
+    try {
+      final station = PrintStation(
+        stationId: stationId,
+        deviceName: _defaultDeviceName(),
+        operatorId: currentUserId,
+        operatorName: currentUserName.isEmpty ? null : currentUserName,
+        printerName: connectedPrinterName!,
+        role: currentUserRole,
+        lastSeenAt: DateTime.now().toUtc(),
+        canPrintComandas: true,
+        online: true,
+      );
+      final response = await http
+          .post(
+            Uri.parse('$_printStationBaseUrl/print-stations/heartbeat'),
+            headers: _jsonAuthHeaders,
+            body: jsonEncode(station.toJson(branchId: terminalBranchId!)),
+          )
+          .timeout(const Duration(seconds: 6));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint(
+          'sendPrintStationHeartbeat failed ${response.statusCode}: ${response.body}',
+        );
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error sending print station heartbeat: $e');
+      return false;
+    }
+  }
+
+  Future<bool> enqueueRemotePrintJob(
+    PrintJob job,
+    String targetStationId,
+  ) async {
+    if (!isTerminalConfigured || terminalBranchId == null) return false;
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_printStationBaseUrl/print-jobs'),
+            headers: _jsonAuthHeaders,
+            body: jsonEncode({
+              'id': job.id,
+              'branchId': terminalBranchId,
+              'targetStationId': targetStationId,
+              'sourceUserId': currentUserId,
+              'sourceUserName': currentUserName,
+              'title': job.title,
+              'details': job.details,
+              'target': job.target,
+              'status': 'queued',
+              'createdAt': job.timestamp.toUtc().toIso8601String(),
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint(
+          'enqueueRemotePrintJob failed ${response.statusCode}: ${response.body}',
+        );
+        final failedJob = PrintJob(
+          id: 'remote_failed_${job.id}',
+          title: job.title,
+          details: job.details,
+          target: job.target,
+          status: 'failed',
+          timestamp: DateTime.now(),
+        );
+        printJobs.add(failedJob);
+        notifyListeners();
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error enqueueing remote print job: $e');
+      final failedJob = PrintJob(
+        id: 'remote_failed_${job.id}',
+        title: job.title,
+        details: job.details,
+        target: job.target,
+        status: 'failed',
+        timestamp: DateTime.now(),
+      );
+      printJobs.add(failedJob);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> pollRemotePrintJobs() async {
+    if (!canAdvertisePrintStation || localStationId == null) return;
+
+    try {
+      final uri = Uri.parse(
+        '$_printStationBaseUrl/print-jobs?branchId=$terminalBranchId&targetStationId=$localStationId&status=queued',
+      );
+      final response = await http
+          .get(uri, headers: _jsonAuthHeaders)
+          .timeout(const Duration(seconds: 6));
+      if (response.statusCode != 200) {
+        debugPrint(
+          'pollRemotePrintJobs failed ${response.statusCode}: ${response.body}',
+        );
+        return;
+      }
+
+      final decoded = jsonDecode(response.body);
+      final List<dynamic> rawJobs =
+          decoded is List ? decoded : decoded['items'] ?? [];
+      for (final rawJob in rawJobs.whereType<Map>()) {
+        final job = RemotePrintJob.fromJson(Map<String, dynamic>.from(rawJob));
+        if (job.id.isEmpty ||
+            job.targetStationId != localStationId ||
+            _remotePrintJobsInFlight.contains(job.id)) {
+          continue;
+        }
+        unawaited(_processRemotePrintJob(job));
+      }
+    } catch (e) {
+      debugPrint('Error polling remote print jobs: $e');
+    }
+  }
+
+  Future<void> _processRemotePrintJob(RemotePrintJob remoteJob) async {
+    _remotePrintJobsInFlight.add(remoteJob.id);
+    await _updateRemotePrintJobStatus(remoteJob.id, 'printing');
+
+    final localJob = PrintJob(
+      id: 'remote_${remoteJob.id}',
+      title: remoteJob.title,
+      details: remoteJob.details,
+      target: remoteJob.target,
+      status: 'queued',
+      timestamp: DateTime.now(),
+    );
+    printJobs.add(localJob);
+    notifyListeners();
+
+    final success = await _printToPhysicalPrinter(remoteJob.details);
+    localJob.status = success ? 'printed' : 'failed';
+    await _updateRemotePrintJobStatus(
+        remoteJob.id, success ? 'printed' : 'failed');
+    _remotePrintJobsInFlight.remove(remoteJob.id);
+    notifyListeners();
+  }
+
+  Future<bool> _updateRemotePrintJobStatus(String jobId, String status) async {
+    try {
+      final response = await http
+          .patch(
+            Uri.parse('$_printStationBaseUrl/print-jobs/$jobId/status'),
+            headers: _jsonAuthHeaders,
+            body: jsonEncode({'status': status}),
+          )
+          .timeout(const Duration(seconds: 6));
+      return response.statusCode >= 200 && response.statusCode < 300;
+    } catch (e) {
+      debugPrint('Error updating remote print job status: $e');
+      return false;
+    }
+  }
+
+  void _refreshPrintStationLifecycle() {
+    _printStationHeartbeatTimer?.cancel();
+    _remotePrintPollingTimer?.cancel();
+
+    if (canAdvertisePrintStation) {
+      unawaited(sendPrintStationHeartbeat());
+      unawaited(pollRemotePrintJobs());
+      _printStationHeartbeatTimer = Timer.periodic(
+        const Duration(seconds: 25),
+        (_) => unawaited(sendPrintStationHeartbeat()),
+      );
+      _remotePrintPollingTimer = Timer.periodic(
+        const Duration(seconds: 8),
+        (_) => unawaited(pollRemotePrintJobs()),
+      );
+    } else if (currentUserRole == UserRole.waiter &&
+        isTerminalConfigured &&
+        terminalBranchId != null) {
+      unawaited(refreshOnlinePrintStations());
+      _remotePrintPollingTimer = Timer.periodic(
+        const Duration(seconds: 20),
+        (_) => unawaited(refreshOnlinePrintStations()),
+      );
+    }
+  }
+
+  void _stopPrintStationLifecycle() {
+    _printStationHeartbeatTimer?.cancel();
+    _printStationHeartbeatTimer = null;
+    _remotePrintPollingTimer?.cancel();
+    _remotePrintPollingTimer = null;
+    _remotePrintJobsInFlight.clear();
+    onlinePrintStations = [];
+  }
+
+  String _defaultDeviceName() {
+    if (isDesktop) {
+      return Platform.localHostname.isNotEmpty
+          ? Platform.localHostname
+          : 'Caja';
+    }
+    if (isMobile) return 'Terminal movil';
+    return 'Terminal POS';
+  }
+
   // Printer Retry logic
   Future<void> retryPrintJob(String jobId) async {
     final index = printJobs.indexWhere((j) => j.id == jobId);
@@ -2703,6 +3522,7 @@ class AppState extends ChangeNotifier {
       connectedPrinterName = printerName;
       connectedPrinterMac = 'desktop'; // Use a marker for desktop printers
       await _secureStorageService.savePrinter('desktop', printerName);
+      _refreshPrintStationLifecycle();
       notifyListeners();
       return true;
     } catch (e) {
@@ -2720,6 +3540,7 @@ class AppState extends ChangeNotifier {
       connectedPrinterName = name;
       await _secureStorageService.savePrinter(mac, name);
       isConnectingPrinter = false;
+      _refreshPrintStationLifecycle();
       notifyListeners();
       return true;
     }
@@ -2732,6 +3553,7 @@ class AppState extends ChangeNotifier {
         connectedPrinterName = name;
         await _secureStorageService.savePrinter(mac, name);
         isConnectingPrinter = false;
+        _refreshPrintStationLifecycle();
         notifyListeners();
         return true;
       }
@@ -2757,6 +3579,7 @@ class AppState extends ChangeNotifier {
     connectedPrinterMac = null;
     connectedPrinterName = null;
     await _secureStorageService.clearSavedPrinter();
+    _refreshPrintStationLifecycle();
     notifyListeners();
   }
 
@@ -3151,7 +3974,118 @@ class AppState extends ChangeNotifier {
 
   // Sync operations manually triggered
   Future<bool> syncOfflineTransactions() async {
-    return _syncPendingSaleJobs();
+    final saleSync = await _syncPendingSaleJobs();
+    final reqSync = await syncPendingRequisitions();
+    return saleSync && reqSync;
+  }
+
+  Future<bool> syncPendingRequisitions() async {
+    if (!isTerminalConfigured) return false;
+
+    final rawList = await _secureStorageService.getPendingRequisitions();
+    if (rawList.isEmpty) return true;
+
+    final String baseUrl = terminalApiUrl ??
+        'https://pos-sync-api-232144991863.us-central1.run.app/api';
+    final token = currentJwtToken ?? await _secureStorageService.getJwtToken();
+
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+    };
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    final List<Map<String, dynamic>> remainingList = [];
+    var allSynced = true;
+
+    for (final map in rawList) {
+      // Decode requisition
+      LocalBranchRequisition req;
+      try {
+        req = LocalBranchRequisition.fromMap(map);
+      } catch (e) {
+        debugPrint('Error decoding pending requisition item: $e');
+        continue;
+      }
+
+      if (req.syncState == 'synced') {
+        remainingList.add(map);
+        continue;
+      }
+
+      try {
+        final payload = {
+          'id': req.id,
+          'businessId': terminalBusinessId ?? req.fromBranchId,
+          'fromBranchId': req.fromBranchId,
+          'toWarehouseId': req.toWarehouseId,
+          'createdBy': currentUserId ?? 'operator-pos',
+          'notes': req.notes,
+          'items': req.items
+              .map((i) => {
+                    'productId': i.productId,
+                    'quantityRequested': i.quantityRequested,
+                  })
+              .toList(),
+        };
+
+        final response = await http
+            .post(
+              Uri.parse('$baseUrl/requisitions'),
+              headers: headers,
+              body: jsonEncode(payload),
+            )
+            .timeout(const Duration(seconds: 8));
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final updatedReq = LocalBranchRequisition(
+            id: req.id,
+            fromBranchId: req.fromBranchId,
+            toWarehouseId: req.toWarehouseId,
+            status: req.status,
+            notes: req.notes,
+            createdAt: req.createdAt,
+            syncState: 'synced',
+            items: req.items,
+          );
+          remainingList.add(updatedReq.toMap());
+        } else {
+          debugPrint(
+              'Failed to sync requisition ${req.id}: ${response.statusCode} ${response.body}');
+          allSynced = false;
+          final failedReq = LocalBranchRequisition(
+            id: req.id,
+            fromBranchId: req.fromBranchId,
+            toWarehouseId: req.toWarehouseId,
+            status: req.status,
+            notes: req.notes,
+            createdAt: req.createdAt,
+            syncState: 'failed',
+            items: req.items,
+          );
+          remainingList.add(failedReq.toMap());
+        }
+      } catch (e) {
+        debugPrint('Error syncing requisition: $e');
+        allSynced = false;
+        final failedReq = LocalBranchRequisition(
+          id: req.id,
+          fromBranchId: req.fromBranchId,
+          toWarehouseId: req.toWarehouseId,
+          status: req.status,
+          notes: req.notes,
+          createdAt: req.createdAt,
+          syncState: 'failed',
+          items: req.items,
+        );
+        remainingList.add(failedReq.toMap());
+      }
+    }
+
+    await _secureStorageService.savePendingRequisitions(remainingList);
+    notifyListeners();
+    return allSynced;
   }
 
   String _normalizePaymentMethod(String paymentMethod) {
@@ -3327,7 +4261,11 @@ class AppState extends ChangeNotifier {
             ? 'cashier'
             : currentUserRole == UserRole.kitchen
                 ? 'kitchen'
-                : 'none';
+                : currentUserRole == UserRole.encargado
+                    ? 'encargado'
+                    : currentUserRole == UserRole.responsable
+                        ? 'responsable'
+                        : 'none';
 
     if (token == null || branchId == null || roleStr == 'none') {
       debugPrint(
@@ -3382,7 +4320,15 @@ class AppState extends ChangeNotifier {
         if (tableIndex != -1) {
           final newStateStr = payload['state']?.toString();
           if (newStateStr != null) {
-            tables[tableIndex].state = _parseTableState(newStateStr);
+            final newState = _parseTableState(newStateStr);
+            tables[tableIndex].state = newState;
+            if (newState == TableState.free ||
+                newState == TableState.cleaning) {
+              tables[tableIndex].items = [];
+              tables[tableIndex].guests = 0;
+              tables[tableIndex].discountPercentage = 0;
+              tables[tableIndex].guestGenders = const ['M'];
+            }
             stateChanged = true;
           }
         }
@@ -3397,7 +4343,10 @@ class AppState extends ChangeNotifier {
             final tableIndex = tables.indexWhere((t) => t.remoteId == tableId);
             if (tableIndex != -1) {
               tables[tableIndex].items = [];
-              tables[tableIndex].state = TableState.cleaning;
+              tables[tableIndex].state =
+                  (tables[tableIndex].zone == 'Para Llevar')
+                      ? TableState.free
+                      : TableState.cleaning;
               stateChanged = true;
             }
           } else {
@@ -3518,6 +4467,8 @@ class AppState extends ChangeNotifier {
   void dispose() {
     _fallbackPollingTimer?.cancel();
     _kitchenSyncRetryTimer?.cancel();
+    _printStationHeartbeatTimer?.cancel();
+    _remotePrintPollingTimer?.cancel();
     _socketService?.dispose();
     super.dispose();
   }

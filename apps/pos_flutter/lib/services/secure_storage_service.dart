@@ -18,6 +18,12 @@ class SecureStorageService {
   static const String _usersCacheKey = 'cached_offline_users';
   static const String _pendingSaleSyncJobsKey = 'pending_sale_sync_jobs';
   static const String _ticketFiscalConfigKey = 'ticket_fiscal_config';
+  static const String _pendingRequisitionsKey = 'pending_requisitions_list';
+  static const String _cachedIngredientsKey = 'cached_ingredients_list';
+  static const String _cachedWarehousesKey = 'cached_warehouses_list';
+  static const String _localStationIdKey = 'local_station_id';
+  static const String _lastPrintStationIdKey = 'last_print_station_id';
+  static const String _receiveRemotePrintJobsKey = 'receive_remote_print_jobs';
 
   SecureStorageService({FlutterSecureStorage? secureStorage})
       : _secureStorage = secureStorage ?? const FlutterSecureStorage() {
@@ -290,6 +296,26 @@ class SecureStorageService {
     await _write(_pendingSaleSyncJobsKey, jsonEncode(jobs));
   }
 
+  Future<List<Map<String, dynamic>>> getPendingRequisitions() async {
+    final raw = await _read(_pendingRequisitionsKey);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final List<dynamic> decoded = jsonDecode(raw);
+      return decoded
+          .where((item) => item is Map)
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } catch (e) {
+      debugPrint('Error reading pending requisitions: $e');
+      return [];
+    }
+  }
+
+  Future<void> savePendingRequisitions(
+      List<Map<String, dynamic>> requisitions) async {
+    await _write(_pendingRequisitionsKey, jsonEncode(requisitions));
+  }
+
   // Save connected printer info
   Future<void> savePrinter(String mac, String name) async {
     await _write('connected_printer_mac', mac);
@@ -310,6 +336,38 @@ class SecureStorageService {
   Future<void> clearSavedPrinter() async {
     await _delete('connected_printer_mac');
     await _delete('connected_printer_name');
+  }
+
+  Future<String> getOrCreateLocalStationId() async {
+    final existing = await _read(_localStationIdKey);
+    if (existing != null && existing.isNotEmpty) {
+      return existing;
+    }
+
+    final random = Random.secure();
+    final suffix = List<int>.generate(8, (_) => random.nextInt(256))
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+        .join();
+    final stationId =
+        'station_${DateTime.now().millisecondsSinceEpoch}_$suffix';
+    await _write(_localStationIdKey, stationId);
+    return stationId;
+  }
+
+  Future<void> saveLastPrintStationId(String stationId) async {
+    await _write(_lastPrintStationIdKey, stationId);
+  }
+
+  Future<String?> getLastPrintStationId() async {
+    return _read(_lastPrintStationIdKey);
+  }
+
+  Future<void> saveReceiveRemotePrintJobs(bool enabled) async {
+    await _write(_receiveRemotePrintJobsKey, enabled ? 'true' : 'false');
+  }
+
+  Future<bool> getReceiveRemotePrintJobs() async {
+    return (await _read(_receiveRemotePrintJobsKey)) == 'true';
   }
 
   // Save terminal config
@@ -412,6 +470,38 @@ class SecureStorageService {
 
   Future<void> clearJwtToken() async {
     await _delete('jwt_access_token');
+  }
+
+  Future<List<Map<String, dynamic>>> getCachedIngredients() async {
+    final raw = await _read(_cachedIngredientsKey);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final List<dynamic> decoded = jsonDecode(raw);
+      return decoded.map((item) => Map<String, dynamic>.from(item)).toList();
+    } catch (e) {
+      debugPrint('Error reading cached ingredients: $e');
+      return [];
+    }
+  }
+
+  Future<void> saveCachedIngredients(List<Map<String, dynamic>> list) async {
+    await _write(_cachedIngredientsKey, jsonEncode(list));
+  }
+
+  Future<List<Map<String, dynamic>>> getCachedWarehouses() async {
+    final raw = await _read(_cachedWarehousesKey);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final List<dynamic> decoded = jsonDecode(raw);
+      return decoded.map((item) => Map<String, dynamic>.from(item)).toList();
+    } catch (e) {
+      debugPrint('Error reading cached warehouses: $e');
+      return [];
+    }
+  }
+
+  Future<void> saveCachedWarehouses(List<Map<String, dynamic>> list) async {
+    await _write(_cachedWarehousesKey, jsonEncode(list));
   }
 
   // Utility functions for Hex conversions

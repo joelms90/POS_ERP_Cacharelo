@@ -3,18 +3,23 @@ import '../common/colors.dart';
 import '../common/app_state.dart';
 
 class CartSidebar extends StatefulWidget {
+  final AppState state;
   final TableModel table;
   final List<OrderItem> initialItems;
   final List<String> activeGenders;
   final Future<bool> Function() onRemoveGuest;
   final VoidCallback? onBillingRequested;
   final VoidCallback onBackToMenu;
-  final Function(List<OrderItem> finalItems, int guests, bool shouldPrint)
-  onConfirm;
+  final Function(
+    List<OrderItem> finalItems,
+    int guests,
+    ComandaPrintSelection printSelection,
+  ) onConfirm;
   final VoidCallback onCancel;
 
   const CartSidebar({
     super.key,
+    required this.state,
     required this.table,
     required this.initialItems,
     required this.activeGenders,
@@ -134,7 +139,7 @@ class _CartSidebarState extends State<CartSidebar> {
         .where((i) => !i.isSent)
         .fold<int>(0, (sum, i) => sum + i.quantity);
 
-    final result = await showDialog<String>(
+    final result = await showDialog<ComandaPrintSelection>(
       context: context,
       builder: (context) => Dialog(
         backgroundColor: EmpireColors.obsidian,
@@ -182,20 +187,41 @@ class _CartSidebarState extends State<CartSidebar> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (widget.state.hasConfiguredPrinter) ...[
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context)
+                          .pop(ComandaPrintSelection.local),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: EmpireColors.champagneGold,
+                        foregroundColor: EmpireColors.obsidian,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('ENVIAR E IMPRIMIR COMANDA'),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   ElevatedButton(
-                    onPressed: () =>
-                        Navigator.of(context).pop('enviar_e_imprimir'),
+                    onPressed: () async {
+                      final station = await _showPrintStationPicker(context);
+                      if (station == null || !context.mounted) return;
+                      Navigator.of(context).pop(
+                        ComandaPrintSelection(
+                          mode: ComandaPrintMode.remoteStation,
+                          stationId: station.stationId,
+                        ),
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: EmpireColors.champagneGold,
                       foregroundColor: EmpireColors.obsidian,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    child: const Text('ENVIAR E IMPRIMIR COMANDA'),
+                    child: const Text('IMPRIMIR EN CAJA...'),
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton(
                     onPressed: () =>
-                        Navigator.of(context).pop('enviar_solamente'),
+                        Navigator.of(context).pop(ComandaPrintSelection.none),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: EmpireColors.charcoalSurface,
                       foregroundColor: EmpireColors.textPrimary,
@@ -226,9 +252,130 @@ class _CartSidebarState extends State<CartSidebar> {
     );
 
     if (result != null) {
-      final shouldPrint = result == 'enviar_e_imprimir';
-      widget.onConfirm(_cartItems, _guests, shouldPrint);
+      widget.onConfirm(_cartItems, _guests, result);
     }
+  }
+
+  Future<PrintStation?> _showPrintStationPicker(
+      BuildContext parentContext) async {
+    await widget.state.refreshOnlinePrintStations();
+    if (!parentContext.mounted) return null;
+
+    return showDialog<PrintStation>(
+      context: parentContext,
+      builder: (context) {
+        final stations = widget.state.onlinePrintStations;
+        return Dialog(
+          backgroundColor: EmpireColors.obsidian,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: EmpireColors.agedBronze, width: 1.5),
+          ),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 420, maxHeight: 520),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Row(
+                  children: [
+                    Icon(
+                      Icons.point_of_sale,
+                      color: EmpireColors.champagneGold,
+                      size: 24,
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Seleccionar Caja',
+                        style: TextStyle(
+                          color: EmpireColors.champagneGold,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (stations.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Text(
+                      'No hay cajas con impresora disponibles.',
+                      style: TextStyle(
+                        color: EmpireColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: stations.length,
+                      separatorBuilder: (_, __) => const Divider(
+                        color: EmpireColors.agedBronzeDark,
+                        height: 1,
+                      ),
+                      itemBuilder: (context, index) {
+                        final station = stations[index];
+                        final isLastSelected = station.stationId ==
+                            widget.state.lastSelectedPrintStationId;
+                        return ListTile(
+                          leading: const Icon(
+                            Icons.print,
+                            color: EmpireColors.champagneGold,
+                          ),
+                          title: Text(
+                            station.deviceName,
+                            style: const TextStyle(
+                              color: EmpireColors.textPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${station.operatorName ?? 'Caja'} - ${station.printerName}',
+                            style: const TextStyle(
+                              color: EmpireColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                          trailing: isLastSelected
+                              ? const Icon(
+                                  Icons.check_circle,
+                                  color: EmpireColors.successGreen,
+                                )
+                              : null,
+                          onTap: () async {
+                            await widget.state.saveLastSelectedPrintStation(
+                              station.stationId,
+                            );
+                            if (context.mounted) {
+                              Navigator.of(context).pop(station);
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: EmpireColors.textSecondary),
+                    foregroundColor: EmpireColors.textPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text('CANCELAR'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -307,9 +454,8 @@ class _CartSidebarState extends State<CartSidebar> {
               Row(
                 children: [
                   IconButton(
-                    onPressed: item.isSent
-                        ? null
-                        : () => _decrementQuantity(index),
+                    onPressed:
+                        item.isSent ? null : () => _decrementQuantity(index),
                     icon: Icon(
                       Icons.remove_circle_outlined,
                       color: item.isSent
@@ -614,7 +760,8 @@ class _CartSidebarState extends State<CartSidebar> {
                               backgroundColor: EmpireColors.obsidian,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                side: const BorderSide(color: EmpireColors.agedBronze, width: 1.5),
+                                side: const BorderSide(
+                                    color: EmpireColors.agedBronze, width: 1.5),
                               ),
                               title: const Text(
                                 'Liberar Mesa',
@@ -625,32 +772,37 @@ class _CartSidebarState extends State<CartSidebar> {
                               ),
                               content: Text(
                                 '¿Deseas liberar la ${widget.table.label}? Todos los platillos actuales se eliminarán y la mesa quedará libre.',
-                                style: const TextStyle(color: EmpireColors.textPrimary),
+                                style: const TextStyle(
+                                    color: EmpireColors.textPrimary),
                               ),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.of(context).pop(false),
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(false),
                                   child: const Text(
                                     'CANCELAR',
-                                    style: TextStyle(color: EmpireColors.textSecondary),
+                                    style: TextStyle(
+                                        color: EmpireColors.textSecondary),
                                   ),
                                 ),
                                 ElevatedButton(
-                                  onPressed: () => Navigator.of(context).pop(true),
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(true),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: EmpireColors.errorRed,
                                     foregroundColor: Colors.white,
                                   ),
                                   child: const Text(
                                     'LIBERAR',
-                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ],
                             ),
                           );
                           if (confirm == true) {
-                            widget.onConfirm([], 0, false);
+                            widget.onConfirm([], 0, ComandaPrintSelection.none);
                           }
                         }
                       : ((!_cartItems.any((i) => !i.isSent))
