@@ -10,11 +10,12 @@ export class ReportsController {
     @Query('businessId') businessId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('branchId') branchId?: string,
   ) {
     if (!businessId) {
       throw new BadRequestException('El parámetro businessId es obligatorio.');
     }
-    return this.reportsService.getSalesDashboard(businessId, startDate, endDate);
+    return this.reportsService.getSalesDashboard(businessId, startDate, endDate, branchId);
   }
 
   @Get('sales/products')

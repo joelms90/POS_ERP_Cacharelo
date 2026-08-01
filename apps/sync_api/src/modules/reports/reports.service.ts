@@ -27,7 +27,7 @@ export class ReportsService {
     private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
-  async getSalesDashboard(businessId: string, startDate?: string, endDate?: string) {
+  async getSalesDashboard(businessId: string, startDate?: string, endDate?: string, branchId?: string) {
     // 1. Resolve date filters (default to current month if not specified)
     const now = new Date();
     const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1); // Start of month
@@ -36,7 +36,20 @@ export class ReportsService {
     const start = startDate ? new Date(startDate) : defaultStart;
     const end = endDate ? new Date(endDate) : defaultEnd;
 
-    // 2. Fetch all closed orders for this business within the date range
+    // 2. Build order conditions
+    const orderConditions = [
+      eq(schema.orders.state, 'closed'),
+      eq(schema.branches.businessId, businessId),
+      isNull(schema.orders.deletedAt),
+      gte(schema.orders.createdAt, start),
+      lte(schema.orders.createdAt, end),
+    ];
+
+    if (branchId) {
+      orderConditions.push(eq(schema.orders.branchId, branchId));
+    }
+
+    // 3. Fetch all closed orders for this business within the date range
     const ordersList = await this.db
       .select({
         id: schema.orders.id,
@@ -54,15 +67,7 @@ export class ReportsService {
       .from(schema.orders)
       .innerJoin(schema.branches, eq(schema.orders.branchId, schema.branches.id))
       .innerJoin(schema.users, eq(schema.orders.waiterId, schema.users.id))
-      .where(
-        and(
-          eq(schema.orders.state, 'closed'),
-          eq(schema.branches.businessId, businessId),
-          isNull(schema.orders.deletedAt),
-          gte(schema.orders.createdAt, start),
-          lte(schema.orders.createdAt, end),
-        )
-      );
+      .where(and(...orderConditions));
 
     // Initial default response if no orders found
     if (ordersList.length === 0) {

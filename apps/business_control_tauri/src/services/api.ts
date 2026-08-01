@@ -95,6 +95,7 @@ export interface Category {
   businessId: string;
   name: string;
   description?: string;
+  targetStation?: 'cocina' | 'barra';
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1119,10 +1120,11 @@ export const api = {
     return apiRequest<any[]>(url);
   },
 
-  async getSalesDashboardReport(businessId: string, startDate?: string, endDate?: string): Promise<SalesDashboardReport> {
+  async getSalesDashboardReport(businessId: string, startDate?: string, endDate?: string, branchId?: string): Promise<SalesDashboardReport> {
     let url = `/reports/sales-dashboard?businessId=${businessId}`;
     if (startDate) url += `&startDate=${startDate}`;
     if (endDate) url += `&endDate=${endDate}`;
+    if (branchId) url += `&branchId=${branchId}`;
     return apiRequest<SalesDashboardReport>(url);
   },
 

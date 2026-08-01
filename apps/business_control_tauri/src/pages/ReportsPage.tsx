@@ -57,9 +57,12 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
   const [auditEndDate, setAuditEndDate] = useState<string>('');
 
   // Date range state
-  const [dateRange, setDateRange] = useState<DateRangeType>('month');
+  const [dateRange, setDateRange] = useState<DateRangeType>('today');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+
+  // Sales dashboard branch filter
+  const [salesFilterBranch, setSalesFilterBranch] = useState<string>('all');
 
   // Set default dates depending on range type
   useEffect(() => {
@@ -96,7 +99,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
       const startISO = startDate ? new Date(startDate + 'T00:00:00').toISOString() : undefined;
       const endISO = endDate ? new Date(endDate + 'T23:59:59').toISOString() : undefined;
 
-      const data = await api.getSalesDashboardReport(businessId, startISO, endISO);
+      const data = await api.getSalesDashboardReport(businessId, startISO, endISO, salesFilterBranch !== 'all' ? salesFilterBranch : undefined);
       setReportData(data);
     } catch (err: any) {
       console.error(err);
@@ -110,7 +113,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
     if (startDate && endDate) {
       fetchReport();
     }
-  }, [businessId, startDate, endDate]);
+  }, [businessId, startDate, endDate, salesFilterBranch]);
 
   const fetchStockData = React.useCallback(async () => {
     try {
@@ -950,6 +953,28 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                 ))}
               </div>
 
+              {branches.length > 0 && (
+                <div className="flex items-center gap-2 bg-charcoal border border-aged-bronze/45 rounded p-1">
+                  <span className="text-[10px] text-text-secondary uppercase px-1">Sucursal:</span>
+                  <select
+                    value={activeReportTab === 'sales' ? salesFilterBranch : activeReportTab === 'salesByProduct' ? productFilterBranch : activeReportTab === 'salesByPaymentMethod' ? paymentMethodFilterBranch : cashShiftsFilterBranch}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (activeReportTab === 'sales') setSalesFilterBranch(val);
+                      else if (activeReportTab === 'salesByProduct') setProductFilterBranch(val);
+                      else if (activeReportTab === 'salesByPaymentMethod') setPaymentMethodFilterBranch(val);
+                      else setCashShiftsFilterBranch(val);
+                    }}
+                    className="bg-transparent text-xs text-text-primary focus:outline-none px-1 cursor-pointer font-medium text-champagne-gold"
+                  >
+                    <option value="all">Todas las Sucursales</option>
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id} className="bg-onyx text-text-primary">{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {dateRange === 'custom' && (
                 <div className="flex items-center gap-2 bg-charcoal border border-aged-bronze/45 rounded p-1">
                   <input
@@ -985,20 +1010,6 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
               {activeReportTab === 'salesByProduct' && (
                 <>
                   <div className="flex items-center gap-2 bg-charcoal border border-aged-bronze/45 rounded p-1">
-                    <span className="text-[10px] text-text-secondary uppercase px-1">Sucursal:</span>
-                    <select
-                      value={productFilterBranch}
-                      onChange={(e) => setProductFilterBranch(e.target.value)}
-                      className="bg-transparent text-xs text-text-primary focus:outline-none px-1 cursor-pointer font-medium text-champagne-gold"
-                    >
-                      <option value="all">Todas</option>
-                      {branches.map((b) => (
-                        <option key={b.id} value={b.id} className="bg-onyx text-text-primary">{b.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex items-center gap-2 bg-charcoal border border-aged-bronze/45 rounded p-1">
                     <span className="text-[10px] text-text-secondary uppercase px-1">Categoría:</span>
                     <select
                       value={productFilterCategory}
@@ -1023,38 +1034,6 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                     />
                   </div>
                 </>
-              )}
-
-              {activeReportTab === 'salesByPaymentMethod' && (
-                <div className="flex items-center gap-2 bg-charcoal border border-aged-bronze/45 rounded p-1">
-                  <span className="text-[10px] text-text-secondary uppercase px-1">Sucursal:</span>
-                  <select
-                    value={paymentMethodFilterBranch}
-                    onChange={(e) => setPaymentMethodFilterBranch(e.target.value)}
-                    className="bg-transparent text-xs text-text-primary focus:outline-none px-1 cursor-pointer font-medium text-champagne-gold"
-                  >
-                    <option value="all">Todas</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id} className="bg-onyx text-text-primary">{b.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {activeReportTab === 'cashShifts' && (
-                <div className="flex items-center gap-2 bg-charcoal border border-aged-bronze/45 rounded p-1">
-                  <span className="text-[10px] text-text-secondary uppercase px-1">Sucursal:</span>
-                  <select
-                    value={cashShiftsFilterBranch}
-                    onChange={(e) => setCashShiftsFilterBranch(e.target.value)}
-                    className="bg-transparent text-xs text-text-primary focus:outline-none px-1 cursor-pointer font-medium text-champagne-gold"
-                  >
-                    <option value="all">Todas</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id} className="bg-onyx text-text-primary">{b.name}</option>
-                    ))}
-                  </select>
-                </div>
               )}
             </>
           ) : activeReportTab === 'stock' ? (
@@ -1117,20 +1096,20 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
       </div>
 
       {/* Sub tabs navigation */}
-      <div className="flex border-b border-aged-bronze/25 gap-6 mb-6">
+      <div className="flex border-b border-aged-bronze/25 gap-1 mb-6 overflow-x-auto -mx-2 px-2 lg:mx-0 lg:px-0 lg:gap-6">
         <button
           onClick={() => setActiveReportTab('sales')}
-          className={`pb-3 text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer ${
+          className={`pb-3 text-xs lg:text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer whitespace-nowrap px-2 ${
             activeReportTab === 'sales'
               ? 'border-champagne-gold text-champagne-gold font-semibold'
               : 'border-transparent text-text-secondary hover:text-text-primary'
           }`}
         >
-          Reporte de Ventas y Finanzas
+          Reporte de Ventas
         </button>
         <button
           onClick={() => setActiveReportTab('salesByProduct')}
-          className={`pb-3 text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer ${
+          className={`pb-3 text-xs lg:text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer whitespace-nowrap px-2 ${
             activeReportTab === 'salesByProduct'
               ? 'border-champagne-gold text-champagne-gold font-semibold'
               : 'border-transparent text-text-secondary hover:text-text-primary'
@@ -1140,7 +1119,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
         </button>
         <button
           onClick={() => setActiveReportTab('salesByPaymentMethod')}
-          className={`pb-3 text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer ${
+          className={`pb-3 text-xs lg:text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer whitespace-nowrap px-2 ${
             activeReportTab === 'salesByPaymentMethod'
               ? 'border-champagne-gold text-champagne-gold font-semibold'
               : 'border-transparent text-text-secondary hover:text-text-primary'
@@ -1150,33 +1129,33 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
         </button>
         <button
           onClick={() => setActiveReportTab('cashShifts')}
-          className={`pb-3 text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer ${
+          className={`pb-3 text-xs lg:text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer whitespace-nowrap px-2 ${
             activeReportTab === 'cashShifts'
               ? 'border-champagne-gold text-champagne-gold font-semibold'
               : 'border-transparent text-text-secondary hover:text-text-primary'
           }`}
         >
-          Cortes y Turnos de Caja
+          Cortes de Caja
         </button>
         <button
           onClick={() => setActiveReportTab('stock')}
-          className={`pb-3 text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer ${
+          className={`pb-3 text-xs lg:text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer whitespace-nowrap px-2 ${
             activeReportTab === 'stock'
               ? 'border-champagne-gold text-champagne-gold font-semibold'
               : 'border-transparent text-text-secondary hover:text-text-primary'
           }`}
         >
-          Existencia de Almacén (Inventario)
+          Inventario
         </button>
         <button
           onClick={() => setActiveReportTab('kardex')}
-          className={`pb-3 text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer ${
+          className={`pb-3 text-xs lg:text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer whitespace-nowrap px-2 ${
             activeReportTab === 'kardex'
               ? 'border-champagne-gold text-champagne-gold font-semibold'
               : 'border-transparent text-text-secondary hover:text-text-primary'
           }`}
         >
-          Auditoría y Kardex Visual
+          Kardex Visual
         </button>
       </div>
 
