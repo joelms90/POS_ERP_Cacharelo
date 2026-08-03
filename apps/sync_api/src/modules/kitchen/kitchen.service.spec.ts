@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { KitchenService } from './kitchen.service';
 import { KitchenRepository } from './repositories/kitchen.repository';
 import { NotFoundException } from '@nestjs/common';
+import { SyncGateway } from '../sync/sync.gateway';
 
 describe('KitchenService', () => {
   let service: KitchenService;
@@ -12,6 +13,12 @@ describe('KitchenService', () => {
     findActiveTicketsByBranch: jest.fn(),
     createTicketsForOrder: jest.fn(),
     updateTicketStatus: jest.fn(),
+    findBranchIdForOrder: jest.fn().mockResolvedValue('branch-1'),
+    findBranchIdForTicket: jest.fn().mockResolvedValue('branch-1'),
+  };
+
+  const mockSyncGateway = {
+    broadcastChange: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -21,6 +28,10 @@ describe('KitchenService', () => {
         {
           provide: KitchenRepository,
           useValue: mockKitchenRepository,
+        },
+        {
+          provide: SyncGateway,
+          useValue: mockSyncGateway,
         },
       ],
     }).compile();

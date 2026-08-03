@@ -221,7 +221,7 @@ class PrintJob {
   });
 }
 
-enum ComandaPrintMode { none, local, remoteStation }
+enum ComandaPrintMode { none, auto, local, remoteStation }
 
 class ComandaPrintSelection {
   final ComandaPrintMode mode;
@@ -233,6 +233,7 @@ class ComandaPrintSelection {
   });
 
   static const none = ComandaPrintSelection(mode: ComandaPrintMode.none);
+  static const auto = ComandaPrintSelection(mode: ComandaPrintMode.auto);
   static const local = ComandaPrintSelection(mode: ComandaPrintMode.local);
 }
 
@@ -246,6 +247,13 @@ class PrintStation {
   final DateTime lastSeenAt;
   final bool canPrintComandas;
   final bool online;
+  final bool recentlySeen;
+  final String presenceStatus;
+  final int? lastSeenSecondsAgo;
+
+  String get displayName => operatorName != null && operatorName!.isNotEmpty
+      ? '$deviceName ($operatorName)'
+      : deviceName;
 
   const PrintStation({
     required this.stationId,
@@ -257,6 +265,9 @@ class PrintStation {
     required this.lastSeenAt,
     required this.canPrintComandas,
     required this.online,
+    required this.recentlySeen,
+    required this.presenceStatus,
+    this.lastSeenSecondsAgo,
   });
 
   factory PrintStation.fromJson(Map<String, dynamic> json) {
@@ -264,7 +275,14 @@ class PrintStation {
         DateTime.tryParse(json['lastSeenAt']?.toString() ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0);
     final rawOnline = json['online'];
-    final inferredOnline = DateTime.now().difference(lastSeenAt).inSeconds < 60;
+    final secondsAgo = DateTime.now().difference(lastSeenAt).inSeconds;
+    final inferredOnline = secondsAgo < 120;
+    final inferredRecent = secondsAgo < 24 * 60 * 60;
+    final rawRecentlySeen = json['recentlySeen'];
+    final rawLastSeenSecondsAgo = json['lastSeenSecondsAgo'];
+    final online = rawOnline is bool ? rawOnline : inferredOnline;
+    final recentlySeen =
+        rawRecentlySeen is bool ? rawRecentlySeen : inferredRecent;
     return PrintStation(
       stationId: json['stationId']?.toString() ?? json['id']?.toString() ?? '',
       deviceName: json['deviceName']?.toString() ?? 'Caja',
@@ -274,7 +292,17 @@ class PrintStation {
       role: _roleFromJson(json['role']?.toString()),
       lastSeenAt: lastSeenAt,
       canPrintComandas: json['canPrintComandas'] != false,
-      online: rawOnline is bool ? rawOnline : inferredOnline,
+      online: online,
+      recentlySeen: recentlySeen,
+      presenceStatus: json['presenceStatus']?.toString() ??
+          (online
+              ? 'online'
+              : recentlySeen
+                  ? 'recent'
+                  : 'offline'),
+      lastSeenSecondsAgo: rawLastSeenSecondsAgo is num
+          ? rawLastSeenSecondsAgo.round()
+          : secondsAgo,
     );
   }
 
@@ -292,6 +320,19 @@ class PrintStation {
         'canPrintComandas': canPrintComandas,
         'lastSeenAt': lastSeenAt.toUtc().toIso8601String(),
       };
+
+  String get presenceLabel {
+    final seconds = lastSeenSecondsAgo;
+    if (online) return 'ONLINE';
+    if (seconds == null || seconds < 0) return 'OFFLINE';
+    if (seconds < 60) return 'visto hace ${seconds}s';
+    final minutes = seconds ~/ 60;
+    if (minutes < 60) return 'visto hace ${minutes}m';
+    final hours = minutes ~/ 60;
+    if (hours < 24) return 'visto hace ${hours}h';
+    final days = hours ~/ 24;
+    return 'visto hace ${days}d';
+  }
 
   static UserRole _roleFromJson(String? role) {
     switch ((role ?? '').toLowerCase()) {
@@ -481,12 +522,36 @@ class AppState extends ChangeNotifier {
   // Bluetooth printer connection state
   String? connectedPrinterMac;
   String? connectedPrinterName;
+  String printerPaperWidth =
+      '58mm'; // '50mm' (26 cols), '58mm' (32 cols), '80mm' (48 cols)
+
+  int get ticketWidth {
+    if (printerPaperWidth == '50mm') return 26;
+    if (printerPaperWidth == '80mm') return 48;
+    return 32;
+  }
+
+  Future<void> setPrinterPaperWidth(String paperWidth) async {
+    if (paperWidth == '50mm') {
+      printerPaperWidth = '50mm';
+    } else if (paperWidth == '80mm') {
+      printerPaperWidth = '80mm';
+    } else {
+      printerPaperWidth = '58mm';
+    }
+    await _secureStorageService.savePrinterPaperWidth(printerPaperWidth);
+    notifyListeners();
+  }
+
   bool isConnectingPrinter = false;
   Future<void>? initializationFuture;
   String? localStationId;
   List<PrintStation> onlinePrintStations = [];
   String? lastSelectedPrintStationId;
   bool receiveRemotePrintJobs = false;
+  DateTime? lastPrintStationPublishAttemptAt;
+  bool? lastPrintStationPublishSucceeded;
+  String? lastPrintStationPublishMessage;
 
   final SecureStorageService _secureStorageService;
   SecureStorageService get secureStorageService => _secureStorageService;
@@ -2085,7 +2150,11 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>?> closeShift(double actualAmount) async {
+  Future<Map<String, dynamic>?> closeShift(
+    double actualAmount, {
+    Map<String, num>? denominationCounts,
+    String? closeNotes,
+  }) async {
     if (activeShiftId == null) return null;
     try {
       final String baseUrl = terminalApiUrl ??
@@ -2096,6 +2165,10 @@ class AppState extends ChangeNotifier {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'actualAmount': actualAmount.toStringAsFixed(2),
+              if (denominationCounts != null)
+                'denominationCounts': denominationCounts,
+              if (closeNotes != null && closeNotes.trim().isNotEmpty)
+                'closeNotes': closeNotes.trim(),
             }),
           )
           .timeout(const Duration(seconds: 8));
@@ -2107,7 +2180,9 @@ class AppState extends ChangeNotifier {
         initialFloat = 0.0;
         cashDrawerAmount = 0.0;
         notifyListeners();
-        return Map<String, dynamic>.from(data['reconciliation'] ?? {});
+        return Map<String, dynamic>.from(
+          data['report'] ?? data['reconciliation'] ?? {},
+        );
       }
       return null;
     } catch (e) {
@@ -2287,6 +2362,14 @@ class AppState extends ChangeNotifier {
     switch (printMode) {
       case ComandaPrintMode.none:
         return;
+      case ComandaPrintMode.auto:
+        unawaited(
+          enqueueCajaPrintJob(
+            job,
+            preferredStationId: targetStationId,
+          ),
+        );
+        return;
       case ComandaPrintMode.local:
         unawaited(enqueuePrintJob(job, forcePhysical: true));
         return;
@@ -2453,6 +2536,50 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       debugPrint('Cloud billing request failed: $e');
     }
+  }
+
+  String generatePreCuentaTicket(TableModel table) {
+    final buffer = StringBuffer();
+    buffer.writeln(formatCenter('=== PRE-CUENTA ==='));
+    buffer.writeln(formatCenter('GRUPO CACHARELO'));
+    buffer.writeln(formatCenter(table.label));
+    final dateStr = DateTime.now().toString().substring(0, 16);
+    buffer.writeln(formatRow('Fecha:', dateStr));
+    buffer.writeln(formatRow('Atendio:', currentUserName));
+    buffer.writeln(formatDivider());
+    buffer.writeln(formatRow('Cant Descripcion', 'Total'));
+    buffer.writeln(formatDivider());
+
+    for (final item in table.items) {
+      final line = '${item.quantity}x ${item.item.name}';
+      final priceStr = '\$${item.totalPrice.toStringAsFixed(2)}';
+      buffer.writeln(formatRow(line, priceStr));
+      if (item.modifiers.isNotEmpty) {
+        buffer.writeln('   + ${item.modifiers.join(', ')}');
+      }
+      if (item.notes.isNotEmpty) {
+        buffer.writeln('   * Nota: ${item.notes}');
+      }
+    }
+
+    buffer.writeln(formatDivider(char: '='));
+    buffer.writeln(formatRow('TOTAL:', '\$${table.total.toStringAsFixed(2)}'));
+    buffer.writeln(formatDivider(char: '='));
+    buffer.writeln('');
+    buffer.writeln(formatCenter('* FAVOR DE PAGAR EN CAJA *'));
+    buffer.writeln(formatCenter('GRACIAS POR SU VISITA'));
+    return buffer.toString();
+  }
+
+  Future<bool> printPreCuentaForTable(TableModel table) async {
+    final job = PrintJob(
+      id: 'pc_${DateTime.now().millisecondsSinceEpoch}',
+      title: 'Pre-Cuenta - ${table.label}',
+      details: generatePreCuentaTicket(table),
+      target: 'Caja',
+      timestamp: DateTime.now(),
+    );
+    return enqueueCajaPrintJob(job);
   }
 
   String _generateOperationNumber(DateTime timestamp) {
@@ -2697,7 +2824,7 @@ class AppState extends ChangeNotifier {
             cashChange: null,
           );
 
-          enqueuePrintJob(
+          unawaited(enqueueCajaPrintJob(
             PrintJob(
               id: 'split_${i}_${DateTime.now().millisecondsSinceEpoch}',
               title: 'Ticket ${t.label} - Pago $i de $originalSplitCount',
@@ -2705,7 +2832,7 @@ class AppState extends ChangeNotifier {
               target: 'Caja',
               timestamp: DateTime.now(),
             ),
-          );
+          ));
         }
 
         // Add all individual payments to partialPayments for the summary
@@ -2738,7 +2865,7 @@ class AppState extends ChangeNotifier {
           cashChange: cashChange,
         );
 
-        enqueuePrintJob(
+        unawaited(enqueueCajaPrintJob(
           PrintJob(
             id: 'rec_${DateTime.now().millisecondsSinceEpoch}',
             title: 'Ticket - ${tableSnapshot.label}',
@@ -2746,7 +2873,7 @@ class AppState extends ChangeNotifier {
             target: 'Caja',
             timestamp: DateTime.now(),
           ),
-        );
+        ));
       }
 
       _addRecentClosedSale(
@@ -2928,7 +3055,7 @@ class AppState extends ChangeNotifier {
     buffer.writeln('');
 
     // Print the summary ticket
-    enqueuePrintJob(
+    unawaited(enqueueCajaPrintJob(
       PrintJob(
         id: 'summary_${DateTime.now().millisecondsSinceEpoch}',
         title: 'Resumen Final - ${table.label}',
@@ -2936,7 +3063,7 @@ class AppState extends ChangeNotifier {
         target: 'Caja',
         timestamp: DateTime.now(),
       ),
-    );
+    ));
 
     debugPrint(
         'Final summary ticket printed for ${table.label} with ${table.partialPayments.length} partial payments.');
@@ -3194,6 +3321,9 @@ class AppState extends ChangeNotifier {
   Future<void> setReceiveRemotePrintJobs(bool enabled) async {
     receiveRemotePrintJobs = enabled;
     await _secureStorageService.saveReceiveRemotePrintJobs(enabled);
+    if (!enabled) {
+      await sendPrintStationAvailability(canPrintComandas: false);
+    }
     _refreshPrintStationLifecycle();
     notifyListeners();
   }
@@ -3202,7 +3332,7 @@ class AppState extends ChangeNotifier {
     final stationId = lastSelectedPrintStationId;
     if (stationId == null) return null;
     for (final station in onlinePrintStations) {
-      if (station.stationId == stationId && station.online) {
+      if (station.stationId == stationId && station.canPrintComandas) {
         return station;
       }
     }
@@ -3218,6 +3348,38 @@ class AppState extends ChangeNotifier {
   String get _printStationBaseUrl =>
       terminalApiUrl ??
       'https://pos-sync-api-232144991863.us-central1.run.app/api';
+
+  String? get branchCashierPrintQueueId {
+    final branchId = terminalBranchId;
+    if (branchId == null || branchId.isEmpty) return null;
+    return 'branch:$branchId:cashier';
+  }
+
+  String? get defaultCajaPrintStationId {
+    final selected = lastSelectedPrintStationId?.trim();
+    if (selected != null && selected.isNotEmpty) return selected;
+    if (!hasConfiguredPrinter) return branchCashierPrintQueueId;
+    return null;
+  }
+
+  String get defaultPrintRouteLabel {
+    final selected = lastSelectedPrintStationId;
+    if (selected != null && selected.isNotEmpty) {
+      final station = onlinePrintStations.cast<PrintStation?>().firstWhere(
+            (station) => station?.stationId == selected,
+            orElse: () => null,
+          );
+      final name = station?.displayName ?? 'caja configurada';
+      return 'Cola de caja: $name';
+    }
+    if (!hasConfiguredPrinter && branchCashierPrintQueueId != null) {
+      return 'Cola de caja';
+    }
+    if (hasConfiguredPrinter) {
+      return 'Impresora local';
+    }
+    return 'Sin impresora configurada';
+  }
 
   Map<String, String> get _jsonAuthHeaders {
     final headers = {'Content-Type': 'application/json'};
@@ -3258,7 +3420,6 @@ class AppState extends ChangeNotifier {
           .where(
             (station) =>
                 station.stationId.isNotEmpty &&
-                station.online &&
                 station.printerName.isNotEmpty &&
                 station.canPrintComandas,
           )
@@ -3273,11 +3434,30 @@ class AppState extends ChangeNotifier {
 
   Future<bool> sendPrintStationHeartbeat() async {
     if (!canAdvertisePrintStation) return false;
+    return sendPrintStationAvailability(canPrintComandas: true);
+  }
+
+  Future<bool> sendPrintStationAvailability({
+    required bool canPrintComandas,
+  }) async {
+    if (!isTerminalConfigured ||
+        terminalBranchId == null ||
+        connectedPrinterName == null ||
+        currentUserRole == UserRole.none ||
+        kIsWeb) {
+      lastPrintStationPublishAttemptAt = DateTime.now();
+      lastPrintStationPublishSucceeded = false;
+      lastPrintStationPublishMessage =
+          'Falta sucursal, sesion o impresora configurada.';
+      notifyListeners();
+      return false;
+    }
     final stationId = localStationId ??
         await _secureStorageService.getOrCreateLocalStationId();
     localStationId = stationId;
 
     try {
+      lastPrintStationPublishAttemptAt = DateTime.now();
       final station = PrintStation(
         stationId: stationId,
         deviceName: _defaultDeviceName(),
@@ -3286,27 +3466,56 @@ class AppState extends ChangeNotifier {
         printerName: connectedPrinterName!,
         role: currentUserRole,
         lastSeenAt: DateTime.now().toUtc(),
-        canPrintComandas: true,
-        online: true,
+        canPrintComandas: canPrintComandas,
+        online: canPrintComandas,
+        recentlySeen: true,
+        presenceStatus: canPrintComandas ? 'online' : 'disabled',
       );
       final response = await http
           .post(
             Uri.parse('$_printStationBaseUrl/print-stations/heartbeat'),
             headers: _jsonAuthHeaders,
-            body: jsonEncode(station.toJson(branchId: terminalBranchId!)),
+            body: jsonEncode({
+              'stationId': station.stationId,
+              'branchId': terminalBranchId,
+              'deviceName': station.deviceName,
+              'role': station.role.name,
+              'operatorId': station.operatorId,
+              'operatorName': station.operatorName,
+              'printerName': station.printerName,
+              'canPrintComandas': station.canPrintComandas,
+            }),
           )
           .timeout(const Duration(seconds: 6));
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        lastPrintStationPublishSucceeded = false;
+        lastPrintStationPublishMessage =
+            'Error ${response.statusCode}: ${response.body}';
+        notifyListeners();
         debugPrint(
           'sendPrintStationHeartbeat failed ${response.statusCode}: ${response.body}',
         );
         return false;
       }
+      lastPrintStationPublishSucceeded = true;
+      lastPrintStationPublishMessage = canPrintComandas
+          ? 'Estacion publicada para recibir comandas.'
+          : 'Estacion desactivada para comandas.';
+      notifyListeners();
       return true;
     } catch (e) {
+      lastPrintStationPublishSucceeded = false;
+      lastPrintStationPublishMessage = 'Error publicando estacion: $e';
+      notifyListeners();
       debugPrint('Error sending print station heartbeat: $e');
       return false;
     }
+  }
+
+  Future<bool> publishPrintStationNow() async {
+    return sendPrintStationAvailability(
+      canPrintComandas: receiveRemotePrintJobs,
+    );
   }
 
   Future<bool> enqueueRemotePrintJob(
@@ -3329,7 +3538,6 @@ class AppState extends ChangeNotifier {
               'title': job.title,
               'details': job.details,
               'target': job.target,
-              'status': 'queued',
               'createdAt': job.timestamp.toUtc().toIso8601String(),
             }),
           )
@@ -3367,12 +3575,59 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<bool> enqueueCajaPrintJob(
+    PrintJob job, {
+    String? preferredStationId,
+    bool allowLocalFallback = true,
+  }) async {
+    final explicitTarget = preferredStationId?.trim();
+    final targetStationId = explicitTarget != null && explicitTarget.isNotEmpty
+        ? explicitTarget
+        : defaultCajaPrintStationId;
+
+    if (targetStationId != null && targetStationId.isNotEmpty) {
+      final queued = await enqueueRemotePrintJob(job, targetStationId);
+      if (queued) return true;
+    }
+
+    if (allowLocalFallback && hasConfiguredPrinter) {
+      await enqueuePrintJob(job, forcePhysical: true);
+      return job.status == 'printed';
+    }
+
+    final failedJob = PrintJob(
+      id: 'unrouted_${job.id}',
+      title: job.title,
+      details: job.details,
+      target: job.target,
+      status: 'failed',
+      timestamp: DateTime.now(),
+    );
+    printJobs.add(failedJob);
+    notifyListeners();
+    return false;
+  }
+
   Future<void> pollRemotePrintJobs() async {
     if (!canAdvertisePrintStation || localStationId == null) return;
 
     try {
+      final targetIds = <String>{
+        localStationId!,
+        if (branchCashierPrintQueueId != null) branchCashierPrintQueueId!,
+      };
+      for (final targetId in targetIds) {
+        await _pollRemotePrintJobsForTarget(targetId);
+      }
+    } catch (e) {
+      debugPrint('Error polling remote print jobs: $e');
+    }
+  }
+
+  Future<void> _pollRemotePrintJobsForTarget(String targetId) async {
+    try {
       final uri = Uri.parse(
-        '$_printStationBaseUrl/print-jobs?branchId=$terminalBranchId&targetStationId=$localStationId&status=queued',
+        '$_printStationBaseUrl/print-jobs?branchId=$terminalBranchId&targetStationId=$targetId&status=queued',
       );
       final response = await http
           .get(uri, headers: _jsonAuthHeaders)
@@ -3390,7 +3645,7 @@ class AppState extends ChangeNotifier {
       for (final rawJob in rawJobs.whereType<Map>()) {
         final job = RemotePrintJob.fromJson(Map<String, dynamic>.from(rawJob));
         if (job.id.isEmpty ||
-            job.targetStationId != localStationId ||
+            job.targetStationId != targetId ||
             _remotePrintJobsInFlight.contains(job.id)) {
           continue;
         }
@@ -3566,6 +3821,9 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> disconnectPrinter() async {
+    if (receiveRemotePrintJobs && connectedPrinterName != null) {
+      await sendPrintStationAvailability(canPrintComandas: false);
+    }
     // Only try to disconnect Bluetooth if it's not a desktop or simulated printer
     if (connectedPrinterMac != '00:11:22:33:44:55' &&
         connectedPrinterMac != 'desktop' &&
@@ -3585,6 +3843,8 @@ class AppState extends ChangeNotifier {
 
   Future<void> _autoConnectPrinter() async {
     try {
+      printerPaperWidth =
+          await _secureStorageService.getSavedPrinterPaperWidth() ?? '58mm';
       final saved = await _secureStorageService.getSavedPrinter();
       if (saved != null) {
         final mac = saved['mac']!;
@@ -3644,7 +3904,7 @@ class AppState extends ChangeNotifier {
         );
         if (!reconnected) return false;
       }
-      final bytes = latin1.encode('$details\n\n\n\n').toList();
+      final bytes = latin1.encode('${details.trimRight()}\n\n').toList();
       return await PrintBluetoothThermal.writeBytes(bytes);
     } catch (e) {
       debugPrint('Error printing to physical printer: $e');
@@ -3658,19 +3918,58 @@ class AppState extends ChangeNotifier {
     try {
       final pdf = pw.Document();
 
-      // Create a simple text-based receipt using monospace font
+      // Calculate dynamic receipt height to avoid excess blank paper feed
+      final lineCount = details.trimRight().split('\n').length;
+      double fontSize;
+      double horizontalMargin;
+      double widthMm;
+
+      if (printerPaperWidth == '50mm') {
+        widthMm = 50.0;
+        fontSize = 7.5;
+        horizontalMargin = 2.0;
+      } else if (printerPaperWidth == '80mm') {
+        widthMm = 80.0;
+        fontSize = 8.0;
+        horizontalMargin = 6.0;
+      } else {
+        widthMm = 57.0;
+        fontSize = 8.0;
+        horizontalMargin = 4.0;
+      }
+
+      // Height per line (pt) based on font size and line spacing (approx fontSize * 1.35)
+      final double lineSpacingPt = fontSize * 1.35;
+      // Convert points to mm (1 pt = 0.352778 mm)
+      final double calculatedHeightMm =
+          ((lineCount * lineSpacingPt) + 16.0) * 0.352778;
+      final double targetHeightMm = max(30.0, calculatedHeightMm);
+
+      final targetFormat = PdfPageFormat(
+        widthMm * PdfPageFormat.mm,
+        targetHeightMm * PdfPageFormat.mm,
+        marginAll: 0,
+      );
+
+      // Create a text-based receipt with tight margins and bold font for thermal clarity
       pdf.addPage(
         pw.Page(
-          pageFormat: PdfPageFormat.roll80,
+          pageFormat: targetFormat,
+          margin: pw.EdgeInsets.symmetric(
+            horizontal: horizontalMargin,
+            vertical: 4.0,
+          ),
           build: (context) {
             return pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Text(
-                  details,
+                  details.trimRight(),
                   style: pw.TextStyle(
-                    font: pw.Font.courier(),
-                    fontSize: 10,
+                    font: pw.Font.courierBold(),
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: fontSize,
+                    lineSpacing: 1.1,
                   ),
                 ),
               ],
@@ -3689,7 +3988,7 @@ class AppState extends ChangeNotifier {
       );
 
       debugPrint(
-          'Successfully printed to desktop printer: $connectedPrinterName');
+          'Successfully printed to desktop printer: $connectedPrinterName ($printerPaperWidth, ${targetHeightMm.toStringAsFixed(1)}mm height)');
       return true;
     } catch (e) {
       debugPrint('Error printing to desktop printer: $e');
@@ -4185,54 +4484,59 @@ class AppState extends ChangeNotifier {
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
   }
 
-  // Format helpers for 58mm thermal printer (32 columns max)
-  String formatCenter(String text, {int width = 32}) {
-    if (text.length >= width) return text.substring(0, width);
-    final leftPadding = (width - text.length) ~/ 2;
-    final rightPadding = width - text.length - leftPadding;
-    return ' ' * leftPadding + text + ' ' * rightPadding;
+  // Format helpers for thermal printer (50/58mm = 32 cols, 80mm = 48 cols)
+  String formatCenter(String text, [int? width]) {
+    final w = width ?? ticketWidth;
+    final trimmed = text.trim();
+    if (trimmed.length >= w) return trimmed.substring(0, w);
+    final leftPadding = (w - trimmed.length) ~/ 2;
+    return ' ' * leftPadding + trimmed;
   }
 
-  String formatCenterLines(String text, {int width = 32}) {
-    return '${_wrapText(text, width).map((line) => formatCenter(line, width: width)).join('\n')}\n';
+  String formatCenterLines(String text, [int? width]) {
+    final w = width ?? ticketWidth;
+    return '${_wrapText(text, w).map((line) => formatCenter(line, w)).join('\n')}\n';
   }
 
-  String formatRow(String left, String right, {int width = 32}) {
-    if (left.length + right.length >= width) {
-      final allowedLeftWidth = width - right.length - 1;
+  String formatRow(String left, String right, [int? width]) {
+    final w = width ?? ticketWidth;
+    if (left.length + right.length >= w) {
+      final allowedLeftWidth = w - right.length - 1;
       if (allowedLeftWidth > 0) {
         left = left.substring(0, allowedLeftWidth);
       } else {
-        return right.substring(0, min(right.length, width));
+        return right.substring(0, min(right.length, w));
       }
     }
-    final padding = width - left.length - right.length;
+    final padding = w - left.length - right.length;
     return left + ' ' * padding + right;
   }
 
-  String formatDivider({String char = '-', int width = 32}) {
-    return char * width;
+  String formatDivider({String char = '-', int? width}) {
+    final w = width ?? ticketWidth;
+    return char * w;
   }
 
-  List<String> _wrapText(String text, int width) {
+  List<String> _wrapText(String text, [int? width]) {
+    final w = width ?? ticketWidth;
     final lines = <String>[];
     for (final rawLine in text.split('\n')) {
       final words = rawLine.trim().split(RegExp(r'\s+'));
       var current = '';
       for (final word in words.where((word) => word.isNotEmpty)) {
-        if (word.length > width) {
+        if (word.length > w) {
           if (current.isNotEmpty) {
             lines.add(current);
             current = '';
           }
-          for (var i = 0; i < word.length; i += width) {
-            lines.add(word.substring(i, min(i + width, word.length)));
+          for (var i = 0; i < word.length; i += w) {
+            lines.add(word.substring(i, min(i + w, word.length)));
           }
           continue;
         }
 
         final candidate = current.isEmpty ? word : '$current $word';
-        if (candidate.length <= width) {
+        if (candidate.length <= w) {
           current = candidate;
         } else {
           lines.add(current);
@@ -4463,12 +4767,20 @@ class AppState extends ChangeNotifier {
     });
   }
 
+  bool _isDisposed = false;
+
+  @override
+  void notifyListeners() {
+    if (_isDisposed) return;
+    super.notifyListeners();
+  }
+
   @override
   void dispose() {
+    _isDisposed = true;
+    _stopPrintStationLifecycle();
     _fallbackPollingTimer?.cancel();
     _kitchenSyncRetryTimer?.cancel();
-    _printStationHeartbeatTimer?.cancel();
-    _remotePrintPollingTimer?.cancel();
     _socketService?.dispose();
     super.dispose();
   }

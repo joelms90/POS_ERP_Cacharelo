@@ -16,6 +16,7 @@ class KitchenDashboardScreen extends StatefulWidget {
 class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
   String selectedFilter =
       'TODOS'; // 'TODOS', 'PENDIENTES', 'EN PREPARACIÓN', 'LISTOS'
+  String selectedStation = 'TODOS'; // 'TODOS', 'COCINA', 'BARRA'
 
   @override
   Widget build(BuildContext context) {
@@ -38,8 +39,14 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
                 .where((o) => o.status == 'ready')
                 .length;
 
-            // Filter kitchen tickets
+            // Filter kitchen tickets by status and station
             final activeOrders = allActiveOrders.where((order) {
+              if (selectedStation == 'COCINA' && order.station != 'cocina') {
+                return false;
+              }
+              if (selectedStation == 'BARRA' && order.station != 'barra') {
+                return false;
+              }
               if (selectedFilter == 'PENDIENTES') {
                 return order.status == 'pending';
               }
@@ -146,17 +153,69 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
                 ),
               ),
               const SizedBox(width: 20),
-              IconButton(
-                onPressed: () {
-                  widget.state.logout();
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => LoginScreen(state: widget.state),
-                    ),
-                  );
+              PopupMenuButton<String>(
+                icon: const Icon(
+                  Icons.settings,
+                  color: EmpireColors.champagneGold,
+                ),
+                color: EmpireColors.onyxSurface,
+                surfaceTintColor: Colors.transparent,
+                offset: const Offset(0, 40),
+                onSelected: (value) {
+                  if (value == 'logout') {
+                    widget.state.logout();
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (context) => LoginScreen(state: widget.state),
+                      ),
+                    );
+                  } else if (value == 'sync') {
+                    _triggerSync(context);
+                  }
                 },
-                icon: const Icon(Icons.logout, color: EmpireColors.errorRed),
-                tooltip: 'Cerrar Sesión',
+                itemBuilder: (BuildContext context) => [
+                  const PopupMenuItem<String>(
+                    value: 'sync',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.sync,
+                          color: EmpireColors.champagneGold,
+                          size: 18,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Sincronizar Datos',
+                          style: TextStyle(
+                            color: EmpireColors.textPrimary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuDivider(height: 1),
+                  const PopupMenuItem<String>(
+                    value: 'logout',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.logout,
+                          color: EmpireColors.errorRed,
+                          size: 18,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Cerrar Sesión',
+                          style: TextStyle(
+                            color: EmpireColors.textPrimary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -208,42 +267,85 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
 
   Widget _buildFilterBar() {
     final filters = ['TODOS', 'PENDIENTES', 'EN PREPARACIÓN', 'LISTOS'];
+    final stations = [
+      {'id': 'TODOS', 'label': '🌐 TODAS LAS ESTACIONES'},
+      {'id': 'COCINA', 'label': '🍳 COCINA'},
+      {'id': 'BARRA', 'label': '🍹 BARRA'},
+    ];
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       color: EmpireColors.obsidian,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: filters.map((f) {
-          final isSelected = selectedFilter == f;
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: ChoiceChip(
-              label: Text(f),
-              selected: isSelected,
-              onSelected: (selected) {
-                if (selected) {
-                  setState(() => selectedFilter = f);
-                }
-              },
-              selectedColor: EmpireColors.champagneGold,
-              backgroundColor: EmpireColors.onyxSurface,
-              labelStyle: TextStyle(
-                color: isSelected
-                    ? EmpireColors.obsidian
-                    : EmpireColors.textPrimary,
-                fontWeight: FontWeight.bold,
-                fontSize: 11,
-              ),
-              side: BorderSide(
-                color: isSelected
-                    ? EmpireColors.champagneGold
-                    : EmpireColors.agedBronzeDark,
-                width: 1,
-              ),
-            ),
-          );
-        }).toList(),
+      child: Column(
+        children: [
+          // Station Selector
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: stations.map((st) {
+              final isSelected = selectedStation == st['id'];
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: ChoiceChip(
+                  label: Text(st['label']!),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() => selectedStation = st['id']!);
+                    }
+                  },
+                  selectedColor: st['id'] == 'BARRA' ? Colors.cyan : (st['id'] == 'COCINA' ? Colors.amber : EmpireColors.champagneGold),
+                  backgroundColor: EmpireColors.onyxSurface,
+                  labelStyle: TextStyle(
+                    color: isSelected ? EmpireColors.obsidian : EmpireColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
+                  side: BorderSide(
+                    color: isSelected
+                        ? (st['id'] == 'BARRA' ? Colors.cyan : (st['id'] == 'COCINA' ? Colors.amber : EmpireColors.champagneGold))
+                        : EmpireColors.agedBronzeDark,
+                    width: 1,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 6),
+          // Status Selector
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: filters.map((f) {
+              final isSelected = selectedFilter == f;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: ChoiceChip(
+                  label: Text(f),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() => selectedFilter = f);
+                    }
+                  },
+                  selectedColor: EmpireColors.champagneGold,
+                  backgroundColor: EmpireColors.onyxSurface,
+                  labelStyle: TextStyle(
+                    color: isSelected
+                        ? EmpireColors.obsidian
+                        : EmpireColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
+                  side: BorderSide(
+                    color: isSelected
+                        ? EmpireColors.champagneGold
+                        : EmpireColors.agedBronzeDark,
+                    width: 1,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
@@ -351,7 +453,7 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Status Badge
+                  // Status & Station Badges
                   Row(
                     children: [
                       Container(
@@ -370,6 +472,50 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
                           ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: order.station == 'barra'
+                              ? Colors.cyan.withOpacity(0.15)
+                              : Colors.amber.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: order.station == 'barra'
+                                ? Colors.cyan
+                                : Colors.amber,
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              order.station == 'barra'
+                                  ? Icons.local_bar
+                                  : Icons.soup_kitchen,
+                              size: 10,
+                              color: order.station == 'barra'
+                                  ? Colors.cyan
+                                  : Colors.amber,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              order.station == 'barra' ? 'BARRA' : 'COCINA',
+                              style: TextStyle(
+                                color: order.station == 'barra'
+                                    ? Colors.cyan
+                                    : Colors.amber,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -576,6 +722,54 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
         return 'Listo';
       default:
         return status;
+    }
+  }
+
+  void _triggerSync(BuildContext context) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: EmpireColors.obsidian,
+              ),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'Sincronizando datos con el servidor...',
+              style: TextStyle(
+                color: EmpireColors.obsidian,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: EmpireColors.champagneGold,
+        duration: Duration(milliseconds: 1500),
+      ),
+    );
+
+    final bool success = await widget.state.syncAllData();
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success ? 'Sincronización completa con éxito.' : 'Sincronización incompleta. Revise su conexión de red.',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: success ? EmpireColors.successGreen : EmpireColors.errorRed,
+          duration: const Duration(seconds: 2),
+        ),
+      );
     }
   }
 }

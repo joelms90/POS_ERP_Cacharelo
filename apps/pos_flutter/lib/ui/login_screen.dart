@@ -3,9 +3,11 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'common/colors.dart';
 import 'common/app_state.dart';
+import 'common/update_dialog.dart';
 import 'waiter/waiter_ordering_screen.dart';
 import 'cashier/cashier_dashboard_screen.dart';
 import 'kitchen/kitchen_dashboard_screen.dart';
+import 'encargado/encargado_dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final AppState state;
@@ -468,6 +470,12 @@ class _LoginScreenState extends State<LoginScreen> {
       case UserRole.kitchen:
         nextScreen = KitchenDashboardScreen(state: widget.state);
         break;
+      case UserRole.encargado:
+        nextScreen = EncargadoDashboardScreen(state: widget.state, showFullFeatures: false);
+        break;
+      case UserRole.responsable:
+        nextScreen = EncargadoDashboardScreen(state: widget.state, showFullFeatures: true);
+        break;
       default:
         return;
     }
@@ -557,6 +565,10 @@ class _LoginScreenState extends State<LoginScreen> {
         return 'Cajero';
       case UserRole.kitchen:
         return 'Cocina';
+      case UserRole.encargado:
+        return 'Encargado';
+      case UserRole.responsable:
+        return 'Responsable';
       case UserRole.none:
         return 'Sin rol';
     }
@@ -679,9 +691,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
                                       SizedBox(height: footerGap),
 
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
+                                      Wrap(
+                                        alignment: WrapAlignment.center,
+                                        spacing: 8,
+                                        runSpacing: 8,
                                         children: [
                                           TextButton(
                                             onPressed: () {
@@ -746,6 +759,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                               ),
                                             ),
                                           ),
+                                          const Text(
+                                            '|',
+                                            style: TextStyle(
+                                              color: Colors.white12,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                          const UpdateCheckButton(),
                                         ],
                                       ),
                                     ],

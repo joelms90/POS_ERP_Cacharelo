@@ -5,7 +5,7 @@ import { UpdateRequisitionStatusDto } from './dto/update-requisition-status.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { ENCARGADO_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE } from '../auth/roles';
+import { ENCARGADO_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE } from '../auth/roles';
 
 @Controller('requisitions')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -43,7 +43,7 @@ export class RequisitionsController {
   }
 
   @Get('branch/:branchId')
-  @Roles(ENCARGADO_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE)
+  @Roles(ENCARGADO_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
   async findByBranch(
     @Param('branchId') branchId: string,
     @Query('businessId') businessId: string,
@@ -54,21 +54,21 @@ export class RequisitionsController {
   }
 
   @Get('pending')
-  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE)
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
   async findPending(@Query('businessId') businessId: string, @Req() req: any) {
     this.validateBusinessAccess(req, businessId);
     return this.requisitionsService.findPendingForBusiness(businessId);
   }
 
   @Get()
-  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE)
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
   async findAll(@Query('businessId') businessId: string, @Req() req: any) {
     this.validateBusinessAccess(req, businessId);
     return this.requisitionsService.findAll(businessId);
   }
 
   @Patch(':id/status')
-  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE)
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
   async updateStatus(
     @Param('id') id: string,
     @Body() updateStatusDto: UpdateRequisitionStatusDto,
@@ -77,7 +77,7 @@ export class RequisitionsController {
   }
 
   @Get(':id')
-  @Roles(ENCARGADO_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE)
+  @Roles(ENCARGADO_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
   async findOne(@Param('id') id: string, @Req() req: any) {
     const requisition = await this.requisitionsService.findOne(id);
     if (requisition) {

@@ -17,6 +17,9 @@ import { BranchesModule } from './modules/branches/branches.module';
 import { RecipesModule } from './modules/recipes/recipes.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { TicketSettingsModule } from './modules/ticket-settings/ticket-settings.module';
+import { PurchaseOrdersModule } from './modules/purchase-orders/purchase-orders.module';
+import { RequisitionsModule } from './modules/requisitions/requisitions.module';
+import { PrintingModule } from './modules/printing/printing.module';
 
 @Module({
   imports: [
@@ -36,6 +39,9 @@ import { TicketSettingsModule } from './modules/ticket-settings/ticket-settings.
     RecipesModule,
     ReportsModule,
     TicketSettingsModule,
+    PurchaseOrdersModule,
+    RequisitionsModule,
+    PrintingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

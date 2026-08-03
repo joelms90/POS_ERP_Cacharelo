@@ -73,6 +73,7 @@ export class KitchenRepository {
           notes: schema.orderItems.notes,
           productName: schema.products.name,
           categoryName: schema.categories.name,
+          targetStation: schema.categories.targetStation,
         })
         .from(schema.orderItems)
         .innerJoin(schema.products, eq(schema.orderItems.productId, schema.products.id))
@@ -87,7 +88,7 @@ export class KitchenRepository {
 
       // Filter items matching the ticket station
       const filteredItems = items.filter((item) => {
-        const isBebida = item.categoryName.toLowerCase() === 'bebidas' || item.categoryName.toLowerCase() === 'drinks';
+        const isBebida = this.isBarraCategory(item.categoryName, item.targetStation);
         if (ticket.station === 'barra') {
           return isBebida;
         } else {
@@ -107,6 +108,17 @@ export class KitchenRepository {
     return ticketsWithItems;
   }
 
+  private isBarraCategory(categoryName: string, targetStation?: string | null): boolean {
+    if (targetStation === 'barra') return true;
+    const name = categoryName.toLowerCase().trim();
+    const barraKeywords = [
+      'bebida', 'drinks', 'drink', 'café', 'cafe', 'té', 'te',
+      'refresco', 'jugo', 'smoothie', 'frappe', 'agua', 'licor',
+      'trago', 'barra'
+    ];
+    return barraKeywords.some((kw) => name.includes(kw));
+  }
+
   async createTicketsForOrder(orderId: string) {
     return this.db.transaction(async (tx) => {
       // 1. Find all unsent items for this order
@@ -116,6 +128,7 @@ export class KitchenRepository {
           productId: schema.orderItems.productId,
           quantity: schema.orderItems.quantity,
           categoryName: schema.categories.name,
+          targetStation: schema.categories.targetStation,
         })
         .from(schema.orderItems)
         .innerJoin(schema.products, eq(schema.orderItems.productId, schema.products.id))
@@ -137,7 +150,7 @@ export class KitchenRepository {
       let hasBarra = false;
 
       for (const item of unsentItems) {
-        const isBebida = item.categoryName.toLowerCase() === 'bebidas' || item.categoryName.toLowerCase() === 'drinks';
+        const isBebida = this.isBarraCategory(item.categoryName, item.targetStation);
         if (isBebida) {
           hasBarra = true;
         } else {

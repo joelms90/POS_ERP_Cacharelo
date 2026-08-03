@@ -49,15 +49,34 @@ jobs:
 
       - name: Upload Web Build to Cloud Storage
         run: |
+          APP_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
           DATE=$(date +"%Y%m%d-%H%M%S")
-          VERSION="v1.0.0-$DATE"
+          VERSION="v${APP_VERSION}-${DATE}"
           cd build/web
           tar -czf ../../pos_flutter_web_$VERSION.tar.gz *
           cd ../..
           gcloud storage cp pos_flutter_web_$VERSION.tar.gz gs://cacharelo-pos-releases/web/pos_flutter_web_$VERSION.tar.gz
           gcloud storage cp pos_flutter_web_$VERSION.tar.gz gs://cacharelo-pos-releases/web/pos_flutter_web_latest.tar.gz
+
+          # Get archive size
+          SIZE=$(du -h pos_flutter_web_latest.tar.gz | cut -f1)
+          echo "SIZE=$SIZE" >> $GITHUB_OUTPUT
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
         id: version
+
+      - name: Install jq for metadata generation
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Update version metadata
+        run: |
+          chmod +x .github/scripts/generate-metadata.sh
+          .github/scripts/generate-metadata.sh \
+            "web" \
+            "${{ steps.version.outputs.VERSION }}" \
+            "https://storage.googleapis.com/cacharelo-pos-releases/web/pos_flutter_web_latest.tar.gz" \
+            "${{ steps.version.outputs.SIZE }}" \
+            "${{ github.sha }}" \
+            "${{ github.ref_name }}"
 
       - name: Create deployment summary
         run: |

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../common/colors.dart';
@@ -123,7 +125,7 @@ class _PaymentFlowDialogState extends State<PaymentFlowDialog> {
     if (_selectedMethod == 'Efectivo') {
       // 1. Add PrintJob for Pre-Cuenta
       final printDetails = _generatePreCuentaTicket();
-      widget.state.enqueuePrintJob(
+      unawaited(widget.state.enqueueCajaPrintJob(
         PrintJob(
           id: 'pc_${DateTime.now().millisecondsSinceEpoch}',
           title: 'Pre-Cuenta - ${widget.table.label}',
@@ -131,7 +133,7 @@ class _PaymentFlowDialogState extends State<PaymentFlowDialog> {
           target: 'Caja',
           timestamp: DateTime.now(),
         ),
-      );
+      ));
 
       // 2. Mark table as ready for billing
       widget.state.requestBilling(widget.table.id);
@@ -147,7 +149,7 @@ class _PaymentFlowDialogState extends State<PaymentFlowDialog> {
 
       // 1. Add PrintJob for Card payment receipt
       final printDetails = _generateCardCheckoutTicket(cardBrand, last4);
-      widget.state.enqueuePrintJob(
+      unawaited(widget.state.enqueueCajaPrintJob(
         PrintJob(
           id: 'card_rec_${DateTime.now().millisecondsSinceEpoch}',
           title: 'Ticket Pago Tarjeta - ${widget.table.label}',
@@ -155,7 +157,7 @@ class _PaymentFlowDialogState extends State<PaymentFlowDialog> {
           target: 'Caja',
           timestamp: DateTime.now(),
         ),
-      );
+      ));
 
       // 2. Checkout the table using card details
       widget.state.checkoutTable(
@@ -172,8 +174,7 @@ class _PaymentFlowDialogState extends State<PaymentFlowDialog> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final maxDialogHeight =
-        media.size.height -
+    final maxDialogHeight = media.size.height -
         media.viewInsets.bottom -
         media.padding.vertical -
         32;
@@ -331,9 +332,8 @@ class _PaymentFlowDialogState extends State<PaymentFlowDialog> {
                         color: isSelected
                             ? EmpireColors.champagneGold
                             : EmpireColors.textPrimary,
-                        fontWeight: isSelected
-                            ? FontWeight.bold
-                            : FontWeight.normal,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
                       ),
                     );
                   }).toList(),
@@ -384,7 +384,7 @@ class _PaymentFlowDialogState extends State<PaymentFlowDialog> {
               OutlinedButton.icon(
                 onPressed: () {
                   final printDetails = _generatePreCuentaTicket();
-                  widget.state.enqueuePrintJob(
+                  unawaited(widget.state.enqueueCajaPrintJob(
                     PrintJob(
                       id: 'pre_preview_${DateTime.now().millisecondsSinceEpoch}',
                       title: 'Pre-Cuenta - ${widget.table.label}',
@@ -392,21 +392,24 @@ class _PaymentFlowDialogState extends State<PaymentFlowDialog> {
                       target: 'Caja',
                       timestamp: DateTime.now(),
                     ),
-                  );
+                  ));
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       backgroundColor: EmpireColors.successGreen,
-                      content: Text('Vista previa de la cuenta enviada a imprimir para ${widget.table.label}.'),
+                      content: Text(
+                          'Vista previa de la cuenta enviada a imprimir para ${widget.table.label}.'),
                     ),
                   );
                 },
                 icon: const Icon(Icons.print, size: 18),
                 label: const Text(
                   'IMPRIMIR PRE-CUENTA',
-                  style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, letterSpacing: 0.5),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: EmpireColors.champagneGold, width: 1.2),
+                  side: const BorderSide(
+                      color: EmpireColors.champagneGold, width: 1.2),
                   foregroundColor: EmpireColors.champagneGold,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),

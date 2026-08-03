@@ -322,6 +322,16 @@ class SecureStorageService {
     await _write('connected_printer_name', name);
   }
 
+  // Save connected printer paper width ('58mm' or '80mm')
+  Future<void> savePrinterPaperWidth(String paperWidth) async {
+    await _write('connected_printer_paper_width', paperWidth);
+  }
+
+  // Load connected printer paper width ('58mm' or '80mm')
+  Future<String?> getSavedPrinterPaperWidth() async {
+    return await _read('connected_printer_paper_width');
+  }
+
   // Load connected printer info
   Future<Map<String, String>?> getSavedPrinter() async {
     final mac = await _read('connected_printer_mac');
@@ -336,6 +346,7 @@ class SecureStorageService {
   Future<void> clearSavedPrinter() async {
     await _delete('connected_printer_mac');
     await _delete('connected_printer_name');
+    await _delete('connected_printer_paper_width');
   }
 
   Future<String> getOrCreateLocalStationId() async {

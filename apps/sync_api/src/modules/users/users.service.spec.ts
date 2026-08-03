@@ -47,10 +47,10 @@ describe('UsersService', () => {
 
       const result = await service.findAll('bus-1');
       expect(result).toEqual([
-        { id: '1', name: 'User 1', role: 'waiter' },
-        { id: '2', name: 'User 2', role: 'cashier' },
+        { id: '1', name: 'User 1', role: 'waiter', roles: ['waiter'] },
+        { id: '2', name: 'User 2', role: 'cashier', roles: ['cashier'] },
       ]);
-      expect(repository.findAll).toHaveBeenCalledWith('bus-1');
+      expect(repository.findAll).toHaveBeenCalledWith('bus-1', undefined);
     });
   });
 
@@ -60,7 +60,7 @@ describe('UsersService', () => {
       mockUsersRepository.findById.mockResolvedValue(dbUser);
 
       const result = await service.findOne('1');
-      expect(result).toEqual({ id: '1', name: 'User 1', role: 'waiter' });
+      expect(result).toEqual({ id: '1', name: 'User 1', role: 'waiter', roles: ['waiter'] });
     });
 
     it('should throw NotFoundException if user not found', async () => {
@@ -92,6 +92,7 @@ describe('UsersService', () => {
         id: 'new-id',
         name: 'New Waiter',
         role: 'waiter',
+        roles: ['waiter'],
         businessId: 'bus-1',
       });
       expect(repository.create).toHaveBeenCalled();

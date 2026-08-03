@@ -26,7 +26,7 @@ export type AdminTab = 'administrators' | 'personal' | 'inventory' | 'providers'
 export const roleTabs: Record<string, AdminTab[]> = {
   owner: ['administrators', 'personal', 'branches', 'ticket-settings', 'pos-simulator', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'transfers', 'purchase-orders', 'requisitions', 'reports', 'inquiries', 'help'],
   inventory_admin: ['inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'purchase-orders', 'requisitions', 'help'],
-  support_tech: ['inventory', 'categories', 'warehouses', 'providers', 'assembly', 'purchase-orders', 'requisitions', 'help'],
+  support_tech: ['personal', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'purchase-orders', 'requisitions', 'help'],
 };
 
 function App() {

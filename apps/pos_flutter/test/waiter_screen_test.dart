@@ -445,8 +445,8 @@ void main() {
       await tester.tap(find.text('CONFIRMAR PEDIDO'));
       await tester.pumpAndSettle();
       expect(find.text('Confirmar Envío'), findsOneWidget);
-      expect(find.text('ENVIAR E IMPRIMIR COMANDA'), findsOneWidget);
-      await tester.tap(find.text('ENVIAR E IMPRIMIR COMANDA'));
+      expect(find.text('CONFIRMAR ENVIO'), findsOneWidget);
+      await tester.tap(find.text('CONFIRMAR ENVIO'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -478,8 +478,8 @@ void main() {
       await tester.tap(find.text('CONFIRMAR PEDIDO'));
       await tester.pumpAndSettle();
       expect(find.text('Confirmar Envío'), findsOneWidget);
-      expect(find.text('ENVIAR E IMPRIMIR COMANDA'), findsOneWidget);
-      await tester.tap(find.text('ENVIAR E IMPRIMIR COMANDA'));
+      expect(find.text('CONFIRMAR ENVIO'), findsOneWidget);
+      await tester.tap(find.text('CONFIRMAR ENVIO'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -539,8 +539,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Confirmar Envío'), findsOneWidget);
-    expect(find.text('ENVIAR E IMPRIMIR COMANDA'), findsOneWidget);
-    await tester.tap(find.text('ENVIAR E IMPRIMIR COMANDA'));
+    expect(find.text('CONFIRMAR ENVIO'), findsOneWidget);
+    await tester.tap(find.text('CONFIRMAR ENVIO'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 

@@ -15,6 +15,7 @@ describe('AuthService', () => {
     findByEmail: jest.fn(),
     findAll: jest.fn(),
     findById: jest.fn(),
+    findAdminAccessForUser: jest.fn().mockResolvedValue([]),
   };
 
   const mockAuthRepository = {
@@ -83,7 +84,9 @@ describe('AuthService', () => {
         name: 'Admin User',
         email: 'admin@example.com',
         role: 'admin',
+        roles: ['admin'],
         businessId: 'bus-1',
+        businessAccess: [{ businessId: 'bus-1', role: 'admin' }],
       });
     });
 

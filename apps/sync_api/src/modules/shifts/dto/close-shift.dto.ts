@@ -1,4 +1,11 @@
-import { IsString, IsNotEmpty, IsNumberString, IsOptional } from 'class-validator';
+import {
+  IsObject,
+  IsString,
+  IsNotEmpty,
+  IsNumberString,
+  IsOptional,
+  MaxLength,
+} from 'class-validator';
 
 export class CloseShiftDto {
   @IsNumberString()
@@ -8,4 +15,13 @@ export class CloseShiftDto {
   @IsString()
   @IsOptional()
   closedAt?: string;
+
+  @IsObject()
+  @IsOptional()
+  denominationCounts?: Record<string, number>;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  closeNotes?: string;
 }

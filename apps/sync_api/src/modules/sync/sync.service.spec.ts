@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SyncService } from './sync.service';
 import { DRIZZLE_CONNECTION } from '../../database/database.module';
+import { SyncGateway } from './sync.gateway';
 
 describe('SyncService', () => {
   let service: SyncService;
@@ -19,6 +20,10 @@ describe('SyncService', () => {
     set: jest.fn().mockReturnThis(),
   };
 
+  const mockSyncGateway = {
+    broadcastChange: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -26,6 +31,10 @@ describe('SyncService', () => {
         {
           provide: DRIZZLE_CONNECTION,
           useValue: mockDb,
+        },
+        {
+          provide: SyncGateway,
+          useValue: mockSyncGateway,
         },
       ],
     }).compile();

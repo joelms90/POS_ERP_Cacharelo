@@ -87,12 +87,29 @@ jobs:
       - name: Upload Versioned Builds to Cloud Storage
         if: github.ref == 'refs/heads/main'
         run: |
+          APP_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
           DATE=$(date +"%Y%m%d-%H%M%S")
-          VERSION="v1.0.0-$DATE"
+          VERSION="v${APP_VERSION}-${DATE}"
           gcloud storage cp build/app/outputs/flutter-apk/app-release.apk gs://cacharelo-pos-releases/android/pos_flutter_android_$VERSION.apk
           gcloud storage cp build/app/outputs/bundle/release/app-release.aab gs://cacharelo-pos-releases/android/pos_flutter_android_$VERSION.aab
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
         id: version
+
+      - name: Install jq for metadata generation
+        if: github.ref == 'refs/heads/main'
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Update version metadata
+        if: github.ref == 'refs/heads/main'
+        run: |
+          chmod +x .github/scripts/generate-metadata.sh
+          .github/scripts/generate-metadata.sh \
+            "android" \
+            "${{ steps.version.outputs.VERSION }}" \
+            "https://storage.googleapis.com/cacharelo-pos-releases/android/pos_flutter_android_latest.apk" \
+            "${{ steps.apk_info.outputs.apk_size }}" \
+            "${{ github.sha }}" \
+            "${{ github.ref_name }}"
 
       - name: Create build summary
         run: |

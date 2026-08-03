@@ -69,6 +69,65 @@ export async function runMigrations() {
     `);
     console.log('✅ Admin business access table ensured.');
 
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS print_stations (
+        station_id varchar(120) PRIMARY KEY,
+        branch_id uuid NOT NULL REFERENCES branches(id),
+        device_name varchar(120) NOT NULL,
+        role varchar(30) NOT NULL,
+        operator_id uuid REFERENCES users(id),
+        operator_name varchar(120),
+        printer_name varchar(180) NOT NULL,
+        can_print_comandas boolean NOT NULL DEFAULT true,
+        last_seen_at timestamptz NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS print_stations_branch_idx ON print_stations(branch_id);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS print_stations_last_seen_idx ON print_stations(last_seen_at);`,
+    );
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS print_jobs (
+        id varchar(120) PRIMARY KEY,
+        branch_id uuid NOT NULL REFERENCES branches(id),
+        target_station_id varchar(120) NOT NULL,
+        source_user_id uuid REFERENCES users(id),
+        source_user_name varchar(120),
+        title varchar(180) NOT NULL,
+        details text NOT NULL,
+        target varchar(50) NOT NULL,
+        status varchar(20) NOT NULL DEFAULT 'queued',
+        error text,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        printed_at timestamptz,
+        failed_at timestamptz
+      );
+    `);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS print_jobs_branch_idx ON print_jobs(branch_id);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS print_jobs_station_status_idx ON print_jobs(target_station_id, status);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS print_jobs_created_at_idx ON print_jobs(created_at);`,
+    );
+    console.log('✅ Print station tables ensured.');
+
+    await db.execute(sql`
+      ALTER TABLE cash_shifts
+        ADD COLUMN IF NOT EXISTS denomination_counts jsonb,
+        ADD COLUMN IF NOT EXISTS close_notes text,
+        ADD COLUMN IF NOT EXISTS close_snapshot jsonb;
+    `);
+    console.log('✅ Cash shift close snapshot columns ensured.');
+
     // Ensure specific default business and branch exist
     const businessLines = [
       {
@@ -172,9 +231,15 @@ export async function runMigrations() {
         .limit(1);
 
       if (matchTicketConfig.length === 0) {
-        await db.insert(schema.ticketFiscalConfigurations).values(mockFiscalConfig);
-      } else if (!String(matchTicketConfig[0].footerText || '').includes('cacharelo.com')) {
-        const existingFooter = String(matchTicketConfig[0].footerText || '').trim();
+        await db
+          .insert(schema.ticketFiscalConfigurations)
+          .values(mockFiscalConfig);
+      } else if (
+        !String(matchTicketConfig[0].footerText || '').includes('cacharelo.com')
+      ) {
+        const existingFooter = String(
+          matchTicketConfig[0].footerText || '',
+        ).trim();
         await db
           .update(schema.ticketFiscalConfigurations)
           .set({
@@ -184,7 +249,9 @@ export async function runMigrations() {
             updatedAt: new Date(),
             version: sql`${schema.ticketFiscalConfigurations.version} + 1`,
           })
-          .where(eq(schema.ticketFiscalConfigurations.id, matchTicketConfig[0].id));
+          .where(
+            eq(schema.ticketFiscalConfigurations.id, matchTicketConfig[0].id),
+          );
       }
     }
     console.log('✅ Specific default business lines and branches seeded.');
@@ -200,7 +267,7 @@ export async function runMigrations() {
           '81a6df6c-5bcb-4d0b-8e75-02f18f399041',
           '81a6df6c-5bcb-4d0b-8e75-02f18f399042',
           '81a6df6c-5bcb-4d0b-8e75-02f18f399043',
-        ])
+        ]),
       );
 
     if (existingEmployees.length === 0) {
@@ -209,34 +276,32 @@ export async function runMigrations() {
       const cashierPin = await bcrypt.hash('2222', 10);
       const kitchenPin = await bcrypt.hash('3333', 10);
 
-      await db
-        .insert(schema.users)
-        .values([
-          {
-            id: '81a6df6c-5bcb-4d0b-8e75-02f18f399041',
-            businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01', // Cafeteria
-            name: 'Juan (Mesero)',
-            pin: waiterPin,
-            role: 'waiter',
-            version: 1,
-          },
-          {
-            id: '81a6df6c-5bcb-4d0b-8e75-02f18f399042',
-            businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01', // Cafeteria
-            name: 'Sofia (Cajero)',
-            pin: cashierPin,
-            role: 'cashier',
-            version: 1,
-          },
-          {
-            id: '81a6df6c-5bcb-4d0b-8e75-02f18f399043',
-            businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01', // Cafeteria
-            name: 'Carlos (Cocina)',
-            pin: kitchenPin,
-            role: 'kitchen',
-            version: 1,
-          },
-        ]);
+      await db.insert(schema.users).values([
+        {
+          id: '81a6df6c-5bcb-4d0b-8e75-02f18f399041',
+          businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01', // Cafeteria
+          name: 'Juan (Mesero)',
+          pin: waiterPin,
+          role: 'waiter',
+          version: 1,
+        },
+        {
+          id: '81a6df6c-5bcb-4d0b-8e75-02f18f399042',
+          businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01', // Cafeteria
+          name: 'Sofia (Cajero)',
+          pin: cashierPin,
+          role: 'cashier',
+          version: 1,
+        },
+        {
+          id: '81a6df6c-5bcb-4d0b-8e75-02f18f399043',
+          businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01', // Cafeteria
+          name: 'Carlos (Cocina)',
+          pin: kitchenPin,
+          role: 'kitchen',
+          version: 1,
+        },
+      ]);
     }
     console.log('✅ Default Cafetería employees ensured.');
 
@@ -250,42 +315,43 @@ export async function runMigrations() {
         inArray(schema.users.id, [
           '91a6df6c-5bcb-4d0b-8e75-02f18f399041',
           '91a6df6c-5bcb-4d0b-8e75-02f18f399042',
-        ])
+        ]),
       );
 
     if (existingAdmins.length === 0) {
       console.log('  Hashing admin passwords (first time only)...');
       const adminPin = await bcrypt.hash('0000', 10);
-      const ownerPassword = await bcrypt.hash(process.env.DEFAULT_OWNER_PASSWORD || 'owner123', 10);
+      const ownerPassword = await bcrypt.hash(
+        process.env.DEFAULT_OWNER_PASSWORD || 'owner123',
+        10,
+      );
       const inventoryAdminPassword = await bcrypt.hash(
         process.env.DEFAULT_INVENTORY_ADMIN_PASSWORD || 'inventario123',
         10,
       );
 
-      await db
-        .insert(schema.users)
-        .values([
-          {
-            id: '91a6df6c-5bcb-4d0b-8e75-02f18f399041',
-            businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01',
-            name: 'Owner Cacharelo',
-            email: 'owner@cacharelo.com',
-            passwordHash: ownerPassword,
-            pin: adminPin,
-            role: 'owner',
-            version: 1,
-          },
-          {
-            id: '91a6df6c-5bcb-4d0b-8e75-02f18f399042',
-            businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01',
-            name: 'Inventario Cacharelo',
-            email: 'inventario@cacharelo.com',
-            passwordHash: inventoryAdminPassword,
-            pin: adminPin,
-            role: 'inventory_admin',
-            version: 1,
-          },
-        ]);
+      await db.insert(schema.users).values([
+        {
+          id: '91a6df6c-5bcb-4d0b-8e75-02f18f399041',
+          businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01',
+          name: 'Owner Cacharelo',
+          email: 'owner@cacharelo.com',
+          passwordHash: ownerPassword,
+          pin: adminPin,
+          role: 'owner',
+          version: 1,
+        },
+        {
+          id: '91a6df6c-5bcb-4d0b-8e75-02f18f399042',
+          businessId: 'd3b07384-d113-4a0e-a555-e5b12824bf01',
+          name: 'Inventario Cacharelo',
+          email: 'inventario@cacharelo.com',
+          passwordHash: inventoryAdminPassword,
+          pin: adminPin,
+          role: 'inventory_admin',
+          version: 1,
+        },
+      ]);
     }
 
     const accessRows = [

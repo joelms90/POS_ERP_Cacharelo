@@ -13,6 +13,7 @@ type AdminRole = 'owner' | 'inventory_admin' | 'support_tech';
 
 const businessOptions = [
   { id: 'd3b07384-d113-4a0e-a555-e5b12824bf01', name: 'Cafetería' },
+  { id: 'e00079b3-16f2-4ac7-9cd3-0bb10335cb4d', name: 'Cafetería Jáltipan' },
   { id: 'd3b07384-d113-4a0e-a555-e5b12824bf03', name: 'Empanadas' },
   { id: 'd3b07384-d113-4a0e-a555-e5b12824bf07', name: 'Tortas' },
   { id: 'd3b07384-d113-4a0e-a555-e5b12824bf05', name: 'Hamburguesas' },

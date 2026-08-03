@@ -26,7 +26,10 @@ describe('ShiftsService', () => {
     select: jest.fn().mockReturnThis(),
     from: jest.fn().mockReturnThis(),
     innerJoin: jest.fn().mockReturnThis(),
-    where: jest.fn().mockResolvedValue([{ totalCashSales: '150.00' }]),
+    where: jest.fn().mockResolvedValue([
+      { paymentMethod: 'cash', amount: '150.00' },
+      { paymentMethod: 'card', amount: '300.00' },
+    ]),
   };
 
   beforeEach(async () => {
@@ -196,7 +199,7 @@ describe('ShiftsService', () => {
       // actual amount counted is 1250.00
       const result = await service.closeShift('shift-1', { actualAmount: '1250.00' });
       expect(result.shift.status).toBe('closed');
-      expect(result.reconciliation).toEqual({
+      expect(result.reconciliation).toMatchObject({
         initialFloat: '1000.00',
         totalCashSales: '150.00',
         totalCashIn: '200.00',
@@ -204,7 +207,29 @@ describe('ShiftsService', () => {
         expectedAmount: '1250.00',
         actualAmount: '1250.00',
         discrepancy: '0.00',
+        cashSales: 150,
+        cardSales: 300,
+        totalSales: 450,
+        expectedCash: 1250,
+        actualCash: 1250,
+        cashDifference: 0,
       });
+      expect(result.report.summary).toMatchObject({
+        cashSales: 150,
+        cardSales: 300,
+        totalSales: 450,
+        expectedCash: 1250,
+        actualCash: 1250,
+        cashDifference: 0,
+      });
+      expect(shiftsRepository.update).toHaveBeenCalledWith(
+        'shift-1',
+        expect.objectContaining({
+          closeSnapshot: expect.objectContaining({
+            summary: expect.objectContaining({ cardSales: 300 }),
+          }),
+        }),
+      );
     });
 
     it('should report discrepancy if actual amount differs from expected', async () => {
@@ -231,6 +256,47 @@ describe('ShiftsService', () => {
       // discrepancy = 1100 - 1150 = -50
       const result = await service.closeShift('shift-1', { actualAmount: '1100.00' });
       expect(result.reconciliation.discrepancy).toBe('-50.00');
+    });
+
+    it('stores denomination counts and close notes in the immutable snapshot', async () => {
+      const shift = {
+        id: 'shift-1',
+        cashierId: 'cashier-1',
+        branchId: 'branch-1',
+        initialFloat: '1000.00',
+        cashDrawerAmount: '1000.00',
+        status: 'open',
+        openedAt: new Date(Date.now() - 3600000),
+      };
+
+      mockShiftsRepository.findById.mockResolvedValue(shift);
+      mockTransactionsRepository.findByShiftId.mockResolvedValue([]);
+      mockShiftsRepository.update.mockResolvedValue({
+        ...shift,
+        status: 'closed',
+        cashDrawerAmount: '1150.00',
+      });
+
+      const denominationCounts = { '500': 2, '100': 1, '50': 1 };
+      const result = await service.closeShift('shift-1', {
+        actualAmount: '1150.00',
+        denominationCounts,
+        closeNotes: 'Todo correcto',
+      });
+
+      expect(result.report.denominationCounts).toEqual(denominationCounts);
+      expect(result.report.closeNotes).toBe('Todo correcto');
+      expect(shiftsRepository.update).toHaveBeenCalledWith(
+        'shift-1',
+        expect.objectContaining({
+          denominationCounts,
+          closeNotes: 'Todo correcto',
+          closeSnapshot: expect.objectContaining({
+            denominationCounts,
+            closeNotes: 'Todo correcto',
+          }),
+        }),
+      );
     });
   });
 });

@@ -62,11 +62,32 @@ jobs:
       - name: Upload to Cloud Storage (Versioned)
         if: github.ref == 'refs/heads/main'
         run: |
+          $appVersion = (Get-Content pubspec.yaml | Select-String '^version:' | ForEach-Object { $_ -replace 'version: ', '' -replace '\+.*', '' }).Trim()
           $date = Get-Date -Format "yyyyMMdd-HHmmss"
-          $version = "v1.0.0-$date"
+          $version = "v$appVersion-$date"
           gcloud storage cp pos_flutter_windows_x64.zip gs://cacharelo-pos-releases/windows/pos_flutter_windows_$version.zip
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+
+          # Get file size
+          $size = (Get-Item pos_flutter_windows_x64.zip).Length / 1MB
+          $sizeFormatted = "{0:N1} MB" -f $size
+          echo "SIZE=$sizeFormatted" >> $env:GITHUB_OUTPUT
         id: version
+
+      - name: Install jq for metadata generation
+        if: github.ref == 'refs/heads/main'
+        run: choco install jq -y
+
+      - name: Update version metadata
+        if: github.ref == 'refs/heads/main'
+        run: |
+          bash .github/scripts/generate-metadata.sh `
+            "windows" `
+            "${{ steps.version.outputs.VERSION }}" `
+            "https://storage.googleapis.com/cacharelo-pos-releases/windows/pos_flutter_windows_latest.zip" `
+            "${{ steps.version.outputs.SIZE }}" `
+            "${{ github.sha }}" `
+            "${{ github.ref_name }}"
 
       - name: Create build summary
         run: |

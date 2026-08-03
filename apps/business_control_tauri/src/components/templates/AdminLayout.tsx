@@ -61,6 +61,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
   const canSee = (tab: AdminTab) => allowedTabs.includes(tab);
   const businessOptions = [
     { value: 'd3b07384-d113-4a0e-a555-e5b12824bf01', label: 'Cafetería' },
+    { value: 'e00079b3-16f2-4ac7-9cd3-0bb10335cb4d', label: 'Cafetería Jáltipan' },
     { value: 'd3b07384-d113-4a0e-a555-e5b12824bf03', label: 'Empanadas' },
     { value: 'd3b07384-d113-4a0e-a555-e5b12824bf07', label: 'Tortas' },
     { value: 'd3b07384-d113-4a0e-a555-e5b12824bf05', label: 'Hamburguesas' },

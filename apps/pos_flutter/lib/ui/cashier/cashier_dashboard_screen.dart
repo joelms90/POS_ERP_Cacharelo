@@ -97,6 +97,14 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
               return t.state == TableState.occupied || t.state == TableState.billing;
             }).toList();
 
+            // Get fresh table reference if one is selected
+            final freshTable = selectedTableForCheckout != null
+                ? widget.state.tables.firstWhere(
+                    (t) => t.id == selectedTableForCheckout!.id,
+                    orElse: () => selectedTableForCheckout!,
+                  )
+                : null;
+
             return Stack(
               children: [
                 Column(
@@ -106,9 +114,10 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
 
                     // Main dashboard workspace
                     Expanded(
-                      child: (selectedTableForCheckout != null && widget.state.isShiftOpen)
+                      child: (freshTable != null && widget.state.isShiftOpen)
                           ? SplitCheckoutView(
-                              table: selectedTableForCheckout!,
+                              key: ValueKey('checkout_${freshTable.id}'),
+                              table: freshTable,
                               state: widget.state,
                               onCancel: () {
                                 setState(() => selectedTableForCheckout = null);
@@ -277,6 +286,41 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
           // Right Side: Sections + Tools
           Row(
             children: [
+              // --- User Profile Chip ---
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: EmpireColors.charcoalSurface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: EmpireColors.agedBronze.withOpacity(0.5),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.person_outline,
+                      color: EmpireColors.champagneGold,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      widget.state.currentUserName.isNotEmpty
+                          ? widget.state.currentUserName
+                          : 'Cajero',
+                      style: const TextStyle(
+                        color: EmpireColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+
               // --- SUB-GROUP 1: Section Navigation ---
               Icon(
                 Icons.point_of_sale,
@@ -299,18 +343,6 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                 widget.state.isOnline ? Icons.wifi : Icons.wifi_off,
                 color: widget.state.isOnline ? EmpireColors.successGreen : EmpireColors.warningOrange,
                 size: 20,
-              ),
-              const SizedBox(width: 12),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                icon: const Icon(
-                  Icons.sync,
-                  color: EmpireColors.textGold,
-                  size: 20,
-                ),
-                tooltip: 'Sincronizar Datos',
-                onPressed: () => _triggerSync(context),
               ),
               if (!widget.state.isOnline) ...[
                 const SizedBox(width: 8),
@@ -401,9 +433,32 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                         context: context,
                         builder: (context) => PrinterSettingsDialog(state: widget.state),
                       );
+                    } else if (value == 'sync') {
+                      _triggerSync(context);
                     }
                   },
                   itemBuilder: (BuildContext context) => [
+                    const PopupMenuItem<String>(
+                      value: 'sync',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.sync,
+                            color: EmpireColors.champagneGold,
+                            size: 18,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Sincronizar Datos',
+                            style: TextStyle(
+                              color: EmpireColors.textPrimary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(height: 1),
                     const PopupMenuItem<String>(
                       value: 'printer',
                       child: Row(

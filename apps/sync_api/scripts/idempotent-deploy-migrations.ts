@@ -1,0 +1,253 @@
+import { Client } from 'pg';
+
+async function main() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    console.error('DATABASE_URL env var is required');
+    process.exit(1);
+  }
+
+  console.log('Connecting to database...');
+  const client = new Client({ connectionString });
+  await client.connect();
+
+  try {
+    console.log('Checking and creating tables...');
+
+    // 1. purchase_orders
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "purchase_orders" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "business_id" uuid NOT NULL,
+        "provider_id" uuid NOT NULL,
+        "warehouse_id" uuid,
+        "branch_id" uuid,
+        "po_number" varchar(50) NOT NULL,
+        "status" varchar(20) DEFAULT 'draft' NOT NULL,
+        "order_date" timestamp with time zone DEFAULT now() NOT NULL,
+        "expected_delivery_date" timestamp with time zone,
+        "actual_delivery_date" timestamp with time zone,
+        "subtotal" numeric(10, 2) DEFAULT '0.00',
+        "tax" numeric(10, 2) DEFAULT '0.00',
+        "total" numeric(10, 2) DEFAULT '0.00',
+        "notes" text,
+        "created_by" uuid NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "deleted_at" timestamp with time zone,
+        "version" integer DEFAULT 1 NOT NULL,
+        CONSTRAINT "purchase_orders_po_number_unique" UNIQUE("po_number")
+      );
+    `);
+    console.log('Table purchase_orders ensured.');
+
+    // 2. purchase_order_items
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "purchase_order_items" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "po_id" uuid NOT NULL,
+        "product_id" uuid NOT NULL,
+        "quantity_ordered" numeric(12, 3) NOT NULL,
+        "quantity_received" numeric(12, 3) DEFAULT '0.000' NOT NULL,
+        "unit_cost_estimated" numeric(10, 2) NOT NULL,
+        "unit_cost_actual" numeric(10, 2) DEFAULT '0.00' NOT NULL
+      );
+    `);
+    console.log('Table purchase_order_items ensured.');
+
+    // 3. branch_requisitions
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "branch_requisitions" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "business_id" uuid NOT NULL,
+        "from_branch_id" uuid NOT NULL,
+        "to_warehouse_id" uuid NOT NULL,
+        "status" varchar(20) DEFAULT 'pending_approval' NOT NULL,
+        "notes" text,
+        "created_by" uuid NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "version" integer DEFAULT 1 NOT NULL
+      );
+    `);
+    console.log('Table branch_requisitions ensured.');
+
+    // 4. branch_requisition_items
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "branch_requisition_items" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "requisition_id" uuid NOT NULL,
+        "product_id" uuid NOT NULL,
+        "quantity_requested" numeric(12, 3) NOT NULL,
+        "quantity_approved" numeric(12, 3) DEFAULT '0.000' NOT NULL
+      );
+    `);
+    console.log('Table branch_requisition_items ensured.');
+
+    // 5. Constraints
+    console.log('Adding constraints...');
+    const addConstraintSafe = async (table: string, constraint: string, sqlQuery: string) => {
+      try {
+        await client.query(sqlQuery);
+        console.log(`Constraint ${constraint} added.`);
+      } catch (e: any) {
+        if (e.code === '42710') {
+          console.log(`Constraint ${constraint} already exists, skipping.`);
+        } else {
+          console.warn(`Warning: failed to add constraint ${constraint}: ${e.message}`);
+        }
+      }
+    };
+
+    await addConstraintSafe(
+      'branch_requisition_items',
+      'branch_requisition_items_requisition_id_branch_requisitions_id_fk',
+      'ALTER TABLE "branch_requisition_items" ADD CONSTRAINT "branch_requisition_items_requisition_id_branch_requisitions_id_fk" FOREIGN KEY ("requisition_id") REFERENCES "public"."branch_requisitions"("id") ON DELETE no action ON UPDATE no action;'
+    );
+
+    await addConstraintSafe(
+      'branch_requisition_items',
+      'branch_requisition_items_product_id_products_id_fk',
+      'ALTER TABLE "branch_requisition_items" ADD CONSTRAINT "branch_requisition_items_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE no action ON UPDATE no action;'
+    );
+
+    await addConstraintSafe(
+      'branch_requisitions',
+      'branch_requisitions_business_id_businesses_id_fk',
+      'ALTER TABLE "branch_requisitions" ADD CONSTRAINT "branch_requisitions_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE no action ON UPDATE no action;'
+    );
+
+    await addConstraintSafe(
+      'branch_requisitions',
+      'branch_requisitions_from_branch_id_branches_id_fk',
+      'ALTER TABLE "branch_requisitions" ADD CONSTRAINT "branch_requisitions_from_branch_id_branches_id_fk" FOREIGN KEY ("from_branch_id") REFERENCES "public"."branches"("id") ON DELETE no action ON UPDATE no action;'
+    );
+
+    await addConstraintSafe(
+      'branch_requisitions',
+      'branch_requisitions_to_warehouse_id_warehouses_id_fk',
+      'ALTER TABLE "branch_requisitions" ADD CONSTRAINT "branch_requisitions_to_warehouse_id_warehouses_id_fk" FOREIGN KEY ("to_warehouse_id") REFERENCES "public"."warehouses"("id") ON DELETE no action ON UPDATE no action;'
+    );
+
+    await addConstraintSafe(
+      'branch_requisitions',
+      'branch_requisitions_created_by_users_id_fk',
+      'ALTER TABLE "branch_requisitions" ADD CONSTRAINT "branch_requisitions_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;'
+    );
+
+    await addConstraintSafe(
+      'purchase_order_items',
+      'purchase_order_items_po_id_purchase_orders_id_fk',
+      'ALTER TABLE "purchase_order_items" ADD CONSTRAINT "purchase_order_items_po_id_purchase_orders_id_fk" FOREIGN KEY ("po_id") REFERENCES "public"."purchase_orders"("id") ON DELETE no action ON UPDATE no action;'
+    );
+
+    await addConstraintSafe(
+      'purchase_order_items',
+      'purchase_order_items_product_id_products_id_fk',
+      'ALTER TABLE "purchase_order_items" ADD CONSTRAINT "purchase_order_items_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE no action ON UPDATE no action;'
+    );
+
+    await addConstraintSafe(
+      'purchase_orders',
+      'purchase_orders_business_id_businesses_id_fk',
+      'ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE no action ON UPDATE no action;'
+    );
+
+    await addConstraintSafe(
+      'purchase_orders',
+      'purchase_orders_provider_id_providers_id_fk',
+      'ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_provider_id_providers_id_fk" FOREIGN KEY ("provider_id") REFERENCES "public"."providers"("id") ON DELETE no action ON UPDATE no action;'
+    );
+
+    await addConstraintSafe(
+      'purchase_orders',
+      'purchase_orders_warehouse_id_warehouses_id_fk',
+      'ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_warehouse_id_warehouses_id_fk" FOREIGN KEY ("warehouse_id") REFERENCES "public"."warehouses"("id") ON DELETE no action ON UPDATE no action;'
+    );
+
+    await addConstraintSafe(
+      'purchase_orders',
+      'purchase_orders_branch_id_branches_id_fk',
+      'ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_branch_id_branches_id_fk" FOREIGN KEY ("branch_id") REFERENCES "public"."branches"("id") ON DELETE no action ON UPDATE no action;'
+    );
+
+    await addConstraintSafe(
+      'purchase_orders',
+      'purchase_orders_created_by_users_id_fk',
+      'ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;'
+    );
+
+    // 6. Ensure target_station column on categories & backfill drink categories
+    await client.query(`
+      ALTER TABLE "categories" ADD COLUMN IF NOT EXISTS "target_station" varchar(20) DEFAULT 'cocina';
+      UPDATE "categories" 
+      SET "target_station" = 'barra' 
+      WHERE LOWER("name") SIMILAR TO '%(bebida|drink|café|cafe|té|te|refresco|jugo|smoothie|frappe|agua|licor|trago|barra)%';
+    `);
+    console.log('Column target_station on categories ensured and backfilled.');
+
+
+    // 7. Remote print stations and jobs
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "print_stations" (
+        "station_id" varchar(120) PRIMARY KEY NOT NULL,
+        "branch_id" uuid NOT NULL REFERENCES "public"."branches"("id"),
+        "device_name" varchar(120) NOT NULL,
+        "role" varchar(30) NOT NULL,
+        "operator_id" uuid REFERENCES "public"."users"("id"),
+        "operator_name" varchar(120),
+        "printer_name" varchar(180) NOT NULL,
+        "can_print_comandas" boolean DEFAULT true NOT NULL,
+        "last_seen_at" timestamp with time zone NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+    `);
+    console.log('Table print_stations ensured.');
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "print_jobs" (
+        "id" varchar(120) PRIMARY KEY NOT NULL,
+        "branch_id" uuid NOT NULL REFERENCES "public"."branches"("id"),
+        "target_station_id" varchar(120) NOT NULL,
+        "source_user_id" uuid REFERENCES "public"."users"("id"),
+        "source_user_name" varchar(120),
+        "title" varchar(180) NOT NULL,
+        "details" text NOT NULL,
+        "target" varchar(50) NOT NULL,
+        "status" varchar(20) DEFAULT 'queued' NOT NULL,
+        "error" text,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "printed_at" timestamp with time zone,
+        "failed_at" timestamp with time zone
+      );
+    `);
+    console.log('Table print_jobs ensured.');
+
+    await client.query('CREATE INDEX IF NOT EXISTS "print_stations_branch_idx" ON "print_stations" USING btree ("branch_id");');
+    await client.query('CREATE INDEX IF NOT EXISTS "print_stations_last_seen_idx" ON "print_stations" USING btree ("last_seen_at");');
+    await client.query('CREATE INDEX IF NOT EXISTS "print_jobs_branch_idx" ON "print_jobs" USING btree ("branch_id");');
+    await client.query('CREATE INDEX IF NOT EXISTS "print_jobs_station_status_idx" ON "print_jobs" USING btree ("target_station_id","status");');
+    await client.query('CREATE INDEX IF NOT EXISTS "print_jobs_created_at_idx" ON "print_jobs" USING btree ("created_at");');
+    console.log('Remote print station indexes ensured.');
+
+    // 8. Cash shift close snapshot fields
+    await client.query(`
+      ALTER TABLE "cash_shifts"
+        ADD COLUMN IF NOT EXISTS "denomination_counts" jsonb,
+        ADD COLUMN IF NOT EXISTS "close_notes" text,
+        ADD COLUMN IF NOT EXISTS "close_snapshot" jsonb;
+    `);
+    console.log('Cash shift close snapshot columns ensured.');
+
+    console.log('✅ Idempotent migrations executed successfully!');
+  } catch (error) {
+    console.error('❌ Failed to run idempotent migrations:', error);
+    process.exit(1);
+  } finally {
+    await client.end();
+  }
+}
+
+main();

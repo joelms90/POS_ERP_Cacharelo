@@ -577,6 +577,9 @@ export class ReportsService {
         status: schema.cashShifts.status,
         openedAt: schema.cashShifts.openedAt,
         closedAt: schema.cashShifts.closedAt,
+        denominationCounts: schema.cashShifts.denominationCounts,
+        closeNotes: schema.cashShifts.closeNotes,
+        closeSnapshot: schema.cashShifts.closeSnapshot,
       })
       .from(schema.cashShifts)
       .innerJoin(schema.users, eq(schema.cashShifts.cashierId, schema.users.id))
@@ -588,6 +591,10 @@ export class ReportsService {
     }
 
     const shift = shiftList[0];
+    if (shift.status === 'closed' && shift.closeSnapshot) {
+      return shift.closeSnapshot;
+    }
+
     const openedAt = new Date(shift.openedAt);
     const closedAt = shift.closedAt ? new Date(shift.closedAt) : new Date();
 
@@ -631,21 +638,47 @@ export class ReportsService {
         ),
       );
 
-    let cashSales = 0;
-    let cardSales = 0;
+    const paymentMethods = new Map<string, { paymentMethod: string; total: number; count: number }>();
     paymentsList.forEach((p) => {
+      const method = p.paymentMethod || 'other';
       const amt = this.parseMoney(p.amount);
-      if (p.paymentMethod === 'cash') {
-        cashSales += amt;
-      } else if (p.paymentMethod === 'card') {
-        cardSales += amt;
-      }
+      const row = paymentMethods.get(method) ?? { paymentMethod: method, total: 0, count: 0 };
+      row.total += amt;
+      row.count += 1;
+      paymentMethods.set(method, row);
     });
+    const salesByPaymentMethod = Array.from(paymentMethods.values()).map((row) => ({
+      paymentMethod: row.paymentMethod,
+      total: this.roundMoney(row.total),
+      count: row.count,
+    }));
+    const cashSales = salesByPaymentMethod
+      .filter((row) => row.paymentMethod === 'cash')
+      .reduce((sum, row) => sum + row.total, 0);
+    const cardSales = salesByPaymentMethod
+      .filter((row) => row.paymentMethod === 'card')
+      .reduce((sum, row) => sum + row.total, 0);
+    const totalSales = salesByPaymentMethod.reduce((sum, row) => sum + row.total, 0);
+    const otherSales = totalSales - cashSales - cardSales;
 
     const initialFloatVal = this.parseMoney(shift.initialFloat);
     const countedCashVal = this.parseMoney(shift.cashDrawerAmount);
     const expectedCash = initialFloatVal + cashSales + totalCashIn - totalCashOut;
     const discrepancy = countedCashVal - expectedCash;
+
+    const summary = {
+      initialFloat: this.roundMoney(initialFloatVal),
+      cashSales: this.roundMoney(cashSales),
+      cardSales: this.roundMoney(cardSales),
+      otherSales: this.roundMoney(otherSales),
+      totalSales: this.roundMoney(totalSales),
+      manualCashIn: this.roundMoney(totalCashIn),
+      manualCashOut: this.roundMoney(totalCashOut),
+      expectedCash: this.roundMoney(expectedCash),
+      actualCash: shift.status === 'closed' ? this.roundMoney(countedCashVal) : null,
+      cashDifference:
+        shift.status === 'closed' ? this.roundMoney(discrepancy) : null,
+    };
 
     return {
       shiftInfo: {
@@ -659,12 +692,21 @@ export class ReportsService {
         initialFloat: initialFloatVal,
         cashDrawerAmount: countedCashVal,
       },
+      summary,
       salesSummary: {
         cashSales: this.roundMoney(cashSales),
         cardSales: this.roundMoney(cardSales),
-        totalSales: this.roundMoney(cashSales + cardSales),
+        totalSales: this.roundMoney(totalSales),
       },
+      salesByPaymentMethod,
       transactions: transactionsList.map((t) => ({
+        id: t.id,
+        type: t.type,
+        amount: this.parseMoney(t.amount),
+        reason: t.reason,
+        createdAt: t.createdAt,
+      })),
+      cashMovements: transactionsList.map((t) => ({
         id: t.id,
         type: t.type,
         amount: this.parseMoney(t.amount),
@@ -673,6 +715,9 @@ export class ReportsService {
       })),
       expectedCash: this.roundMoney(expectedCash),
       discrepancy: shift.status === 'closed' ? this.roundMoney(discrepancy) : 0,
+      denominationCounts: shift.denominationCounts ?? null,
+      closeNotes: shift.closeNotes ?? null,
+      generatedAt: new Date(),
     };
   }
 

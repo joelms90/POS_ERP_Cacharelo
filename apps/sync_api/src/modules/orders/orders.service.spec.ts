@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { OrdersService } from './orders.service';
 import { OrdersRepository } from './repositories/orders.repository';
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { SyncGateway } from '../sync/sync.gateway';
 
 describe('OrdersService', () => {
   let service: OrdersService;
@@ -16,6 +17,10 @@ describe('OrdersService', () => {
     createPayment: jest.fn(),
   };
 
+  const mockSyncGateway = {
+    broadcastChange: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -23,6 +28,10 @@ describe('OrdersService', () => {
         {
           provide: OrdersRepository,
           useValue: mockOrdersRepository,
+        },
+        {
+          provide: SyncGateway,
+          useValue: mockSyncGateway,
         },
       ],
     }).compile();
@@ -111,11 +120,20 @@ describe('OrdersService', () => {
   });
 
   describe('processPayment', () => {
-    it('should process payment successfully', async () => {
-      mockOrdersRepository.findById.mockResolvedValue({ id: 'order-1', total: '116.00', state: 'billing' });
+    it('should process normal payment (no paidOrderItemIds) successfully', async () => {
+      mockOrdersRepository.findById.mockResolvedValue({
+        id: 'order-1',
+        total: '116.00',
+        state: 'billing',
+        branchId: 'branch-1',
+        tableId: 'table-1',
+      });
       mockOrdersRepository.createPayment.mockResolvedValue({
         payment: { id: 'pay-1', amount: '116.00', paymentMethod: 'cash' },
         isFullyPaid: true,
+        orderState: 'closed',
+        tableState: 'cleaning',
+        totalPaid: '116.00',
       });
 
       const result = await service.processPayment('order-1', {
@@ -124,7 +142,162 @@ describe('OrdersService', () => {
       });
 
       expect(result.isFullyPaid).toBe(true);
-      expect(repository.createPayment).toHaveBeenCalled();
+      expect(result.orderState).toBe('closed');
+      expect(repository.createPayment).toHaveBeenCalledWith('order-1', {
+        orderId: 'order-1',
+        amount: '116.00',
+        paymentMethod: 'cash',
+        referenceCode: null,
+        paidOrderItemIds: undefined,
+      });
+    });
+
+    it('should process partial payment without closing order', async () => {
+      mockOrdersRepository.findById.mockResolvedValue({
+        id: 'order-1',
+        total: '200.00',
+        state: 'billing',
+        branchId: 'branch-1',
+        tableId: 'table-1',
+      });
+      mockOrdersRepository.createPayment.mockResolvedValue({
+        payment: { id: 'pay-1', amount: '100.00', paymentMethod: 'cash' },
+        isFullyPaid: false,
+        orderState: 'billing',
+        tableState: 'billing',
+        totalPaid: '100.00',
+      });
+
+      const result = await service.processPayment('order-1', {
+        amount: '100.00',
+        paymentMethod: 'cash',
+      });
+
+      expect(result.isFullyPaid).toBe(false);
+      expect(result.orderState).toBe('billing');
+    });
+
+    it('should process by-items payment with paidOrderItemIds', async () => {
+      mockOrdersRepository.findById.mockResolvedValue({
+        id: 'order-1',
+        total: '200.00',
+        state: 'billing',
+        branchId: 'branch-1',
+        tableId: 'table-1',
+      });
+      mockOrdersRepository.createPayment.mockResolvedValue({
+        payment: { id: 'pay-1', amount: '100.00', paymentMethod: 'cash' },
+        isFullyPaid: false,
+        orderState: 'billing',
+        tableState: 'billing',
+        totalPaid: '100.00',
+        splitOrder: { id: 'split-order-1', state: 'closed' },
+      });
+
+      const result = await service.processPayment('order-1', {
+        amount: '100.00',
+        paymentMethod: 'cash',
+        paidOrderItemIds: ['item-uuid-1'],
+      });
+
+      expect(result.isFullyPaid).toBe(false);
+      expect(result.splitOrder).toBeDefined();
+      expect(repository.createPayment).toHaveBeenCalledWith('order-1', {
+        orderId: 'order-1',
+        amount: '100.00',
+        paymentMethod: 'cash',
+        referenceCode: null,
+        paidOrderItemIds: ['item-uuid-1'],
+      });
+    });
+
+    it('should handle by-items payment where items are not found (graceful fallback)', async () => {
+      mockOrdersRepository.findById.mockResolvedValue({
+        id: 'order-1',
+        total: '200.00',
+        state: 'billing',
+        branchId: 'branch-1',
+        tableId: 'table-1',
+      });
+      // When items are not found, the repository falls back to normal flow
+      mockOrdersRepository.createPayment.mockResolvedValue({
+        payment: { id: 'pay-1', amount: '100.00', paymentMethod: 'cash' },
+        isFullyPaid: false,
+        orderState: 'billing',
+        tableState: 'billing',
+        totalPaid: '100.00',
+      });
+
+      const result = await service.processPayment('order-1', {
+        amount: '100.00',
+        paymentMethod: 'cash',
+        paidOrderItemIds: ['nonexistent-uuid'],
+      });
+
+      // Should not throw — gracefully falls back to normal flow
+      expect(result.isFullyPaid).toBe(false);
+      expect(result.orderState).toBe('billing');
+    });
+
+    it('should close order on last by-items payment', async () => {
+      mockOrdersRepository.findById.mockResolvedValue({
+        id: 'order-1',
+        total: '200.00',
+        state: 'billing',
+        branchId: 'branch-1',
+        tableId: 'table-1',
+      });
+      mockOrdersRepository.createPayment.mockResolvedValue({
+        payment: { id: 'pay-2', amount: '100.00', paymentMethod: 'cash' },
+        isFullyPaid: true,
+        orderState: 'closed',
+        tableState: 'cleaning',
+        totalPaid: '100.00',
+      });
+
+      const result = await service.processPayment('order-1', {
+        amount: '100.00',
+        paymentMethod: 'cash',
+        paidOrderItemIds: ['item-uuid-2'],
+      });
+
+      expect(result.isFullyPaid).toBe(true);
+      expect(result.orderState).toBe('closed');
+      expect(result.tableState).toBe('cleaning');
+    });
+
+    it('should throw ConflictException for closed orders', async () => {
+      mockOrdersRepository.findById.mockResolvedValue({
+        id: 'order-1',
+        total: '116.00',
+        state: 'closed',
+        branchId: 'branch-1',
+        tableId: 'table-1',
+      });
+
+      await expect(
+        service.processPayment('order-1', {
+          amount: '116.00',
+          paymentMethod: 'cash',
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw ConflictException for cancelled orders', async () => {
+      mockOrdersRepository.findById.mockResolvedValue({
+        id: 'order-1',
+        total: '116.00',
+        state: 'cancelled',
+        branchId: 'branch-1',
+        tableId: 'table-1',
+      });
+
+      await expect(
+        service.processPayment('order-1', {
+          amount: '116.00',
+          paymentMethod: 'cash',
+        }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 });

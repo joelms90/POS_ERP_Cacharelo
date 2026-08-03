@@ -321,6 +321,8 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  _buildPaperWidthSelector(),
+                  const SizedBox(height: 12),
                   _buildReceiveRemoteJobsSwitch(),
                   const SizedBox(height: 16),
                 ],
@@ -563,7 +565,7 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
           const SizedBox(height: 8),
           if (stations.isEmpty)
             const Text(
-              'No hay cajas con impresora disponibles.',
+              'No hay cajas configuradas. Aun puedes enviar comandas a Cola de caja; cualquier cajero con Recibir comandas activo las imprimira al sincronizar.',
               style: TextStyle(color: EmpireColors.textSecondary, fontSize: 12),
             )
           else
@@ -636,8 +638,30 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Icon(Icons.wifi,
-                              color: EmpireColors.successGreen, size: 16),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                station.online ? Icons.wifi : Icons.wifi_off,
+                                color: station.online
+                                    ? EmpireColors.successGreen
+                                    : EmpireColors.warningOrange,
+                                size: 16,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                station.presenceLabel,
+                                style: TextStyle(
+                                  color: station.online
+                                      ? EmpireColors.successGreen
+                                      : EmpireColors.warningOrange,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -690,6 +714,94 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
             fontSize: 11,
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPaperWidthSelector() {
+    final current = widget.state.printerPaperWidth;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: EmpireColors.onyxSurface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: EmpireColors.agedBronzeDark),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'ANCHO DE PAPEL TÉRMICO (TICKET)',
+            style: TextStyle(
+              color: EmpireColors.textGold,
+              fontWeight: FontWeight.bold,
+              fontSize: 11,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: ChoiceChip(
+                  label: const Text('📱 50mm (26 cols)',
+                      style: TextStyle(fontSize: 10)),
+                  selected: current == '50mm',
+                  onSelected: (selected) {
+                    if (selected) widget.state.setPrinterPaperWidth('50mm');
+                  },
+                  selectedColor: EmpireColors.champagneGold,
+                  backgroundColor: EmpireColors.charcoalSurface,
+                  labelStyle: TextStyle(
+                    color: current == '50mm'
+                        ? EmpireColors.obsidian
+                        : EmpireColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: ChoiceChip(
+                  label: const Text('📱 58mm (32 cols)',
+                      style: TextStyle(fontSize: 10)),
+                  selected: current == '58mm',
+                  onSelected: (selected) {
+                    if (selected) widget.state.setPrinterPaperWidth('58mm');
+                  },
+                  selectedColor: EmpireColors.champagneGold,
+                  backgroundColor: EmpireColors.charcoalSurface,
+                  labelStyle: TextStyle(
+                    color: current == '58mm'
+                        ? EmpireColors.obsidian
+                        : EmpireColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: ChoiceChip(
+                  label: const Text('🖥️ 80mm (48 cols)',
+                      style: TextStyle(fontSize: 10)),
+                  selected: current == '80mm',
+                  onSelected: (selected) {
+                    if (selected) widget.state.setPrinterPaperWidth('80mm');
+                  },
+                  selectedColor: EmpireColors.champagneGold,
+                  backgroundColor: EmpireColors.charcoalSurface,
+                  labelStyle: TextStyle(
+                    color: current == '80mm'
+                        ? EmpireColors.obsidian
+                        : EmpireColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

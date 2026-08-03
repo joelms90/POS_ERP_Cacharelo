@@ -673,4 +673,187 @@ export class InventoryService {
 
     return { success: true };
   }
+
+  async processPurchaseOrderReception(
+    poId: string,
+    items: Array<{
+      productId: string;
+      quantityReceived: number;
+      unitCostActual: number;
+    }>,
+    notes?: string,
+  ) {
+    const db = this.inventoryRepository.getDb();
+
+    const [po] = await db
+      .select()
+      .from(schema.purchaseOrders)
+      .where(eq(schema.purchaseOrders.id, poId))
+      .limit(1);
+
+    if (!po) {
+      throw new NotFoundException(`Purchase Order with ID ${poId} not found`);
+    }
+
+    const destinationWarehouseId = po.warehouseId;
+    const destinationBranchId = po.branchId;
+    const businessId = po.businessId;
+
+    if (!destinationWarehouseId && !destinationBranchId) {
+      throw new BadRequestException('La orden de compra no especifica una bodega o sucursal de destino');
+    }
+
+    return db.transaction(async (tx) => {
+      for (const item of items) {
+        // 1. Update purchase order item actuals
+        await tx
+          .update(schema.purchaseOrderItems)
+          .set({
+            quantityReceived: item.quantityReceived.toString(),
+            unitCostActual: item.unitCostActual.toString(),
+          })
+          .where(
+            and(
+              eq(schema.purchaseOrderItems.poId, poId),
+              eq(schema.purchaseOrderItems.productId, item.productId),
+            ),
+          );
+
+        // 2. Recalculate average cost
+        const [product] = await tx
+          .select()
+          .from(schema.products)
+          .where(eq(schema.products.id, item.productId))
+          .limit(1);
+
+        if (!product) {
+          throw new NotFoundException(`Producto con ID ${item.productId} no encontrado`);
+        }
+
+        const currentCost = parseFloat(product.cost || '0');
+
+        // Sum current stock across all locations of this business
+        const allStocks = await tx
+          .select({ quantity: schema.stockLevels.quantity })
+          .from(schema.stockLevels)
+          .leftJoin(schema.warehouses, eq(schema.stockLevels.warehouseId, schema.warehouses.id))
+          .leftJoin(schema.branches, eq(schema.stockLevels.branchId, schema.branches.id))
+          .where(
+            and(
+              eq(schema.stockLevels.productId, item.productId),
+              sql`(${schema.warehouses.businessId} = ${businessId} OR ${schema.branches.businessId} = ${businessId})`,
+            ),
+          );
+
+        const currentStock = allStocks.reduce((acc, curr) => acc + parseFloat(curr.quantity || '0'), 0);
+        const totalQty = currentStock + item.quantityReceived;
+
+        let newCost = item.unitCostActual;
+        if (currentStock > 0 && totalQty > 0) {
+          newCost = (currentStock * currentCost + item.quantityReceived * item.unitCostActual) / totalQty;
+        } else {
+          newCost = item.unitCostActual;
+        }
+
+        newCost = Math.round(newCost * 100) / 100;
+
+        await tx
+          .update(schema.products)
+          .set({
+            cost: newCost.toString(),
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.products.id, item.productId));
+
+        // 3. Update stock levels at destination
+        const stockConditions = [eq(schema.stockLevels.productId, item.productId)];
+        if (destinationWarehouseId) {
+          stockConditions.push(eq(schema.stockLevels.warehouseId, destinationWarehouseId));
+        } else {
+          stockConditions.push(eq(schema.stockLevels.branchId, destinationBranchId!));
+        }
+
+        const [existingStock] = await tx
+          .select()
+          .from(schema.stockLevels)
+          .where(and(...stockConditions))
+          .limit(1);
+
+        if (existingStock) {
+          const newQty = (parseFloat(existingStock.quantity || '0') + item.quantityReceived).toString();
+          await tx
+            .update(schema.stockLevels)
+            .set({
+              quantity: newQty,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.stockLevels.id, existingStock.id));
+        } else {
+          await tx
+            .insert(schema.stockLevels)
+            .values({
+              productId: item.productId,
+              warehouseId: destinationWarehouseId || null,
+              branchId: destinationBranchId || null,
+              quantity: item.quantityReceived.toString(),
+              updatedAt: new Date(),
+            });
+        }
+
+        // 4. Log stock movement
+        await tx.insert(schema.inventoryMovements).values({
+          businessId,
+          productId: item.productId,
+          warehouseId: destinationWarehouseId || null,
+          branchId: destinationBranchId || null,
+          quantity: item.quantityReceived.toString(),
+          type: 'receipt',
+          referenceId: poId,
+          notes: notes || `Recepción de Orden de Compra ${po.poNumber}`,
+        });
+      }
+
+      // 5. Update PO status
+      const allPoItems = await tx
+        .select()
+        .from(schema.purchaseOrderItems)
+        .where(eq(schema.purchaseOrderItems.poId, poId));
+
+      let allFullyReceived = true;
+      let someReceived = false;
+
+      for (const poItem of allPoItems) {
+        const ordered = parseFloat(poItem.quantityOrdered);
+        const received = parseFloat(poItem.quantityReceived || '0');
+        if (received < ordered) {
+          allFullyReceived = false;
+        }
+        if (received > 0) {
+          someReceived = true;
+        }
+      }
+
+      const finalStatus = allFullyReceived
+        ? 'received'
+        : someReceived
+          ? 'partially_received'
+          : 'sent';
+
+      const [updatedPo] = await tx
+        .update(schema.purchaseOrders)
+        .set({
+          status: finalStatus,
+          actualDeliveryDate: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.purchaseOrders.id, poId))
+        .returning();
+
+      return {
+        success: true,
+        status: finalStatus,
+        purchaseOrder: updatedPo,
+      };
+    });
+  }
 }

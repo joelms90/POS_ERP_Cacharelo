@@ -1,6 +1,6 @@
 # Makefile for Empire POS-ERP project
 
-.PHONY: help install db-up db-down db-status db-migrate db-seed db-rollback db-reset db-clean db-clean-prod db-clean-today db-clean-today-prod db-clean-old-history-prod db-clean-all-history-sales-prod db-proxy dev-backend dev-frontend lint test infra-init infra-plan infra-apply provision-infra infra-destroy backend-migrate backend-deploy backend-deploy-fast backend-status backend-logs landing-install landing-build landing-deploy landing-infra admin-build admin-deploy admin-deploy-gcs flutter-web-build flutter-web-dev flutter-web-serve flutter-web-deploy flutter-apk-build flutter-clean flutter-macos-build flutter-windows-build flutter-android-build flutter-desktop-releases flutter-all-releases flutter-release-info
+.PHONY: help install db-up db-down db-status db-migrate db-seed db-rollback db-reset db-clean db-clean-prod db-clean-today db-clean-today-prod db-clean-old-history-prod db-clean-all-history-sales-prod db-proxy dev-backend dev-frontend lint test infra-init infra-plan infra-apply provision-infra infra-destroy backend-migrate backend-deploy backend-deploy-fast backend-status backend-logs landing-install landing-build landing-deploy landing-infra admin-build admin-deploy admin-deploy-gcs flutter-web-build flutter-web-dev flutter-web-serve flutter-web-deploy flutter-portal-deploy flutter-apk-build flutter-clean flutter-macos-build flutter-windows-build flutter-android-build flutter-desktop-releases flutter-all-releases flutter-release-info
 
 # Default target: show help
 help:
@@ -425,7 +425,7 @@ backend-migrate:
 		cd apps/sync_api && \
 		DATABASE_URL="postgresql://pos_user:pos-secure-db-pass-2026!@localhost:5433/pos_db" \
 		NODE_ENV=production \
-		pnpm tsx scripts/manual-create-changelog.ts ; \
+		pnpm tsx scripts/idempotent-deploy-migrations.ts ; \
 		EXIT_CODE=$$? ; \
 		echo "Stopping proxy..." && \
 		kill $$PROXY_PID 2>/dev/null || true ; \
@@ -575,6 +575,10 @@ admin-deploy-gcs: admin-build
 flutter-web-build:
 	@echo "Building Flutter web app for production..."
 	cd apps/pos_flutter && flutter build web --release
+	@cp apps/pos_flutter/web/descargas.html apps/pos_flutter/build/web/descargas.html 2>/dev/null || true
+	@if [ -f apps/pos_flutter/build/app/outputs/flutter-apk/app-release.apk ]; then \
+		cp apps/pos_flutter/build/app/outputs/flutter-apk/app-release.apk apps/pos_flutter/build/web/app-release.apk; \
+	fi
 	@echo "✓ Build complete! Output: apps/pos_flutter/build/web/"
 	@echo "  To deploy, run: make flutter-web-deploy"
 
@@ -595,6 +599,14 @@ flutter-web-deploy: flutter-web-build
 	@echo "  🌐 Your POS web app is live at:"
 	@echo "     https://cacharelo-pos.web.app"
 	@echo "     https://cafeteria.cacharelo.com (after DNS configuration)"
+	@echo ""
+
+flutter-portal-deploy: flutter-apk-build flutter-web-build
+	@echo "Deploying Download Portal, Android APK & POS Web to Firebase Hosting..."
+	@gsutil cp apps/pos_flutter/build/app/outputs/flutter-apk/app-release.apk gs://cacharelo-pos-releases/android/pos_flutter_android_latest.apk 2>/dev/null || true
+	cd apps/pos_flutter && firebase deploy --only hosting --project fresh-sensor-497515-d3
+	@echo "✓ Portal deployment complete!"
+	@echo "  🌐 Download Portal live at: https://cacharelo-pos.web.app/descargas.html (PIN: 9876)"
 	@echo ""
 
 flutter-apk-build:

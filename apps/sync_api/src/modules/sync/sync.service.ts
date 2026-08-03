@@ -105,7 +105,18 @@ export class SyncService implements OnModuleInit {
             });
 
             if (order.tableId) {
-              const tableState = order.state === 'closed' ? 'cleaning' : 'occupied';
+              const [table] = await tx
+                .select()
+                .from(schema.branchTables)
+                .where(eq(schema.branchTables.id, order.tableId));
+
+              let tableState = 'occupied';
+              if (order.state === 'closed') {
+                tableState = (table && table.room === 'Para Llevar') ? 'free' : 'cleaning';
+              } else if (order.state === 'cancelled') {
+                tableState = 'free';
+              }
+
               await tx
                 .update(schema.branchTables)
                 .set({ state: tableState, updatedAt: now })
@@ -374,6 +385,23 @@ export class SyncService implements OnModuleInit {
   }
 
   async pull(pullSyncDto: PullSyncDto) {
+    // Self-healing: Reset any 'Para Llevar' table that is stuck in occupied/billing/cleaning but has no active orders
+    try {
+      await this.db.execute(sql`
+        UPDATE branch_tables
+        SET state = 'free', updated_at = NOW()
+        WHERE room = 'Para Llevar'
+          AND state != 'free'
+          AND id NOT IN (
+            SELECT table_id FROM orders
+            WHERE state IN ('open', 'billing')
+              AND deleted_at IS NULL
+          )
+      `);
+    } catch (err) {
+      this.logger.error('Failed to run self-healing query for takeaway tables:', err);
+    }
+
     const lastSyncedAt = pullSyncDto.lastSyncedAt
       ? new Date(pullSyncDto.lastSyncedAt)
       : new Date(0);

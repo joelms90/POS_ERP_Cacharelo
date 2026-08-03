@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Observable } from 'rxjs';
-import { OWNER_ROLE } from '../roles';
+import { OWNER_ROLE, SUPPORT_TECH_ROLE } from '../roles';
 
 @Injectable()
 export class AdminGuard implements CanActivate {
@@ -28,7 +28,7 @@ export class AdminGuard implements CanActivate {
       try {
         const secret = process.env.JWT_SECRET || 'dev_jwt_secret_key';
         const payload = this.jwtService.verify(bearerToken, { secret });
-        if (payload.role === OWNER_ROLE) {
+        if (payload.role === OWNER_ROLE || payload.role === SUPPORT_TECH_ROLE) {
           request.user = payload;
           return true;
         }

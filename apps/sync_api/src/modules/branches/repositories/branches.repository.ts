@@ -2,7 +2,7 @@ import { Injectable, Inject, BadRequestException } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
-import { eq, and, isNull, or } from 'drizzle-orm';
+import { eq, and, isNull, or, sql } from 'drizzle-orm';
 
 @Injectable()
 export class BranchesRepository {
@@ -129,6 +129,22 @@ export class BranchesRepository {
   }
 
   async findTables(branchId: string) {
+    try {
+      await this.db.execute(sql`
+        UPDATE branch_tables
+        SET state = 'free', updated_at = NOW()
+        WHERE room = 'Para Llevar'
+          AND state != 'free'
+          AND id NOT IN (
+            SELECT table_id FROM orders
+            WHERE state IN ('open', 'billing')
+              AND deleted_at IS NULL
+          )
+      `);
+    } catch (err) {
+      // Ignore or log error
+    }
+
     return this.db
       .select()
       .from(schema.branchTables)

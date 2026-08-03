@@ -74,6 +74,24 @@ class _DesktopPrinterSettingsDialogState
     );
   }
 
+  Future<void> _handlePublishStationNow() async {
+    final success = await widget.state.publishPrintStationNow();
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor:
+            success ? EmpireColors.successGreen : EmpireColors.errorRed,
+        content: Text(
+          widget.state.lastPrintStationPublishMessage ??
+              (success
+                  ? 'Estacion publicada.'
+                  : 'No se pudo publicar la estacion.'),
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleTestPrint() async {
     if (widget.state.connectedPrinterName == null) return;
 
@@ -237,6 +255,8 @@ class _DesktopPrinterSettingsDialogState
                 ],
 
                 if (isConnected) ...[
+                  _buildPaperWidthSelector(),
+                  const SizedBox(height: 12),
                   _buildReceiveRemoteJobsSwitch(),
                   const SizedBox(height: 16),
                 ],
@@ -452,31 +472,178 @@ class _DesktopPrinterSettingsDialogState
               : EmpireColors.agedBronzeDark,
         ),
       ),
-      child: SwitchListTile(
-        value: widget.state.receiveRemotePrintJobs,
-        onChanged: canUse ? widget.state.setReceiveRemotePrintJobs : null,
-        dense: true,
-        contentPadding: EdgeInsets.zero,
-        activeColor: EmpireColors.successGreen,
-        title: const Text(
-          'Recibir comandas de otros dispositivos',
-          style: TextStyle(
-            color: EmpireColors.textPrimary,
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
+      child: Column(
+        children: [
+          SwitchListTile(
+            value: widget.state.receiveRemotePrintJobs,
+            onChanged: canUse ? widget.state.setReceiveRemotePrintJobs : null,
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            activeColor: EmpireColors.successGreen,
+            title: const Text(
+              'Recibir comandas de otros dispositivos',
+              style: TextStyle(
+                color: EmpireColors.textPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
+            subtitle: Text(
+              canUse
+                  ? (widget.state.receiveRemotePrintJobs
+                      ? 'Esta caja imprimira comandas enviadas a la Cola de caja.'
+                      : 'Actívalo para recibir la Cola de caja y comandas dirigidas a este equipo.')
+                  : 'Configura la sucursal e inicia sesión para activar esta estación.',
+              style: const TextStyle(
+                color: EmpireColors.textSecondary,
+                fontSize: 11,
+              ),
+            ),
           ),
-        ),
-        subtitle: Text(
-          canUse
-              ? (widget.state.receiveRemotePrintJobs
-                  ? 'Esta caja está disponible para imprimir comandas.'
-                  : 'Actívalo para que meseros puedan elegir esta caja.')
-              : 'Configura la sucursal e inicia sesión para activar esta estación.',
-          style: const TextStyle(
-            color: EmpireColors.textSecondary,
-            fontSize: 11,
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                widget.state.lastPrintStationPublishSucceeded == true
+                    ? Icons.check_circle
+                    : widget.state.lastPrintStationPublishSucceeded == false
+                        ? Icons.error_outline
+                        : Icons.info_outline,
+                color: widget.state.lastPrintStationPublishSucceeded == true
+                    ? EmpireColors.successGreen
+                    : widget.state.lastPrintStationPublishSucceeded == false
+                        ? EmpireColors.errorRed
+                        : EmpireColors.textSecondary,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _printStationStatusText(),
+                  style: const TextStyle(
+                    color: EmpireColors.textSecondary,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                onPressed: canUse ? _handlePublishStationNow : null,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: EmpireColors.champagneGold,
+                  side: const BorderSide(color: EmpireColors.agedBronze),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  minimumSize: Size.zero,
+                ),
+                child: const Text(
+                  'PUBLICAR AHORA',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ),
-        ),
+        ],
+      ),
+    );
+  }
+
+  String _printStationStatusText() {
+    final message = widget.state.lastPrintStationPublishMessage;
+    final attemptAt = widget.state.lastPrintStationPublishAttemptAt;
+    if (message == null || attemptAt == null) {
+      return 'Sin intento de publicacion en esta sesion.';
+    }
+    final secondsAgo = DateTime.now().difference(attemptAt).inSeconds;
+    final age =
+        secondsAgo < 60 ? 'hace ${secondsAgo}s' : 'hace ${secondsAgo ~/ 60}m';
+    return '$message ($age)';
+  }
+
+  Widget _buildPaperWidthSelector() {
+    final current = widget.state.printerPaperWidth;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: EmpireColors.onyxSurface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: EmpireColors.agedBronzeDark),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'ANCHO DE PAPEL TÉRMICO (TICKET)',
+            style: TextStyle(
+              color: EmpireColors.textGold,
+              fontWeight: FontWeight.bold,
+              fontSize: 11,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: ChoiceChip(
+                  label: const Text('📱 50mm (26 cols)',
+                      style: TextStyle(fontSize: 10)),
+                  selected: current == '50mm',
+                  onSelected: (selected) {
+                    if (selected) widget.state.setPrinterPaperWidth('50mm');
+                  },
+                  selectedColor: EmpireColors.champagneGold,
+                  backgroundColor: EmpireColors.charcoalSurface,
+                  labelStyle: TextStyle(
+                    color: current == '50mm'
+                        ? EmpireColors.obsidian
+                        : EmpireColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: ChoiceChip(
+                  label: const Text('📱 58mm (32 cols)',
+                      style: TextStyle(fontSize: 10)),
+                  selected: current == '58mm',
+                  onSelected: (selected) {
+                    if (selected) widget.state.setPrinterPaperWidth('58mm');
+                  },
+                  selectedColor: EmpireColors.champagneGold,
+                  backgroundColor: EmpireColors.charcoalSurface,
+                  labelStyle: TextStyle(
+                    color: current == '58mm'
+                        ? EmpireColors.obsidian
+                        : EmpireColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: ChoiceChip(
+                  label: const Text('🖥️ 80mm (48 cols)',
+                      style: TextStyle(fontSize: 10)),
+                  selected: current == '80mm',
+                  onSelected: (selected) {
+                    if (selected) widget.state.setPrinterPaperWidth('80mm');
+                  },
+                  selectedColor: EmpireColors.champagneGold,
+                  backgroundColor: EmpireColors.charcoalSurface,
+                  labelStyle: TextStyle(
+                    color: current == '80mm'
+                        ? EmpireColors.obsidian
+                        : EmpireColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

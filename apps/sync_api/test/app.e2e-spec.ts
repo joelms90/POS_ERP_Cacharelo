@@ -3,6 +3,18 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+
+jest.mock('pg', () => {
+  const mClient = {
+    connect: jest.fn().mockResolvedValue(undefined),
+    query: jest.fn().mockResolvedValue({}),
+    on: jest.fn(),
+    removeAllListeners: jest.fn(),
+    end: jest.fn().mockResolvedValue(undefined),
+  };
+  return { Client: jest.fn(() => mClient), Pool: jest.fn(() => ({ on: jest.fn(), end: jest.fn().mockResolvedValue(undefined) })) };
+});
+import { WsAdapter } from '@nestjs/platform-ws';
 import { DRIZZLE_CONNECTION } from '../src/database/database.module';
 
 describe('AppController (e2e)', () => {
@@ -20,6 +32,7 @@ describe('AppController (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    app.useWebSocketAdapter(new WsAdapter(app));
     await app.init();
   });
 

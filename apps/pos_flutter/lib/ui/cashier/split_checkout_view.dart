@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'dart:ui';
 import '../common/colors.dart';
 import '../common/app_state.dart';
+import 'equal_split_payment_screen.dart';
+import 'by_items_payment_screen.dart';
 
 class SplitCheckoutView extends StatefulWidget {
   final TableModel table;
@@ -22,10 +24,22 @@ class SplitCheckoutView extends StatefulWidget {
   State<SplitCheckoutView> createState() => _SplitCheckoutViewState();
 }
 
+enum PaymentType {
+  simple, // Cobro Simple - regular full payment
+  equalSplit, // División Equitativa
+  byItems, // Por Artículos
+}
+
 class _SplitCheckoutViewState extends State<SplitCheckoutView> {
+  // Payment type selection
+  PaymentType _selectedPaymentType = PaymentType.simple;
+
   // Split settings
   bool isEqualSplit = true;
-  int splitCount = 1;
+  int splitCount = 2; // Start with 2 for equal split
+  int?
+      _originalSplitCount; // Original split count (never changes after first payment)
+  int _paymentsMade = 0; // Track how many partial payments have been completed
   List<int> selectedItemIndexes = [];
 
   // Discounts
@@ -37,16 +51,77 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
   final TextEditingController _cashReceivedController = TextEditingController();
   final TextEditingController _cardRefController = TextEditingController();
 
-  double get currentGrossSubtotal {
-    if (isEqualSplit) {
-      return widget.table.subtotal / splitCount;
+  @override
+  void initState() {
+    super.initState();
+    // Restore payment session state from table if it exists
+    if (widget.table.activePaymentType != null) {
+      switch (widget.table.activePaymentType) {
+        case 'simple':
+          _selectedPaymentType = PaymentType.simple;
+          break;
+        case 'equalSplit':
+          _selectedPaymentType = PaymentType.equalSplit;
+          break;
+        case 'byItems':
+          _selectedPaymentType = PaymentType.byItems;
+          break;
+      }
     } else {
+      widget.table.activePaymentType = 'simple';
+    }
+    _paymentsMade = widget.table.paymentsMadeInSession;
+    _originalSplitCount = widget.table.originalSplitCountInSession;
+  }
+
+  Future<void> _handlePrintPreCuenta() async {
+    final printed = await widget.state.printPreCuentaForTable(widget.table);
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor:
+            printed ? EmpireColors.successGreen : EmpireColors.errorRed,
+        content: Text(
+          printed
+              ? 'Pre-cuenta enviada a impresora.'
+              : 'No se pudo imprimir la pre-cuenta. Verifica la impresora.',
+        ),
+      ),
+    );
+  }
+
+  double get currentGrossSubtotal {
+    if (_selectedPaymentType == PaymentType.simple) {
+      // Full table total for simple payment
+      return widget.table.subtotal;
+    } else if (_selectedPaymentType == PaymentType.equalSplit) {
+      // Use the original split count (set on first payment) or current split count
+      final divisor = _originalSplitCount ?? splitCount;
+      // Ensure divisor is never 0 to avoid division by zero
+      if (divisor == 0 || divisor < 2) return 0.0;
+      return widget.table.subtotal / divisor;
+    } else {
+      // By items
       double selectedSum = 0.0;
       for (var i in selectedItemIndexes) {
         selectedSum += widget.table.items[i].totalPrice;
       }
       return selectedSum;
     }
+  }
+
+  // Get remaining payments to be made
+  int get remainingPayments {
+    if (_selectedPaymentType != PaymentType.equalSplit) return 0;
+    final total = _originalSplitCount ?? splitCount;
+    return total - _paymentsMade;
+  }
+
+  // Check if this is the last payment
+  bool get isLastPayment {
+    if (_selectedPaymentType != PaymentType.equalSplit) return false;
+    return remainingPayments <= 1;
   }
 
   double get currentSubtotal =>
@@ -58,6 +133,15 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
           .toStringAsFixed(2));
   double get currentTax => double.parse(
       (currentTotal - (currentSubtotal - discountAmount)).toStringAsFixed(2));
+
+  double get remainingTableTotal {
+    if (isEqualSplit) {
+      final divisor = _originalSplitCount ?? splitCount;
+      return splitCount * (widget.table.total / divisor);
+    } else {
+      return widget.table.total;
+    }
+  }
 
   double get cashChange {
     final double cash = double.tryParse(_cashReceivedController.text) ?? 0.0;
@@ -104,11 +188,47 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
       }
     }
 
-    // Capture whether this checkout is a partial split check
-    final bool isPartialEqual = isEqualSplit && splitCount > 1;
-    final bool isPartialItems = !isEqualSplit &&
+    // For simple payment, just process as full payment
+    if (_selectedPaymentType == PaymentType.simple) {
+      widget.state.checkoutTable(
+        widget.table.id,
+        discount: selectedDiscount,
+        paymentMethod: selectedPaymentMethod,
+        refCode: refCode,
+        cashReceived: selectedPaymentMethod == 'Efectivo'
+            ? double.tryParse(_cashReceivedController.text)
+            : null,
+        cashChange: selectedPaymentMethod == 'Efectivo' ? cashChange : null,
+      );
+      // Clear payment session state
+      widget.table.activePaymentType = null;
+      widget.table.paymentsMadeInSession = 0;
+      widget.table.originalSplitCountInSession = null;
+      widget.onSuccess();
+      return;
+    }
+
+    // Set original split count on first payment (for equal split)
+    if (_originalSplitCount == null &&
+        _selectedPaymentType == PaymentType.equalSplit) {
+      _originalSplitCount = splitCount;
+      widget.table.originalSplitCountInSession = splitCount;
+    }
+
+    final divisor = _originalSplitCount ?? splitCount;
+
+    // Determine if this is a partial payment
+    final bool isPartialEqual =
+        _selectedPaymentType == PaymentType.equalSplit && !isLastPayment;
+    final bool isPartialItems = _selectedPaymentType == PaymentType.byItems &&
         selectedItemIndexes.isNotEmpty &&
         selectedItemIndexes.length < widget.table.items.length;
+
+    // Save state to table BEFORE processing payment (so it survives the rebuild)
+    if (isPartialEqual) {
+      _paymentsMade += 1;
+      widget.table.paymentsMadeInSession = _paymentsMade;
+    }
 
     // Process the payment
     widget.state.checkoutTable(
@@ -120,9 +240,14 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
           ? double.tryParse(_cashReceivedController.text)
           : null,
       cashChange: selectedPaymentMethod == 'Efectivo' ? cashChange : null,
-      isEqualSplit: isEqualSplit,
-      splitCount: splitCount,
-      itemIndicesToPay: isEqualSplit ? null : List.from(selectedItemIndexes),
+      isEqualSplit: _selectedPaymentType == PaymentType.equalSplit,
+      splitCount: isLastPayment
+          ? 1
+          : remainingPayments, // Tell backend how many parts remain
+      originalSplitCount: divisor,
+      itemIndicesToPay: _selectedPaymentType == PaymentType.equalSplit
+          ? null
+          : List.from(selectedItemIndexes),
     );
 
     // Clear controllers
@@ -130,14 +255,13 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
     _cardRefController.clear();
 
     if (isPartialEqual) {
-      setState(() {
-        splitCount -= 1;
-      });
+      setState(() {}); // Trigger UI update
+      final remaining = remainingPayments;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: EmpireColors.successGreen,
           content: Text(
-              'Pago parcial registrado con éxito. Quedan $splitCount partes por cobrar.'),
+              'Pago ${_paymentsMade} de $divisor registrado. Quedan $remaining pago(s) pendiente(s).'),
         ),
       );
     } else if (isPartialItems) {
@@ -152,7 +276,10 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
         ),
       );
     } else {
-      // Full payment complete (either equal split final part, or last items, or full single ticket payment)
+      // Full payment complete - clear payment session state
+      widget.table.activePaymentType = null;
+      widget.table.paymentsMadeInSession = 0;
+      widget.table.originalSplitCountInSession = null;
       widget.onSuccess();
     }
   }
@@ -182,11 +309,11 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
         color: borderColor ?? backgroundColor,
         width: 1.5,
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       textStyle: const TextStyle(
         fontWeight: FontWeight.bold,
-        fontSize: 14,
+        fontSize: 13,
       ),
     );
   }
@@ -198,7 +325,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
     IconData? icon,
   }) {
     return SizedBox(
-      height: 52,
+      height: 42,
       child: OutlinedButton.icon(
         onPressed: onPressed,
         icon: icon == null ? const SizedBox.shrink() : Icon(icon, size: 18),
@@ -261,8 +388,8 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
               filled: true,
               fillColor: EmpireColors.obsidian,
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 20,
+                horizontal: 14,
+                vertical: 12,
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -289,7 +416,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
             ),
             style: const TextStyle(
               color: EmpireColors.textPrimary,
-              fontSize: 26,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
             onChanged: (val) => setState(() {}),
@@ -334,12 +461,12 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
           ),
           const SizedBox(height: 10),
           Wrap(
-            spacing: 10,
-            runSpacing: 10,
+            spacing: 8,
+            runSpacing: 8,
             children: [20, 50, 100, 200, 500]
                 .map(
                   (amount) => SizedBox(
-                    width: 108,
+                    width: 88,
                     child: _buildCashQuickButton(
                       label: '+\$$amount',
                       onPressed: () => _addCashReceived(amount.toDouble()),
@@ -428,7 +555,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
     );
 
     return Container(
-      constraints: const BoxConstraints(maxHeight: 140),
+      constraints: const BoxConstraints(maxHeight: 320),
       decoration: BoxDecoration(
         color: EmpireColors.charcoalSurface,
         borderRadius: BorderRadius.circular(8),
@@ -632,6 +759,8 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
 
   Widget _buildPaymentSummaryCard() {
     final received = double.tryParse(_cashReceivedController.text) ?? 0.0;
+    final totalParts = _originalSplitCount ?? splitCount;
+    final currentPaymentNumber = _paymentsMade + 1;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -643,14 +772,39 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'RESUMEN DE PAGO',
-            style: TextStyle(
-              color: EmpireColors.textGold,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.8,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'RESUMEN DE PAGO',
+                style: TextStyle(
+                  color: EmpireColors.textGold,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              if (isEqualSplit && _originalSplitCount != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: EmpireColors.champagneGold.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: EmpireColors.champagneGold.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Text(
+                    'Pago $currentPaymentNumber de $totalParts',
+                    style: const TextStyle(
+                      color: EmpireColors.champagneGold,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
           _buildSummaryRow(
@@ -664,7 +818,13 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
           _buildSummaryRow('IVA (16%)', '\$${currentTax.toStringAsFixed(2)}'),
           const Divider(color: EmpireColors.agedBronzeDark, height: 18),
           _buildSummaryRow(
-            'Total',
+            'Total Restante (Mesa)',
+            '\$${remainingTableTotal.toStringAsFixed(2)}',
+            valueColor: EmpireColors.textSecondary,
+          ),
+          const Divider(color: EmpireColors.agedBronzeDark, height: 10),
+          _buildSummaryRow(
+            'Total Seleccionado',
             '\$${currentTotal.toStringAsFixed(2)}',
             valueColor: EmpireColors.champagneGold,
             valueSize: 18,
@@ -720,12 +880,25 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                   ),
                 ],
               ),
-              IconButton(
-                onPressed: widget.onCancel,
-                icon: const Icon(
-                  Icons.close,
-                  color: EmpireColors.textSecondary,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    onPressed: _handlePrintPreCuenta,
+                    tooltip: 'Imprimir pre-cuenta',
+                    icon: const Icon(
+                      Icons.receipt_long,
+                      color: EmpireColors.champagneGold,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: widget.onCancel,
+                    icon: const Icon(
+                      Icons.close,
+                      color: EmpireColors.textSecondary,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -746,7 +919,10 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                         textAlign: TextAlign.center,
                       ),
                       selected: isEqualSplit,
-                      onSelected: (val) => setState(() => isEqualSplit = true),
+                      onSelected: (val) => setState(() {
+                        isEqualSplit = true;
+                        _originalSplitCount = null;
+                      }),
                       selectedColor: EmpireColors.champagneGold,
                       backgroundColor: EmpireColors.charcoalSurface,
                       labelStyle: TextStyle(
@@ -766,7 +942,10 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                         textAlign: TextAlign.center,
                       ),
                       selected: !isEqualSplit,
-                      onSelected: (val) => setState(() => isEqualSplit = false),
+                      onSelected: (val) => setState(() {
+                        isEqualSplit = false;
+                        _originalSplitCount = null;
+                      }),
                       selectedColor: EmpireColors.champagneGold,
                       backgroundColor: EmpireColors.charcoalSurface,
                       labelStyle: TextStyle(
@@ -797,13 +976,18 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                   children: [
                     IconButton(
                       onPressed: () {
-                        if (splitCount > 1) {
-                          setState(() => splitCount--);
+                        if (splitCount > 2 && _paymentsMade == 0) {
+                          setState(() {
+                            splitCount--;
+                            _originalSplitCount = null;
+                          });
                         }
                       },
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.remove_circle_outline,
-                        color: EmpireColors.champagneGold,
+                        color: (splitCount > 2 && _paymentsMade == 0)
+                            ? EmpireColors.champagneGold
+                            : EmpireColors.textSecondary,
                       ),
                     ),
                     Padding(
@@ -818,12 +1002,19 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                       ),
                     ),
                     IconButton(
-                      onPressed: () {
-                        setState(() => splitCount++);
-                      },
-                      icon: const Icon(
+                      onPressed: _paymentsMade == 0
+                          ? () {
+                              setState(() {
+                                splitCount++;
+                                _originalSplitCount = null;
+                              });
+                            }
+                          : null,
+                      icon: Icon(
                         Icons.add_circle_outline,
-                        color: EmpireColors.champagneGold,
+                        color: _paymentsMade == 0
+                            ? EmpireColors.champagneGold
+                            : EmpireColors.textSecondary,
                       ),
                     ),
                     const SizedBox(width: 20),
@@ -1002,53 +1193,10 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                 ),
               ],
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+              _buildDiscountSelector(),
 
-              // Discounts Segment
-              const Text(
-                'Aplicar Descuento Especial:',
-                style: TextStyle(
-                  color: EmpireColors.textGold,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 10,
-                children: discounts.map((disc) {
-                  final isSelected = selectedDiscount == disc;
-                  return ChoiceChip(
-                    label: Text(
-                      disc == 0.0 ? 'Sin Descuento' : '${disc.toInt()}%',
-                    ),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      if (selected) {
-                        setState(() => selectedDiscount = disc);
-                      }
-                    },
-                    selectedColor: EmpireColors.champagneGold.withOpacity(0.2),
-                    backgroundColor: EmpireColors.charcoalSurface,
-                    labelStyle: TextStyle(
-                      color: isSelected
-                          ? EmpireColors.champagneGold
-                          : EmpireColors.textPrimary,
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.normal,
-                      fontSize: 12,
-                    ),
-                    side: BorderSide(
-                      color: isSelected
-                          ? EmpireColors.champagneGold
-                          : EmpireColors.agedBronzeDark,
-                      width: 1,
-                    ),
-                  );
-                }).toList(),
-              ),
-
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
               // Payment Method
               const Text(
@@ -1171,53 +1319,111 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
               ),
             ],
           ),
-          IconButton(
-            onPressed: widget.onCancel,
-            icon: const Icon(Icons.close, color: EmpireColors.textSecondary),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                onPressed: _handlePrintPreCuenta,
+                tooltip: 'Imprimir pre-cuenta',
+                icon: const Icon(
+                  Icons.receipt_long,
+                  color: EmpireColors.champagneGold,
+                ),
+              ),
+              IconButton(
+                onPressed: widget.onCancel,
+                icon:
+                    const Icon(Icons.close, color: EmpireColors.textSecondary),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSplitMethodSelector() {
-    return Row(
+  Widget _buildPaymentTypeSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: ChoiceChip(
-            label: const Text(
-              'DIVISIÓN EQUITATIVA',
-              textAlign: TextAlign.center,
-            ),
-            selected: isEqualSplit,
-            onSelected: (val) => setState(() => isEqualSplit = true),
-            selectedColor: EmpireColors.champagneGold,
-            backgroundColor: EmpireColors.charcoalSurface,
-            labelStyle: TextStyle(
-              color: isEqualSplit
-                  ? EmpireColors.obsidian
-                  : EmpireColors.textPrimary,
-              fontWeight: FontWeight.bold,
-              fontSize: 11,
-            ),
+        const Text(
+          'Seleccione tipo de pago:',
+          style: TextStyle(
+            color: EmpireColors.textPrimary,
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ChoiceChip(
-            label: const Text('POR ARTÍCULOS', textAlign: TextAlign.center),
-            selected: !isEqualSplit,
-            onSelected: (val) => setState(() => isEqualSplit = false),
-            selectedColor: EmpireColors.champagneGold,
-            backgroundColor: EmpireColors.charcoalSurface,
-            labelStyle: TextStyle(
-              color: !isEqualSplit
-                  ? EmpireColors.obsidian
-                  : EmpireColors.textPrimary,
-              fontWeight: FontWeight.bold,
-              fontSize: 11,
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _PaymentTypeButton(
+                label: 'COBRO\nSIMPLE',
+                icon: Icons.receipt_long,
+                selected: _selectedPaymentType == PaymentType.simple,
+                onTap: () {
+                  setState(() {
+                    _selectedPaymentType = PaymentType.simple;
+                    widget.table.activePaymentType = 'simple';
+                  });
+                },
+              ),
             ),
-          ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _PaymentTypeButton(
+                label: 'DIVISIÓN\nEQUITATIVA',
+                icon: Icons.people,
+                selected: _selectedPaymentType == PaymentType.equalSplit,
+                onTap: () {
+                  // Navigate to dedicated equal split screen
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => EqualSplitPaymentScreen(
+                        table: widget.table,
+                        state: widget.state,
+                        onCancel: () {
+                          Navigator.of(context).pop();
+                        },
+                        onComplete: () {
+                          Navigator.of(context).pop();
+                          widget.onSuccess();
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            if (widget.table.items.length > 1) ...[
+              const SizedBox(width: 6),
+              Expanded(
+                child: _PaymentTypeButton(
+                  label: 'POR\nARTÍCULOS',
+                  icon: Icons.shopping_cart,
+                  selected: _selectedPaymentType == PaymentType.byItems,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ByItemsPaymentScreen(
+                          table: widget.table,
+                          state: widget.state,
+                          onCancel: () {
+                            Navigator.of(context).pop();
+                          },
+                          onComplete: () {
+                            Navigator.of(context).pop();
+                            widget.onSuccess();
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ],
         ),
       ],
     );
@@ -1240,13 +1446,18 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
           children: [
             IconButton(
               onPressed: () {
-                if (splitCount > 1) {
-                  setState(() => splitCount--);
+                if (splitCount > 2) {
+                  setState(() {
+                    splitCount--;
+                    _originalSplitCount = null;
+                  });
                 }
               },
-              icon: const Icon(
+              icon: Icon(
                 Icons.remove_circle_outline,
-                color: EmpireColors.champagneGold,
+                color: splitCount > 2
+                    ? EmpireColors.champagneGold
+                    : EmpireColors.textSecondary,
               ),
             ),
             Padding(
@@ -1262,7 +1473,10 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
             ),
             IconButton(
               onPressed: () {
-                setState(() => splitCount++);
+                setState(() {
+                  splitCount++;
+                  _originalSplitCount = null;
+                });
               },
               icon: const Icon(
                 Icons.add_circle_outline,
@@ -1375,7 +1589,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
           const SizedBox(height: 12),
         ],
         Container(
-          constraints: const BoxConstraints(maxHeight: 260),
+          constraints: const BoxConstraints(maxHeight: 320),
           decoration: BoxDecoration(
             color: EmpireColors.charcoalSurface,
             borderRadius: BorderRadius.circular(8),
@@ -1446,48 +1660,60 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
   }
 
   Widget _buildDiscountSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Row(
       children: [
+        const Icon(Icons.discount, color: EmpireColors.textGold, size: 16),
+        const SizedBox(width: 6),
         const Text(
-          'Aplicar Descuento Especial:',
+          'Descuento:',
           style: TextStyle(
             color: EmpireColors.textGold,
             fontWeight: FontWeight.bold,
-            fontSize: 13,
+            fontSize: 12,
           ),
         ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 10,
-          runSpacing: 8,
-          children: discounts.map((disc) {
-            final isSelected = selectedDiscount == disc;
-            return ChoiceChip(
-              label: Text(disc == 0.0 ? 'Sin Descuento' : '${disc.toInt()}%'),
-              selected: isSelected,
-              onSelected: (selected) {
-                if (selected) {
-                  setState(() => selectedDiscount = disc);
-                }
-              },
-              selectedColor: EmpireColors.champagneGold.withOpacity(0.2),
-              backgroundColor: EmpireColors.charcoalSurface,
-              labelStyle: TextStyle(
-                color: isSelected
-                    ? EmpireColors.champagneGold
-                    : EmpireColors.textPrimary,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                fontSize: 12,
+        const SizedBox(width: 8),
+        Expanded(
+          child: Container(
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: EmpireColors.charcoalSurface,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: EmpireColors.agedBronzeDark),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<double>(
+                value: selectedDiscount,
+                isExpanded: true,
+                isDense: true,
+                dropdownColor: EmpireColors.charcoalSurface,
+                style: const TextStyle(
+                  color: EmpireColors.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+                items: discounts.map((disc) {
+                  return DropdownMenuItem(
+                    value: disc,
+                    child: Text(
+                      disc == 0.0 ? 'Sin Descuento' : '${disc.toInt()}%',
+                      style: TextStyle(
+                        color: selectedDiscount == disc
+                            ? EmpireColors.champagneGold
+                            : EmpireColors.textPrimary,
+                      ),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => selectedDiscount = val);
+                  }
+                },
               ),
-              side: BorderSide(
-                color: isSelected
-                    ? EmpireColors.champagneGold
-                    : EmpireColors.agedBronzeDark,
-                width: 1,
-              ),
-            );
-          }).toList(),
+            ),
+          ),
         ),
       ],
     );
@@ -1499,14 +1725,16 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          _buildSplitMethodSelector(),
-          const SizedBox(height: 20),
-          if (isEqualSplit)
-            _buildEqualSplitControls()
-          else
-            _buildItemSplitControls(),
-          const SizedBox(height: 20),
+          _buildPaymentTypeSelector(),
+          const SizedBox(height: 16),
           _buildDiscountSelector(),
+          const SizedBox(height: 16),
+          if (_selectedPaymentType == PaymentType.equalSplit)
+            _buildEqualSplitControls()
+          else if (_selectedPaymentType == PaymentType.byItems)
+            _buildItemSplitControls()
+          else if (_selectedPaymentType == PaymentType.simple)
+            _buildOrderReviewPanel(),
         ],
       ),
     );
@@ -1601,6 +1829,15 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
   }
 
   Widget _buildPaymentColumn() {
+    // Payment type is always selected (defaults to simple)
+    final bool hasZeroAmount = (currentTotal <= 0 ||
+        (_selectedPaymentType == PaymentType.equalSplit &&
+            (_originalSplitCount ?? splitCount) < 2) ||
+        (_selectedPaymentType == PaymentType.byItems &&
+            selectedItemIndexes.isEmpty));
+
+    final bool cannotProceed = hasZeroAmount;
+
     return Container(
       width: 380,
       padding: const EdgeInsets.all(20),
@@ -1618,10 +1855,46 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildPaymentMethodSelector(),
-                  const SizedBox(height: 18),
-                  _buildPaymentInputs(),
-                  const SizedBox(height: 18),
+                  if (hasZeroAmount) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: EmpireColors.charcoalSurface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: EmpireColors.errorRed.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          const Icon(
+                            Icons.info_outline,
+                            color: EmpireColors.errorRed,
+                            size: 28,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _selectedPaymentType == PaymentType.equalSplit
+                                ? 'Por favor, ajuste el número de personas para dividir la cuenta.'
+                                : 'Por favor, seleccione artículos a la izquierda para poder registrar el pago parcial.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: EmpireColors.textPrimary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                  ] else ...[
+                    _buildPaymentMethodSelector(),
+                    const SizedBox(height: 18),
+                    _buildPaymentInputs(),
+                    const SizedBox(height: 18),
+                  ],
                   _buildPaymentSummaryCard(),
                 ],
               ),
@@ -1629,16 +1902,26 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: _processPayment,
+            onPressed: cannotProceed ? null : _processPayment,
             style: ElevatedButton.styleFrom(
-              backgroundColor: EmpireColors.champagneGold,
+              backgroundColor: cannotProceed
+                  ? EmpireColors.charcoalSurface
+                  : (isLastPayment
+                      ? EmpireColors.successGreen
+                      : EmpireColors.champagneGold),
+              disabledBackgroundColor: EmpireColors.charcoalSurface,
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
-            child: const FittedBox(
+            child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
-                'PROCESAR COBRO',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                isLastPayment ? 'PROCESAR PAGO FINAL' : 'PROCESAR COBRO',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: cannotProceed
+                      ? EmpireColors.textSecondary
+                      : (isLastPayment ? Colors.white : EmpireColors.obsidian),
+                ),
               ),
             ),
           ),
@@ -1663,6 +1946,66 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// Helper widget for payment type selection buttons
+class _PaymentTypeButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PaymentTypeButton({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? EmpireColors.champagneGold
+              : EmpireColors.charcoalSurface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected
+                ? EmpireColors.champagneGold
+                : EmpireColors.agedBronzeDark,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color:
+                  selected ? EmpireColors.obsidian : EmpireColors.textPrimary,
+              size: 22,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color:
+                    selected ? EmpireColors.obsidian : EmpireColors.textPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+                height: 1.2,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

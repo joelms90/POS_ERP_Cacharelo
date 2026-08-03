@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsNumberString, IsOptional, IsString, Length } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumberString, IsOptional, IsString, Length, IsArray } from 'class-validator';
 
 export class CreatePaymentDto {
   @IsNumberString()
@@ -15,4 +15,9 @@ export class CreatePaymentDto {
   @IsOptional()
   @Length(2, 50)
   referenceCode?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  paidOrderItemIds?: string[];
 }

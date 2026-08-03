@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../common/colors.dart';
 import '../common/app_state.dart';
@@ -14,14 +16,163 @@ class ShiftControlPanel extends StatefulWidget {
 class _ShiftControlPanelState extends State<ShiftControlPanel> {
   final TextEditingController _floatController = TextEditingController();
   final TextEditingController _dropController = TextEditingController();
-  final TextEditingController _countedCashController = TextEditingController();
+  final TextEditingController _closeNotesController = TextEditingController();
+  final Map<double, TextEditingController> _denominationControllers = {
+    for (final value in _denominations) value: TextEditingController(),
+  };
+
+  static const List<double> _denominations = [
+    1000,
+    500,
+    200,
+    100,
+    50,
+    20,
+    10,
+    5,
+    2,
+    1,
+    0.5,
+  ];
 
   @override
   void dispose() {
     _floatController.dispose();
     _dropController.dispose();
-    _countedCashController.dispose();
+    _closeNotesController.dispose();
+    for (final controller in _denominationControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
+  }
+
+  double _money(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString()) ?? 0.0;
+  }
+
+  Map<String, dynamic> _summary(Map<String, dynamic> report) {
+    final raw = report['summary'];
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return report;
+  }
+
+  double _countedCashFromDenominations() {
+    return _denominationControllers.entries.fold<double>(0.0, (sum, entry) {
+      final count = int.tryParse(entry.value.text.trim()) ?? 0;
+      return sum + (entry.key * count);
+    });
+  }
+
+  Map<String, num> _denominationCounts() {
+    final counts = <String, num>{};
+    for (final entry in _denominationControllers.entries) {
+      final count = int.tryParse(entry.value.text.trim()) ?? 0;
+      if (count > 0) {
+        final key = entry.key == entry.key.roundToDouble()
+            ? entry.key.toInt().toString()
+            : entry.key.toString();
+        counts[key] = count;
+      }
+    }
+    return counts;
+  }
+
+  void _clearCloseInputs() {
+    for (final controller in _denominationControllers.values) {
+      controller.clear();
+    }
+    _closeNotesController.clear();
+  }
+
+  String _formatCorteReport(
+    String title,
+    Map<String, dynamic> report, {
+    bool includeCounted = false,
+  }) {
+    final summary = _summary(report);
+    final shiftInfo = report['shiftInfo'] is Map
+        ? Map<String, dynamic>.from(report['shiftInfo'])
+        : <String, dynamic>{};
+    final movements = report['cashMovements'] is List
+        ? List<dynamic>.from(report['cashMovements'])
+        : report['transactions'] is List
+            ? List<dynamic>.from(report['transactions'])
+            : const <dynamic>[];
+    final denominations = report['denominationCounts'] is Map
+        ? Map<String, dynamic>.from(report['denominationCounts'])
+        : _denominationCounts();
+    final notes =
+        (report['closeNotes'] ?? _closeNotesController.text).toString().trim();
+
+    final buffer = StringBuffer();
+    buffer.writeln(title);
+    buffer.writeln('Fecha: ${DateTime.now().toLocal()}');
+    buffer.writeln('Operador: ${widget.state.currentUserName}');
+    if (shiftInfo['branchName'] != null) {
+      buffer.writeln('Sucursal: ${shiftInfo['branchName']}');
+    }
+    if (shiftInfo['openedAt'] != null) {
+      buffer.writeln('Apertura: ${shiftInfo['openedAt']}');
+    }
+    if (shiftInfo['closedAt'] != null) {
+      buffer.writeln('Cierre: ${shiftInfo['closedAt']}');
+    }
+    buffer.writeln('');
+    buffer.writeln('VENTAS');
+    buffer.writeln(
+        'Efectivo: \$${_money(summary['cashSales']).toStringAsFixed(2)}');
+    buffer.writeln(
+        'Tarjeta: \$${_money(summary['cardSales']).toStringAsFixed(2)}');
+    buffer.writeln(
+        'Otros: \$${_money(summary['otherSales']).toStringAsFixed(2)}');
+    buffer.writeln(
+        'Total ventas: \$${_money(summary['totalSales']).toStringAsFixed(2)}');
+    buffer.writeln('');
+    buffer.writeln('EFECTIVO EN CAJA');
+    buffer.writeln(
+        'Fondo inicial: \$${_money(summary['initialFloat']).toStringAsFixed(2)}');
+    buffer.writeln(
+        'Ventas efectivo: \$${_money(summary['cashSales']).toStringAsFixed(2)}');
+    buffer.writeln(
+        'Ingresos: \$${_money(summary['manualCashIn']).toStringAsFixed(2)}');
+    buffer.writeln(
+        'Retiros: \$${_money(summary['manualCashOut']).toStringAsFixed(2)}');
+    buffer.writeln(
+        'Esperado sistema: \$${_money(summary['expectedCash']).toStringAsFixed(2)}');
+    if (includeCounted) {
+      buffer.writeln(
+          'Contado fisico: \$${_money(summary['actualCash']).toStringAsFixed(2)}');
+      buffer.writeln(
+          'Diferencia: \$${_money(summary['cashDifference']).toStringAsFixed(2)}');
+    }
+    if (denominations.isNotEmpty) {
+      buffer.writeln('');
+      buffer.writeln('DENOMINACIONES');
+      denominations.forEach((value, count) {
+        final subtotal = _money(value) * _money(count);
+        buffer.writeln('\$$value x $count = \$${subtotal.toStringAsFixed(2)}');
+      });
+    }
+    if (movements.isNotEmpty) {
+      buffer.writeln('');
+      buffer.writeln('MOVIMIENTOS');
+      for (final raw in movements) {
+        if (raw is! Map) continue;
+        final movement = Map<String, dynamic>.from(raw);
+        final type = movement['type']?.toString() ?? '';
+        final reason = movement['reason']?.toString() ?? '';
+        buffer.writeln(
+            '$type \$${_money(movement['amount']).toStringAsFixed(2)} - $reason');
+      }
+    }
+    if (notes.isNotEmpty) {
+      buffer.writeln('');
+      buffer.writeln('NOTAS');
+      buffer.writeln(notes);
+    }
+    return buffer.toString();
   }
 
   void _openShift() async {
@@ -56,7 +207,8 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               backgroundColor: EmpireColors.errorRed,
-              content: Text('Error al abrir el turno de caja. Valida tu conexión.'),
+              content:
+                  Text('Error al abrir el turno de caja. Valida tu conexión.'),
             ),
           );
         }
@@ -82,7 +234,8 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
         ),
       );
 
-      final String reason = isAdd ? 'Ingreso de caja manual' : 'Retiro de caja manual';
+      final String reason =
+          isAdd ? 'Ingreso de caja manual' : 'Retiro de caja manual';
       final bool success = isAdd
           ? await widget.state.addCashDrop(amount, reason: reason)
           : await widget.state.removeCashDrop(amount, reason: reason);
@@ -109,7 +262,8 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               backgroundColor: EmpireColors.errorRed,
-              content: Text('Error al registrar transacción. Valida tu conexión.'),
+              content:
+                  Text('Error al registrar transacción. Valida tu conexión.'),
             ),
           );
         }
@@ -162,75 +316,149 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
     );
   }
 
-  void _showCierreDialog() {
+  void _showCierreDialog() async {
+    final shiftId = widget.state.activeShiftId;
+    Map<String, dynamic>? auditData;
+    if (shiftId != null) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(color: EmpireColors.champagneGold),
+        ),
+      );
+      auditData = await widget.state.getCashShiftAuditReport(shiftId);
+      if (mounted) Navigator.of(context).pop();
+    }
+    if (!mounted) return;
+
+    final expectedCash = _money(_summary(auditData ?? {})['expectedCash']);
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: EmpireColors.obsidian,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: EmpireColors.errorRed, width: 1.5),
-        ),
-        title: const Text(
-          'Cierre de Caja (Corte Z)',
-          style: TextStyle(
-            color: EmpireColors.champagneGold,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Por favor, cuenta el efectivo físico en caja e ingresa el monto para conciliar.',
-              style: TextStyle(color: EmpireColors.textSecondary, fontSize: 12),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final countedCash = _countedCashFromDenominations();
+          final difference = countedCash - expectedCash;
+          return AlertDialog(
+            backgroundColor: EmpireColors.obsidian,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: EmpireColors.errorRed, width: 1.5),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _countedCashController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Efectivo Contado (\$)',
-                hintText: '0.00',
+            title: const Text(
+              'Cierre de Caja (Corte Z)',
+              style: TextStyle(
+                color: EmpireColors.champagneGold,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
-              style: const TextStyle(color: EmpireColors.textPrimary),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'CANCELAR',
-              style: TextStyle(color: EmpireColors.textSecondary),
+            content: SizedBox(
+              width: 460,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Efectivo esperado por sistema: \$${expectedCash.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: EmpireColors.champagneGold,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Efectivo contado: \$${countedCash.toStringAsFixed(2)}',
+                      style: const TextStyle(color: EmpireColors.textPrimary),
+                    ),
+                    Text(
+                      'Diferencia: \$${difference.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        color: difference.abs() < 0.01
+                            ? EmpireColors.successGreen
+                            : EmpireColors.errorRed,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Denominaciones',
+                      style: TextStyle(
+                        color: EmpireColors.textSecondary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ..._denominations.map(
+                      (value) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: TextField(
+                          controller: _denominationControllers[value],
+                          keyboardType: TextInputType.number,
+                          onChanged: (_) => setDialogState(() {}),
+                          decoration: InputDecoration(
+                            labelText:
+                                '\$${value == value.roundToDouble() ? value.toInt() : value}',
+                            hintText: 'Cantidad',
+                          ),
+                          style: const TextStyle(
+                            color: EmpireColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _closeNotesController,
+                      maxLines: 3,
+                      maxLength: 500,
+                      decoration: const InputDecoration(
+                        labelText: 'Notas de cierre',
+                        hintText: 'Observaciones, faltantes, sobrantes...',
+                      ),
+                      style: const TextStyle(color: EmpireColors.textPrimary),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final double? amount = double.tryParse(_countedCashController.text);
-              if (amount != null && amount >= 0) {
-                Navigator.of(context).pop();
-                _performCierre(amount);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    backgroundColor: EmpireColors.errorRed,
-                    content: Text('Ingresa un monto de efectivo válido.'),
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: EmpireColors.errorRed),
-            child: const Text('CERRAR CAJA'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text(
+                  'CANCELAR',
+                  style: TextStyle(color: EmpireColors.textSecondary),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _performCierre(
+                    countedCash,
+                    denominationCounts: _denominationCounts(),
+                    closeNotes: _closeNotesController.text,
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: EmpireColors.errorRed,
+                ),
+                child: const Text('CERRAR CAJA'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  void _performCierre(double actualAmount) async {
+  void _performCierre(
+    double actualAmount, {
+    Map<String, num>? denominationCounts,
+    String? closeNotes,
+  }) async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -239,35 +467,25 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
       ),
     );
 
-    final Map<String, dynamic>? recon = await widget.state.closeShift(actualAmount);
+    final Map<String, dynamic>? report = await widget.state.closeShift(
+      actualAmount,
+      denominationCounts: denominationCounts,
+      closeNotes: closeNotes,
+    );
 
     if (mounted) {
       Navigator.of(context).pop();
     }
 
-    if (recon != null) {
-      _countedCashController.clear();
+    if (report != null) {
+      final reportDetails = _formatCorteReport(
+        'Corte Z - Cierre de Caja',
+        report,
+        includeCounted: true,
+      );
+      _clearCloseInputs();
 
-      final initialFloatVal = double.tryParse(recon['initialFloat']?.toString() ?? '0') ?? 0.0;
-      final totalCashSalesVal = double.tryParse(recon['totalCashSales']?.toString() ?? '0') ?? 0.0;
-      final totalCashInVal = double.tryParse(recon['totalCashIn']?.toString() ?? '0') ?? 0.0;
-      final totalCashOutVal = double.tryParse(recon['totalCashOut']?.toString() ?? '0') ?? 0.0;
-      final expectedAmountVal = double.tryParse(recon['expectedAmount']?.toString() ?? '0') ?? 0.0;
-      final actualAmountVal = double.tryParse(recon['actualAmount']?.toString() ?? '0') ?? 0.0;
-      final discrepancyVal = double.tryParse(recon['discrepancy']?.toString() ?? '0') ?? 0.0;
-
-      final reportDetails = 'Corte Z - Cierre de Caja\n'
-          'Fecha: ${DateTime.now().toLocal()}\n'
-          'Fondo Inicial: \$${initialFloatVal.toStringAsFixed(2)}\n'
-          'Ventas Efectivo: \$${totalCashSalesVal.toStringAsFixed(2)}\n'
-          'Ingresos Turno: \$${totalCashInVal.toStringAsFixed(2)}\n'
-          'Retiros Turno: \$${totalCashOutVal.toStringAsFixed(2)}\n'
-          'Esperado en Caja: \$${expectedAmountVal.toStringAsFixed(2)}\n'
-          'Físico Reportado: \$${actualAmountVal.toStringAsFixed(2)}\n'
-          'Diferencia: \$${discrepancyVal.toStringAsFixed(2)}\n'
-          'Operador: ${widget.state.currentUserName}';
-
-      widget.state.enqueuePrintJob(
+      unawaited(widget.state.enqueueCajaPrintJob(
         PrintJob(
           id: 'report_z_${DateTime.now().millisecondsSinceEpoch}',
           title: 'Corte Z - Cierre de Caja',
@@ -275,7 +493,7 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
           target: 'Caja',
           timestamp: DateTime.now(),
         ),
-      );
+      ));
 
       if (mounted) {
         showDialog(
@@ -284,7 +502,10 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
             backgroundColor: EmpireColors.obsidian,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: EmpireColors.champagneGold, width: 1.5),
+              side: const BorderSide(
+                color: EmpireColors.champagneGold,
+                width: 1.5,
+              ),
             ),
             title: const Text(
               'Resumen de Cierre de Caja (Corte Z)',
@@ -337,30 +558,20 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
       ),
     );
 
-    final Map<String, dynamic>? auditData = await widget.state.getCashShiftAuditReport(shiftId);
+    final Map<String, dynamic>? auditData =
+        await widget.state.getCashShiftAuditReport(shiftId);
 
     if (mounted) {
       Navigator.of(context).pop();
     }
 
     if (auditData != null) {
-      final summary = auditData['summary'] ?? {};
-      final initialFloatVal = double.tryParse(auditData['shiftInfo']?['initialFloat']?.toString() ?? '0') ?? 0.0;
-      final totalCashSalesVal = double.tryParse(summary['cashSales']?.toString() ?? '0') ?? 0.0;
-      final totalCashInVal = double.tryParse(summary['totalCashIn']?.toString() ?? '0') ?? 0.0;
-      final totalCashOutVal = double.tryParse(summary['totalCashOut']?.toString() ?? '0') ?? 0.0;
-      final expectedCashVal = double.tryParse(summary['expectedCash']?.toString() ?? '0') ?? 0.0;
+      final reportDetails = _formatCorteReport(
+        'Corte X - Arqueo Parcial',
+        auditData,
+      );
 
-      final reportDetails = 'Corte X - Arqueo Parcial\n'
-          'Fecha: ${DateTime.now().toLocal()}\n'
-          'Fondo Inicial: \$${initialFloatVal.toStringAsFixed(2)}\n'
-          'Ventas Efectivo: \$${totalCashSalesVal.toStringAsFixed(2)}\n'
-          'Ingresos Turno: \$${totalCashInVal.toStringAsFixed(2)}\n'
-          'Retiros Turno: \$${totalCashOutVal.toStringAsFixed(2)}\n'
-          'Esperado en Caja: \$${expectedCashVal.toStringAsFixed(2)}\n'
-          'Operador: ${widget.state.currentUserName}';
-
-      widget.state.enqueuePrintJob(
+      unawaited(widget.state.enqueueCajaPrintJob(
         PrintJob(
           id: 'report_x_${DateTime.now().millisecondsSinceEpoch}',
           title: 'Corte X - Resumen Parcial',
@@ -368,7 +579,7 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
           target: 'Caja',
           timestamp: DateTime.now(),
         ),
-      );
+      ));
 
       if (mounted) {
         showDialog(
@@ -377,7 +588,8 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
             backgroundColor: EmpireColors.obsidian,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: EmpireColors.champagneGold, width: 1.5),
+              side: const BorderSide(
+                  color: EmpireColors.champagneGold, width: 1.5),
             ),
             title: const Text(
               'Resumen de Turno Parcial (Corte X)',
@@ -438,10 +650,10 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
               'Caja Cerrada'.toUpperCase(),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: EmpireColors.champagneGold,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.5,
-              ),
+                    color: EmpireColors.champagneGold,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                  ),
             ),
             const SizedBox(height: 12),
             const Text(
@@ -487,9 +699,9 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
             Text(
               'Turno de Caja',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: EmpireColors.champagneGold,
-                fontWeight: FontWeight.bold,
-              ),
+                    color: EmpireColors.champagneGold,
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 20),
 
@@ -578,7 +790,7 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
               ),
             ),
             const SizedBox(height: 10),
-             OutlinedButton(
+            OutlinedButton(
               onPressed: _printCorteX,
               child: const Text('CORTEX (PARCIAL)'),
             ),

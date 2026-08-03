@@ -18,6 +18,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ businessId }) =>
   // Form State
   const [name, setName] = useState<string>('');
   const [description, setDescription] = useState<string>('');
+  const [targetStation, setTargetStation] = useState<'cocina' | 'barra'>('cocina');
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const fetchData = async () => {
@@ -51,10 +52,12 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ businessId }) =>
       const savedCategory = await api.addCategory({
         name: name.trim(),
         description: description.trim() || undefined,
+        targetStation,
       }, businessId);
       setCategories((prev) => [...prev, savedCategory]);
       setName('');
       setDescription('');
+      setTargetStation('cocina');
     } catch (err: any) {
       alert(err.message || 'Error al crear la categoría.');
     } finally {
@@ -121,6 +124,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ businessId }) =>
                   <tr className="bg-charcoal-surface border-b border-aged-bronze/30 text-text-secondary uppercase tracking-wider text-[10px]">
                     <th className="p-4 font-semibold">Nombre</th>
                     <th className="p-4 font-semibold">Descripción</th>
+                    <th className="p-4 font-semibold text-center">Estación KDS</th>
                     <th className="p-4 font-semibold text-center">Artículos</th>
                     <th className="p-4 font-semibold text-right">Acciones</th>
                   </tr>
@@ -128,11 +132,19 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ businessId }) =>
                 <tbody className="divide-y divide-aged-bronze/10">
                   {categories.map((c) => {
                     const count = products.filter((p) => p.categoryId === c.id).length;
+                    const isBarra = c.targetStation === 'barra';
                     return (
                       <tr key={c.id} className="hover:bg-charcoal-surface/30 transition-colors">
                         <td className="p-4 font-medium text-text-primary">{c.name}</td>
                         <td className="p-4 text-text-secondary max-w-xs truncate" title={c.description || ''}>
                           {c.description || '-'}
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                            isBarra ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          }`}>
+                            {isBarra ? '🍹 BARRA' : '🍳 COCINA'}
+                          </span>
                         </td>
                         <td className="p-4 text-center font-mono text-text-secondary">{count}</td>
                         <td className="p-4 text-right">
@@ -170,6 +182,17 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ businessId }) =>
                 onChange={(e) => setName(e.target.value)}
                 required
               />
+            </FormField>
+
+            <FormField label="Estación de Preparación (KDS)" required>
+              <select
+                value={targetStation}
+                onChange={(e) => setTargetStation(e.target.value as 'cocina' | 'barra')}
+                className="w-full bg-charcoal-surface border border-aged-bronze focus:border-champagne-gold text-text-primary rounded-md p-3 font-sans text-xs focus:outline-none transition-all"
+              >
+                <option value="cocina">🍳 Cocina (Platillos / Comida)</option>
+                <option value="barra">🍹 Barra (Bebidas / Café / Tragos)</option>
+              </select>
             </FormField>
 
             <FormField label="Descripción / Detalle">

@@ -1,19 +1,36 @@
-# POS-ERP: Offline-First POS & ERP System
+# 🚀 POS-ERP: Offline-First POS & Enterprise ERP System
 
-Welcome to the **POS-ERP** repository! This is an offline-first Point of Sale (POS) and Enterprise Resource Planning (ERP) system designed for food business operations. It utilizes a shared Flutter codebase for desktop and mobile clients, synchronizing with a serverless AWS Lambda and PostgreSQL backend.
+Welcome to **POS-ERP (Cacharelo)**! A high-performance, offline-first Point of Sale (POS) and Enterprise Resource Planning (ERP) platform built for restaurant, café, and food service operations.
 
 ---
 
-## 📊 Project Status & Active Files
+## 🎯 Master Goal Tracker & Feature Progress
 
-| Document / Area | Path | Status | Description |
+| Feature / Module | Scope | Status | Live Production Target | Notes / Progress |
+| :--- | :--- | :--- | :--- | :--- |
+| **Multi-Station KDS Routing** | Backend & POS | 🟢 **Completed** | KDS Dashboard | Splits tickets dynamically between `🍳 Cocina` and `🍹 Barra`. |
+| **Dynamic Admin Station Config** | Admin Dashboard & API | 🟢 **Completed** | `https://cacharelo-central.web.app` | Managers set KDS stations per category in the Admin Dashboard. |
+| **Non-Intrusive Ready Orders Tray** | POS Waiter App | 🟢 **Completed** | Web POS & Android | Bell icon (`🛎️`) with ready counter badge and modal to deliver items. |
+| **Sellable Menu Filtering** | POS App | 🟢 **Completed** | Web POS & Android | Limits menu strictly to `isSellable = true` products. |
+| **Split Checkout & Partial Payments** | POS Cashier App | 🟢 **Completed** | Web POS & Android | Supports Equal Split and By-Item Split across Cash/Card/Transfer. |
+| **Public Download Portal** | Web Portal & GCP | 🟢 **Completed** | `https://cacharelo-pos.web.app/descargas.html` | PIN-protected (`9876`) download portal for Android APK & Web POS. |
+| **App Self-Update System** | POS App & API | 🟢 **Completed** | POS App | Version service check and update prompt modal (`UpdateDialog`). |
+| **Idempotent DB Migrations** | Backend API | 🟢 **Completed** | Cloud SQL Postgres | Custom DDL migration runner (`idempotent-deploy-migrations.ts`). |
+| **Encargado Counter & Take-Out** | POS App | 🟡 **In Progress** | POS App | Fast counter ordering & direct checkout without table allocation. |
+| **PO Product Component Reuse** | Admin Dashboard | 🔵 **Planned** | `https://cacharelo-central.web.app` | Reusable product search & line-item editor for Purchase Orders. |
+| **Requisitions Approval Flow** | Backend & Admin | 🔵 **Planned** | Admin & API | Branch-to-warehouse stock request and manager approval workflows. |
+
+---
+
+## 🌐 Live System URLs & Deployment Summary
+
+| Application | Technology | Environment / Production Link | Deployment Command |
 | :--- | :--- | :--- | :--- |
-| **Living Roadmap** | [PLAN.md](file:///Users/joelmorales/web/POS-ERP/PLAN.md) | 🟢 Active | High-level phases, milestones, and progress checkboxes. |
-| **Task Tracker** | [TRACKER.md](file:///Users/joelmorales/web/POS-ERP/TRACKER.md) | 🟢 Active | Detailed task assignment, statuses, and LLM session notes. |
-| **LLM Tracking Spec** | [llm-tracking-spec.md](file:///Users/joelmorales/web/POS-ERP/docs/llm-tracking-spec.md) | 🟢 Complete | Portable specification of the LLM tracking system for other repos. |
-| **Architecture Spec** | [spec.md](file:///Users/joelmorales/web/POS-ERP/specs/001-offline-pos-architecture/spec.md) | 🟡 In Review | Core specs, user stories, and acceptance criteria. |
-| **Implementation Plan** | [plan.md](file:///Users/joelmorales/web/POS-ERP/specs/001-offline-pos-architecture/plan.md) | 🟢 Active | Phase summaries, project structure, and technology context. |
-| **Offline Runbook** | [offline-sync-runbook.md](file:///Users/joelmorales/web/POS-ERP/docs/offline-sync-runbook.md) | 🟢 Complete | Recovery procedures for sync and printer failures. |
+| **POS Web Application** | Flutter 3.x Web | [https://cacharelo-pos.web.app](https://cacharelo-pos.web.app) | `make flutter-web-deploy` |
+| **Public Download Portal** | HTML5 / PIN 9876 | [https://cacharelo-pos.web.app/descargas.html](https://cacharelo-pos.web.app/descargas.html) | `make flutter-portal-deploy` |
+| **Admin Dashboard** | React / Vite / Tauri | [https://cacharelo-central.web.app](https://cacharelo-central.web.app) | `make admin-deploy` |
+| **Backend API** | NestJS / TypeScript | [https://pos-sync-api-232144991863.us-central1.run.app/api](https://pos-sync-api-232144991863.us-central1.run.app/api) | `make backend-deploy-fast` |
+| **Database** | PostgreSQL 15 | GCP Cloud SQL (`pos-db-instance`) | `make backend-migrate` |
 
 ---
 
@@ -21,87 +38,49 @@ Welcome to the **POS-ERP** repository! This is an offline-first Point of Sale (P
 
 ```mermaid
 graph TD
-    subgraph Client [POS Client: Flutter]
-        A[pos_flutter] -->|Local Stores| B[(Isar Database)]
-        A -->|Print Command| C[ESC/POS Adapters]
-        C -->|Windows USB| D[Thermal Printer]
-        C -->|Android BT/Net| E[Thermal Printer]
+    subgraph Clients [POS & Admin Clients]
+        A[Flutter POS App - Mobile / Web / Desktop] -->|Offline Cash & Sales| B[(Isar Database)]
+        C[Admin Dashboard - React/Vite/Tauri] -->|Management & Catalog| D[NestJS API]
     end
 
-    subgraph Cloud [Sync Backend: AWS]
-        F[AWS RDS Proxy] -->|Connection Pool| G[(PostgreSQL)]
-        H[AWS Lambda APIs] -->|SQL Writes| F
+    subgraph Backend [Sync Engine & Cloud Infrastructure]
+        D -->|Cloud Run Service| E[(Cloud SQL PostgreSQL)]
+        A -->|Idempotent Sync Request| D
     end
 
-    A -->|Idempotent Sync Request| H
+    subgraph Release [Distribution & Storage]
+        F[GCP Storage Bucket] -->|APK Releases| G[Public Download Portal]
+    end
 ```
 
-- **Frontend & Local Logic**: [pos_flutter](file:///Users/joelmorales/web/POS-ERP/apps/pos_flutter) — Shared Flutter 3.x codebase targeting Windows 10 and Android.
-- **Local Database**: [Isar Database](https://isar.dev) — Locally authoritative, thread-safe transactional store using UUID v4 keys.
-- **Printing**: Raw ESC/POS generation with platform adapters (USB on Windows; Bluetooth/Network on Android).
-- **Backend API**: [sync_api](file:///Users/joelmorales/web/POS-ERP/apps/sync_api) — TypeScript Node.js 22.x running on AWS Lambda.
-- **Cloud Database**: AWS RDS PostgreSQL connected securely through **AWS RDS Proxy** to manage connection spikes.
-- **Database Migrations & Seeds**: Powered by [Knex.js](file:///Users/joelmorales/web/POS-ERP/apps/sync_api/knexfile.ts) with local database schemas defined in [apps/sync_api/migrations/](file:///Users/joelmorales/web/POS-ERP/apps/sync_api/migrations) and seeded via [apps/sync_api/seeds/](file:///Users/joelmorales/web/POS-ERP/apps/sync_api/seeds).
+- **Frontend POS**: [`apps/pos_flutter`](file:///Users/joelmorales/web/POS-ERP/apps/pos_flutter) — Flutter 3.x targeting Android, Web, Windows, and macOS.
+- **Admin Dashboard**: [`apps/business_control_tauri`](file:///Users/joelmorales/web/POS-ERP/apps/business_control_tauri) — React 18 / Vite / TailwindCSS admin interface.
+- **Backend API**: [`apps/sync_api`](file:///Users/joelmorales/web/POS-ERP/apps/sync_api) — NestJS TypeScript API running on GCP Cloud Run.
+- **Database**: Cloud SQL PostgreSQL managed with Drizzle ORM and idempotent DDL migration scripts.
 
 ---
 
-## 🛠️ Dev Commands Quick Reference (Makefile)
+## 🛠️ Quick Reference Commands (Makefile)
 
-We use a root-level [Makefile](file:///Users/joelmorales/web/POS-ERP/Makefile) to simplify local development, testing, and deployment.
+```bash
+# 🚀 Deployment Commands
+make backend-deploy-fast    # Deploy NestJS API to Cloud Run
+make backend-migrate        # Run Cloud SQL database migrations
+make admin-deploy           # Deploy Admin Dashboard to Firebase Hosting
+make flutter-portal-deploy  # Build APK + Web POS + GCP Bucket + Firebase Hosting
 
-### Setup & Dev
-* `make install` - Install Node.js backend and Flutter frontend dependencies.
-* `make dev-backend` - Start Express API with watch/hot-reload mode.
-* `make dev-frontend` - Start the Flutter client application.
-
-### Local Database
-* `make db-up` - Boot local Postgres Docker container.
-* `make db-down` - Stop Postgres Docker container.
-* `make db-status` - View status of Postgres Docker container.
-* `make db-migrate` - Run pending migrations.
-* `make db-seed` - Run seed files.
-* `make db-rollback` - Rollback last batch of migrations.
-* `make db-reset` - Recreate, migrate, and seed the local database.
-
-### Quality & Deploy
-* `make lint` - Run `flutter analyze` on the client application.
-* `make test` - Run client unit/widget tests.
-* `make infra-init` / `infra-plan` / `infra-apply` - Manage GCP infrastructure via Terraform.
+# 💻 Development Commands
+make dev-backend            # Run NestJS API in watch mode
+make dev-frontend           # Run Flutter POS app locally
+make test                   # Run unit & integration tests
+```
 
 ---
 
-## 🤖 LLM Workflow Tracking Mechanism
+## 📋 Documentation Map
 
-We track LLM prompts, brainstorming logs, and ongoing development tasks in Markdown files directly in the repository. This enables context preservation across chat sessions and is fully Git-friendly.
-
-### 📁 Directory Structure
-
-```text
-├── README.md             # This Master Dashboard
-├── PLAN.md               # Living roadmap with checkboxes
-├── TRACKER.md            # Active task tracking table
-├── prompts/              # Reusable, complex prompts
-│   ├── README.md         # Guide on reusing prompts
-│   └── developer_persona.md
-└── logs/                 # Dated chat session transcripts
-    ├── README.md         # Guide on logging sessions
-    └── YYYY-MM-DD-chat.md
-```
-
-### 🚦 Tagging Guidelines
-
-Use these tags consistently in your tracker files and commit logs so LLMs can quickly parse status:
-* `#todo` - A task that is planned but not started.
-* `#in-progress` - Currently being worked on by an agent or developer.
-* `#blocked` - A task that cannot proceed due to external dependencies or clarifications.
-* `#waiting-for-llm` - Waiting for AI output, code generation, or review.
-* `#completed` - Completed and verified.
-
-### 📝 How to Log a Session
-Whenever you finish a heavy coding or design session:
-1. Create a dated markdown file in `logs/` (e.g., `logs/2026-05-30-pos-sync-review.md`).
-2. Briefly summarize:
-   - What was accomplished.
-   - Any new decisions or design changes.
-   - Remaining tasks or next steps.
-3. Update [PLAN.md](file:///Users/joelmorales/web/POS-ERP/PLAN.md) and [TRACKER.md](file:///Users/joelmorales/web/POS-ERP/TRACKER.md) with updated task states.
+- [AGENTS.md](file:///Users/joelmorales/web/POS-ERP/AGENTS.md) — Multi-session coordination protocol & agent instructions.
+- [HANDOFF.md](file:///Users/joelmorales/web/POS-ERP/HANDOFF.md) — Latest session handoff report.
+- [TRACKER.md](file:///Users/joelmorales/web/POS-ERP/TRACKER.md) — Detailed task-level status tracker.
+- [PLAN.md](file:///Users/joelmorales/web/POS-ERP/PLAN.md) — Architectural phases & milestone checklist.
+- [.claude/deployment-agent.md](file:///Users/joelmorales/web/POS-ERP/.claude/deployment-agent.md) — Complete deployment operational manual.
