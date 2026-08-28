@@ -6,6 +6,19 @@ import { Badge } from '../components/atoms/Badge';
 import { Heading } from '../components/atoms/Heading';
 import { ToastContainer } from '../components/molecules/ToastNotification';
 
+const ITEM_TYPE_LABELS: Record<string, string> = {
+  raw_material: 'Materia Prima',
+  wip: 'En Proceso',
+  finished_good: 'Terminado',
+  service: 'Servicio',
+};
+
+const PRODUCTION_STRATEGY_LABELS: Record<string, string> = {
+  none: 'Sin producción',
+  backflush: 'Backflush',
+  work_order: 'Orden de Trabajo',
+};
+
 interface InventoryPageProps {
   businessId: string;
 }
@@ -288,12 +301,13 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
         'Precio Mayoreo',
         'Inv Mínimo',
         'Inv Máximo',
-        'Tipo de Venta',
+        'Tipo de Artículo',
+        'Estrategia de Producción',
+        'Unidad de Medida',
         'SKU',
         'Código Barras',
         'Existencia',
-        'Proveedor',
-        'Para Venta'
+        'Proveedor'
       ];
 
       // Format individual cell helper
@@ -328,12 +342,13 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
           p.priceWholesale || '0.00',
           p.minStock || '0',
           p.maxStock || '0',
-          p.saleType || 'pieza',
+          p.itemType || 'finished_good',
+          p.productionStrategy || 'none',
+          p.uom || 'piece',
           p.sku || '',
           p.barcode || '',
           '', // Existencia - left empty for re-import
-          providerName,
-          p.isSellable !== false ? 'SI' : 'NO'
+          providerName
         ].map(formatCell).join(',');
       });
 
@@ -369,12 +384,13 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
       'Precio Mayoreo',
       'Inv Mínimo',
       'Inv Máximo',
-      'Tipo de Venta',
+      'Tipo de Artículo',
+      'Estrategia de Producción',
+      'Unidad de Medida',
       'SKU',
       'Código Barras',
       'Existencia',
-      'Proveedor',
-      'Para Venta'
+      'Proveedor'
     ];
     const row = [
       '1',
@@ -385,12 +401,13 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
       '0.00',
       '10',
       '100',
-      'granel',
+      'finished_good',
+      'none',
+      'piece',
       'SKU-ARROZ',
       '123456789',
       '50',
-      'PLANTA PRODUCCION',
-      'SI'
+      'PLANTA PRODUCCION'
     ];
     
     // Include BOM character for proper Spanish characters opening in Excel
@@ -1228,14 +1245,18 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                                        <Badge variant="error" className="bg-red-500/10 text-error-red border border-error-red/20">Deprecado</Badge>
                                      ) : (
                                        <>
-                                         {p.isSellable !== false && (
-                                           <Badge variant="success">Venta</Badge>
-                                         )}
-                                         {p.isIngredient && (
-                                           <Badge variant="warning">Insumo</Badge>
-                                         )}
-                                         {p.isSellable === false && !p.isIngredient && (
-                                           <span className="text-[10px] text-text-secondary italic">Inactivo</span>
+                                         {(() => {
+                                           const itemType = p.itemType || (p.isIngredient ? 'raw_material' : (p.isSellable === false ? 'wip' : 'finished_good'));
+                                           return (
+                                             <Badge variant="charcoal">
+                                               {ITEM_TYPE_LABELS[itemType] || 'Producto'}
+                                             </Badge>
+                                           );
+                                         })()}
+                                         {p.productionStrategy && p.productionStrategy !== 'none' && (
+                                           <Badge variant="warning">
+                                             {PRODUCTION_STRATEGY_LABELS[p.productionStrategy] || p.productionStrategy}
+                                           </Badge>
                                          )}
                                        </>
                                      )}

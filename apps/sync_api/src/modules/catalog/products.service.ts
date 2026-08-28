@@ -10,6 +10,61 @@ import { eq, and, isNull, desc } from 'drizzle-orm';
 import { read, utils } from 'xlsx';
 import { Storage } from '@google-cloud/storage';
 
+const ITEM_TYPE_FLAGS: Record<string, { isIngredient: boolean; isSellable: boolean }> = {
+  raw_material: { isIngredient: true, isSellable: false },
+  wip: { isIngredient: false, isSellable: false },
+  finished_good: { isIngredient: false, isSellable: true },
+  service: { isIngredient: false, isSellable: true },
+};
+
+function normalizeItemType(value: string | undefined): string | undefined {
+  const s = (value || '').trim().toLowerCase();
+  const map: Record<string, string> = {
+    raw_material: 'raw_material', 'materia prima': 'raw_material', materia: 'raw_material',
+    insumo: 'raw_material', ingrediente: 'raw_material', 'raw material': 'raw_material',
+    wip: 'wip', 'producto en proceso': 'wip', 'en proceso': 'wip', 'producto en proceso (wip)': 'wip',
+    finished_good: 'finished_good', 'producto terminado': 'finished_good', terminado: 'finished_good',
+    'finished good': 'finished_good',
+    service: 'service', servicio: 'service',
+  };
+  return s ? map[s] : undefined;
+}
+
+function normalizeProductionStrategy(value: string | undefined): string | undefined {
+  const s = (value || '').trim().toLowerCase();
+  const map: Record<string, string> = {
+    none: 'none', ninguna: 'none', 'sin lógica automática': 'none', 'sin logica automatica': 'none',
+    backflush: 'backflush',
+    work_order: 'work_order', 'orden de trabajo': 'work_order', orden: 'work_order',
+    'orden de trabajo (producción por lotes)': 'work_order',
+  };
+  return s ? map[s] : undefined;
+}
+
+function normalizeUom(value: string | undefined): string | undefined {
+  const s = (value || '').trim().toLowerCase();
+  const map: Record<string, string> = {
+    piece: 'piece', pieza: 'piece', unidad: 'piece', pz: 'piece', 'pieza (unidad)': 'piece',
+    kg: 'kg', kilogramo: 'kg', kilos: 'kg', 'kilogramo (kg)': 'kg',
+    g: 'g', gramo: 'g', gramos: 'g', gr: 'g', 'gramo (g)': 'g',
+    l: 'l', litro: 'l', litros: 'l', lt: 'l', 'litro (l)': 'l',
+    ml: 'ml', mililitro: 'ml', mililitros: 'ml', 'mililitro (ml)': 'ml',
+  };
+  return s ? map[s] : undefined;
+}
+
+function resolveItemFlags(
+  itemType: string | undefined,
+  fallback: { isIngredient: boolean; isSellable: boolean },
+): { isIngredient: boolean; isSellable: boolean } {
+  return itemType && ITEM_TYPE_FLAGS[itemType] ? ITEM_TYPE_FLAGS[itemType] : fallback;
+}
+
+function resolveSaleType(uom: string | undefined, fallback: string): string {
+  if (!uom) return fallback;
+  return uom === 'piece' ? 'pieza' : 'granel';
+}
+
 @Injectable()
 export class ProductsService {
   constructor(
@@ -127,6 +182,9 @@ export class ProductsService {
       const minStock = cleanNumber(row['Inv Mínimo']);
       const maxStock = cleanNumber(row['Inv Máximo']);
       const saleType = (row['Tipo de Venta']?.toString().trim() || 'pieza').toLowerCase() === 'granel' ? 'granel' : 'pieza';
+      const itemType = normalizeItemType(row['Tipo de Artículo']?.toString());
+      const productionStrategy = normalizeProductionStrategy(row['Estrategia de Producción']?.toString());
+      const uom = normalizeUom(row['Unidad de Medida']?.toString());
       const sku = row['SKU']?.toString().trim() || '';
       const barcode = row['Código Barras']?.toString().trim() || '';
       const internalCode = row['Código Interno']?.toString().trim() || '';
@@ -161,6 +219,9 @@ export class ProductsService {
         minStock,
         maxStock,
         saleType,
+        itemType,
+        productionStrategy,
+        uom,
         sku,
         barcode,
         internalCode,
@@ -234,6 +295,11 @@ export class ProductsService {
           }
 
           // 3. Create Product
+          const flags = resolveItemFlags(row.itemType, {
+            isIngredient: providerId ? true : false,
+            isSellable: true,
+          });
+
           const [product] = await tx
             .insert(schema.products)
             .values({
@@ -248,9 +314,12 @@ export class ProductsService {
               priceWholesale: row.priceWholesale || '0.00',
               minStock: row.minStock || '0.000',
               maxStock: row.maxStock || '0.000',
-              saleType: row.saleType || 'pieza',
-              isSellable: true,
-              isIngredient: providerId ? true : false,
+              saleType: resolveSaleType(row.uom, row.saleType || 'pieza'),
+              itemType: row.itemType || (providerId ? 'raw_material' : 'finished_good'),
+              productionStrategy: row.productionStrategy || 'none',
+              uom: row.uom || 'piece',
+              isSellable: flags.isSellable,
+              isIngredient: flags.isIngredient,
               businessId,
             })
             .returning();
@@ -545,6 +614,9 @@ export class ProductsService {
         const minStock = cleanNumber(getRowValue(row, 'Inv Mínimo') || getRowValue(row, 'Minimo') || getRowValue(row, 'Stock Minimo'));
         const maxStock = cleanNumber(getRowValue(row, 'Inv Máximo') || getRowValue(row, 'Maximo') || getRowValue(row, 'Stock Maximo'));
         const saleType = (getRowValue(row, 'Tipo de Venta') || 'pieza').toLowerCase() === 'granel' ? 'granel' : 'pieza';
+        const itemType = normalizeItemType(getRowValue(row, 'Tipo de Artículo') || getRowValue(row, 'Tipo de Articulo'));
+        const productionStrategy = normalizeProductionStrategy(getRowValue(row, 'Estrategia de Producción') || getRowValue(row, 'Estrategia de Produccion'));
+        const uom = normalizeUom(getRowValue(row, 'Unidad de Medida') || getRowValue(row, 'Unidad Medida'));
         const sku = getRowValue(row, 'SKU');
         const barcode = getRowValue(row, 'Código Barras') || getRowValue(row, 'Codigo Barras') || getRowValue(row, 'Codigo de Barras') || getRowValue(row, 'Barcode');
         const internalCode = getRowValue(row, 'Código Interno') || getRowValue(row, 'Codigo Interno') || getRowValue(row, 'Codigo');
@@ -567,6 +639,9 @@ export class ProductsService {
             minStock,
             maxStock,
             saleType,
+            itemType,
+            productionStrategy,
+            uom,
             sku,
             barcode,
             internalCode,
@@ -625,6 +700,11 @@ export class ProductsService {
             const provider = p.providerName ? providers.find(prov => prov.name.toLowerCase() === p.providerName.toLowerCase()) : null;
             const providerId = provider ? provider.id : null;
 
+            const flags = resolveItemFlags(p.itemType, {
+              isIngredient: !p.paraVenta,
+              isSellable: p.paraVenta,
+            });
+
             const productData = {
               categoryId: category.id,
               name: p.name,
@@ -637,9 +717,12 @@ export class ProductsService {
               priceWholesale: p.priceWholesale,
               minStock: p.minStock,
               maxStock: p.maxStock,
-              saleType: p.saleType,
-              isSellable: p.paraVenta,
-              isIngredient: !p.paraVenta,
+              saleType: resolveSaleType(p.uom, p.saleType),
+              itemType: p.itemType || (p.paraVenta ? 'finished_good' : 'raw_material'),
+              productionStrategy: p.productionStrategy || 'none',
+              uom: p.uom || 'piece',
+              isSellable: flags.isSellable,
+              isIngredient: flags.isIngredient,
               businessId,
               updatedAt: new Date(),
             };
