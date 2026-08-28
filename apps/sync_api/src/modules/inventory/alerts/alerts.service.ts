@@ -243,7 +243,33 @@ export class AlertsService {
       .where(and(...conditions))
       .orderBy(desc(schema.inventoryAlerts.createdAt));
 
-    return alerts;
+    // For branch alerts, compute how much stock is available elsewhere (to transfer)
+    const branchProductIds = alerts
+      .filter((a) => a.branchId)
+      .map((a) => a.productId);
+
+    const globalStockMap = new Map<string, number>();
+    if (branchProductIds.length > 0) {
+      const rows = await this.db
+        .select({
+          productId: schema.stockLevels.productId,
+          qty: sql<string>`COALESCE(SUM(${schema.stockLevels.quantity}), 0)::numeric`,
+        })
+        .from(schema.stockLevels)
+        .where(inArray(schema.stockLevels.productId, branchProductIds))
+        .groupBy(schema.stockLevels.productId);
+
+      for (const r of rows) {
+        globalStockMap.set(r.productId, parseFloat(r.qty || '0'));
+      }
+    }
+
+    return alerts.map((a) => {
+      if (!a.branchId) return { ...a, transferableQty: null };
+      const global = globalStockMap.get(a.productId) ?? 0;
+      const branchQty = parseFloat(a.currentQty || '0');
+      return { ...a, transferableQty: global - branchQty };
+    });
   }
 
   async getSummary(businessId: string, branchId?: string) {
@@ -348,6 +374,15 @@ export class AlertsService {
     const warehouse = await this.resolveDefaultWarehouse(alert.businessId);
     if (!warehouse) {
       throw new BadRequestException('No hay una bodega configurada para este negocio.');
+    }
+
+    // Requisition only makes sense if there is stock elsewhere to transfer
+    const globalStock = await this.getGlobalStock(alert.productId);
+    const branchQty = parseFloat(alert.currentQty || '0');
+    if (globalStock - branchQty <= 0) {
+      throw new BadRequestException(
+        'No hay stock disponible para traspasar. Genere una Orden de Compra en su lugar.',
+      );
     }
 
     // Skip if an open requisition already exists for the same product+branch

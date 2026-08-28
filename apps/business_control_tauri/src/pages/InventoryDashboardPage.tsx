@@ -265,6 +265,7 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
 
         {visibleAlerts.map((alert) => {
           const isGlobal = !alert.branchId;
+          const hasTransferable = (alert.transferableQty ?? 0) > 0;
           return (
           <div
             key={alert.id}
@@ -291,20 +292,25 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
                   {alert.alertType === 'out_of_stock' ? 'Sin stock' : 'Bajo mínimo'}
                 </span>
                 <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-charcoal-surface/60 border border-aged-bronze/20 text-text-secondary">
-                  {isGlobal ? 'Compra sugerida' : 'Requisición sugerida'}
+                  {isGlobal || !hasTransferable ? 'Compra sugerida' : 'Requisición sugerida'}
                 </span>
                 {alert.status === 'resolved' && (
                   <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">Resuelta</span>
                 )}
               </div>
               <div className="text-xs text-text-secondary mt-1">
-                {isGlobal ? 'Todo el negocio (stock global)' : alert.branchName} · Stock actual: <span className="text-text-primary">{alert.currentQty}</span> · Mínimo: <span className="text-text-primary">{alert.threshold}</span>
+                {isGlobal
+                  ? 'Todo el negocio (stock global)'
+                  : hasTransferable
+                    ? `${alert.branchName} (${alert.transferableQty} disponible para traspasar)`
+                    : `${alert.branchName} (sin stock para traspasar)`}{' '}
+                · Stock actual: <span className="text-text-primary">{alert.currentQty}</span> · Mínimo: <span className="text-text-primary">{alert.threshold}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
               {alert.status !== 'resolved' && (
-                isGlobal ? (
+                isGlobal || !hasTransferable ? (
                   <Button variant="primary" size="sm" data-testid={`alert-generate-oc-${alert.id}`} disabled={actionId === alert.id} onClick={() => handleGeneratePurchaseOrder(alert)}>
                     Generar OC
                   </Button>
