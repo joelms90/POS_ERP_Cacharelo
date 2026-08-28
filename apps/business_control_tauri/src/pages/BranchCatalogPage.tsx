@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { api, Branch, Product, BranchCatalogEntry } from '../services/api';
+import { api, Branch, Product, BranchCatalogEntry, BranchStockThreshold } from '../services/api';
 import { Heading } from '../components/atoms/Heading';
 import { Button } from '../components/atoms/Button';
 import { Input } from '../components/atoms/Input';
@@ -26,6 +26,7 @@ export const BranchCatalogPage: React.FC<BranchCatalogPageProps> = ({ businessId
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
+  const [thresholdsMap, setThresholdsMap] = useState<Map<string, BranchStockThreshold>>(new Map());
   const [copyFromBranchId, setCopyFromBranchId] = useState('');
   const [copying, setCopying] = useState(false);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
@@ -50,10 +51,11 @@ export const BranchCatalogPage: React.FC<BranchCatalogPageProps> = ({ businessId
   const loadData = useCallback(async (branchId: string) => {
     setLoading(true);
     try {
-      const [productsData, overridesData, stockData] = await Promise.all([
+      const [productsData, overridesData, stockData, thresholdsData] = await Promise.all([
         api.getProducts(businessId, branchId),
         api.getBranchCatalog(branchId),
         api.getStockLevels(businessId, undefined, branchId),
+        api.getBranchThresholds(businessId, branchId),
       ]);
       setProducts(productsData);
       setOverrides(new Map(overridesData.map((o) => [o.productId, o])));
@@ -64,6 +66,7 @@ export const BranchCatalogPage: React.FC<BranchCatalogPageProps> = ({ businessId
         }
       }
       setStockMap(stockMap);
+      setThresholdsMap(new Map(thresholdsData.map((t) => [t.productId, t])));
     } catch (e: any) {
       showToast(e?.message || 'Error al cargar el catálogo.', 'error');
     } finally {
@@ -108,6 +111,25 @@ export const BranchCatalogPage: React.FC<BranchCatalogPageProps> = ({ businessId
       showToast(e?.message || 'Error al restablecer.', 'error');
     } finally {
       setSavingId(null);
+    }
+  };
+
+  const handleThresholdChange = async (
+    productId: string,
+    field: 'minStock' | 'maxStock',
+    value: string,
+  ) => {
+    const num = parseFloat(value);
+    try {
+      await api.upsertBranchThreshold({
+        businessId,
+        productId,
+        branchId: selectedBranchId,
+        [field]: isNaN(num) ? 0 : num,
+      });
+      await loadData(selectedBranchId);
+    } catch (e: any) {
+      showToast(e?.message || 'Error al guardar el mínimo/máximo.', 'error');
     }
   };
 
@@ -202,6 +224,7 @@ export const BranchCatalogPage: React.FC<BranchCatalogPageProps> = ({ businessId
             const branchStock = stockMap.get(p.id) ?? 0;
             const minStock = parseFloat(p.minStock || '0');
             const isLow = minStock > 0 && branchStock < minStock;
+            const thr = thresholdsMap.get(p.id);
             return (
               <div
                 key={p.id}
@@ -221,7 +244,7 @@ export const BranchCatalogPage: React.FC<BranchCatalogPageProps> = ({ businessId
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex items-center gap-3 flex-shrink-0 flex-wrap">
                   <div className="flex flex-col items-end" data-testid={`catalog-stock-${p.id}`}>
                     <span className={`text-xs font-mono font-semibold ${isLow ? 'text-error-red' : 'text-text-primary'}`}>
                       {branchStock.toFixed(3)} <span className="text-[10px] text-text-secondary font-normal">stock</span>
@@ -230,6 +253,32 @@ export const BranchCatalogPage: React.FC<BranchCatalogPageProps> = ({ businessId
                       <span className="text-[9px] text-error-red uppercase tracking-wider">bajo mín ({minStock})</span>
                     )}
                   </div>
+
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] text-text-secondary uppercase tracking-wider">Mín</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="global"
+                      defaultValue={thr && parseFloat(thr.minStock || '0') > 0 ? parseFloat(thr.minStock) : ''}
+                      onBlur={(e) => handleThresholdChange(p.id, 'minStock', e.target.value)}
+                      className="w-16 px-1.5 py-1 bg-charcoal-surface border border-aged-bronze rounded text-xs text-text-primary focus:outline-none focus:border-champagne-gold"
+                      data-testid={`catalog-min-${p.id}`}
+                    />
+                    <span className="text-[9px] text-text-secondary uppercase tracking-wider ml-1">Máx</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="global"
+                      defaultValue={thr && parseFloat(thr.maxStock || '0') > 0 ? parseFloat(thr.maxStock) : ''}
+                      onBlur={(e) => handleThresholdChange(p.id, 'maxStock', e.target.value)}
+                      className="w-16 px-1.5 py-1 bg-charcoal-surface border border-aged-bronze rounded text-xs text-text-primary focus:outline-none focus:border-champagne-gold"
+                      data-testid={`catalog-max-${p.id}`}
+                    />
+                  </div>
+
                   <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer select-none">
                     <input
                       type="checkbox"

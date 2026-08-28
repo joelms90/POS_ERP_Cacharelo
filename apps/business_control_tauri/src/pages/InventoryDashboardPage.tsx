@@ -3,6 +3,7 @@ import { api, InventoryAlert, InventoryAlertSummary, Branch } from '../services/
 import { Heading } from '../components/atoms/Heading';
 import { Button } from '../components/atoms/Button';
 import { ToastContainer } from '../components/molecules/ToastNotification';
+import { ProductionOrderModal } from './ProductionOrderModal';
 
 interface InventoryDashboardPageProps {
   businessId: string;
@@ -23,6 +24,7 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
   const [actionId, setActionId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [productionProduct, setProductionProduct] = useState<InventoryAlert | null>(null);
 
   const showToast = useCallback((message: string, type: Toast['type'] = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -335,9 +337,9 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
                     Sin proveedor registrado
                   </span>
                 ) : (
-                  <span className="text-[10px] text-text-secondary italic px-2 py-1 rounded bg-charcoal-surface/40 border border-aged-bronze/20">
-                    Producir en Ensamble
-                  </span>
+                  <Button variant="secondary" size="sm" data-testid={`alert-produce-${alert.id}`} onClick={() => setProductionProduct(alert)}>
+                    Producir
+                  </Button>
                 )
               )}
             </div>
@@ -347,6 +349,16 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
       </div>
 
       <ToastContainer toasts={toasts} onClose={removeToast} />
+
+      {productionProduct && (
+        <ProductionOrderModal
+          businessId={businessId}
+          productId={productionProduct.productId}
+          productName={productionProduct.productName}
+          onClose={() => setProductionProduct(null)}
+          onToast={showToast}
+        />
+      )}
     </div>
   );
 };
