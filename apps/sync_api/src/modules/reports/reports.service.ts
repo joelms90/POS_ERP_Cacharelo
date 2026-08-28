@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../database/schema';
-import { eq, and, isNull, gte, lte, inArray, desc } from 'drizzle-orm';
+import { eq, and, isNull, gte, lte, lt, gt, inArray, desc } from 'drizzle-orm';
 
 export type ReconciliationExceptionType =
   | 'zero_total_with_items'
@@ -941,43 +941,42 @@ export class ReportsService {
     const { businessId, productId, warehouseId, branchId, startDate, endDate } = query;
 
     const conditions = [
-      eq(schema.inventoryMovements.businessId, businessId),
-      eq(schema.inventoryMovements.productId, productId),
+      eq(schema.stockLedger.businessId, businessId),
+      eq(schema.stockLedger.productId, productId),
     ];
 
     if (warehouseId) {
-      conditions.push(eq(schema.inventoryMovements.warehouseId, warehouseId));
+      conditions.push(eq(schema.stockLedger.warehouseId, warehouseId));
     }
     if (branchId) {
-      conditions.push(eq(schema.inventoryMovements.branchId, branchId));
+      conditions.push(eq(schema.stockLedger.branchId, branchId));
     }
 
     const movements = await this.db
       .select({
-        id: schema.inventoryMovements.id,
-        productId: schema.inventoryMovements.productId,
-        warehouseId: schema.inventoryMovements.warehouseId,
+        id: schema.stockLedger.id,
+        productId: schema.stockLedger.productId,
+        warehouseId: schema.stockLedger.warehouseId,
         warehouseName: schema.warehouses.name,
-        branchId: schema.inventoryMovements.branchId,
+        branchId: schema.stockLedger.branchId,
         branchName: schema.branches.name,
-        quantity: schema.inventoryMovements.quantity,
-        type: schema.inventoryMovements.type,
-        referenceId: schema.inventoryMovements.referenceId,
-        documentNumber: schema.inventoryMovements.documentNumber,
-        notes: schema.inventoryMovements.notes,
-        lotNumber: schema.inventoryMovements.lotNumber,
-        expirationDate: schema.inventoryMovements.expirationDate,
-        drawerLocation: schema.inventoryMovements.drawerLocation,
-        createdAt: schema.inventoryMovements.createdAt,
-        createdById: schema.inventoryMovements.createdById,
+        quantity: schema.stockLedger.quantityDelta,
+        type: schema.stockLedger.eventType,
+        referenceId: schema.stockLedger.referenceId,
+        documentNumber: schema.stockLedger.documentNumber,
+        notes: schema.stockLedger.notes,
+        lotNumber: schema.stockLedger.lotNumber,
+        expirationDate: schema.stockLedger.expirationDate,
+        createdAt: schema.stockLedger.createdAt,
+        createdById: schema.stockLedger.createdById,
         createdByName: schema.users.name,
       })
-      .from(schema.inventoryMovements)
-      .leftJoin(schema.warehouses, eq(schema.inventoryMovements.warehouseId, schema.warehouses.id))
-      .leftJoin(schema.branches, eq(schema.inventoryMovements.branchId, schema.branches.id))
-      .leftJoin(schema.users, eq(schema.inventoryMovements.createdById, schema.users.id))
+      .from(schema.stockLedger)
+      .leftJoin(schema.warehouses, eq(schema.stockLedger.warehouseId, schema.warehouses.id))
+      .leftJoin(schema.branches, eq(schema.stockLedger.branchId, schema.branches.id))
+      .leftJoin(schema.users, eq(schema.stockLedger.createdById, schema.users.id))
       .where(and(...conditions))
-      .orderBy(schema.inventoryMovements.createdAt);
+      .orderBy(schema.stockLedger.createdAt);
 
     // Calculate balances sequentially in memory
     let runningBalance = 0;
@@ -1002,5 +1001,124 @@ export class ReportsService {
     }
 
     return filtered;
+  }
+
+  async getTicketsToday(businessId: string, branchId?: string) {
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+    const branchFilter = branchId ? and(eq(schema.orders.branchId, branchId)) : undefined;
+
+    const closedOrders = await this.db
+      .select({
+        id: schema.orders.id,
+        createdAt: schema.orders.createdAt,
+        total: schema.orders.total,
+        discount: schema.orders.discount,
+        subtotal: schema.orders.subtotal,
+        tax: schema.orders.tax,
+        state: schema.orders.state,
+        tableLabel: schema.branchTables.label,
+        tableId: schema.orders.tableId,
+        waiterName: schema.users.name,
+      })
+      .from(schema.orders)
+      .innerJoin(schema.branchTables, eq(schema.orders.tableId, schema.branchTables.id))
+      .innerJoin(schema.users, eq(schema.orders.waiterId, schema.users.id))
+      .innerJoin(schema.branches, eq(schema.orders.branchId, schema.branches.id))
+      .where(
+        and(
+          eq(schema.branches.businessId, businessId),
+          eq(schema.orders.state, 'closed'),
+          gte(schema.orders.createdAt, todayStart),
+          lt(schema.orders.createdAt, todayEnd),
+          isNull(schema.orders.deletedAt),
+          ...(branchFilter ? [branchFilter] : []),
+        ),
+      )
+      .orderBy(schema.orders.createdAt);
+
+    if (closedOrders.length === 0) {
+      return { tickets: [], branchName: '', date: todayStart.toISOString().substring(0, 10) };
+    }
+
+    const orderIds = closedOrders.map((o) => o.id);
+
+    const allItems = await this.db
+      .select({
+        orderId: schema.orderItems.orderId,
+        quantity: schema.orderItems.quantity,
+        productName: schema.products.name,
+        price: schema.orderItems.price,
+        notes: schema.orderItems.notes,
+        assignedGuest: schema.orderItems.assignedGuest,
+      })
+      .from(schema.orderItems)
+      .innerJoin(schema.products, eq(schema.orderItems.productId, schema.products.id))
+      .where(inArray(schema.orderItems.orderId, orderIds));
+
+    const allPayments = await this.db
+      .select({
+        orderId: schema.payments.orderId,
+        amount: schema.payments.amount,
+        paymentMethod: schema.payments.paymentMethod,
+        referenceCode: schema.payments.referenceCode,
+      })
+      .from(schema.payments)
+      .where(inArray(schema.payments.orderId, orderIds));
+
+    const branchName = await this.db
+      .select({ name: schema.branches.name })
+      .from(schema.branches)
+      .where(
+        branchId
+          ? eq(schema.branches.id, branchId)
+          : eq(schema.branches.businessId, businessId),
+      )
+      .limit(1)
+      .then((rows) => rows[0]?.name ?? '');
+
+    const tickets = closedOrders.map((order) => {
+      const items = allItems
+        .filter((i) => i.orderId === order.id)
+        .map((i) => ({
+          quantity: i.quantity,
+          productName: i.productName,
+          price: Number(i.price),
+          notes: i.notes,
+          assignedGuest: i.assignedGuest,
+        }));
+
+      const payments = allPayments
+        .filter((p) => p.orderId === order.id)
+        .map((p) => ({
+          method: p.paymentMethod,
+          amount: Number(p.amount),
+          reference: p.referenceCode,
+        }));
+
+      const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+
+      return {
+        id: order.id,
+        tableLabel: order.tableLabel,
+        waiterName: order.waiterName,
+        createdAt: order.createdAt,
+        subtotal: Number(order.subtotal),
+        discount: Number(order.discount),
+        tax: Number(order.tax),
+        total: Number(order.total),
+        totalPaid,
+        items,
+        payments,
+      };
+    });
+
+    return {
+      branchName,
+      date: todayStart.toISOString().substring(0, 10),
+      tickets,
+    };
   }
 }
