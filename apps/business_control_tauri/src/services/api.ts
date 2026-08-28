@@ -1433,6 +1433,17 @@ export const api = {
     });
   },
 
+  async generatePurchaseOrdersFromAlerts(alertIds: string[]): Promise<{
+    success: boolean;
+    purchaseOrders: Array<{ purchaseOrderId: string; poNumber: string; itemCount: number }>;
+    skipped: string[];
+  }> {
+    return apiRequest('/inventory/alerts/generate-purchase-orders', {
+      method: 'POST',
+      body: JSON.stringify({ alertIds }),
+    });
+  },
+
   async runAutoPurchaseOrders(businessId: string): Promise<{ created: number; purchaseOrderIds: string[] }> {
     return apiRequest(`/inventory/alerts/auto-purchase-orders`, {
       method: 'POST',

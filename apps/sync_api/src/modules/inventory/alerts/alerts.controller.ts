@@ -5,11 +5,17 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE } from '../../auth/roles';
 import { assertBusinessAccess } from '../../auth/business-access';
-import { IsUUID } from 'class-validator';
+import { IsUUID, IsArray, IsString } from 'class-validator';
 
 class RefreshDto {
   @IsUUID()
   businessId: string;
+}
+
+class BulkGeneratePoDto {
+  @IsArray()
+  @IsString({ each: true })
+  alertIds: string[];
 }
 
 @Controller('inventory/alerts')
@@ -70,5 +76,11 @@ export class AlertsController {
   @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
   async generatePurchaseOrder(@Param('id') id: string, @Req() req: any) {
     return this.alertsService.generatePurchaseOrder(id, req.user?.sub);
+  }
+
+  @Post('generate-purchase-orders')
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
+  async generatePurchaseOrders(@Body() dto: BulkGeneratePoDto, @Req() req: any) {
+    return this.alertsService.generatePurchaseOrders(dto.alertIds, req.user?.sub);
   }
 }

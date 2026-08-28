@@ -21,6 +21,8 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
   const [hideResolved, setHideResolved] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkGenerating, setBulkGenerating] = useState(false);
 
   const showToast = useCallback((message: string, type: Toast['type'] = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -114,6 +116,48 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
     }
   };
 
+  const handleBulkGenerateOc = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) {
+      showToast('Seleccione al menos un producto.', 'warning');
+      return;
+    }
+    setBulkGenerating(true);
+    try {
+      const result = await api.generatePurchaseOrdersFromAlerts(ids);
+      const totalItems = result.purchaseOrders.reduce((sum, po) => sum + po.itemCount, 0);
+      showToast(`Se generaron ${result.purchaseOrders.length} OC con ${totalItems} productos.`);
+      setSelectedIds(new Set());
+      await fetchData(branchFilter);
+    } catch (e: any) {
+      showToast(e?.message || 'Error al generar órdenes de compra.', 'error');
+    } finally {
+      setBulkGenerating(false);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectableAlerts = alerts.filter(
+    (a) => !a.branchId && (a.status === 'active' || a.status === 'acknowledged'),
+  );
+  const allSelected = selectableAlerts.length > 0 && selectableAlerts.every((a) => selectedIds.has(a.id));
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(selectableAlerts.map((a) => a.id)));
+    }
+  };
+
   const visibleAlerts = alerts.filter((a) => (hideResolved ? a.status !== 'resolved' : true));
 
   const SummaryCard: React.FC<{ label: string; value: number; tone: 'red' | 'amber' | 'green' | 'gold' }> = ({ label, value, tone }) => {
@@ -176,17 +220,40 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <Heading level={5} className="!text-sm">Alertas ({visibleAlerts.length})</Heading>
-        <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
-          <input
-            type="checkbox"
-            checked={hideResolved}
-            onChange={(e) => setHideResolved(e.target.checked)}
-            className="accent-champagne-gold"
-          />
-          Ocultar resueltas
-        </label>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleSelectAll}
+              className="accent-champagne-gold"
+              data-testid="alert-select-all"
+            />
+            Seleccionar todos
+          </label>
+          {selectedIds.size > 0 && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleBulkGenerateOc}
+              disabled={bulkGenerating}
+              data-testid="alert-bulk-generate-oc"
+            >
+              {bulkGenerating ? 'Generando...' : `Generar OC (${selectedIds.size})`}
+            </Button>
+          )}
+          <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={hideResolved}
+              onChange={(e) => setHideResolved(e.target.checked)}
+              className="accent-champagne-gold"
+            />
+            Ocultar resueltas
+          </label>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -206,6 +273,15 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
               alert.alertType === 'out_of_stock' ? 'border-error-red/40' : 'border-aged-bronze/30'
             }`}
           >
+            {isGlobal && alert.status !== 'resolved' && (
+              <input
+                type="checkbox"
+                checked={selectedIds.has(alert.id)}
+                onChange={() => toggleSelect(alert.id)}
+                className="accent-champagne-gold w-4 h-4 flex-shrink-0"
+                data-testid={`alert-select-${alert.id}`}
+              />
+            )}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-semibold text-text-primary truncate">{alert.productName}</span>

@@ -467,6 +467,108 @@ export class AlertsService {
     });
   }
 
+  /**
+   * Bulk: create draft purchase orders from a selection of (global) alerts,
+   * grouping products by provider into one OC per provider.
+   */
+  async generatePurchaseOrders(alertIds: string[], userId: string) {
+    if (!alertIds || alertIds.length === 0) {
+      throw new BadRequestException('Seleccione al menos una alerta.');
+    }
+
+    const alerts = await this.db
+      .select()
+      .from(schema.inventoryAlerts)
+      .where(inArray(schema.inventoryAlerts.id, alertIds));
+
+    if (alerts.length === 0) {
+      throw new NotFoundException('No se encontraron alertas seleccionadas.');
+    }
+
+    const businessId = alerts[0].businessId;
+    const globalAlerts = alerts.filter((a) => !a.branchId);
+
+    // Resolve provider + quantity per product, grouped by provider
+    const itemsByProvider = new Map<
+      string,
+      Array<{ productId: string; qty: number; cost: string }>
+    >();
+    const skipped: string[] = [];
+
+    for (const alert of globalAlerts) {
+      const [product] = await this.db
+        .select()
+        .from(schema.products)
+        .where(eq(schema.products.id, alert.productId))
+        .limit(1);
+
+      if (!product) {
+        skipped.push(alert.productId);
+        continue;
+      }
+
+      const provider = await this.resolveCheapestProvider(alert.productId);
+      if (!provider) {
+        skipped.push(alert.productId);
+        continue;
+      }
+
+      const globalStock = await this.getGlobalStock(alert.productId);
+      const globalMin = parseFloat(product.minStock || '0');
+      const globalMax = parseFloat(product.maxStock || '0');
+      let qty = globalMax - globalStock;
+      if (qty <= 0) qty = globalMin > 0 ? globalMin * 2 : 1;
+
+      const list = itemsByProvider.get(provider.providerId) || [];
+      list.push({ productId: alert.productId, qty, cost: provider.cost });
+      itemsByProvider.set(provider.providerId, list);
+    }
+
+    if (itemsByProvider.size === 0) {
+      throw new BadRequestException(
+        'Ningún producto seleccionado tiene un proveedor registrado.',
+      );
+    }
+
+    const warehouse = await this.resolveDefaultWarehouse(businessId);
+    const purchaseOrders: Array<{
+      purchaseOrderId: string;
+      poNumber: string;
+      itemCount: number;
+    }> = [];
+
+    await this.db.transaction(async (tx) => {
+      for (const [providerId, items] of itemsByProvider.entries()) {
+        const poNumber = await this.nextPoNumber(tx, businessId);
+        const [po] = await tx
+          .insert(schema.purchaseOrders)
+          .values({
+            businessId,
+            providerId,
+            warehouseId: warehouse ? warehouse.id : null,
+            poNumber,
+            status: 'draft',
+            createdBy: userId,
+            notes: 'Generada desde alertas de inventario (selección múltiple)',
+          })
+          .returning();
+
+        await tx.insert(schema.purchaseOrderItems).values(
+          items.map((it) => ({
+            poId: po.id,
+            productId: it.productId,
+            quantityOrdered: it.qty.toFixed(3),
+            unitCostEstimated: it.cost,
+          })),
+        );
+
+        purchaseOrders.push({ purchaseOrderId: po.id, poNumber, itemCount: items.length });
+      }
+    });
+
+    return { success: true, purchaseOrders, skipped };
+  }
+
   // ---------------------------------------------------------------------------
   // Auto-PO engine (global minimums, grouped by provider)
   // ---------------------------------------------------------------------------
@@ -626,7 +728,7 @@ export class AlertsService {
       .where(eq(schema.purchaseOrders.businessId, businessId));
 
     const maxNum = rows.reduce((max: number, r: any) => {
-      const m = String(r.poNumber || '').match(/(\d+)\s*$/);
+      const m = String(r.poNumber || '').match(/^OC-(\d+)$/);
       return m ? Math.max(max, parseInt(m[1], 10)) : max;
     }, 0);
 
