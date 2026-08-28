@@ -177,6 +177,19 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
 
     setIsSavingProduct(true);
     try {
+      const itemType = editingProduct.itemType || 'finished_good';
+      const productionStrategy = editingProduct.productionStrategy || 'none';
+      const uom = editingProduct.uom || 'piece';
+
+      const itemTypeFlags: Record<string, { isIngredient: boolean; isSellable: boolean }> = {
+        raw_material: { isIngredient: true, isSellable: false },
+        wip: { isIngredient: false, isSellable: false },
+        finished_good: { isIngredient: false, isSellable: true },
+        service: { isIngredient: false, isSellable: true },
+      };
+      const flags = itemTypeFlags[itemType] || { isIngredient: false, isSellable: true };
+      const saleType = uom === 'piece' ? 'pieza' : 'granel';
+
       const payload = {
         categoryId: editingProduct.categoryId,
         name: editingProduct.name.trim(),
@@ -189,9 +202,12 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
         priceWholesale: priceWholesaleVal.toFixed(2),
         minStock: minStockVal.toFixed(3),
         maxStock: maxStockVal.toFixed(3),
-        saleType: editingProduct.saleType || 'pieza',
-        isSellable: editingProduct.isSellable ?? true,
-        isIngredient: editingProduct.isIngredient ?? false,
+        saleType,
+        itemType,
+        productionStrategy,
+        uom,
+        isSellable: flags.isSellable,
+        isIngredient: flags.isIngredient,
         isActive: editingProduct.isActive ?? true,
         imageUrl: editingProduct.imageUrl || undefined,
       };
@@ -505,6 +521,9 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                 minStock: '0.000',
                 maxStock: '0.000',
                 saleType: 'pieza',
+                itemType: 'finished_good',
+                productionStrategy: 'none',
+                uom: 'piece',
                 isSellable: true,
                 isIngredient: false,
                 isActive: true,
@@ -728,6 +747,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                         onChange={(e) => setEditingProduct(prev => ({ ...prev, name: e.target.value }))}
                         disabled={isSavingProduct}
                         required
+                        data-testid="product-name"
                       />
                     </div>
 
@@ -739,6 +759,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                         disabled={isSavingProduct}
                         className="w-full px-4 py-2 bg-charcoal-surface border border-aged-bronze focus:border-champagne-gold focus:ring-champagne-gold/50 rounded font-sans text-text-primary transition-all duration-300 focus:outline-none focus:ring-2"
                         required
+                        data-testid="product-category"
                       >
                         <option value="" disabled>Seleccione categoría</option>
                         {categories.map((c) => (
@@ -784,15 +805,19 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-medium text-text-secondary">Tipo de Venta</label>
+                        <label className="text-xs font-medium text-text-secondary">Unidad de Medida</label>
                         <select
-                          value={editingProduct.saleType || 'pieza'}
-                          onChange={(e) => setEditingProduct(prev => ({ ...prev, saleType: e.target.value }))}
+                          value={editingProduct.uom || 'piece'}
+                          onChange={(e) => setEditingProduct(prev => ({ ...prev, uom: e.target.value }))}
                           disabled={isSavingProduct}
                           className="w-full px-4 py-2 bg-charcoal-surface border border-aged-bronze focus:border-champagne-gold focus:ring-champagne-gold/50 rounded font-sans text-text-primary transition-all duration-300 focus:outline-none focus:ring-2 text-xs"
+                          data-testid="product-uom"
                         >
-                          <option value="pieza">Por Pieza (Unidad)</option>
-                          <option value="granel">A Granel (Granel)</option>
+                          <option value="piece">Pieza (unidad)</option>
+                          <option value="kg">Kilogramo (kg)</option>
+                          <option value="g">Gramo (g)</option>
+                          <option value="l">Litro (l)</option>
+                          <option value="ml">Mililitro (ml)</option>
                         </select>
                       </div>
                     </div>
@@ -886,6 +911,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                           onChange={(e) => setEditingProduct(prev => ({ ...prev, price: e.target.value }))}
                           disabled={isSavingProduct}
                           required
+                          data-testid="product-price"
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
@@ -946,65 +972,38 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                         Propiedades del Artículo
                       </span>
                       
-                      {/* Is Sellable Checkbox */}
-                      <label className="flex items-center gap-3 cursor-pointer group">
-                        <input
-                          type="checkbox"
-                          checked={editingProduct.isSellable ?? true}
-                          onChange={(e) => setEditingProduct(prev => ({ ...prev, isSellable: e.target.checked }))}
+                      {/* Tipo de Artículo */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-text-secondary">Tipo de Artículo</label>
+                        <select
+                          value={editingProduct.itemType || 'finished_good'}
+                          onChange={(e) => setEditingProduct(prev => ({ ...prev, itemType: e.target.value }))}
                           disabled={isSavingProduct}
-                          className="sr-only"
-                        />
-                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all duration-300 ${
-                          (editingProduct.isSellable ?? true)
-                            ? 'bg-champagne-gold border-champagne-gold text-obsidian'
-                            : 'border-aged-bronze group-hover:border-champagne-gold/60 bg-onyx-surface'
-                        }`}>
-                          {(editingProduct.isSellable ?? true) && (
-                            <svg className="w-3.5 h-3.5 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-text-primary group-hover:text-champagne-gold transition-colors">
-                            Artículo de Venta Directa
-                          </span>
-                          <span className="text-[11px] text-text-secondary">
-                            Aparece en el menú para tomar órdenes.
-                          </span>
-                        </div>
-                      </label>
+                          className="w-full px-4 py-2 bg-charcoal-surface border border-aged-bronze focus:border-champagne-gold focus:ring-champagne-gold/50 rounded font-sans text-text-primary transition-all duration-300 focus:outline-none focus:ring-2 text-xs"
+                          data-testid="product-item-type"
+                        >
+                          <option value="finished_good">Producto Terminado (se vende)</option>
+                          <option value="raw_material">Materia Prima (insumo)</option>
+                          <option value="wip">Producto en Proceso (WIP)</option>
+                          <option value="service">Servicio</option>
+                        </select>
+                      </div>
 
-                      {/* Is Ingredient Checkbox */}
-                      <label className="flex items-center gap-3 cursor-pointer group">
-                        <input
-                          type="checkbox"
-                          checked={editingProduct.isIngredient ?? false}
-                          onChange={(e) => setEditingProduct(prev => ({ ...prev, isIngredient: e.target.checked }))}
+                      {/* Estrategia de Producción */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium text-text-secondary">Estrategia de Producción</label>
+                        <select
+                          value={editingProduct.productionStrategy || 'none'}
+                          onChange={(e) => setEditingProduct(prev => ({ ...prev, productionStrategy: e.target.value }))}
                           disabled={isSavingProduct}
-                          className="sr-only"
-                        />
-                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all duration-300 ${
-                          (editingProduct.isIngredient ?? false)
-                            ? 'bg-champagne-gold border-champagne-gold text-obsidian'
-                            : 'border-aged-bronze group-hover:border-champagne-gold/60 bg-onyx-surface'
-                        }`}>
-                          {(editingProduct.isIngredient ?? false) && (
-                            <svg className="w-3.5 h-3.5 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-text-primary group-hover:text-champagne-gold transition-colors">
-                            Insumo / Ingrediente
-                          </span>
-                          <span className="text-[11px] text-text-secondary">
-                            Utilizado para componer recetas o controlar inventarios.
-                          </span>
-                        </div>
-                      </label>
+                          className="w-full px-4 py-2 bg-charcoal-surface border border-aged-bronze focus:border-champagne-gold focus:ring-champagne-gold/50 rounded font-sans text-text-primary transition-all duration-300 focus:outline-none focus:ring-2 text-xs"
+                          data-testid="product-production-strategy"
+                        >
+                          <option value="none">Ninguna (sin lógica automática)</option>
+                          <option value="backflush">Backflush (descarga insumos al vender)</option>
+                          <option value="work_order">Orden de Trabajo (producción por lotes)</option>
+                        </select>
+                      </div>
 
                       {/* Is Active Checkbox */}
                       <label className="flex items-center gap-3 cursor-pointer group">
@@ -1038,7 +1037,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                     </div>
 
                     {/* Provider Selector for Ingredients */}
-                    {(editingProduct.isIngredient ?? false) && (
+                    {(editingProduct.itemType === 'raw_material') && (
                       <div className="flex flex-col gap-1.5 mt-2">
                         <label className="text-xs text-text-secondary font-medium tracking-wide">
                           Proveedor Principal
@@ -1072,6 +1071,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                       <Button
                         type="submit"
                         disabled={isSavingProduct}
+                        data-testid="product-submit"
                       >
                         {isSavingProduct ? 'Guardando...' : 'Guardar Artículo'}
                       </Button>

@@ -69,4 +69,16 @@ export class CreateProductDto {
   @IsString()
   @IsOptional()
   saleType?: string;
+
+  @IsString()
+  @IsOptional()
+  itemType?: string;
+
+  @IsString()
+  @IsOptional()
+  productionStrategy?: string;
+
+  @IsString()
+  @IsOptional()
+  uom?: string;
 }

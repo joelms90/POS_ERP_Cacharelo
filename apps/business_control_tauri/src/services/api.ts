@@ -119,6 +119,9 @@ export interface Product {
   minStock?: string;
   maxStock?: string;
   saleType?: string;
+  itemType?: 'raw_material' | 'wip' | 'finished_good' | 'service' | string;
+  productionStrategy?: 'none' | 'backflush' | 'work_order' | string;
+  uom?: string;
   createdAt?: string;
   updatedAt?: string;
 }
