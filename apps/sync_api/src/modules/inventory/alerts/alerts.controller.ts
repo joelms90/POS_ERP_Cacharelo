@@ -51,24 +51,24 @@ export class AlertsController {
   @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
   async autoPurchaseOrders(@Body() dto: RefreshDto, @Req() req: any) {
     assertBusinessAccess(req.user, dto.businessId);
-    return this.alertsService.runAutoPoEngine(dto.businessId, req.user?.id);
+    return this.alertsService.runAutoPoEngine(dto.businessId, req.user?.sub);
   }
 
   @Post(':id/acknowledge')
   @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
   async acknowledge(@Param('id') id: string, @Req() req: any) {
-    return this.alertsService.acknowledge(id, req.user?.id);
+    return this.alertsService.acknowledge(id, req.user?.sub);
   }
 
   @Post(':id/generate-requisition')
   @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
   async generateRequisition(@Param('id') id: string, @Req() req: any) {
-    return this.alertsService.generateRequisition(id, req.user?.id);
+    return this.alertsService.generateRequisition(id, req.user?.sub);
   }
 
   @Post(':id/generate-purchase-order')
   @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
   async generatePurchaseOrder(@Param('id') id: string, @Req() req: any) {
-    return this.alertsService.generatePurchaseOrder(id, req.user?.id);
+    return this.alertsService.generatePurchaseOrder(id, req.user?.sub);
   }
 }

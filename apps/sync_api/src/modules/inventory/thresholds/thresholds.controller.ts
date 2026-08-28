@@ -50,7 +50,7 @@ export class ThresholdsController {
       branchId: dto.branchId,
       minStock: dto.minStock,
       maxStock: dto.maxStock,
-      updatedBy: req.user?.id,
+      updatedBy: req.user?.sub,
     });
   }
 
