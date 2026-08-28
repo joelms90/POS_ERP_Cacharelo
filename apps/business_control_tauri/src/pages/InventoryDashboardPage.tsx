@@ -201,6 +201,7 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
           return (
           <div
             key={alert.id}
+            data-testid={`alert-row-${alert.id}`}
             className={`flex flex-col sm:flex-row sm:items-center gap-3 bg-charcoal-surface border rounded-lg p-4 ${
               alert.alertType === 'out_of_stock' ? 'border-error-red/40' : 'border-aged-bronze/30'
             }`}
@@ -228,11 +229,11 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
             <div className="flex items-center gap-2 flex-shrink-0">
               {alert.status !== 'resolved' && (
                 isGlobal ? (
-                  <Button variant="primary" size="sm" disabled={actionId === alert.id} onClick={() => handleGeneratePurchaseOrder(alert)}>
+                  <Button variant="primary" size="sm" data-testid={`alert-generate-oc-${alert.id}`} disabled={actionId === alert.id} onClick={() => handleGeneratePurchaseOrder(alert)}>
                     Generar OC
                   </Button>
                 ) : (
-                  <Button variant="secondary" size="sm" disabled={actionId === alert.id} onClick={() => handleGenerateRequisition(alert)}>
+                  <Button variant="secondary" size="sm" data-testid={`alert-generate-req-${alert.id}`} disabled={actionId === alert.id} onClick={() => handleGenerateRequisition(alert)}>
                     Generar Requisición
                   </Button>
                 )
