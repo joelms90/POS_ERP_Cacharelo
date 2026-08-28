@@ -253,6 +253,11 @@ export const products = pgTable('products', {
     .default('0.000')
     .notNull(),
   saleType: varchar('sale_type', { length: 20 }).default('pieza').notNull(),
+  itemType: varchar('item_type', { length: 20 }).default('finished_good').notNull(), // raw_material | wip | finished_good | service
+  productionStrategy: varchar('production_strategy', { length: 20 })
+    .default('none')
+    .notNull(), // none | backflush | work_order
+  uom: varchar('uom', { length: 10 }).default('piece').notNull(), // piece | kg | g | l | ml
   isSellable: boolean('is_sellable').default(true).notNull(),
   isIngredient: boolean('is_ingredient').default(false).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
@@ -273,6 +278,7 @@ export const products = pgTable('products', {
 
 export const orders = pgTable('orders', {
   id: uuid('id').primaryKey().defaultRandom(),
+  clientUuid: varchar('client_uuid', { length: 120 }),
   branchId: uuid('branch_id')
     .references(() => branches.id)
     .notNull(),
@@ -305,6 +311,7 @@ export const orders = pgTable('orders', {
 
 export const orderItems = pgTable('order_items', {
   id: uuid('id').primaryKey().defaultRandom(),
+  clientUuid: varchar('client_uuid', { length: 120 }),
   orderId: uuid('order_id')
     .references(() => orders.id)
     .notNull(),
@@ -693,6 +700,52 @@ export const inventoryMovements = pgTable(
     index('idx_inv_mov_branch').on(table.branchId),
     index('idx_inv_mov_warehouse').on(table.warehouseId),
     index('idx_inv_mov_created_at').on(table.createdAt),
+  ],
+);
+
+// Immutable inventory ledger. Stock is derived from SUM(quantity_delta),
+// never edited directly. Each row is one auditable movement.
+export const stockLedger = pgTable(
+  'stock_ledger',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    businessId: uuid('business_id')
+      .references(() => businesses.id)
+      .notNull(),
+    productId: uuid('product_id')
+      .references(() => products.id)
+      .notNull(),
+
+    // Ubicaciones
+    branchId: uuid('branch_id').references(() => branches.id),
+    warehouseId: uuid('warehouse_id').references(() => warehouses.id),
+
+    // Detalle del Movimiento (delta, no valor absoluto)
+    quantityDelta: decimal('quantity_delta', { precision: 12, scale: 3 }).notNull(), // Positivo = Entrada, Negativo = Salida
+    eventType: varchar('event_type', { length: 30 }).notNull(),
+    // 'receipt' | 'sale' | 'production_input' | 'production_output' | 'transfer_out' | 'transfer_in' | 'adjustment' | 'initial'
+
+    // Costo y referencias cruzadas
+    unitCost: decimal('unit_cost', { precision: 10, scale: 2 }),
+    referenceType: varchar('reference_type', { length: 30 }),
+    referenceId: uuid('reference_id'), // ID de la tabla asociada (order_id, receipt_id, transfer_id, etc.)
+    documentNumber: varchar('document_number', { length: 50 }),
+    notes: text('notes'),
+
+    // Lotes y Caducidades
+    lotNumber: varchar('lot_number', { length: 100 }),
+    expirationDate: timestamp('expiration_date', { withTimezone: true }),
+
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdById: uuid('created_by_id').references(() => users.id),
+  },
+  (table) => [
+    index('idx_stock_ledger_bus_prod').on(table.businessId, table.productId),
+    index('idx_stock_ledger_branch').on(table.branchId),
+    index('idx_stock_ledger_warehouse').on(table.warehouseId),
+    index('idx_stock_ledger_created_at').on(table.createdAt),
   ],
 );
 

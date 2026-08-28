@@ -241,6 +241,71 @@ async function main() {
     `);
     console.log('Cash shift close snapshot columns ensured.');
 
+    // 9. Order idempotency fields for reliable waiter retries
+    await client.query(`
+      ALTER TABLE "orders"
+        ADD COLUMN IF NOT EXISTS "client_uuid" varchar(120);
+    `);
+    await client.query(`
+      ALTER TABLE "order_items"
+        ADD COLUMN IF NOT EXISTS "client_uuid" varchar(120);
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "orders_client_uuid_unique_idx"
+      ON "orders" ("client_uuid")
+      WHERE "client_uuid" IS NOT NULL;
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "order_items_client_uuid_unique_idx"
+      ON "order_items" ("client_uuid")
+      WHERE "client_uuid" IS NOT NULL;
+    `);
+    console.log('Order client idempotency columns ensured.');
+
+    // 10. Product inventory model columns
+    await client.query(`
+      ALTER TABLE "products"
+        ADD COLUMN IF NOT EXISTS "item_type" varchar(20) NOT NULL DEFAULT 'finished_good',
+        ADD COLUMN IF NOT EXISTS "production_strategy" varchar(20) NOT NULL DEFAULT 'none',
+        ADD COLUMN IF NOT EXISTS "uom" varchar(10) NOT NULL DEFAULT 'piece';
+    `);
+    await client.query(`
+      UPDATE "products" SET "item_type" = 'raw_material'
+      WHERE "is_ingredient" = true AND "item_type" = 'finished_good';
+    `);
+    await client.query(`
+      UPDATE "products" SET "uom" = "sale_type"
+      WHERE "sale_type" IS NOT NULL AND "sale_type" <> 'pieza' AND "uom" = 'piece';
+    `);
+    console.log('Product inventory model columns ensured.');
+
+    // 11. Immutable stock ledger
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "stock_ledger" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "business_id" uuid NOT NULL REFERENCES "public"."businesses"("id"),
+        "product_id" uuid NOT NULL REFERENCES "public"."products"("id"),
+        "branch_id" uuid REFERENCES "public"."branches"("id"),
+        "warehouse_id" uuid REFERENCES "public"."warehouses"("id"),
+        "quantity_delta" numeric(12, 3) NOT NULL,
+        "event_type" varchar(30) NOT NULL,
+        "unit_cost" numeric(10, 2),
+        "reference_type" varchar(30),
+        "reference_id" uuid,
+        "document_number" varchar(50),
+        "notes" text,
+        "lot_number" varchar(100),
+        "expiration_date" timestamp with time zone,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "created_by_id" uuid REFERENCES "public"."users"("id")
+      );
+    `);
+    await client.query('CREATE INDEX IF NOT EXISTS "idx_stock_ledger_bus_prod" ON "stock_ledger" USING btree ("business_id","product_id");');
+    await client.query('CREATE INDEX IF NOT EXISTS "idx_stock_ledger_branch" ON "stock_ledger" USING btree ("branch_id");');
+    await client.query('CREATE INDEX IF NOT EXISTS "idx_stock_ledger_warehouse" ON "stock_ledger" USING btree ("warehouse_id");');
+    await client.query('CREATE INDEX IF NOT EXISTS "idx_stock_ledger_created_at" ON "stock_ledger" USING btree ("created_at");');
+    console.log('Stock ledger table ensured.');
+
     console.log('✅ Idempotent migrations executed successfully!');
   } catch (error) {
     console.error('❌ Failed to run idempotent migrations:', error);
