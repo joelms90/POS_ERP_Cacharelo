@@ -3,6 +3,7 @@ import { ProductsService } from './products.service';
 import { ProductsRepository } from './repositories/products.repository';
 import { CategoriesRepository } from './repositories/categories.repository';
 import { ProvidersRepository } from '../providers/repositories/providers.repository';
+import { LedgerService } from '../inventory/ledger.service';
 import { NotFoundException } from '@nestjs/common';
 
 describe('ProductsService', () => {
@@ -27,6 +28,11 @@ describe('ProductsService', () => {
     findById: jest.fn(),
   };
 
+  const mockLedgerService = {
+    applyMovement: jest.fn().mockResolvedValue(undefined),
+    getStockLevel: jest.fn().mockResolvedValue(0),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -42,6 +48,10 @@ describe('ProductsService', () => {
         {
           provide: ProvidersRepository,
           useValue: mockProvidersRepository,
+        },
+        {
+          provide: LedgerService,
+          useValue: mockLedgerService,
         },
       ],
     }).compile();

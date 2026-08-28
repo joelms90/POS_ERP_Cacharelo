@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { ProductsRepository } from './repositories/products.repository';
 import { CategoriesRepository } from './repositories/categories.repository';
 import { ProvidersRepository } from '../providers/repositories/providers.repository';
+import { LedgerService } from '../inventory/ledger.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import * as schema from '../../database/schema';
@@ -15,6 +16,7 @@ export class ProductsService {
     private readonly productsRepository: ProductsRepository,
     private readonly categoriesRepository: CategoriesRepository,
     private readonly providersRepository: ProvidersRepository,
+    private readonly ledgerService: LedgerService,
   ) {}
 
   async findAll(businessId?: string, categoryId?: string) {
@@ -266,13 +268,14 @@ export class ProductsService {
               warehouses.push(createdWh);
             }
 
-            await tx
-              .insert(schema.stockLevels)
-              .values({
-                productId: product.id,
-                warehouseId: targetWh.id,
-                quantity: row.existence.toString(),
-              });
+            await this.ledgerService.applyMovement(tx, {
+              businessId,
+              productId: product.id,
+              quantityDelta: row.existence,
+              eventType: 'initial',
+              warehouseId: targetWh.id,
+              notes: 'Stock inicial (importación)',
+            });
           }
 
           successCount++;
@@ -740,31 +743,22 @@ export class ProductsService {
               if (existence > 0) {
                 const productId = insertedProducts[i].id;
 
-                // Check if stock level exists
-                const existingStock = await tx
-                  .select()
-                  .from(schema.stockLevels)
-                  .where(and(
-                    eq(schema.stockLevels.productId, productId),
-                    eq(schema.stockLevels.warehouseId, targetWh.id)
-                  ))
-                  .limit(1);
+                const currentStock = await this.ledgerService.getStockLevel(
+                  tx,
+                  productId,
+                  targetWh.id,
+                  null,
+                );
 
-                if (existingStock && existingStock.length > 0) {
-                  // Update existing stock level
-                  await tx
-                    .update(schema.stockLevels)
-                    .set({
-                      quantity: existence.toString(),
-                      updatedAt: new Date(),
-                    })
-                    .where(eq(schema.stockLevels.id, existingStock[0].id));
-                } else {
-                  // Insert new stock level
-                  await tx.insert(schema.stockLevels).values({
+                const delta = existence - currentStock;
+                if (delta !== 0) {
+                  await this.ledgerService.applyMovement(tx, {
+                    businessId,
                     productId,
+                    quantityDelta: delta,
+                    eventType: currentStock === 0 ? 'initial' : 'adjustment',
                     warehouseId: targetWh.id,
-                    quantity: existence.toString(),
+                    notes: 'Ajuste de stock por importación (existencias)',
                   });
                 }
               }
