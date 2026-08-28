@@ -200,6 +200,71 @@ export async function runMigrations() {
     );
     console.log('✅ Stock ledger table ensured.');
 
+    // Intelligent inventory control tables
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS branch_stock_thresholds (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        business_id uuid NOT NULL REFERENCES businesses(id),
+        product_id uuid NOT NULL REFERENCES products(id),
+        branch_id uuid NOT NULL REFERENCES branches(id),
+        min_stock numeric(12, 3) DEFAULT '0.000',
+        max_stock numeric(12, 3) DEFAULT '0.000',
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        updated_by uuid REFERENCES users(id)
+      );
+    `);
+    await db.execute(
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS unq_bst_product_branch ON branch_stock_thresholds(product_id, branch_id);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_bst_branch ON branch_stock_thresholds(branch_id);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_bst_business ON branch_stock_thresholds(business_id);`,
+    );
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS inventory_alerts (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        business_id uuid NOT NULL REFERENCES businesses(id),
+        product_id uuid NOT NULL REFERENCES products(id),
+        branch_id uuid NOT NULL REFERENCES branches(id),
+        alert_type varchar(20) NOT NULL,
+        threshold numeric(12, 3) NOT NULL,
+        current_qty numeric(12, 3) NOT NULL,
+        status varchar(20) NOT NULL DEFAULT 'active',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        acknowledged_at timestamptz,
+        acknowledged_by uuid REFERENCES users(id),
+        resolved_at timestamptz
+      );
+    `);
+    await db.execute(
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS unq_ia_product_branch_active ON inventory_alerts(product_id, branch_id) WHERE status IN ('active', 'acknowledged');`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_ia_business_status ON inventory_alerts(business_id, status);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_ia_branch_status ON inventory_alerts(branch_id, status);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_ia_product ON inventory_alerts(product_id);`,
+    );
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS business_inventory_settings (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        business_id uuid NOT NULL UNIQUE REFERENCES businesses(id),
+        auto_requisition_enabled boolean NOT NULL DEFAULT false,
+        default_warehouse_id uuid REFERENCES warehouses(id),
+        alert_engine_interval_minutes integer NOT NULL DEFAULT 15,
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        updated_by uuid REFERENCES users(id)
+      );
+    `);
+    console.log('✅ Intelligent inventory control tables ensured.');
+
     // Ensure specific default business and branch exist
     const businessLines = [
       {

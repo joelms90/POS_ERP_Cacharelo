@@ -10,8 +10,10 @@ import {
   doublePrecision,
   jsonb,
   index,
+  uniqueIndex,
   bigserial,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 // ==========================================
 // 1. Tenants & Catalog Entities
@@ -874,4 +876,94 @@ export const branchRequisitionItems = pgTable('branch_requisition_items', {
   quantityApproved: decimal('quantity_approved', { precision: 12, scale: 3 })
     .default('0.000')
     .notNull(),
+});
+
+// ==========================================
+// 6. Intelligent Inventory Control (alerts & thresholds)
+// ==========================================
+
+export const branchStockThresholds = pgTable(
+  'branch_stock_thresholds',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    businessId: uuid('business_id')
+      .references(() => businesses.id)
+      .notNull(),
+    productId: uuid('product_id')
+      .references(() => products.id)
+      .notNull(),
+    branchId: uuid('branch_id')
+      .references(() => branches.id)
+      .notNull(),
+    minStock: decimal('min_stock', { precision: 12, scale: 3 }).default('0.000'), // 0 = use global
+    maxStock: decimal('max_stock', { precision: 12, scale: 3 }).default('0.000'), // 0 = use global
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedBy: uuid('updated_by').references(() => users.id),
+  },
+  (table) => ({
+    unqProductBranch: uniqueIndex('unq_bst_product_branch').on(
+      table.productId,
+      table.branchId,
+    ),
+    idxBranch: index('idx_bst_branch').on(table.branchId),
+    idxBusiness: index('idx_bst_business').on(table.businessId),
+  }),
+);
+
+export const inventoryAlerts = pgTable(
+  'inventory_alerts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    businessId: uuid('business_id')
+      .references(() => businesses.id)
+      .notNull(),
+    productId: uuid('product_id')
+      .references(() => products.id)
+      .notNull(),
+    branchId: uuid('branch_id')
+      .references(() => branches.id)
+      .notNull(),
+    alertType: varchar('alert_type', { length: 20 }).notNull(), // 'low_stock' | 'out_of_stock'
+    threshold: decimal('threshold', { precision: 12, scale: 3 }).notNull(),
+    currentQty: decimal('current_qty', { precision: 12, scale: 3 }).notNull(),
+    status: varchar('status', { length: 20 }).default('active').notNull(), // 'active' | 'acknowledged' | 'resolved'
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    acknowledgedAt: timestamp('acknowledged_at', { withTimezone: true }),
+    acknowledgedBy: uuid('acknowledged_by').references(() => users.id),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  },
+  (table) => ({
+    unqActiveAlert: uniqueIndex('unq_ia_product_branch_active')
+      .on(table.productId, table.branchId)
+      .where(sql`${table.status} IN ('active', 'acknowledged')`),
+    idxBusinessStatus: index('idx_ia_business_status').on(
+      table.businessId,
+      table.status,
+    ),
+    idxBranchStatus: index('idx_ia_branch_status').on(table.branchId, table.status),
+    idxProduct: index('idx_ia_product').on(table.productId),
+  }),
+);
+
+export const businessInventorySettings = pgTable('business_inventory_settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  businessId: uuid('business_id')
+    .references(() => businesses.id)
+    .unique()
+    .notNull(),
+  autoRequisitionEnabled: boolean('auto_requisition_enabled')
+    .default(false)
+    .notNull(),
+  defaultWarehouseId: uuid('default_warehouse_id').references(() => warehouses.id),
+  alertEngineIntervalMinutes: integer('alert_engine_interval_minutes')
+    .default(15)
+    .notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedBy: uuid('updated_by').references(() => users.id),
 });

@@ -306,6 +306,57 @@ async function main() {
     await client.query('CREATE INDEX IF NOT EXISTS "idx_stock_ledger_created_at" ON "stock_ledger" USING btree ("created_at");');
     console.log('Stock ledger table ensured.');
 
+    // 12. Intelligent inventory control tables
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "branch_stock_thresholds" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "business_id" uuid NOT NULL REFERENCES "public"."businesses"("id"),
+        "product_id" uuid NOT NULL REFERENCES "public"."products"("id"),
+        "branch_id" uuid NOT NULL REFERENCES "public"."branches"("id"),
+        "min_stock" numeric(12, 3) DEFAULT '0.000',
+        "max_stock" numeric(12, 3) DEFAULT '0.000',
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_by" uuid REFERENCES "public"."users"("id")
+      );
+    `);
+    await client.query('CREATE UNIQUE INDEX IF NOT EXISTS "unq_bst_product_branch" ON "branch_stock_thresholds" USING btree ("product_id","branch_id");');
+    await client.query('CREATE INDEX IF NOT EXISTS "idx_bst_branch" ON "branch_stock_thresholds" USING btree ("branch_id");');
+    await client.query('CREATE INDEX IF NOT EXISTS "idx_bst_business" ON "branch_stock_thresholds" USING btree ("business_id");');
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "inventory_alerts" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "business_id" uuid NOT NULL REFERENCES "public"."businesses"("id"),
+        "product_id" uuid NOT NULL REFERENCES "public"."products"("id"),
+        "branch_id" uuid NOT NULL REFERENCES "public"."branches"("id"),
+        "alert_type" varchar(20) NOT NULL,
+        "threshold" numeric(12, 3) NOT NULL,
+        "current_qty" numeric(12, 3) NOT NULL,
+        "status" varchar(20) DEFAULT 'active' NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "acknowledged_at" timestamp with time zone,
+        "acknowledged_by" uuid REFERENCES "public"."users"("id"),
+        "resolved_at" timestamp with time zone
+      );
+    `);
+    await client.query('CREATE UNIQUE INDEX IF NOT EXISTS "unq_ia_product_branch_active" ON "inventory_alerts" ("product_id","branch_id") WHERE "status" IN (\'active\', \'acknowledged\');');
+    await client.query('CREATE INDEX IF NOT EXISTS "idx_ia_business_status" ON "inventory_alerts" USING btree ("business_id","status");');
+    await client.query('CREATE INDEX IF NOT EXISTS "idx_ia_branch_status" ON "inventory_alerts" USING btree ("branch_id","status");');
+    await client.query('CREATE INDEX IF NOT EXISTS "idx_ia_product" ON "inventory_alerts" USING btree ("product_id");');
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "business_inventory_settings" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "business_id" uuid NOT NULL UNIQUE REFERENCES "public"."businesses"("id"),
+        "auto_requisition_enabled" boolean DEFAULT false NOT NULL,
+        "default_warehouse_id" uuid REFERENCES "public"."warehouses"("id"),
+        "alert_engine_interval_minutes" integer DEFAULT 15 NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_by" uuid REFERENCES "public"."users"("id")
+      );
+    `);
+    console.log('Intelligent inventory control tables ensured.');
+
     console.log('✅ Idempotent migrations executed successfully!');
   } catch (error) {
     console.error('❌ Failed to run idempotent migrations:', error);
