@@ -16,6 +16,21 @@ const BUSINESS_BRANCH_MAP: Record<string, { id: string; name: string }> = {
   'd3b07384-d113-4a0e-a555-e5b12824bf05': { id: 'c4f07384-d113-4a0e-a555-e5b12824bf06', name: 'Sucursal Hamburguesas' },
 };
 
+const ITEM_TYPE_LABELS: Record<string, string> = {
+  raw_material: 'Materia Prima',
+  wip: 'En Proceso',
+  finished_good: 'Terminado',
+  service: 'Servicio',
+};
+
+const UOM_LABELS: Record<string, string> = {
+  piece: 'pza',
+  kg: 'kg',
+  g: 'g',
+  l: 'l',
+  ml: 'ml',
+};
+
 export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [providers, setProviders] = useState<any[]>([]);
@@ -38,7 +53,7 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
   const [isPoLinked, setIsPoLinked] = useState(false);
   const [selectedPoId, setSelectedPoId] = useState('');
 
-  const [itemsList, setItemsList] = useState<Array<{ productId: string; productName: string; quantity: number; unitCost: number }>>([]);
+  const [itemsList, setItemsList] = useState<Array<{ productId: string; productName: string; quantity: number; unitCost: number; uom?: string }>>([]);
   const [selectedProductId, setSelectedProductId] = useState('');
   const [itemQuantity, setItemQuantity] = useState('1');
   const [itemUnitCost, setItemUnitCost] = useState('0');
@@ -128,12 +143,14 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
         const ordered = item.quantityOrdered;
         const previouslyReceived = item.quantityReceived || 0;
         const remainingQty = Math.max(0, ordered - previouslyReceived);
-        const prodName = products.find((p) => p.id === item.productId)?.name || item.productName || 'Producto sin nombre';
+        const prod = products.find((p) => p.id === item.productId);
+        const prodName = prod?.name || item.productName || 'Producto sin nombre';
         return {
           productId: item.productId,
           productName: prodName,
           quantity: remainingQty,
           unitCost: item.unitCostActual || item.unitCostEstimated || 0,
+          uom: prod?.uom || 'piece',
         };
       });
       setItemsList(items);
@@ -164,16 +181,18 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
     const existingIndex = itemsList.findIndex((it) => it.productId === selectedProductId);
     const prodObj = products.find((p) => p.id === selectedProductId);
     const prodName = prodObj ? prodObj.name : 'Insumo';
+    const prodUom = prodObj?.uom || 'piece';
 
     if (existingIndex > -1) {
       const newList = [...itemsList];
       newList[existingIndex].quantity += qty;
       newList[existingIndex].unitCost = cost;
+      newList[existingIndex].uom = prodUom;
       setItemsList(newList);
     } else {
       setItemsList((prev) => [
         ...prev,
-        { productId: selectedProductId, productName: prodName, quantity: qty, unitCost: cost },
+        { productId: selectedProductId, productName: prodName, quantity: qty, unitCost: cost, uom: prodUom },
       ]);
     }
 
@@ -468,7 +487,7 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
                       options={products.map((p) => ({
                         id: p.id,
                         label: p.name,
-                        sublabel: p.sku ? `SKU: ${p.sku}` : undefined,
+                        sublabel: `${ITEM_TYPE_LABELS[p.itemType || (p.isIngredient ? 'raw_material' : 'finished_good')] || 'Producto'} · ${UOM_LABELS[p.uom || 'piece'] || p.uom || 'pza'}${p.sku ? ` · SKU: ${p.sku}` : ''}`,
                       }))}
                       value={selectedProductId}
                       onChange={setSelectedProductId}
@@ -594,7 +613,7 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
                             <div className="flex flex-col flex-1">
                               <span className="font-semibold text-text-primary">{item.productName}</span>
                               <span className="text-[10px] text-text-secondary">
-                                Cant: {item.quantity} x ${item.unitCost}
+                                Cant: {item.quantity} {UOM_LABELS[item.uom || 'piece'] || item.uom || ''} × ${item.unitCost}
                               </span>
                             </div>
                             <div className="flex items-center gap-3">
@@ -711,7 +730,11 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-aged-bronze/10 text-sm">
-                        {stockLevels.map((st) => (
+                        {stockLevels.map((st) => {
+                          const prod = products.find((p) => p.id === st.productId);
+                          const itemType = prod?.itemType || (st.isIngredient ? 'raw_material' : 'finished_good');
+                          const uom = prod?.uom || 'piece';
+                          return (
                           <tr key={st.id} className="hover:bg-charcoal/20 transition-colors">
                             <td className="px-6 py-4 font-semibold text-text-primary">{st.productName}</td>
                             <td className="px-6 py-4 text-xs text-text-secondary">
@@ -719,18 +742,19 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
                             </td>
                             <td className="px-6 py-4">
                               <span className={`text-[10px] uppercase px-2 py-0.5 rounded border ${
-                                st.isIngredient
+                                itemType === 'raw_material'
                                   ? 'border-champagne-gold/30 text-champagne-gold bg-champagne-gold/5'
                                   : 'border-text-secondary/30 text-text-secondary'
                               }`}>
-                                {st.isIngredient ? 'Insumo' : 'Producto Venta'}
+                                {ITEM_TYPE_LABELS[itemType] || 'Producto'}
                               </span>
                             </td>
                             <td className="px-6 py-4 text-right font-mono text-champagne-gold font-bold">
-                              {st.quantity}
+                              {st.quantity} {UOM_LABELS[uom] || uom}
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
