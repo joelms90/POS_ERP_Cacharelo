@@ -265,6 +265,13 @@ export async function runMigrations() {
     `);
     console.log('✅ Intelligent inventory control tables ensured.');
 
+    // Recipe waste percentage column
+    await db.execute(sql`
+      ALTER TABLE recipes
+        ADD COLUMN IF NOT EXISTS waste_percent numeric(5, 2) NOT NULL DEFAULT '0.00';
+    `);
+    console.log('✅ Recipe waste percent column ensured.');
+
     // Ensure specific default business and branch exist
     const businessLines = [
       {

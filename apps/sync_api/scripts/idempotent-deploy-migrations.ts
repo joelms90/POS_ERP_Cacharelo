@@ -357,6 +357,13 @@ async function main() {
     `);
     console.log('Intelligent inventory control tables ensured.');
 
+    // 13. Recipe waste percentage column
+    await client.query(`
+      ALTER TABLE "recipes"
+        ADD COLUMN IF NOT EXISTS "waste_percent" numeric(5, 2) NOT NULL DEFAULT '0.00';
+    `);
+    console.log('Recipe waste percent column ensured.');
+
     console.log('✅ Idempotent migrations executed successfully!');
   } catch (error) {
     console.error('❌ Failed to run idempotent migrations:', error);

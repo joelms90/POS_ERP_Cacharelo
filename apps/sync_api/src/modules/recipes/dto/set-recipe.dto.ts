@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsUUID, IsNumber, IsArray, ValidateNested, Min } from 'class-validator';
+import { IsNotEmpty, IsUUID, IsNumber, IsArray, ValidateNested, Min, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class RecipeItemDto {
@@ -10,6 +10,11 @@ export class RecipeItemDto {
   @IsNotEmpty()
   @Min(0.001)
   quantityNeeded: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  wastePercent?: number;
 }
 
 export class SetRecipeDto {

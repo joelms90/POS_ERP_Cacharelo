@@ -18,6 +18,7 @@ export class RecipesRepository {
         parentProductId: schema.recipes.parentProductId,
         ingredientProductId: schema.recipes.ingredientProductId,
         quantityNeeded: schema.recipes.quantityNeeded,
+        wastePercent: schema.recipes.wastePercent,
         ingredientName: schema.products.name,
         ingredientSku: schema.products.sku,
       })
@@ -26,7 +27,10 @@ export class RecipesRepository {
       .where(eq(schema.recipes.parentProductId, parentProductId));
   }
 
-  async setRecipe(parentProductId: string, items: { ingredientProductId: string; quantityNeeded: string }[]) {
+  async setRecipe(
+    parentProductId: string,
+    items: { ingredientProductId: string; quantityNeeded: string; wastePercent?: string }[],
+  ) {
     return this.db.transaction(async (tx) => {
       // 1. Clear old recipe ingredients
       await tx
@@ -40,6 +44,7 @@ export class RecipesRepository {
             parentProductId,
             ingredientProductId: item.ingredientProductId,
             quantityNeeded: item.quantityNeeded,
+            wastePercent: item.wastePercent ?? '0.00',
           })),
         );
       }

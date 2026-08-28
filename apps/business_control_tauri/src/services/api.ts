@@ -956,7 +956,7 @@ export const api = {
    */
   async setRecipe(payload: {
     parentProductId: string;
-    items: Array<{ ingredientProductId: string; quantityNeeded: number }>;
+    items: Array<{ ingredientProductId: string; quantityNeeded: number; wastePercent?: number }>;
   }): Promise<{ success: boolean }> {
     return apiRequest<{ success: boolean }>('/recipes', {
       method: 'POST',
@@ -1473,6 +1473,7 @@ export interface RecipeItem {
   parentProductId: string;
   ingredientProductId: string;
   quantityNeeded: string | number;
+  wastePercent?: string | number;
   ingredientName?: string;
   ingredientSku?: string;
 }

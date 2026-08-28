@@ -519,6 +519,9 @@ export const recipes = pgTable('recipes', {
     precision: 12,
     scale: 3,
   }).notNull(),
+  wastePercent: decimal('waste_percent', { precision: 5, scale: 2 })
+    .default('0.00')
+    .notNull(),
   createdAt: timestamp('created_at', { withTimezone: true })
     .defaultNow()
     .notNull(),

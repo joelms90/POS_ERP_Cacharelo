@@ -28,6 +28,7 @@ export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
   // Adding component to recipe state
   const [newIngredientId, setNewIngredientId] = useState<string>('');
   const [newQuantityNeeded, setNewQuantityNeeded] = useState<string>('');
+  const [newWastePercent, setNewWastePercent] = useState<string>('0');
 
   // Tab 2: Production Assembly Run State
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
@@ -144,6 +145,7 @@ export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
       parentProductId: selectedParentId,
       ingredientProductId: newIngredientId,
       quantityNeeded: parseFloat(newQuantityNeeded),
+      wastePercent: parseFloat(newWastePercent || '0'),
       ingredientName: matchedProd.name,
       ingredientSku: matchedProd.sku,
     };
@@ -151,6 +153,7 @@ export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
     setCurrentRecipeItems(prev => [...prev, newItem]);
     setNewIngredientId('');
     setNewQuantityNeeded('');
+    setNewWastePercent('0');
   };
 
   // Remove component from recipe in local state
@@ -168,6 +171,7 @@ export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
         items: currentRecipeItems.map(item => ({
           ingredientProductId: item.ingredientProductId,
           quantityNeeded: parseFloat(item.quantityNeeded.toString()),
+          wastePercent: item.wastePercent != null ? parseFloat(item.wastePercent.toString()) : 0,
         })),
       });
       alert('Receta guardada exitosamente.');
@@ -206,10 +210,19 @@ export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
     }
   };
 
-  // Filter products for BOM: typically sellable dishes that are NOT raw ingredients
-  const assembledProductCandidates = products.filter(p => p.isSellable !== false && p.isIngredient !== true);
-  // Filter ingredients: products designated as ingredients
-  const ingredientCandidates = products.filter(p => p.isIngredient === true);
+  // Filter products for BOM: parents are FinishedGood or Wip; components are RawMaterial or Wip.
+  const resolveItemType = (p: Product) =>
+    p.itemType || (p.isIngredient ? 'raw_material' : (p.isSellable === false ? 'wip' : 'finished_good'));
+
+  const assembledProductCandidates = products.filter(p => {
+    const it = resolveItemType(p);
+    return it === 'finished_good' || it === 'wip';
+  });
+
+  const ingredientCandidates = products.filter(p => {
+    const it = resolveItemType(p);
+    return it === 'raw_material' || it === 'wip';
+  });
 
   // Calculate ingredient validation stats for active assembly selection
   const [selectedAssemblyRecipe, setSelectedAssemblyRecipe] = useState<RecipeItem[]>([]);
@@ -286,7 +299,7 @@ export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
           {/* Left panel: Product Selection */}
           <div className="w-full lg:w-80 bg-onyx-surface border border-aged-bronze/40 rounded-lg p-5 flex flex-col overflow-hidden shadow-xl">
             <span className="text-xs text-text-secondary uppercase tracking-widest font-semibold mb-4">
-              1. Seleccione Producto Terminado
+              1. Seleccione Producto Terminado / En Proceso
             </span>
             <div className="flex-1 overflow-y-auto border border-aged-bronze/20 rounded divide-y divide-aged-bronze/10">
               {assembledProductCandidates.map(p => (
@@ -356,6 +369,19 @@ export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
                     />
                   </div>
 
+                  <div className="w-full sm:w-28">
+                    <label className="text-[10px] text-text-secondary block mb-1 uppercase tracking-wider font-semibold">Merma %</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      placeholder="0"
+                      value={newWastePercent}
+                      onChange={(e) => setNewWastePercent(e.target.value)}
+                    />
+                  </div>
+
                   <Button type="submit" variant="secondary" size="md">
                     Añadir
                   </Button>
@@ -381,6 +407,7 @@ export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
                           <th className="p-3 font-semibold">Ingrediente</th>
                           <th className="p-3 font-semibold">SKU</th>
                           <th className="p-3 font-semibold text-right">Cantidad por Unidad</th>
+                          <th className="p-3 font-semibold text-right">Merma %</th>
                           <th className="p-3 font-semibold text-right">Acciones</th>
                         </tr>
                       </thead>
@@ -390,6 +417,7 @@ export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
                             <td className="p-3 font-medium text-text-primary">{item.ingredientName}</td>
                             <td className="p-3 text-text-secondary font-mono">{item.ingredientSku || '-'}</td>
                             <td className="p-3 text-right font-mono text-text-primary">{parseFloat(item.quantityNeeded.toString()).toFixed(3)}</td>
+                            <td className="p-3 text-right font-mono text-text-secondary">{item.wastePercent != null ? parseFloat(item.wastePercent.toString()).toFixed(2) : '0.00'}</td>
                             <td className="p-3 text-right">
                               <button
                                 type="button"
