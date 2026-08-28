@@ -255,7 +255,10 @@ export class InventoryService {
     const db = this.inventoryRepository.getDb();
 
     return db.transaction(async (tx) => {
-      // 1. Create the transfer record
+      // Resolve virtual "En Tránsito" warehouse
+      const transitWh = await this.getOrCreateTransitWarehouse(tx, businessId);
+
+      // 1. Create the transfer record (shipped = in transit)
       const [transfer] = await tx
         .insert(schema.stockTransfers)
         .values({
@@ -265,13 +268,12 @@ export class InventoryService {
           toWarehouseId: toWarehouseId || null,
           toBranchId: toBranchId || null,
           notes: notes || null,
-          status: 'completed',
+          status: 'in_transit',
         })
         .returning();
 
-      // 2. Process items
+      // 2. Ship: origin -qty, transit +qty
       for (const item of items) {
-        // Find product to get the current cost
         const [product] = await tx
           .select()
           .from(schema.products)
@@ -285,7 +287,7 @@ export class InventoryService {
         const unitCost = product.cost;
         const totalCost = (parseFloat(unitCost) * item.quantity).toFixed(2);
 
-        // A. Validate + decrement stock from source (via ledger)
+        // A. Validate + decrement stock from source
         const sourceStock = await this.ledgerService.getStockLevel(
           tx,
           item.productId,
@@ -307,21 +309,20 @@ export class InventoryService {
           unitCost,
           referenceType: 'transfer',
           referenceId: transfer.id,
-          notes: `Traspaso enviado`,
+          notes: 'Traspaso enviado',
         });
 
-        // B. Increment stock at destination (via ledger)
+        // B. Stock moves into transit location (avoid double-counting while in transit)
         await this.ledgerService.applyMovement(tx, {
           businessId,
           productId: item.productId,
           quantityDelta: item.quantity,
-          eventType: 'transfer_in',
-          warehouseId: toWarehouseId || null,
-          branchId: toBranchId || null,
+          eventType: 'transit_in',
+          warehouseId: transitWh.id,
           unitCost,
           referenceType: 'transfer',
           referenceId: transfer.id,
-          notes: `Traspaso recibido`,
+          notes: 'En tránsito',
         });
 
         // C. Record transfer item details
@@ -339,8 +340,101 @@ export class InventoryService {
       return {
         success: true,
         transferId: transfer.id,
+        status: 'in_transit',
       };
     });
+  }
+
+  async receiveTransfer(transferId: string) {
+    const db = this.inventoryRepository.getDb();
+
+    return db.transaction(async (tx) => {
+      const [transfer] = await tx
+        .select()
+        .from(schema.stockTransfers)
+        .where(eq(schema.stockTransfers.id, transferId))
+        .limit(1);
+
+      if (!transfer) {
+        throw new NotFoundException(`Traspaso con ID ${transferId} no encontrado`);
+      }
+
+      if (transfer.status !== 'in_transit') {
+        throw new BadRequestException(
+          `El traspaso no se puede recibir en estado "${transfer.status}".`,
+        );
+      }
+
+      const transitWh = await this.getOrCreateTransitWarehouse(tx, transfer.businessId);
+
+      const items = await tx
+        .select()
+        .from(schema.stockTransferItems)
+        .where(eq(schema.stockTransferItems.transferId, transferId));
+
+      for (const item of items) {
+        await this.ledgerService.applyMovement(tx, {
+          businessId: transfer.businessId,
+          productId: item.productId,
+          quantityDelta: -parseFloat(item.quantity),
+          eventType: 'transit_out',
+          warehouseId: transitWh.id,
+          unitCost: item.unitCost,
+          referenceType: 'transfer',
+          referenceId: transferId,
+          notes: 'Sale de tránsito',
+        });
+
+        await this.ledgerService.applyMovement(tx, {
+          businessId: transfer.businessId,
+          productId: item.productId,
+          quantityDelta: parseFloat(item.quantity),
+          eventType: 'transfer_in',
+          warehouseId: transfer.toWarehouseId || null,
+          branchId: transfer.toBranchId || null,
+          unitCost: item.unitCost,
+          referenceType: 'transfer',
+          referenceId: transferId,
+          notes: 'Traspaso recibido',
+        });
+      }
+
+      const [updated] = await tx
+        .update(schema.stockTransfers)
+        .set({ status: 'received', transferredAt: new Date() })
+        .where(eq(schema.stockTransfers.id, transferId))
+        .returning();
+
+      return { success: true, transferId, status: updated.status };
+    });
+  }
+
+  private async getOrCreateTransitWarehouse(tx: any, businessId: string) {
+    const [existing] = await tx
+      .select()
+      .from(schema.warehouses)
+      .where(
+        and(
+          eq(schema.warehouses.businessId, businessId),
+          eq(schema.warehouses.locationType, 'transit'),
+        ),
+      )
+      .limit(1);
+
+    if (existing) return existing;
+
+    const [created] = await tx
+      .insert(schema.warehouses)
+      .values({
+        businessId,
+        name: 'En Tránsito',
+        code: 'TRANSIT',
+        locationType: 'transit',
+        isActive: false,
+      })
+      .returning();
+
+    return created;
   }
 
   async getTransfersSummaryReport(businessId: string, startDate?: string, endDate?: string) {

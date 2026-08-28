@@ -481,6 +481,7 @@ export const warehouses = pgTable('warehouses', {
   name: varchar('name', { length: 100 }).notNull(),
   code: varchar('code', { length: 30 }),
   address: text('address'),
+  locationType: varchar('location_type', { length: 30 }).default('warehouse').notNull(), // 'warehouse' | 'transit'
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true })
     .defaultNow()

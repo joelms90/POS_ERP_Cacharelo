@@ -272,6 +272,13 @@ export async function runMigrations() {
     `);
     console.log('✅ Recipe waste percent column ensured.');
 
+    // Warehouse location type (transit support)
+    await db.execute(sql`
+      ALTER TABLE warehouses
+        ADD COLUMN IF NOT EXISTS location_type varchar(30) NOT NULL DEFAULT 'warehouse';
+    `);
+    console.log('✅ Warehouse location type column ensured.');
+
     // Ensure specific default business and branch exist
     const businessLines = [
       {

@@ -38,6 +38,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
   // Loading states
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [receivingId, setReceivingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
 
   // Form states (Create Transfer)
@@ -291,7 +292,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
         }
       }
 
-      showToast('Traspaso enviado con éxito. Stock actualizado.', 'success');
+      showToast('Traspaso enviado con éxito. Stock movido a tránsito.', 'success');
       
       // Reset form
       setItemsList([]);
@@ -306,6 +307,20 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
       showToast(err.message || 'Error al procesar el traspaso.', 'error');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleReceiveTransfer = async (transferId: string) => {
+    setReceivingId(transferId);
+    try {
+      await api.receiveTransfer(transferId);
+      showToast('Traspaso recibido. Stock actualizado en el destino.', 'success');
+      const transData = await api.getTransfers(businessId);
+      setTransfers(transData);
+    } catch (err: any) {
+      showToast(err.message || 'Error al recibir el traspaso.', 'error');
+    } finally {
+      setReceivingId(null);
     }
   };
 
@@ -669,12 +684,13 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                     <th className="py-3 px-4">Destino</th>
                     <th className="py-3 px-4">Estado</th>
                     <th className="py-3 px-4">Notas</th>
+                    <th className="py-3 px-4 text-right">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-aged-bronze/10 text-xs">
                   {transfers.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-text-secondary italic">
+                      <td colSpan={6} className="py-12 text-center text-text-secondary italic">
                         No se han registrado traspasos de mercancía todavía.
                       </td>
                     </tr>
@@ -693,10 +709,28 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                         <td className="py-3 px-4 text-text-secondary">{t.fromWarehouseName || t.fromBranchName || 'Desconocido'}</td>
                         <td className="py-3 px-4 text-text-primary font-medium">{t.toWarehouseName || t.toBranchName || 'Desconocido'}</td>
                         <td className="py-3 px-4">
-                          <Badge variant="success">{t.status.toUpperCase()}</Badge>
+                          {t.status === 'in_transit' && <Badge variant="warning">En Tránsito</Badge>}
+                          {t.status === 'received' && <Badge variant="success">Recibido</Badge>}
+                          {t.status === 'pending' && <Badge variant="charcoal">Pendiente</Badge>}
+                          {t.status === 'completed' && <Badge variant="success">Completado</Badge>}
+                          {!['in_transit', 'received', 'pending', 'completed'].includes(t.status) && (
+                            <Badge variant="charcoal">{t.status.toUpperCase()}</Badge>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-text-secondary max-w-xs truncate" title={t.notes}>
                           {t.notes || '-'}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          {t.status === 'in_transit' && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              disabled={receivingId === t.id}
+                              onClick={() => handleReceiveTransfer(t.id)}
+                            >
+                              {receivingId === t.id ? 'Recibiendo...' : 'Recibir'}
+                            </Button>
+                          )}
                         </td>
                       </tr>
                     ))

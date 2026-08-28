@@ -1030,13 +1030,20 @@ export const api = {
     toBranchId?: string;
     notes?: string;
     items: Array<{ productId: string; quantity: number }>;
-  }, businessId: string): Promise<{ success: boolean; transferId: string }> {
-    return apiRequest<{ success: boolean; transferId: string }>('/inventory/transfers', {
+  }, businessId: string): Promise<{ success: boolean; transferId: string; status: string }> {
+    return apiRequest<{ success: boolean; transferId: string; status: string }>('/inventory/transfers', {
       method: 'POST',
       body: JSON.stringify({
         ...payload,
         businessId,
       }),
+    });
+  },
+
+  async receiveTransfer(id: string): Promise<{ success: boolean; transferId: string; status: string }> {
+    return apiRequest<{ success: boolean; transferId: string; status: string }>(`/inventory/transfers/${id}/receive`, {
+      method: 'POST',
+      body: JSON.stringify({}),
     });
   },
 

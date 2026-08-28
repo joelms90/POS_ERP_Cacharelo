@@ -364,6 +364,13 @@ async function main() {
     `);
     console.log('Recipe waste percent column ensured.');
 
+    // 14. Warehouse location type (transit support)
+    await client.query(`
+      ALTER TABLE "warehouses"
+        ADD COLUMN IF NOT EXISTS "location_type" varchar(30) NOT NULL DEFAULT 'warehouse';
+    `);
+    console.log('Warehouse location type column ensured.');
+
     console.log('✅ Idempotent migrations executed successfully!');
   } catch (error) {
     console.error('❌ Failed to run idempotent migrations:', error);

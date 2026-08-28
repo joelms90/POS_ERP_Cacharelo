@@ -47,6 +47,11 @@ export class InventoryController {
     return this.inventoryService.recordTransfer(createTransferDto);
   }
 
+  @Post('transfers/:id/receive')
+  async receiveTransfer(@Param('id') id: string) {
+    return this.inventoryService.receiveTransfer(id);
+  }
+
   @Get('reports/transfers-summary')
   async getTransfersSummaryReport(
     @Query('businessId') businessId: string,

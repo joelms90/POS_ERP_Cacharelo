@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, ne } from 'drizzle-orm';
 
 @Injectable()
 export class WarehousesRepository {
@@ -12,11 +12,14 @@ export class WarehousesRepository {
   ) {}
 
   async findAll(businessId?: string) {
-    const conditions = [isNull(schema.warehouses.deletedAt)];
+    const conditions = [
+      isNull(schema.warehouses.deletedAt),
+      ne(schema.warehouses.locationType, 'transit'),
+    ];
     if (businessId) {
       conditions.push(eq(schema.warehouses.businessId, businessId));
     }
-    
+
     return this.db
       .select()
       .from(schema.warehouses)
