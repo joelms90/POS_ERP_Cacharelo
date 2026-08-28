@@ -3,11 +3,14 @@ import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { OrdersRepository } from './repositories/orders.repository';
 import { SyncModule } from '../sync/sync.module';
+import { InventoryModule } from '../inventory/inventory.module';
+import { JwtModule } from '@nestjs/jwt';
+import { AdminGuard } from '../auth/guards/admin.guard';
 
 @Module({
-  imports: [forwardRef(() => SyncModule)],
+  imports: [forwardRef(() => SyncModule), InventoryModule, JwtModule.register({})],
   controllers: [OrdersController],
-  providers: [OrdersService, OrdersRepository],
+  providers: [OrdersService, OrdersRepository, AdminGuard],
   exports: [OrdersService, OrdersRepository],
 })
 export class OrdersModule {}

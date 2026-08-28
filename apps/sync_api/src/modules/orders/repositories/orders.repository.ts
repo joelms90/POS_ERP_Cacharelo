@@ -2,25 +2,31 @@ import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
-import { eq, and, isNull, sql } from 'drizzle-orm';
+import { eq, and, isNull, sql, inArray } from 'drizzle-orm';
 import * as crypto from 'crypto';
+import { LedgerService } from '../../inventory/ledger.service';
 
 @Injectable()
 export class OrdersRepository {
   constructor(
     @Inject(DRIZZLE_CONNECTION)
     private readonly db: NodePgDatabase<typeof schema>,
+    private readonly ledgerService: LedgerService,
   ) {}
 
   async findById(id: string) {
-    const order = await this.db
+    return this.hydrateOrder(this.db, id);
+  }
+
+  private async hydrateOrder(db: any, id: string) {
+    const order = await db
       .select()
       .from(schema.orders)
       .where(eq(schema.orders.id, id));
 
     if (order.length === 0) return null;
 
-    const items = await this.db
+    const items = await db
       .select()
       .from(schema.orderItems)
       .where(
@@ -30,7 +36,7 @@ export class OrdersRepository {
         ),
       );
 
-    const payments = await this.db
+    const payments = await db
       .select()
       .from(schema.payments)
       .where(eq(schema.payments.orderId, id));
@@ -82,8 +88,115 @@ export class OrdersRepository {
     return hydrated;
   }
 
+  async findActiveByBusiness(businessId: string) {
+    const branchIds = await this.db
+      .select({ id: schema.branches.id })
+      .from(schema.branches)
+      .where(eq(schema.branches.businessId, businessId))
+      .then((rows) => rows.map((r) => r.id));
+
+    if (branchIds.length === 0) return [];
+
+    const rows = await this.db
+      .select({
+        orderId: schema.orders.id,
+        orderState: schema.orders.state,
+        orderTotal: schema.orders.total,
+        orderSubtotal: schema.orders.subtotal,
+        orderTax: schema.orders.tax,
+        orderDiscount: schema.orders.discount,
+        orderCreatedAt: schema.orders.createdAt,
+        branchId: schema.orders.branchId,
+        branchName: schema.branches.name,
+        tableId: schema.orders.tableId,
+        tableLabel: schema.branchTables.label,
+        tableRoom: schema.branchTables.room,
+        waiterName: schema.users.name,
+        itemId: schema.orderItems.id,
+        itemQuantity: schema.orderItems.quantity,
+        itemPrice: schema.orderItems.price,
+        itemNotes: schema.orderItems.notes,
+        itemAssignedGuest: schema.orderItems.assignedGuest,
+        productName: schema.products.name,
+        paymentAmount: schema.payments.amount,
+        paymentMethod: schema.payments.paymentMethod,
+        paymentRef: schema.payments.referenceCode,
+      })
+      .from(schema.orders)
+      .innerJoin(schema.branches, eq(schema.orders.branchId, schema.branches.id))
+      .innerJoin(schema.branchTables, eq(schema.orders.tableId, schema.branchTables.id))
+      .innerJoin(schema.users, eq(schema.orders.waiterId, schema.users.id))
+      .leftJoin(schema.orderItems, and(
+        eq(schema.orderItems.orderId, schema.orders.id),
+        isNull(schema.orderItems.deletedAt),
+      ))
+      .leftJoin(schema.products, eq(schema.orderItems.productId, schema.products.id))
+      .leftJoin(schema.payments, eq(schema.payments.orderId, schema.orders.id))
+      .where(
+        and(
+          inArray(schema.orders.branchId, branchIds),
+          isNull(schema.orders.deletedAt),
+          sql`${schema.orders.state} IN ('open', 'billing')`,
+        ),
+      )
+      .orderBy(schema.orders.createdAt);
+
+    // Group flat rows back into orders
+    const orderMap = new Map<string, any>();
+    for (const row of rows) {
+      if (!orderMap.has(row.orderId)) {
+        orderMap.set(row.orderId, {
+          id: row.orderId,
+          state: row.orderState,
+          total: row.orderTotal,
+          subtotal: row.orderSubtotal,
+          tax: row.orderTax,
+          discount: row.orderDiscount,
+          createdAt: row.orderCreatedAt,
+          branchId: row.branchId,
+          branchName: row.branchName,
+          tableLabel: row.tableLabel,
+          tableRoom: row.tableRoom,
+          waiterName: row.waiterName,
+          items: [],
+          payments: [],
+        });
+      }
+      const order = orderMap.get(row.orderId);
+      if (row.itemId && !order.items.find((i: any) => i.id === row.itemId)) {
+        order.items.push({
+          id: row.itemId,
+          quantity: row.itemQuantity,
+          price: row.itemPrice,
+          notes: row.itemNotes,
+          assignedGuest: row.itemAssignedGuest,
+          productName: row.productName,
+        });
+      }
+      if (row.paymentAmount != null && !order.payments.find((p: any) => p.amount === row.paymentAmount && p.method === row.paymentMethod)) {
+        order.payments.push({
+          amount: row.paymentAmount,
+          method: row.paymentMethod,
+          reference: row.paymentRef,
+        });
+      }
+    }
+
+    return Array.from(orderMap.values());
+  }
+
   async create(orderData: typeof schema.orders.$inferInsert, itemsData: Omit<typeof schema.orderItems.$inferInsert, 'orderId'>[]) {
     return this.db.transaction(async (tx) => {
+      if (orderData.clientUuid) {
+        const existing = await tx
+          .select({ id: schema.orders.id })
+          .from(schema.orders)
+          .where(eq(schema.orders.clientUuid, orderData.clientUuid));
+        if (existing[0]?.id) {
+          return this.hydrateOrder(tx, existing[0].id);
+        }
+      }
+
       // 1. Insert order
       const [newOrder] = await tx
         .insert(schema.orders)
@@ -117,8 +230,44 @@ export class OrdersRepository {
 
   async addItems(orderId: string, itemsData: Omit<typeof schema.orderItems.$inferInsert, 'orderId'>[], newTotals: { subtotal: string; total: string; tax?: string }) {
     return this.db.transaction(async (tx) => {
+      const clientUuids = itemsData
+        .map((item) => item.clientUuid)
+        .filter((clientUuid): clientUuid is string => Boolean(clientUuid));
+      let itemsToCreate = itemsData;
+      if (clientUuids.length > 0) {
+        const existingItems = await tx
+          .select({ clientUuid: schema.orderItems.clientUuid })
+          .from(schema.orderItems)
+          .where(
+            and(
+              eq(schema.orderItems.orderId, orderId),
+              inArray(schema.orderItems.clientUuid, clientUuids),
+              isNull(schema.orderItems.deletedAt),
+            ),
+          );
+        const existingClientUuids = new Set(
+          existingItems
+            .map((item) => item.clientUuid)
+            .filter((clientUuid): clientUuid is string => Boolean(clientUuid)),
+        );
+        itemsToCreate = itemsData.filter(
+          (item) => !item.clientUuid || !existingClientUuids.has(item.clientUuid),
+        );
+      }
+
+      if (itemsToCreate.length === 0) {
+        const order = await this.hydrateOrder(tx, orderId);
+        if (!order) {
+          throw new NotFoundException(`Order ${orderId} not found`);
+        }
+        return {
+          ...order,
+          newItems: [],
+        };
+      }
+
       // 1. Insert new items
-      const itemsToInsert = itemsData.map((item) => ({
+      const itemsToInsert = itemsToCreate.map((item) => ({
         ...item,
         orderId,
       }));
@@ -145,6 +294,27 @@ export class OrdersRepository {
         newItems,
       };
     });
+  }
+
+  async findExistingOrderItemClientUuids(orderId: string, clientUuids: string[]) {
+    if (clientUuids.length === 0) return new Set<string>();
+
+    const rows = await this.db
+      .select({ clientUuid: schema.orderItems.clientUuid })
+      .from(schema.orderItems)
+      .where(
+        and(
+          eq(schema.orderItems.orderId, orderId),
+          inArray(schema.orderItems.clientUuid, clientUuids),
+          isNull(schema.orderItems.deletedAt),
+        ),
+      );
+
+    return new Set(
+      rows
+        .map((row) => row.clientUuid)
+        .filter((clientUuid): clientUuid is string => Boolean(clientUuid)),
+    );
   }
 
   async updateOrderAndTableState(orderId: string, orderState: string, tableState: string) {
@@ -203,7 +373,7 @@ export class OrdersRepository {
           .where(
             and(
               eq(schema.orderItems.orderId, orderId),
-              sql`id = ANY(${paidOrderItemIds})`,
+              inArray(schema.orderItems.id, paidOrderItemIds),
               isNull(schema.orderItems.deletedAt),
             ),
           );
@@ -490,25 +660,25 @@ export class OrdersRepository {
               const coveredQty = Math.min(qtySold, availableFinishedQty);
               const remainingQtyToDeduct = qtySold - coveredQty;
 
-              // Decrement finished stock level
-              const newFinishedQty = availableFinishedQty - coveredQty;
-              await tx
-                .update(schema.stockLevels)
-                .set({
-                  quantity: newFinishedQty.toString(),
-                  updatedAt: new Date(),
-                })
-                .where(eq(schema.stockLevels.id, finishedStock.id));
+              // Decrement finished stock via ledger
+              await this.ledgerService.applyMovement(tx, {
+                businessId,
+                productId: item.productId,
+                quantityDelta: -coveredQty,
+                eventType: 'sale',
+                warehouseId,
+                notes: 'Venta POS',
+              });
 
               if (remainingQtyToDeduct > 0) {
-                await deductIngredients(tx, recipe, remainingQtyToDeduct, warehouseId);
+                await deductIngredients(this.ledgerService, tx, businessId, recipe, remainingQtyToDeduct, warehouseId);
               }
             } else {
-              await deductIngredients(tx, recipe, qtySold, warehouseId);
+              await deductIngredients(this.ledgerService, tx, businessId, recipe, qtySold, warehouseId);
             }
           } else {
             // Product doesn't have a recipe. Deduct directly from product stock level
-            await deductDirectStock(tx, item.productId, qtySold, warehouseId);
+            await deductDirectStock(this.ledgerService, tx, businessId, item.productId, qtySold, warehouseId);
           }
         }
       }
@@ -516,60 +686,34 @@ export class OrdersRepository {
   }
 }
 
-async function deductIngredients(tx: any, recipe: any[], quantity: number, warehouseId: string) {
+async function deductIngredients(
+  ledgerService: LedgerService,
+  tx: any,
+  businessId: string,
+  recipe: any[],
+  quantity: number,
+  warehouseId: string,
+) {
   for (const item of recipe) {
     const requiredQty = parseFloat(item.quantityNeeded) * quantity;
-    await deductDirectStock(tx, item.ingredientProductId, requiredQty, warehouseId);
+    await deductDirectStock(ledgerService, tx, businessId, item.ingredientProductId, requiredQty, warehouseId);
   }
 }
 
-async function deductDirectStock(tx: any, productId: string, quantity: number, warehouseId: string) {
-  const [stock] = await tx
-    .select()
-    .from(schema.stockLevels)
-    .where(
-      and(
-        eq(schema.stockLevels.productId, productId),
-        eq(schema.stockLevels.warehouseId, warehouseId)
-      )
-    )
-    .limit(1);
-
-  if (stock) {
-    const newQty = (parseFloat(stock.quantity) - quantity).toString();
-    await tx
-      .update(schema.stockLevels)
-      .set({
-        quantity: newQty,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.stockLevels.id, stock.id));
-  } else {
-    await tx
-      .insert(schema.stockLevels)
-      .values({
-        productId,
-        warehouseId,
-        quantity: (-quantity).toString(),
-        updatedAt: new Date(),
-      });
-  }
-
-  // Record stock movement
-  const [product] = await tx
-    .select()
-    .from(schema.products)
-    .where(eq(schema.products.id, productId))
-    .limit(1);
-
-  if (product) {
-    await tx.insert(schema.inventoryMovements).values({
-      businessId: product.businessId,
-      productId,
-      warehouseId,
-      quantity: (-quantity).toString(),
-      type: 'sale',
-      notes: `Venta POS`,
-    });
-  }
+async function deductDirectStock(
+  ledgerService: LedgerService,
+  tx: any,
+  businessId: string,
+  productId: string,
+  quantity: number,
+  warehouseId: string,
+) {
+  await ledgerService.applyMovement(tx, {
+    businessId,
+    productId,
+    quantityDelta: -quantity,
+    eventType: 'sale',
+    warehouseId,
+    notes: 'Venta POS',
+  });
 }
