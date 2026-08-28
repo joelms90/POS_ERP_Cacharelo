@@ -130,6 +130,12 @@ async function cleanTodaySales() {
           AND created_at <= ${todayEnd.toISOString()}
           AND type = 'sale'
       `);
+      await tx.execute(sql`
+        DELETE FROM ${schema.stockLedger}
+        WHERE created_at >= ${todayStart.toISOString()}
+          AND created_at <= ${todayEnd.toISOString()}
+          AND event_type = 'sale'
+      `);
 
       // 10. Delete "Para Llevar" (takeout) tables that have no remaining orders
       console.log('Deleting empty "Para Llevar" (takeout) tables...');

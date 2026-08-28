@@ -90,6 +90,10 @@ async function cleanAllSalesHistory() {
         DELETE FROM ${schema.inventoryMovements}
         WHERE type = 'sale'
       `);
+      await tx.execute(sql`
+        DELETE FROM ${schema.stockLedger}
+        WHERE event_type = 'sale'
+      `);
 
       // 10. Delete ALL "Para Llevar" (takeout) tables (no orders left to reference them)
       console.log('Deleting all "Para Llevar" (takeout) tables...');

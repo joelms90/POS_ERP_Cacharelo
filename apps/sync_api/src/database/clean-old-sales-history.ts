@@ -130,6 +130,11 @@ async function cleanOldSalesHistory() {
         WHERE created_at < ${todayStart.toISOString()}
           AND type = 'sale'
       `);
+      await tx.execute(sql`
+        DELETE FROM ${schema.stockLedger}
+        WHERE created_at < ${todayStart.toISOString()}
+          AND event_type = 'sale'
+      `);
 
       // 10. Delete old "Para Llevar" tables that have no remaining orders
       console.log('Deleting old empty "Para Llevar" (takeout) tables...');

@@ -78,6 +78,10 @@ async function resetTransactionalData() {
       console.log('Deleting inventory movements...');
       await tx.execute(sql`DELETE FROM ${schema.inventoryMovements}`);
 
+      // 8b. Delete all stock ledger entries
+      console.log('Deleting stock ledger entries...');
+      await tx.execute(sql`DELETE FROM ${schema.stockLedger}`);
+
       // 9. Delete all stock transfer items
       console.log('Deleting stock transfer items...');
       await tx.execute(sql`DELETE FROM ${schema.stockTransferItems}`);
