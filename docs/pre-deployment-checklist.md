@@ -70,6 +70,27 @@ Recomputes `products.is_sellable` / `is_ingredient` from `item_type`:
 > Also review products that sound like finished goods but are `raw_material`
 > (historically `is_ingredient` was set from `providerId` in the old import).
 
+### 2.3 Stock model change: sales now deduct from the sucursal (per-sucursal)
+
+POS sales decrement the **selling sucursal's** stock (and its recipe/backflush
+ingredients), no longer the primary warehouse. The intended flow is:
+
+```
+Proveedor → Recepción → Bodega (bulk)
+                         ↓ Traspaso (ship → transit → receive)
+                        Sucursal  ← POS deducts HERE
+```
+
+**Migration actions after this change:**
+
+1. **Review legacy warehouse stock** — historical sales drained the warehouse, so many
+   products have negative or stale warehouse balances. Do a physical count and use
+   *Ajuste de stock* (`adjustStock`) to correct the warehouse to reality.
+2. **Stock the sucursales** — create Traspasos (Bodega → Sucursal) for the products each
+   branch sells, otherwise sales will drive branch stock negative.
+3. **Per-branch thresholds** — set `branch_stock_thresholds` so the Panel's "Requisición
+   sugerida" alerts fire when a sucursal is low.
+
 ---
 
 ## 3. Rebuild & deploy each app
