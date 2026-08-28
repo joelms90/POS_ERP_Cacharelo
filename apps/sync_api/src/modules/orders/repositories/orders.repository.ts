@@ -608,78 +608,54 @@ export class OrdersRepository {
     const businessId = branch ? branch.businessId : null;
 
     if (businessId) {
-      // Find primary warehouse for this business
-      const [warehouse] = await tx
-        .select()
-        .from(schema.warehouses)
-        .where(
-          and(
-            eq(schema.warehouses.businessId, businessId),
-            eq(schema.warehouses.isActive, true)
-          )
-        )
-        .limit(1);
+      for (const item of orderItems) {
+        const qtySold = item.quantity;
+        if (qtySold <= 0) continue;
 
-      let warehouseId = warehouse ? warehouse.id : null;
-      if (!warehouseId) {
-        const [anyWarehouse] = await tx
+        // Check if product has a recipe
+        const recipe = await tx
           .select()
-          .from(schema.warehouses)
-          .where(eq(schema.warehouses.businessId, businessId))
-          .limit(1);
-        warehouseId = anyWarehouse ? anyWarehouse.id : null;
-      }
+          .from(schema.recipes)
+          .where(eq(schema.recipes.parentProductId, item.productId));
 
-      if (warehouseId) {
-        for (const item of orderItems) {
-          const qtySold = item.quantity;
-          if (qtySold <= 0) continue;
-
-          // Check if product has a recipe
-          const recipe = await tx
+        if (recipe.length > 0) {
+          // Product has a recipe. Check finished product stock at THIS branch
+          const [finishedStock] = await tx
             .select()
-            .from(schema.recipes)
-            .where(eq(schema.recipes.parentProductId, item.productId));
+            .from(schema.stockLevels)
+            .where(
+              and(
+                eq(schema.stockLevels.productId, item.productId),
+                eq(schema.stockLevels.branchId, branchId),
+              ),
+            )
+            .limit(1);
 
-          if (recipe.length > 0) {
-            // Product has a recipe. Check finished product stock in warehouse
-            const [finishedStock] = await tx
-              .select()
-              .from(schema.stockLevels)
-              .where(
-                and(
-                  eq(schema.stockLevels.productId, item.productId),
-                  eq(schema.stockLevels.warehouseId, warehouseId)
-                )
-              )
-              .limit(1);
+          const availableFinishedQty = finishedStock ? parseFloat(finishedStock.quantity) : 0;
 
-            const availableFinishedQty = finishedStock ? parseFloat(finishedStock.quantity) : 0;
+          if (availableFinishedQty > 0) {
+            const coveredQty = Math.min(qtySold, availableFinishedQty);
+            const remainingQtyToDeduct = qtySold - coveredQty;
 
-            if (availableFinishedQty > 0) {
-              const coveredQty = Math.min(qtySold, availableFinishedQty);
-              const remainingQtyToDeduct = qtySold - coveredQty;
+            // Decrement finished stock via ledger
+            await this.ledgerService.applyMovement(tx, {
+              businessId,
+              productId: item.productId,
+              quantityDelta: -coveredQty,
+              eventType: 'sale',
+              branchId,
+              notes: 'Venta POS',
+            });
 
-              // Decrement finished stock via ledger
-              await this.ledgerService.applyMovement(tx, {
-                businessId,
-                productId: item.productId,
-                quantityDelta: -coveredQty,
-                eventType: 'sale',
-                warehouseId,
-                notes: 'Venta POS',
-              });
-
-              if (remainingQtyToDeduct > 0) {
-                await deductIngredients(this.ledgerService, tx, businessId, recipe, remainingQtyToDeduct, warehouseId);
-              }
-            } else {
-              await deductIngredients(this.ledgerService, tx, businessId, recipe, qtySold, warehouseId);
+            if (remainingQtyToDeduct > 0) {
+              await deductIngredients(this.ledgerService, tx, businessId, recipe, remainingQtyToDeduct, branchId);
             }
           } else {
-            // Product doesn't have a recipe. Deduct directly from product stock level
-            await deductDirectStock(this.ledgerService, tx, businessId, item.productId, qtySold, warehouseId);
+            await deductIngredients(this.ledgerService, tx, businessId, recipe, qtySold, branchId);
           }
+        } else {
+          // Product doesn't have a recipe. Deduct directly from product stock at this branch
+          await deductDirectStock(this.ledgerService, tx, businessId, item.productId, qtySold, branchId);
         }
       }
     }
@@ -692,11 +668,11 @@ async function deductIngredients(
   businessId: string,
   recipe: any[],
   quantity: number,
-  warehouseId: string,
+  branchId: string,
 ) {
   for (const item of recipe) {
     const requiredQty = parseFloat(item.quantityNeeded) * quantity;
-    await deductDirectStock(ledgerService, tx, businessId, item.ingredientProductId, requiredQty, warehouseId);
+    await deductDirectStock(ledgerService, tx, businessId, item.ingredientProductId, requiredQty, branchId);
   }
 }
 
@@ -706,14 +682,14 @@ async function deductDirectStock(
   businessId: string,
   productId: string,
   quantity: number,
-  warehouseId: string,
+  branchId: string,
 ) {
   await ledgerService.applyMovement(tx, {
     businessId,
     productId,
     quantityDelta: -quantity,
     eventType: 'sale',
-    warehouseId,
+    branchId,
     notes: 'Venta POS',
   });
 }
