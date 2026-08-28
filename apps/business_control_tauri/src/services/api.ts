@@ -296,6 +296,17 @@ export interface BranchStockThreshold {
   branchName?: string;
 }
 
+export interface BranchCatalogEntry {
+  id: string;
+  branchId: string;
+  productId: string;
+  isSellable: boolean;
+  isActive: boolean;
+  productName?: string;
+  productItemType?: string;
+  globalIsSellable?: boolean;
+}
+
 const DEFAULT_API_URL = 'http://localhost:3000/api';
 
 // Retrieve the base URL from env or fallback
@@ -570,8 +581,10 @@ export const api = {
   /**
    * Get all products for a business
    */
-  async getProducts(businessId: string): Promise<Product[]> {
-    return apiRequest<Product[]>(`/products?businessId=${businessId}`);
+  async getProducts(businessId: string, branchId?: string): Promise<Product[]> {
+    let url = `/products?businessId=${businessId}`;
+    if (branchId) url += `&branchId=${branchId}`;
+    return apiRequest<Product[]>(url);
   },
 
   /**
@@ -1448,6 +1461,31 @@ export const api = {
 
   async deleteBranchThreshold(id: string): Promise<{ success: boolean }> {
     return apiRequest(`/inventory/thresholds/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * Per-branch catalog (what each sucursal can sell)
+   */
+  async getBranchCatalog(branchId: string): Promise<BranchCatalogEntry[]> {
+    return apiRequest<BranchCatalogEntry[]>(`/branch-catalog?branchId=${branchId}`);
+  },
+
+  async upsertBranchCatalog(data: {
+    businessId: string;
+    branchId: string;
+    productId: string;
+    isSellable: boolean;
+  }): Promise<BranchCatalogEntry> {
+    return apiRequest<BranchCatalogEntry>('/branch-catalog', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteBranchCatalog(id: string): Promise<{ success: boolean }> {
+    return apiRequest<{ success: boolean }>(`/branch-catalog/${id}`, {
       method: 'DELETE',
     });
   },

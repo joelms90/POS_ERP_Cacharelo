@@ -10,6 +10,7 @@ import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../services/secure_storage_service.dart';
 import '../../models/local_requisition.dart';
 import 'sync_socket_service.dart';
@@ -22,6 +23,13 @@ enum UserRole { waiter, cashier, kitchen, encargado, responsable, none }
 
 const double ivaRate = 0.16;
 const double ivaFactor = 1 + ivaRate;
+
+const String defaultProductionApiUrl =
+    'https://pos-sync-api-232144991863.us-central1.run.app/api';
+const String configuredDefaultApiUrl = String.fromEnvironment(
+  'API_URL',
+  defaultValue: defaultProductionApiUrl,
+);
 
 // Model for tracking individual partial payments
 class PartialPayment {
@@ -149,6 +157,8 @@ class OrderItem {
   String? assignedGuest; // e.g. 'P1'
   bool isSent;
   String? remoteId;
+  String? clientUuid;
+  String syncState; // 'synced', 'pending', 'failed'
 
   OrderItem({
     required this.item,
@@ -158,6 +168,8 @@ class OrderItem {
     this.assignedGuest,
     this.isSent = false,
     this.remoteId,
+    this.clientUuid,
+    this.syncState = 'synced',
   });
 
   double get totalPrice => double.parse(
@@ -172,6 +184,8 @@ class OrderItem {
     String? assignedGuest,
     bool? isSent,
     String? remoteId,
+    String? clientUuid,
+    String? syncState,
   }) {
     return OrderItem(
       item: item,
@@ -181,6 +195,60 @@ class OrderItem {
       assignedGuest: assignedGuest ?? this.assignedGuest,
       isSent: isSent ?? this.isSent,
       remoteId: remoteId ?? this.remoteId,
+      clientUuid: clientUuid ?? this.clientUuid,
+      syncState: syncState ?? this.syncState,
+    );
+  }
+
+  Map<String, dynamic> toSyncJson() => {
+        'item': {
+          'id': item.id,
+          'name': item.name,
+          'price': item.price,
+          'category': item.category,
+          'imagePath': item.imagePath,
+          'modifierGroups': item.modifierGroups,
+        },
+        'quantity': quantity,
+        'modifiers': modifiers,
+        'notes': notes,
+        'assignedGuest': assignedGuest,
+        'isSent': isSent,
+        'remoteId': remoteId,
+        'clientUuid': clientUuid,
+        'syncState': syncState,
+      };
+
+  factory OrderItem.fromSyncJson(Map<String, dynamic> json) {
+    final rawItem = json['item'];
+    final itemMap = rawItem is Map
+        ? Map<String, dynamic>.from(rawItem)
+        : <String, dynamic>{};
+    final rawModifierGroups = itemMap['modifierGroups'];
+    final rawModifiers = json['modifiers'];
+    return OrderItem(
+      item: MenuItem(
+        id: itemMap['id']?.toString() ?? '',
+        name: itemMap['name']?.toString() ?? '',
+        price: (itemMap['price'] as num?)?.toDouble() ??
+            double.tryParse(itemMap['price']?.toString() ?? '') ??
+            0.0,
+        category: itemMap['category']?.toString() ?? '',
+        imagePath: itemMap['imagePath']?.toString() ?? '',
+        modifierGroups: rawModifierGroups is List
+            ? rawModifierGroups.map((value) => value.toString()).toList()
+            : const [],
+      ),
+      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+      modifiers: rawModifiers is List
+          ? rawModifiers.map((value) => value.toString()).toList()
+          : const [],
+      notes: json['notes']?.toString() ?? '',
+      assignedGuest: json['assignedGuest']?.toString(),
+      isSent: json['isSent'] == true,
+      remoteId: json['remoteId']?.toString(),
+      clientUuid: json['clientUuid']?.toString(),
+      syncState: json['syncState']?.toString() ?? 'pending',
     );
   }
 }
@@ -201,6 +269,35 @@ class KitchenOrder {
     this.status = 'pending',
     this.station = 'cocina',
   });
+
+  Map<String, dynamic> toSyncJson() => {
+        'id': id,
+        'tableLabel': tableLabel,
+        'items': items.map((item) => item.toSyncJson()).toList(),
+        'timestamp': timestamp.toIso8601String(),
+        'status': status,
+        'station': station,
+      };
+
+  factory KitchenOrder.fromSyncJson(Map<String, dynamic> json) {
+    final rawItems = json['items'];
+    return KitchenOrder(
+      id: json['id']?.toString() ?? '',
+      tableLabel: json['tableLabel']?.toString() ?? 'Mesa',
+      items: rawItems is List
+          ? rawItems
+              .whereType<Map>()
+              .map((item) => OrderItem.fromSyncJson(
+                    Map<String, dynamic>.from(item),
+                  ))
+              .toList()
+          : const [],
+      timestamp: DateTime.tryParse(json['timestamp']?.toString() ?? '') ??
+          DateTime.now(),
+      status: json['status']?.toString() ?? 'ready',
+      station: json['station']?.toString() ?? 'cocina',
+    );
+  }
 }
 
 class PrintJob {
@@ -470,6 +567,7 @@ class AppState extends ChangeNotifier {
 
   // Kitchen orders
   List<KitchenOrder> kitchenOrders = [];
+  List<KitchenOrder> readyPickupOrders = [];
 
   // Printer Queue
   List<PrintJob> printJobs = [];
@@ -491,8 +589,11 @@ class AppState extends ChangeNotifier {
   Timer? _fallbackPollingTimer;
   int pendingSyncCount = 0;
   final List<Map<String, dynamic>> _pendingSaleSyncJobs = [];
+  final List<Map<String, dynamic>> _pendingOrderSyncJobs = [];
   final Map<String, String> _activeOrderIdsByTableRemoteId = {};
+  final Map<String, String> _locallyClosedPaidOrderIdsByTableRemoteId = {};
   final Set<String> _pendingKitchenStatusUpdates = {};
+  final Set<String> _alertedReadyPickupIds = {};
   Timer? _kitchenSyncRetryTimer;
   int _kitchenSyncRetryCount = 0;
   Timer? _printStationHeartbeatTimer;
@@ -522,19 +623,15 @@ class AppState extends ChangeNotifier {
   // Bluetooth printer connection state
   String? connectedPrinterMac;
   String? connectedPrinterName;
-  String printerPaperWidth =
-      '58mm'; // '50mm' (26 cols), '58mm' (32 cols), '80mm' (48 cols)
+  String printerPaperWidth = '58mm'; // '58mm' (26 cols), '80mm' (40 cols)
 
   int get ticketWidth {
-    if (printerPaperWidth == '50mm') return 26;
-    if (printerPaperWidth == '80mm') return 48;
-    return 32;
+    if (printerPaperWidth == '80mm') return 40;
+    return 26; // 58mm uses 26 cols
   }
 
   Future<void> setPrinterPaperWidth(String paperWidth) async {
-    if (paperWidth == '50mm') {
-      printerPaperWidth = '50mm';
-    } else if (paperWidth == '80mm') {
+    if (paperWidth == '80mm') {
       printerPaperWidth = '80mm';
     } else {
       printerPaperWidth = '58mm';
@@ -546,12 +643,14 @@ class AppState extends ChangeNotifier {
   bool isConnectingPrinter = false;
   Future<void>? initializationFuture;
   String? localStationId;
+  String? deviceId;
   List<PrintStation> onlinePrintStations = [];
   String? lastSelectedPrintStationId;
   bool receiveRemotePrintJobs = false;
   DateTime? lastPrintStationPublishAttemptAt;
   bool? lastPrintStationPublishSucceeded;
   String? lastPrintStationPublishMessage;
+  String appVersion = 'v1.0.1+3';
 
   final SecureStorageService _secureStorageService;
   SecureStorageService get secureStorageService => _secureStorageService;
@@ -560,7 +659,14 @@ class AppState extends ChangeNotifier {
       : _secureStorageService = secureStorageService ?? SecureStorageService() {
     _initMockData();
     initializationFuture = () async {
+      try {
+        final packageInfo = await PackageInfo.fromPlatform();
+        appVersion = 'v${packageInfo.version}+${packageInfo.buildNumber}';
+      } catch (e) {
+        debugPrint('Error getting PackageInfo: $e');
+      }
       localStationId = await _secureStorageService.getOrCreateLocalStationId();
+      deviceId = await _secureStorageService.getOrCreateDeviceId();
       lastSelectedPrintStationId =
           await _secureStorageService.getLastPrintStationId();
       receiveRemotePrintJobs =
@@ -568,10 +674,13 @@ class AppState extends ChangeNotifier {
       await loadTerminalConfig();
       await loadTicketFiscalConfig();
       await _loadRecentClosedSales();
+      await _loadReadyPickupOrders();
       cachedIngredients = await _secureStorageService.getCachedIngredients();
       cachedWarehouses = await _secureStorageService.getCachedWarehouses();
+      await _loadPendingOrderSyncJobs();
       if (isTerminalConfigured) {
         await _loadPendingSaleSyncJobs();
+        await syncOperators();
         await syncTicketSettings();
         await fetchMenuDynamic();
         await syncWarehouses();
@@ -583,7 +692,6 @@ class AppState extends ChangeNotifier {
       await _autoConnectPrinter();
       _refreshPrintStationLifecycle();
     }();
-    _seedDefaultUsersOffline();
   }
 
   Future<void> loadTerminalConfig() async {
@@ -600,7 +708,7 @@ class AppState extends ChangeNotifier {
         if (terminalApiUrl != null &&
             terminalApiUrl!.contains('umqpitkpoa-uc.a.run.app')) {
           terminalApiUrl =
-              'https://pos-sync-api-232144991863.us-central1.run.app/api';
+              configuredDefaultApiUrl;
           await _secureStorageService.saveTerminalConfig(
             businessId: terminalBusinessId ?? '',
             branchId: terminalBranchId ?? '',
@@ -665,6 +773,7 @@ class AppState extends ChangeNotifier {
     await fetchMenuDynamic();
     await syncWarehouses();
     await syncTicketSettings();
+    await syncOperators();
     notifyListeners();
   }
 
@@ -683,7 +792,7 @@ class AppState extends ChangeNotifier {
   Future<bool> configureTerminalWithCode(String branchId) async {
     try {
       String baseUrl =
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
 
       http.Response response = await http
           .get(Uri.parse('$baseUrl/branches/$branchId'))
@@ -716,7 +825,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       final String? businessId = terminalBusinessId;
       final String? branchId = terminalBranchId;
       if (businessId == null || branchId == null) return false;
@@ -754,9 +863,12 @@ class AppState extends ChangeNotifier {
     }
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
-      final String bId =
-          terminalBusinessId ?? 'd3b07384-d113-4a0e-a555-e5b12824bf01';
+          configuredDefaultApiUrl;
+      final String? bId = terminalBusinessId;
+      if (bId == null || bId.isEmpty) {
+        debugPrint('SyncOperators skipped: missing terminal businessId.');
+        return false;
+      }
       final String brId = terminalBranchId ?? '';
 
       final url = '$baseUrl/auth/operators?businessId=$bId&branchId=$brId';
@@ -769,7 +881,11 @@ class AppState extends ChangeNotifier {
         final List<dynamic> operators = jsonDecode(response.body);
         debugPrint('SyncOperators loaded ${operators.length} operators.');
         if (operators.isNotEmpty) {
-          await _secureStorageService.cacheOperatorsOffline(operators);
+          await _secureStorageService.cacheOperatorsOffline(
+            operators,
+            businessId: bId,
+            branchId: brId.isEmpty ? null : brId,
+          );
           _hydrateCurrentUserIdFromOperators(operators);
         }
         return true;
@@ -857,33 +973,6 @@ class AppState extends ChangeNotifier {
 
     notifyListeners();
     return success;
-  }
-
-  Future<void> _seedDefaultUsersOffline() async {
-    try {
-      final cached = await _secureStorageService.verifyOfflineCredentials(
-        '1111',
-      );
-      if (cached == null) {
-        await _secureStorageService.cacheUserOffline(
-          name: 'Juan (Mesero)',
-          pin: '1111',
-          role: 'waiter',
-        );
-        await _secureStorageService.cacheUserOffline(
-          name: 'Sofia (Cajero)',
-          pin: '2222',
-          role: 'cashier',
-        );
-        await _secureStorageService.cacheUserOffline(
-          name: 'Chef Carlos',
-          pin: '3333',
-          role: 'kitchen',
-        );
-      }
-    } catch (e) {
-      debugPrint('Error writing default secure storage seed: $e');
-    }
   }
 
   void _initMockData() {
@@ -1119,7 +1208,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       final String brId = terminalBranchId!;
 
       // Fetch branch configs dynamically (room configs, zoom, images)
@@ -1316,22 +1405,29 @@ class AppState extends ChangeNotifier {
     if (!isTerminalConfigured) return;
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       final bool isLocalConfig = baseUrl.contains('localhost') ||
           baseUrl.contains('10.0.2.2') ||
           baseUrl.contains('127.0.0.1');
 
       http.Response catResponse;
       http.Response prodResponse;
-      final String bId =
-          terminalBusinessId ?? 'd3b07384-d113-4a0e-a555-e5b12824bf01';
+      final String? bId = terminalBusinessId;
+      if (bId == null || bId.isEmpty) {
+        debugPrint('fetchMenuDynamic skipped: missing terminal businessId.');
+        return;
+      }
 
       try {
         catResponse = await http
             .get(Uri.parse('$baseUrl/categories?businessId=$bId'))
             .timeout(const Duration(seconds: 10));
+        final String? brId = terminalBranchId;
+        final String productsUrl = (brId != null && brId.isNotEmpty)
+            ? '$baseUrl/products?businessId=$bId&branchId=$brId'
+            : '$baseUrl/products?businessId=$bId';
         prodResponse = await http
-            .get(Uri.parse('$baseUrl/products?businessId=$bId'))
+            .get(Uri.parse(productsUrl))
             .timeout(const Duration(seconds: 10));
       } catch (e) {
         debugPrint('API request failed: $e');
@@ -1399,9 +1495,12 @@ class AppState extends ChangeNotifier {
     if (!isTerminalConfigured) return false;
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
-      final String bId =
-          terminalBusinessId ?? 'd3b07384-d113-4a0e-a555-e5b12824bf01';
+          configuredDefaultApiUrl;
+      final String? bId = terminalBusinessId;
+      if (bId == null || bId.isEmpty) {
+        debugPrint('syncWarehouses skipped: missing terminal businessId.');
+        return false;
+      }
       final response = await http
           .get(Uri.parse('$baseUrl/warehouses?businessId=$bId'))
           .timeout(const Duration(seconds: 10));
@@ -1430,7 +1529,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       final response = await http
           .get(Uri.parse('$baseUrl/orders/active?branchId=$terminalBranchId'))
           .timeout(const Duration(seconds: 10));
@@ -1470,6 +1569,16 @@ class AppState extends ChangeNotifier {
         final orderId = order['id']?.toString();
         if (!_isUuid(tableId) || !_isUuid(orderId)) continue;
 
+        final locallyClosedOrderId =
+            _locallyClosedPaidOrderIdsByTableRemoteId[tableId];
+        if (locallyClosedOrderId == orderId) {
+          activeTableIds.add(tableId!);
+          continue;
+        }
+        if (locallyClosedOrderId != null && locallyClosedOrderId != orderId) {
+          _locallyClosedPaidOrderIdsByTableRemoteId.remove(tableId);
+        }
+
         activeTableIds.add(tableId!);
         _activeOrderIdsByTableRemoteId[tableId] = orderId!;
 
@@ -1483,7 +1592,10 @@ class AppState extends ChangeNotifier {
             : TableState.occupied;
 
         tables[tableIndex].state = state;
-        tables[tableIndex].items = _itemsFromCloud(order['items']);
+        tables[tableIndex].items = _mergePendingOrderItems(
+          tables[tableIndex],
+          _itemsFromCloud(order['items']),
+        );
       }
 
       // Clear items from tables that no longer have active orders
@@ -1492,7 +1604,8 @@ class AppState extends ChangeNotifier {
         final table = tables[i];
         if (table.remoteId != null &&
             !activeTableIds.contains(table.remoteId) &&
-            table.items.isNotEmpty) {
+            table.items.isNotEmpty &&
+            !_hasPendingOpenOrderForTable(table)) {
           // Table had items but is not in active orders anymore
           // Clear the items (state will be updated by syncTableStates)
           tables[i].items = [];
@@ -1502,7 +1615,9 @@ class AppState extends ChangeNotifier {
       }
 
       _activeOrderIdsByTableRemoteId.removeWhere(
-        (tableId, _) => !activeTableIds.contains(tableId),
+        (tableId, _) =>
+            !activeTableIds.contains(tableId) &&
+            !_hasPendingOpenOrderForTableRemoteId(tableId),
       );
 
       if (notify) notifyListeners();
@@ -1518,7 +1633,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       final response = await http
           .get(Uri.parse('$baseUrl/kitchen/active?branchId=$terminalBranchId'))
           .timeout(const Duration(seconds: 10));
@@ -1557,15 +1672,19 @@ class AppState extends ChangeNotifier {
         ));
       }
 
+      final serverReadyIds = newOrders
+          .where((order) => order.status == 'ready')
+          .map((order) => order.id)
+          .toSet();
+      await _reconcileReadyPickupOrders(serverReadyIds);
+
       // Trigger notification if status changed to 'ready'
       for (final order in newOrders) {
         final oldStatus = oldStatuses[order.id];
         if (order.status == 'ready' && oldStatus != 'ready') {
-          final String notificationText =
-              '¡Pedido listo para la ${order.tableLabel}!';
-          if (!readyNotifications.contains(notificationText)) {
-            readyNotifications.add(notificationText);
-          }
+          await _addReadyPickupOrder(order, alert: true);
+        } else if (order.status == 'ready') {
+          await _addReadyPickupOrder(order, alert: false);
         }
       }
 
@@ -1600,7 +1719,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
 
       // Get last sync checkpoint timestamp
       final lastSyncedAt = await _getLastSyncCheckpoint();
@@ -1611,7 +1730,7 @@ class AppState extends ChangeNotifier {
             Uri.parse('$baseUrl/sync/pull'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
-              'deviceId': 'tablet-pos-1',
+              'deviceId': deviceId ?? 'tablet-pos-1',
               'branchId': terminalBranchId,
               if (lastSyncedAt != null) 'lastSyncedAt': lastSyncedAt,
             }),
@@ -1664,6 +1783,16 @@ class AppState extends ChangeNotifier {
           final tableIndex = tables.indexWhere((t) => t.remoteId == tableId);
           if (tableIndex != -1) {
             final newState = _parseTableState(tableState);
+            final isLocallyClosedPaidOrder =
+                _locallyClosedPaidOrderIdsByTableRemoteId.containsKey(tableId);
+            if (isLocallyClosedPaidOrder &&
+                newState != TableState.free &&
+                newState != TableState.cleaning) {
+              continue;
+            }
+            if (isLocallyClosedPaidOrder) {
+              _locallyClosedPaidOrderIdsByTableRemoteId.remove(tableId);
+            }
             tables[tableIndex].state = newState;
             if (newState == TableState.free ||
                 newState == TableState.cleaning) {
@@ -1745,6 +1874,8 @@ class AppState extends ChangeNotifier {
 
       return OrderItem(
         remoteId: item['id']?.toString(),
+        clientUuid: item['clientUuid']?.toString(),
+        syncState: 'synced',
         item: MenuItem(
           id: menuItem.id,
           name: menuItem.name,
@@ -1759,6 +1890,51 @@ class AppState extends ChangeNotifier {
         isSent: true,
       );
     }).toList();
+  }
+
+  List<OrderItem> _mergePendingOrderItems(
+    TableModel table,
+    List<OrderItem> cloudItems,
+  ) {
+    final cloudClientUuids = cloudItems
+        .map((item) => item.clientUuid)
+        .whereType<String>()
+        .where((value) => value.isNotEmpty)
+        .toSet();
+    final cloudRemoteIds = cloudItems
+        .map((item) => item.remoteId)
+        .whereType<String>()
+        .where((value) => value.isNotEmpty)
+        .toSet();
+
+    final pendingLocalItems = table.items.where((item) {
+      final isPending =
+          item.syncState == 'pending' || item.syncState == 'failed';
+      if (!isPending) return false;
+      if (item.clientUuid != null &&
+          cloudClientUuids.contains(item.clientUuid)) {
+        return false;
+      }
+      if (item.remoteId != null && cloudRemoteIds.contains(item.remoteId)) {
+        return false;
+      }
+      return true;
+    }).toList();
+
+    return [...cloudItems, ...pendingLocalItems];
+  }
+
+  bool _hasPendingOpenOrderForTable(TableModel table) {
+    final tableRemoteId = _remoteIdForTable(table);
+    return _hasPendingOpenOrderForTableRemoteId(tableRemoteId) ||
+        _pendingOrderSyncJobs.any((job) => job['tableId'] == table.id);
+  }
+
+  bool _hasPendingOpenOrderForTableRemoteId(String? tableRemoteId) {
+    if (!_isUuid(tableRemoteId)) return false;
+    return _pendingOrderSyncJobs.any(
+      (job) => job['tableRemoteId']?.toString() == tableRemoteId,
+    );
   }
 
   MenuItem _menuItemById(String id, {String? fallbackName}) {
@@ -1830,8 +2006,11 @@ class AppState extends ChangeNotifier {
     currentUserRole = UserRole.none;
     availableUserRoles = const [];
     try {
-      final String bId =
-          terminalBusinessId ?? 'd3b07384-d113-4a0e-a555-e5b12824bf01';
+      final String? bId = terminalBusinessId;
+      if (bId == null || bId.isEmpty) {
+        debugPrint('Login skipped: terminal businessId is not configured.');
+        return false;
+      }
       final String? brId = terminalBranchId;
 
       final Map<String, dynamic> payload = {
@@ -1845,7 +2024,7 @@ class AppState extends ChangeNotifier {
 
       http.Response response;
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       try {
         response = await http
             .post(
@@ -1871,6 +2050,12 @@ class AppState extends ChangeNotifier {
         if (data['success'] == true || data['user'] != null) {
           final userData = data['user'];
           final roles = _parseRoles(userData['roles'], userData['role']);
+          if (roles.every((role) => role == UserRole.none)) {
+            debugPrint(
+              'Login rejected: user has no valid POS role (${userData['role']}/${userData['roles']}).',
+            );
+            return false;
+          }
           currentUserId = userData['id'];
           currentUserName = userData['name'];
           availableUserRoles = roles;
@@ -1887,6 +2072,8 @@ class AppState extends ChangeNotifier {
             pin: pin,
             role: roles.first.name,
             roles: roles.map((role) => role.name).toList(),
+            businessId: bId,
+            branchId: brId,
           );
 
           if (roles.length > 1 && !roles.contains(currentUserRole)) {
@@ -1910,12 +2097,20 @@ class AppState extends ChangeNotifier {
     try {
       final offlineUser = await _secureStorageService.verifyOfflineCredentials(
         pin,
+        businessId: terminalBusinessId,
+        branchId: terminalBranchId,
       );
       if (offlineUser != null) {
         currentUserId =
             offlineUser['id']?.isNotEmpty == true ? offlineUser['id'] : null;
         currentUserName = offlineUser['name']!;
         final roles = _parseRoles(offlineUser['roles'], offlineUser['role']);
+        if (roles.every((role) => role == UserRole.none)) {
+          debugPrint(
+            'Offline login rejected: user has no valid POS role (${offlineUser['role']}/${offlineUser['roles']}).',
+          );
+          return false;
+        }
         availableUserRoles = roles;
 
         currentJwtToken = await _secureStorageService.getJwtToken();
@@ -2015,7 +2210,7 @@ class AppState extends ChangeNotifier {
     }
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       final response = await http
           .get(Uri.parse(
               '$baseUrl/cash-shifts/active?branchId=$terminalBranchId&cashierId=$currentUserId'))
@@ -2047,7 +2242,7 @@ class AppState extends ChangeNotifier {
     }
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       final response = await http
           .post(
             Uri.parse('$baseUrl/cash-shifts'),
@@ -2081,7 +2276,7 @@ class AppState extends ChangeNotifier {
     if (activeShiftId == null) return false;
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       final response = await http
           .post(
             Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
@@ -2118,7 +2313,7 @@ class AppState extends ChangeNotifier {
     if (activeShiftId == null) return false;
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       final response = await http
           .post(
             Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
@@ -2158,7 +2353,7 @@ class AppState extends ChangeNotifier {
     if (activeShiftId == null) return null;
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       final response = await http
           .post(
             Uri.parse('$baseUrl/cash-shifts/$activeShiftId/close'),
@@ -2194,7 +2389,7 @@ class AppState extends ChangeNotifier {
   Future<Map<String, dynamic>?> getCashShiftAuditReport(String shiftId) async {
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       final response = await http
           .get(Uri.parse('$baseUrl/reports/cash-shifts/$shiftId/audit'))
           .timeout(const Duration(seconds: 8));
@@ -2210,7 +2405,7 @@ class AppState extends ChangeNotifier {
   }
 
   // Waiter Order submission
-  void submitOrder(
+  Future<bool> submitOrder(
     int tableId,
     List<OrderItem> cartItems,
     int guestsCount,
@@ -2218,20 +2413,36 @@ class AppState extends ChangeNotifier {
     bool printComanda = false,
     ComandaPrintMode printMode = ComandaPrintMode.none,
     String? targetStationId,
-  }) {
+  }) async {
     if (cartItems.isEmpty) {
-      unawaited(cancelActiveOrder(tableId));
-      return;
+      await cancelActiveOrder(tableId);
+      return true;
     }
 
     final index = tables.indexWhere((t) => t.id == tableId);
     if (index != -1) {
-      // Filter out only new (unsent) items to print and send to kitchen
-      final newItems = cartItems.where((i) => !i.isSent).toList();
+      if (_hasPendingOpenOrderForTable(tables[index])) {
+        await _syncPendingOrderJobs();
+        if (_hasPendingOpenOrderForTable(tables[index])) {
+          debugPrint(
+            'Order submit blocked: table ${tables[index].label} has a pending order sync job.',
+          );
+          return false;
+        }
+      }
 
-      // Mark all cart items as sent
-      final updatedItems =
-          cartItems.map((i) => i.copyWith(isSent: true)).toList();
+      // Filter out only new (unsent) items to print and send to kitchen.
+      final newItems = <OrderItem>[];
+      final updatedItems = cartItems.map((item) {
+        if (item.isSent) return item;
+        final queuedItem = item.copyWith(
+          isSent: true,
+          clientUuid: item.clientUuid ?? _newUuid(),
+          syncState: 'pending',
+        );
+        newItems.add(queuedItem);
+        return queuedItem;
+      }).toList();
 
       tables[index].items = updatedItems;
       tables[index].guests = guestsCount;
@@ -2347,11 +2558,21 @@ class AppState extends ChangeNotifier {
           ),
         );
 
-        unawaited(_pushOpenOrderToCloud(tables[index], newItems));
+        final syncJob = _buildOpenOrderSyncJob(
+          table: tables[index],
+          newItems: newItems,
+        );
+        if (syncJob != null) {
+          final synced = await _queueAndSyncOrderJob(syncJob);
+          notifyListeners();
+          return synced;
+        }
       }
 
       notifyListeners();
+      return true;
     }
+    return false;
   }
 
   void _routeComandaPrintJob(
@@ -2407,7 +2628,7 @@ class AppState extends ChangeNotifier {
     if (orderId != null) {
       try {
         final String baseUrl = terminalApiUrl ??
-            'https://pos-sync-api-232144991863.us-central1.run.app/api';
+            configuredDefaultApiUrl;
         await http
             .post(Uri.parse('$baseUrl/orders/$orderId/cancel'))
             .timeout(const Duration(seconds: 8));
@@ -2427,18 +2648,136 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> _pushOpenOrderToCloud(
-    TableModel table,
-    List<OrderItem> newItems,
-  ) async {
-    if (!isTerminalConfigured || terminalBranchId == null) return;
+  Map<String, dynamic>? _buildOpenOrderSyncJob({
+    required TableModel table,
+    required List<OrderItem> newItems,
+  }) {
     final tableRemoteId = _remoteIdForTable(table);
-    if (!_isUuid(tableRemoteId) || !_isUuid(currentUserId)) return;
-    if (newItems.isEmpty) return;
+    if (!_isUuid(tableRemoteId) || newItems.isEmpty) return null;
+
+    return {
+      'id': _newUuid(),
+      'orderClientUuid': _newUuid(),
+      'tableId': table.id,
+      'tableRemoteId': tableRemoteId,
+      'tableLabel': table.label,
+      'waiterId': currentUserId,
+      'subtotal': table.netSubtotal.toStringAsFixed(2),
+      'discount': table.netDiscountAmount.toStringAsFixed(2),
+      'tax': table.includedTax.toStringAsFixed(2),
+      'total': table.total.toStringAsFixed(2),
+      'items': newItems.map((item) => item.toSyncJson()).toList(),
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+      'attemptCount': 0,
+    };
+  }
+
+  Future<bool> _queueAndSyncOrderJob(Map<String, dynamic> job) async {
+    await _syncPendingOrderJobs();
+    _pendingOrderSyncJobs.add(job);
+    await _persistPendingOrderSyncJobs();
+    await _syncPendingOrderJobs();
+    final jobId = job['id']?.toString();
+    if (jobId == null) return false;
+    return !_pendingOrderSyncJobs.any(
+      (pendingJob) => pendingJob['id']?.toString() == jobId,
+    );
+  }
+
+  Future<bool> _syncPendingOrderJobs() async {
+    if (_pendingOrderSyncJobs.isEmpty) {
+      _updatePendingSyncCount();
+      return true;
+    }
+
+    if (!isTerminalConfigured) {
+      return false;
+    }
+
+    final remaining = <Map<String, dynamic>>[];
+    for (final job in List<Map<String, dynamic>>.from(_pendingOrderSyncJobs)) {
+      final pushed = await _pushOpenOrderJobToCloud(job);
+      if (pushed) {
+        _markOrderJobItemsSynced(job);
+      } else {
+        remaining.add({
+          ...job,
+          'attemptCount': ((job['attemptCount'] as num?)?.toInt() ?? 0) + 1,
+          'lastAttemptAt': DateTime.now().toUtc().toIso8601String(),
+        });
+      }
+    }
+
+    _pendingOrderSyncJobs
+      ..clear()
+      ..addAll(remaining);
+    await _persistPendingOrderSyncJobs();
+    return _pendingOrderSyncJobs.isEmpty;
+  }
+
+  void _markOrderJobItemsSynced(Map<String, dynamic> job) {
+    final rawItems = job['items'];
+    if (rawItems is! List) return;
+
+    final clientUuids = rawItems
+        .whereType<Map>()
+        .map((rawItem) => Map<String, dynamic>.from(rawItem))
+        .map((item) => item['clientUuid']?.toString())
+        .whereType<String>()
+        .where((value) => value.isNotEmpty)
+        .toSet();
+    if (clientUuids.isEmpty) return;
+
+    final tableRemoteId = job['tableRemoteId']?.toString();
+    final tableId = (job['tableId'] as num?)?.toInt();
+    final tableIndex = tables.indexWhere(
+      (table) =>
+          (_isUuid(tableRemoteId) &&
+              _remoteIdForTable(table) == tableRemoteId) ||
+          (tableId != null && table.id == tableId),
+    );
+    if (tableIndex == -1) return;
+
+    tables[tableIndex].items = tables[tableIndex].items.map((item) {
+      if (item.clientUuid != null && clientUuids.contains(item.clientUuid)) {
+        return item.copyWith(syncState: 'synced');
+      }
+      return item;
+    }).toList();
+  }
+
+  Future<bool> _pushOpenOrderJobToCloud(Map<String, dynamic> job) async {
+    if (!isTerminalConfigured || terminalBranchId == null) return false;
+
+    final tableRemoteId = job['tableRemoteId']?.toString();
+    final waiterId = job['waiterId']?.toString() ?? currentUserId;
+    final rawItems = job['items'];
+    if (!_isUuid(tableRemoteId) || !_isUuid(waiterId) || rawItems is! List) {
+      return false;
+    }
+
+    final newItems = rawItems
+        .whereType<Map>()
+        .map((rawItem) => OrderItem.fromSyncJson(
+              Map<String, dynamic>.from(rawItem),
+            ))
+        .toList();
+    if (newItems.isEmpty) return true;
+
+    final missingProducts = newItems
+        .where((item) => !_isUuid(_productRemoteIdForItem(item)))
+        .map((item) => '${item.item.name}=${item.item.id}')
+        .toList();
+    if (missingProducts.isNotEmpty) {
+      debugPrint(
+        'Open order sync skipped: products without cloud UUIDs: ${missingProducts.join(', ')}.',
+      );
+      return false;
+    }
 
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
 
       var orderId = _activeOrderIdsByTableRemoteId[tableRemoteId!];
       if (orderId == null) {
@@ -2449,8 +2788,6 @@ class AppState extends ChangeNotifier {
       final itemsPayload = newItems.map(_cloudOrderItemPayload).toList();
 
       if (orderId == null) {
-        final netSubtotal = table.netSubtotal;
-        final tax = table.includedTax;
         final response = await http
             .post(
               Uri.parse('$baseUrl/orders'),
@@ -2458,26 +2795,27 @@ class AppState extends ChangeNotifier {
               body: jsonEncode({
                 'branchId': terminalBranchId,
                 'tableId': tableRemoteId,
-                'waiterId': currentUserId,
-                'subtotal': netSubtotal.toStringAsFixed(2),
-                'discount': '0.00',
-                'tax': tax.toStringAsFixed(2),
-                'total': table.total.toStringAsFixed(2),
+                'waiterId': waiterId,
+                'clientUuid': job['orderClientUuid']?.toString(),
+                'subtotal': job['subtotal']?.toString() ?? '0.00',
+                'discount': job['discount']?.toString() ?? '0.00',
+                'tax': job['tax']?.toString() ?? '0.00',
+                'total': job['total']?.toString() ?? '0.00',
                 'items': itemsPayload,
               }),
             )
             .timeout(const Duration(seconds: 10));
 
-        if (response.statusCode != 201) {
+        if (response.statusCode != 201 && response.statusCode != 200) {
           debugPrint(
             'Cloud order create failed ${response.statusCode}: ${response.body}',
           );
-          return;
+          return false;
         }
 
         final created = Map<String, dynamic>.from(jsonDecode(response.body));
         orderId = created['id']?.toString();
-        if (!_isUuid(orderId)) return;
+        if (!_isUuid(orderId)) return false;
         _activeOrderIdsByTableRemoteId[tableRemoteId] = orderId!;
       } else {
         final response = await http
@@ -2492,7 +2830,7 @@ class AppState extends ChangeNotifier {
           debugPrint(
             'Cloud order add items failed ${response.statusCode}: ${response.body}',
           );
-          return;
+          return false;
         }
       }
 
@@ -2503,14 +2841,18 @@ class AppState extends ChangeNotifier {
         debugPrint(
           'Cloud kitchen send failed ${kitchenResponse.statusCode}: ${kitchenResponse.body}',
         );
+        return false;
       }
+      return true;
     } catch (e) {
       debugPrint('Cloud open order sync failed: $e');
+      return false;
     }
   }
 
   Map<String, dynamic> _cloudOrderItemPayload(OrderItem item) => {
         'productId': _productRemoteIdForItem(item),
+        'clientUuid': item.clientUuid,
         'quantity': item.quantity,
         'price': (item.totalPrice / item.quantity).toStringAsFixed(2),
         'assignedGuest': _assignedGuestNumber(item.assignedGuest),
@@ -2529,7 +2871,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       await http
           .post(Uri.parse('$baseUrl/orders/$orderId/billing'))
           .timeout(const Duration(seconds: 10));
@@ -2621,7 +2963,10 @@ class AppState extends ChangeNotifier {
     buffer.writeln(formatDivider());
     buffer.writeln(formatRow('Operacion:', operationNumber));
     buffer.writeln(formatRow('Fecha:', dateStr));
-    buffer.writeln(formatRow('Mesa:', table.label));
+    final mesaClean = table.label.startsWith('Mesa ')
+        ? table.label.substring(5)
+        : table.label;
+    buffer.writeln(formatRow('Mesa:', mesaClean));
     buffer.writeln(formatRow('Atendio:', currentUserName));
     buffer.writeln(formatDivider());
     buffer.writeln(formatRow('Metodo:', paymentMethod.toUpperCase()));
@@ -2722,6 +3067,7 @@ class AppState extends ChangeNotifier {
     int? splitCount,
     int? originalSplitCount,
     List<int>? itemIndicesToPay,
+    bool printCustomerTicket = true,
   }) {
     final index = tables.indexWhere((t) => t.id == tableId);
     if (index != -1) {
@@ -2793,47 +3139,7 @@ class AppState extends ChangeNotifier {
       String printDetails; // Declare here so it's accessible later
 
       if (isCompletedEqualSplit) {
-        // Generate individual tickets for each person
         final amountPerPerson = t.total / originalSplitCount;
-
-        for (int i = 1; i <= originalSplitCount; i++) {
-          final personSnapshot = t.copyWith(
-            label: '${t.label} (Pago $i de $originalSplitCount)',
-            items: [
-              OrderItem(
-                item: MenuItem(
-                  id: 'split_payment_$i',
-                  name: 'División Equitativa ($i/$originalSplitCount)',
-                  price: t.subtotal / originalSplitCount,
-                  category: 'Pago',
-                ),
-                quantity: 1,
-                isSent: true,
-              ),
-            ],
-          );
-
-          final personTicket = _generateFinalCustomerTicket(
-            personSnapshot,
-            discount: discount,
-            paymentMethod:
-                'Efectivo', // Individual tickets show as cash for simplicity
-            refCode: 'División $i/$originalSplitCount',
-            closedAt: closedAt,
-            cashReceived: null,
-            cashChange: null,
-          );
-
-          unawaited(enqueueCajaPrintJob(
-            PrintJob(
-              id: 'split_${i}_${DateTime.now().millisecondsSinceEpoch}',
-              title: 'Ticket ${t.label} - Pago $i de $originalSplitCount',
-              details: personTicket,
-              target: 'Caja',
-              timestamp: DateTime.now(),
-            ),
-          ));
-        }
 
         // Add all individual payments to partialPayments for the summary
         t.partialPayments = []; // Clear any existing
@@ -2865,15 +3171,17 @@ class AppState extends ChangeNotifier {
           cashChange: cashChange,
         );
 
-        unawaited(enqueueCajaPrintJob(
-          PrintJob(
-            id: 'rec_${DateTime.now().millisecondsSinceEpoch}',
-            title: 'Ticket - ${tableSnapshot.label}',
-            details: printDetails,
-            target: 'Caja',
-            timestamp: DateTime.now(),
-          ),
-        ));
+        if (printCustomerTicket) {
+          unawaited(enqueueCajaPrintJob(
+            PrintJob(
+              id: 'rec_${DateTime.now().millisecondsSinceEpoch}',
+              title: 'Ticket - ${tableSnapshot.label}',
+              details: printDetails,
+              target: 'Caja',
+              timestamp: DateTime.now(),
+            ),
+          ));
+        }
       }
 
       _addRecentClosedSale(
@@ -2891,16 +3199,23 @@ class AppState extends ChangeNotifier {
             .whereType<String>()
             .toList();
       }
+      final willCloseAfterItemPayment =
+          itemIndicesToPay != null && itemIndicesToPay.length >= t.items.length;
 
       final cloudOrderId = _activeCloudOrderIdForTable(t);
       if (cloudOrderId != null) {
+        if (willCloseAfterItemPayment) {
+          _markLocallyClosedPaidOrder(t, orderId: cloudOrderId);
+        }
         unawaited(
           _processCloudOrderPayment(
             cloudOrderId,
+            tableId: t.id,
             amount: finalTotal,
             paymentMethod: paymentMethod,
             refCode: refCode,
             paidOrderItemIds: paidOrderItemIds,
+            forceCloseLocalOnSuccess: willCloseAfterItemPayment,
           ),
         );
       } else {
@@ -3017,7 +3332,10 @@ class AppState extends ChangeNotifier {
     buffer.writeln(formatDivider());
     buffer.writeln(formatRow('Operacion:', operationNumber));
     buffer.writeln(formatRow('Fecha:', dateStr));
-    buffer.writeln(formatRow('Mesa:', table.label));
+    final mesaClean = table.label.startsWith('Mesa ')
+        ? table.label.substring(5)
+        : table.label;
+    buffer.writeln(formatRow('Mesa:', mesaClean));
     buffer.writeln(formatRow('Atendio:', currentUserName));
     buffer.writeln(formatDivider());
 
@@ -3075,16 +3393,43 @@ class AppState extends ChangeNotifier {
     return _activeOrderIdsByTableRemoteId[tableRemoteId];
   }
 
+  void finalizeCompletedSplitCheckout(int tableId) {
+    final index = tables.indexWhere((table) => table.id == tableId);
+    if (index == -1) return;
+
+    final table = tables[index];
+    final orderId = _activeCloudOrderIdForTable(table);
+    if (orderId != null) {
+      _forceCloseLocalPaidTable(tableId, orderId: orderId);
+    } else {
+      table.state =
+          table.zone == 'Para Llevar' ? TableState.free : TableState.cleaning;
+      table.items = [];
+      table.guests = 0;
+      table.discountPercentage = 0;
+      table.guestGenders = const ['M'];
+      table.partialPayments = [];
+      table.activePaymentType = null;
+      table.paymentsMadeInSession = 0;
+      table.originalSplitCountInSession = null;
+      notifyListeners();
+    }
+
+    unawaited(_updateClosedPaidTableStateOnServer(tableId));
+  }
+
   Future<void> _processCloudOrderPayment(
     String orderId, {
+    required int tableId,
     required double amount,
     required String paymentMethod,
     required String refCode,
     List<String>? paidOrderItemIds,
+    bool forceCloseLocalOnSuccess = false,
   }) async {
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       final response = await http
           .post(
             Uri.parse('$baseUrl/orders/$orderId/payments'),
@@ -3104,20 +3449,103 @@ class AppState extends ChangeNotifier {
         debugPrint(
           'Cloud order payment failed ${response.statusCode}: ${response.body}',
         );
+        if (forceCloseLocalOnSuccess) {
+          _clearLocallyClosedPaidOrder(orderId);
+        }
         return;
       }
 
       final Map<String, dynamic> responseData = jsonDecode(response.body);
       final bool isFullyPaid = responseData['isFullyPaid'] == true;
+      final bool shouldCloseLocal = isFullyPaid || forceCloseLocalOnSuccess;
 
-      if (isFullyPaid) {
+      if (shouldCloseLocal) {
         _activeOrderIdsByTableRemoteId.removeWhere((_, id) => id == orderId);
+        _forceCloseLocalPaidTable(tableId, orderId: orderId);
+        await _updateClosedPaidTableStateOnServer(tableId);
       }
 
       // Sync table states after successful payment to update other devices
       await syncTableStates(notify: true);
+      if (shouldCloseLocal) {
+        _forceCloseLocalPaidTable(tableId, orderId: orderId);
+      }
     } catch (e) {
+      if (forceCloseLocalOnSuccess) {
+        _clearLocallyClosedPaidOrder(orderId);
+      }
       debugPrint('Cloud order payment request failed: $e');
+    }
+  }
+
+  void _markLocallyClosedPaidOrder(
+    TableModel table, {
+    required String orderId,
+  }) {
+    final tableRemoteId = _remoteIdForTable(table);
+    if (tableRemoteId == null) return;
+    _activeOrderIdsByTableRemoteId.remove(tableRemoteId);
+    _locallyClosedPaidOrderIdsByTableRemoteId[tableRemoteId] = orderId;
+  }
+
+  void _clearLocallyClosedPaidOrder(String orderId) {
+    _locallyClosedPaidOrderIdsByTableRemoteId.removeWhere(
+      (_, locallyClosedOrderId) => locallyClosedOrderId == orderId,
+    );
+  }
+
+  void _forceCloseLocalPaidTable(int tableId, {required String orderId}) {
+    final index = tables.indexWhere((table) => table.id == tableId);
+    if (index == -1) return;
+
+    final table = tables[index];
+    _markLocallyClosedPaidOrder(table, orderId: orderId);
+
+    table.state =
+        table.zone == 'Para Llevar' ? TableState.free : TableState.cleaning;
+    table.items = [];
+    table.guests = 0;
+    table.discountPercentage = 0;
+    table.guestGenders = const ['M'];
+    table.partialPayments = [];
+    table.activePaymentType = null;
+    table.paymentsMadeInSession = 0;
+    table.originalSplitCountInSession = null;
+    notifyListeners();
+  }
+
+  Future<void> _updateClosedPaidTableStateOnServer(int tableId) async {
+    final index = tables.indexWhere((table) => table.id == tableId);
+    if (index == -1) return;
+
+    final table = tables[index];
+    if (table.remoteId == null ||
+        !isTerminalConfigured ||
+        terminalBranchId == null) {
+      return;
+    }
+
+    final state = table.zone == 'Para Llevar' ? 'free' : 'cleaning';
+    try {
+      final String baseUrl = terminalApiUrl ??
+          configuredDefaultApiUrl;
+      final response = await http
+          .patch(
+            Uri.parse(
+              '$baseUrl/branches/$terminalBranchId/tables/${table.remoteId}',
+            ),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'state': state}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode != 200) {
+        debugPrint(
+          'Failed to close paid table on server: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error closing paid table on server: $e');
     }
   }
 
@@ -3146,7 +3574,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       final String brId = terminalBranchId!;
 
       // Calculate next index
@@ -3235,7 +3663,7 @@ class AppState extends ChangeNotifier {
         terminalBranchId != null) {
       try {
         final String baseUrl = terminalApiUrl ??
-            'https://pos-sync-api-232144991863.us-central1.run.app/api';
+            configuredDefaultApiUrl;
         final response = await http
             .patch(
               Uri.parse(
@@ -3268,25 +3696,40 @@ class AppState extends ChangeNotifier {
       unawaited(_updateCloudKitchenTicketStatus(orderId, newStatus));
 
       if (newStatus == 'ready') {
-        // Notification for waiter
-        final String notificationText =
-            '¡Pedido listo para la ${kitchenOrders[index].tableLabel}!';
-        readyNotifications.add(notificationText);
-
-        // Also highlight table as needing service or update list
+        unawaited(_addReadyPickupOrder(kitchenOrders[index], alert: true));
+      } else if (newStatus == 'served') {
+        unawaited(_removeReadyPickupOrder(orderId));
       }
       notifyListeners();
     }
   }
 
-  Future<void> _updateCloudKitchenTicketStatus(
+  Future<void> markReadyPickupOrderServed(String orderId) async {
+    if (orderId.isEmpty) return;
+
+    final index = kitchenOrders.indexWhere((o) => o.id == orderId);
+    if (index != -1) {
+      kitchenOrders[index].status = 'served';
+      _pendingKitchenStatusUpdates.add(orderId);
+      Timer(const Duration(seconds: 2), () {
+        _pendingKitchenStatusUpdates.remove(orderId);
+      });
+      notifyListeners();
+    }
+
+    await _removeReadyPickupOrder(orderId);
+    await _updateCloudKitchenTicketStatus(orderId, 'served');
+    await syncKitchenOrders();
+  }
+
+  Future<bool> _updateCloudKitchenTicketStatus(
     String ticketId,
     String status,
   ) async {
-    if (!isTerminalConfigured) return;
+    if (!isTerminalConfigured) return false;
     try {
       final String baseUrl = terminalApiUrl ??
-          'https://pos-sync-api-232144991863.us-central1.run.app/api';
+          configuredDefaultApiUrl;
       final response = await http
           .patch(
             Uri.parse('$baseUrl/kitchen/tickets/$ticketId/status'),
@@ -3298,15 +3741,127 @@ class AppState extends ChangeNotifier {
         debugPrint(
           'Kitchen status sync failed ${response.statusCode}: ${response.body}',
         );
+        return false;
       }
+      return true;
     } catch (e) {
       debugPrint('Kitchen status sync request failed: $e');
+      return false;
     }
   }
 
   void clearNotification(String notification) {
     readyNotifications.remove(notification);
     notifyListeners();
+  }
+
+  Future<void> _loadReadyPickupOrders() async {
+    try {
+      final orders = await _secureStorageService.getReadyPickupOrders();
+      readyPickupOrders = orders
+          .map((order) => KitchenOrder.fromSyncJson(order))
+          .where((order) => order.id.isNotEmpty && order.status == 'ready')
+          .toList();
+      _alertedReadyPickupIds
+        ..clear()
+        ..addAll(readyPickupOrders.map((order) => order.id));
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading ready pickup orders: $e');
+    }
+  }
+
+  Future<void> _persistReadyPickupOrders() async {
+    await _secureStorageService.saveReadyPickupOrders(
+      readyPickupOrders.map((order) => order.toSyncJson()).toList(),
+    );
+  }
+
+  Future<void> _reconcileReadyPickupOrders(Set<String> serverReadyIds) async {
+    if (readyPickupOrders.isEmpty) return;
+
+    final removedTableLabels = <String>{};
+    final removedIds = <String>{};
+    readyPickupOrders.removeWhere((order) {
+      final shouldRemove =
+          order.id.isEmpty || !serverReadyIds.contains(order.id);
+      if (shouldRemove) {
+        removedIds.add(order.id);
+        removedTableLabels.add(order.tableLabel);
+      }
+      return shouldRemove;
+    });
+
+    if (removedIds.isEmpty) return;
+
+    _alertedReadyPickupIds.removeAll(removedIds);
+    for (final tableLabel in removedTableLabels) {
+      readyNotifications.remove('¡Pedido listo para la $tableLabel!');
+    }
+
+    await _persistReadyPickupOrders();
+    notifyListeners();
+  }
+
+  Future<void> _addReadyPickupOrder(
+    KitchenOrder order, {
+    required bool alert,
+  }) async {
+    if (order.id.isEmpty || order.status != 'ready') return;
+
+    final existingIndex =
+        readyPickupOrders.indexWhere((existing) => existing.id == order.id);
+    if (existingIndex == -1) {
+      readyPickupOrders.add(order);
+    } else {
+      readyPickupOrders[existingIndex] = order;
+    }
+
+    final notificationText = '¡Pedido listo para la ${order.tableLabel}!';
+    if (!readyNotifications.contains(notificationText)) {
+      readyNotifications.add(notificationText);
+    }
+
+    if (alert && !_alertedReadyPickupIds.contains(order.id)) {
+      _alertedReadyPickupIds.add(order.id);
+      unawaited(_playReadyPickupAlert());
+    }
+
+    await _persistReadyPickupOrders();
+    notifyListeners();
+  }
+
+  Future<void> _removeReadyPickupOrder(String orderId) async {
+    String? tableLabel;
+    for (final order in readyPickupOrders) {
+      if (order.id == orderId) {
+        tableLabel = order.tableLabel;
+        break;
+      }
+    }
+    readyPickupOrders.removeWhere((order) => order.id == orderId);
+    _alertedReadyPickupIds.remove(orderId);
+    if (tableLabel != null) {
+      readyNotifications.remove('¡Pedido listo para la $tableLabel!');
+    }
+    await _persistReadyPickupOrders();
+    notifyListeners();
+  }
+
+  Future<void> _playReadyPickupAlert() async {
+    try {
+      await SystemSound.play(SystemSoundType.alert);
+    } catch (e) {
+      debugPrint('Ready pickup sound failed: $e');
+    }
+
+    if (!kIsWeb) {
+      try {
+        await HapticFeedback.vibrate();
+      } catch (e) {
+        debugPrint('Ready pickup vibration failed: $e');
+      }
+    }
   }
 
   bool get hasConfiguredPrinter => connectedPrinterMac != null;
@@ -3347,7 +3902,7 @@ class AppState extends ChangeNotifier {
 
   String get _printStationBaseUrl =>
       terminalApiUrl ??
-      'https://pos-sync-api-232144991863.us-central1.run.app/api';
+      configuredDefaultApiUrl;
 
   String? get branchCashierPrintQueueId {
     final branchId = terminalBranchId;
@@ -3414,7 +3969,7 @@ class AppState extends ChangeNotifier {
       final decoded = jsonDecode(response.body);
       final List<dynamic> rawStations =
           decoded is List ? decoded : decoded['items'] ?? [];
-      onlinePrintStations = rawStations
+      final parsed = rawStations
           .whereType<Map>()
           .map((item) => PrintStation.fromJson(Map<String, dynamic>.from(item)))
           .where(
@@ -3422,8 +3977,19 @@ class AppState extends ChangeNotifier {
                 station.stationId.isNotEmpty &&
                 station.printerName.isNotEmpty &&
                 station.canPrintComandas,
-          )
-          .toList();
+          );
+
+      // Deduplicate stations by deviceName (keeping the most recently active record)
+      final Map<String, PrintStation> uniqueByDevice = {};
+      for (final station in parsed) {
+        final key = station.deviceName.trim().toLowerCase();
+        if (!uniqueByDevice.containsKey(key) ||
+            station.lastSeenAt.isAfter(uniqueByDevice[key]!.lastSeenAt)) {
+          uniqueByDevice[key] = station;
+        }
+      }
+
+      onlinePrintStations = uniqueByDevice.values.toList();
       notifyListeners();
       return true;
     } catch (e) {
@@ -3730,6 +4296,8 @@ class AppState extends ChangeNotifier {
     onlinePrintStations = [];
   }
 
+  String get localDeviceName => _defaultDeviceName();
+
   String _defaultDeviceName() {
     if (isDesktop) {
       return Platform.localHostname.isNotEmpty
@@ -3771,7 +4339,7 @@ class AppState extends ChangeNotifier {
 
   // Desktop printer connectivity
   Future<bool> connectToDesktopPrinter(String printerName) async {
-    if (!isDesktop) return false;
+    if (!isDesktop && !kIsWeb) return false;
 
     try {
       connectedPrinterName = printerName;
@@ -3883,6 +4451,60 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  String _sanitizePdfText(String text) {
+    return text
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('ü', 'u')
+        .replaceAll('ñ', 'n')
+        .replaceAll('Á', 'A')
+        .replaceAll('É', 'E')
+        .replaceAll('Í', 'I')
+        .replaceAll('Ó', 'O')
+        .replaceAll('Ú', 'U')
+        .replaceAll('Ü', 'U')
+        .replaceAll('Ñ', 'N')
+        .replaceAll('¡', '!')
+        .replaceAll('¿', '?')
+        .replaceAll(RegExp(r'[^\x00-\x7F]'), '');
+  }
+
+  String reformatTicketForWidth(String details, int targetWidth) {
+    final lines = details.split('\n');
+    final buffer = StringBuffer();
+    for (final line in lines) {
+      final trimmed = line.trimRight();
+      if (trimmed.startsWith('---') ||
+          trimmed.startsWith('===') ||
+          trimmed.startsWith('***')) {
+        if (trimmed.contains('---')) {
+          buffer.writeln(formatDivider(width: targetWidth));
+        } else {
+          buffer.writeln(formatCenter(trimmed, targetWidth));
+        }
+      } else if (trimmed.startsWith('Fecha:') ||
+          trimmed.startsWith('Mesero:') ||
+          trimmed.startsWith('Atendió:') ||
+          trimmed.startsWith('Estado:') ||
+          trimmed.startsWith('Conectado a:')) {
+        final parts = trimmed.split(':');
+        if (parts.length >= 2) {
+          final label = '${parts[0]}:';
+          final val = parts.sublist(1).join(':').trim();
+          buffer.writeln(formatRow(label, val, targetWidth));
+        } else {
+          buffer.writeln(trimmed);
+        }
+      } else {
+        buffer.writeln(trimmed);
+      }
+    }
+    return buffer.toString();
+  }
+
   Future<bool> _printToPhysicalPrinter(String details) async {
     if (connectedPrinterMac == null) return false;
     if (connectedPrinterMac == '00:11:22:33:44:55') {
@@ -3890,9 +4512,13 @@ class AppState extends ChangeNotifier {
       return true;
     }
 
+    final currentWidth = ticketWidth;
+    final reformatted = reformatTicketForWidth(details, currentWidth);
+    final sanitizedDetails = _sanitizePdfText(reformatted);
+
     // Desktop printer (using system printers)
     if (connectedPrinterMac == 'desktop' && connectedPrinterName != null) {
-      return await _printToDesktopPrinter(details);
+      return await _printToDesktopPrinter(sanitizedDetails);
     }
 
     // Mobile Bluetooth printer
@@ -3904,7 +4530,10 @@ class AppState extends ChangeNotifier {
         );
         if (!reconnected) return false;
       }
-      final bytes = latin1.encode('${details.trimRight()}\n\n').toList();
+      final bytes =
+          latin1.encode('${sanitizedDetails.trimRight()}\n\n\n\n\n').toList();
+      // GS V 66 1 — feed paper to cut position then full cut
+      bytes.addAll([0x1D, 0x56, 0x42, 0x01]);
       return await PrintBluetoothThermal.writeBytes(bytes);
     } catch (e) {
       debugPrint('Error printing to physical printer: $e');
@@ -3917,33 +4546,45 @@ class AppState extends ChangeNotifier {
 
     try {
       final pdf = pw.Document();
+      final currentWidth = ticketWidth;
+      final reformatted = reformatTicketForWidth(details, currentWidth);
+      final sanitized = _sanitizePdfText(reformatted).trimRight();
 
-      // Calculate dynamic receipt height to avoid excess blank paper feed
-      final lineCount = details.trimRight().split('\n').length;
+      // Calculate visual line count including word wrapping
+      final rawLines = sanitized.split('\n');
+      int totalVisualLines = 0;
+      for (final line in rawLines) {
+        if (line.isEmpty) {
+          totalVisualLines += 1;
+        } else {
+          totalVisualLines += (line.length / currentWidth).ceil();
+        }
+      }
+
       double fontSize;
       double horizontalMargin;
       double widthMm;
+      double minHeightMm;
 
-      if (printerPaperWidth == '50mm') {
-        widthMm = 50.0;
-        fontSize = 7.5;
-        horizontalMargin = 2.0;
-      } else if (printerPaperWidth == '80mm') {
+      if (printerPaperWidth == '80mm') {
         widthMm = 80.0;
         fontSize = 8.0;
         horizontalMargin = 6.0;
+        minHeightMm = 50.0; // 50mm floor for POS-80 driver threshold
       } else {
-        widthMm = 57.0;
-        fontSize = 8.0;
+        widthMm = 58.0;
+        fontSize = 7.5;
         horizontalMargin = 4.0;
+        minHeightMm = 35.0; // 35mm floor for POS-58 driver threshold
       }
 
-      // Height per line (pt) based on font size and line spacing (approx fontSize * 1.35)
+      // Robust overflow-proof height math:
+      // fontSize * 1.35 accounts for full font ascent/descent metrics
+      // +16.0pt safety buffer prevents PDF layout engine from spawning a blank Page 2
       final double lineSpacingPt = fontSize * 1.35;
-      // Convert points to mm (1 pt = 0.352778 mm)
       final double calculatedHeightMm =
-          ((lineCount * lineSpacingPt) + 16.0) * 0.352778;
-      final double targetHeightMm = max(30.0, calculatedHeightMm);
+          ((totalVisualLines * lineSpacingPt) + 16.0) * 0.352778;
+      final double targetHeightMm = max(minHeightMm, calculatedHeightMm);
 
       final targetFormat = PdfPageFormat(
         widthMm * PdfPageFormat.mm,
@@ -3951,25 +4592,24 @@ class AppState extends ChangeNotifier {
         marginAll: 0,
       );
 
-      // Create a text-based receipt with tight margins and bold font for thermal clarity
       pdf.addPage(
         pw.Page(
           pageFormat: targetFormat,
           margin: pw.EdgeInsets.symmetric(
             horizontal: horizontalMargin,
-            vertical: 4.0,
+            vertical: 0.0,
           ),
           build: (context) {
             return pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Text(
-                  details.trimRight(),
+                  sanitized,
                   style: pw.TextStyle(
                     font: pw.Font.courierBold(),
                     fontWeight: pw.FontWeight.bold,
                     fontSize: fontSize,
-                    lineSpacing: 1.1,
+                    lineSpacing: 1.0,
                   ),
                 ),
               ],
@@ -3988,7 +4628,7 @@ class AppState extends ChangeNotifier {
       );
 
       debugPrint(
-          'Successfully printed to desktop printer: $connectedPrinterName ($printerPaperWidth, ${targetHeightMm.toStringAsFixed(1)}mm height)');
+          'Successfully printed to desktop printer: $connectedPrinterName ($printerPaperWidth)');
       return true;
     } catch (e) {
       debugPrint('Error printing to desktop printer: $e');
@@ -4052,7 +4692,7 @@ class AppState extends ChangeNotifier {
       _pendingSaleSyncJobs
         ..clear()
         ..addAll(jobs);
-      pendingSyncCount = _pendingSaleSyncJobs.length;
+      _updatePendingSyncCount();
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading pending sale sync jobs: $e');
@@ -4060,9 +4700,33 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _persistPendingSaleSyncJobs() async {
-    pendingSyncCount = _pendingSaleSyncJobs.length;
+    _updatePendingSyncCount();
     await _secureStorageService.savePendingSaleSyncJobs(_pendingSaleSyncJobs);
     notifyListeners();
+  }
+
+  Future<void> _loadPendingOrderSyncJobs() async {
+    try {
+      final jobs = await _secureStorageService.getPendingOrderSyncJobs();
+      _pendingOrderSyncJobs
+        ..clear()
+        ..addAll(jobs);
+      _updatePendingSyncCount();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading pending order sync jobs: $e');
+    }
+  }
+
+  Future<void> _persistPendingOrderSyncJobs() async {
+    _updatePendingSyncCount();
+    await _secureStorageService.savePendingOrderSyncJobs(_pendingOrderSyncJobs);
+    notifyListeners();
+  }
+
+  void _updatePendingSyncCount() {
+    pendingSyncCount =
+        _pendingSaleSyncJobs.length + _pendingOrderSyncJobs.length;
   }
 
   Future<void> _queueAndSyncSaleJob(Map<String, dynamic> job) async {
@@ -4246,7 +4910,7 @@ class AppState extends ChangeNotifier {
     }
 
     final baseUrl = terminalApiUrl ??
-        'https://pos-sync-api-232144991863.us-central1.run.app/api';
+        configuredDefaultApiUrl;
     try {
       final response = await http
           .post(
@@ -4274,8 +4938,9 @@ class AppState extends ChangeNotifier {
   // Sync operations manually triggered
   Future<bool> syncOfflineTransactions() async {
     final saleSync = await _syncPendingSaleJobs();
+    final orderSync = await _syncPendingOrderJobs();
     final reqSync = await syncPendingRequisitions();
-    return saleSync && reqSync;
+    return saleSync && orderSync && reqSync;
   }
 
   Future<bool> syncPendingRequisitions() async {
@@ -4285,7 +4950,7 @@ class AppState extends ChangeNotifier {
     if (rawList.isEmpty) return true;
 
     final String baseUrl = terminalApiUrl ??
-        'https://pos-sync-api-232144991863.us-central1.run.app/api';
+        configuredDefaultApiUrl;
     final token = currentJwtToken ?? await _secureStorageService.getJwtToken();
 
     final headers = <String, String>{
@@ -4556,7 +5221,7 @@ class AppState extends ChangeNotifier {
     _socketService?.dispose();
 
     final String baseUrl = terminalApiUrl ??
-        'https://pos-sync-api-232144991863.us-central1.run.app/api';
+        configuredDefaultApiUrl;
     final token = currentJwtToken;
     final branchId = terminalBranchId;
     final roleStr = currentUserRole == UserRole.waiter
@@ -4598,6 +5263,7 @@ class AppState extends ChangeNotifier {
           _fallbackPollingTimer?.cancel();
           _triggerResync();
           unawaited(_syncPendingSaleJobs());
+          unawaited(_syncPendingOrderJobs());
         } else {
           _startFallbackPolling();
         }
@@ -4625,6 +5291,16 @@ class AppState extends ChangeNotifier {
           final newStateStr = payload['state']?.toString();
           if (newStateStr != null) {
             final newState = _parseTableState(newStateStr);
+            final isLocallyClosedPaidOrder = entityId != null &&
+                _locallyClosedPaidOrderIdsByTableRemoteId.containsKey(entityId);
+            if (isLocallyClosedPaidOrder &&
+                newState != TableState.free &&
+                newState != TableState.cleaning) {
+              continue;
+            }
+            if (isLocallyClosedPaidOrder) {
+              _locallyClosedPaidOrderIdsByTableRemoteId.remove(entityId);
+            }
             tables[tableIndex].state = newState;
             if (newState == TableState.free ||
                 newState == TableState.cleaning) {
@@ -4642,6 +5318,15 @@ class AppState extends ChangeNotifier {
         final orderState = payload['state']?.toString();
 
         if (tableId != null && orderId != null) {
+          final locallyClosedOrderId =
+              _locallyClosedPaidOrderIdsByTableRemoteId[tableId];
+          if (locallyClosedOrderId == orderId && orderState != 'closed') {
+            continue;
+          }
+          if (locallyClosedOrderId != null && locallyClosedOrderId != orderId) {
+            _locallyClosedPaidOrderIdsByTableRemoteId.remove(tableId);
+          }
+
           if (orderState == 'closed') {
             _activeOrderIdsByTableRemoteId.remove(tableId);
             final tableIndex = tables.indexWhere((t) => t.remoteId == tableId);
@@ -4707,7 +5392,7 @@ class AppState extends ChangeNotifier {
     _fallbackPollingTimer?.cancel();
 
     _fallbackPollingTimer =
-        Timer.periodic(const Duration(seconds: 15), (timer) async {
+        Timer.periodic(const Duration(seconds: 30), (timer) async {
       if (socketConnectionState == SocketConnectionState.connected) {
         timer.cancel();
         return;
@@ -4723,6 +5408,7 @@ class AppState extends ChangeNotifier {
           syncSucceeded = await syncTableStates(notify: false) && syncSucceeded;
           if (currentUserRole == UserRole.waiter) {
             syncSucceeded = await syncKitchenOrders() && syncSucceeded;
+            syncSucceeded = await _syncPendingOrderJobs() && syncSucceeded;
           }
         }
         isOnline = syncSucceeded;
