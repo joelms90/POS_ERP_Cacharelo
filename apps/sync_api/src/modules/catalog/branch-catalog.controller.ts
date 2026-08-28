@@ -21,6 +21,17 @@ class UpsertBranchProductDto {
   isSellable: boolean;
 }
 
+class CopyCatalogDto {
+  @IsUUID()
+  businessId: string;
+
+  @IsUUID()
+  fromBranchId: string;
+
+  @IsUUID()
+  toBranchId: string;
+}
+
 @Controller('branch-catalog')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class BranchCatalogController {
@@ -37,6 +48,13 @@ export class BranchCatalogController {
   async upsert(@Body() dto: UpsertBranchProductDto, @Req() req: any) {
     assertBusinessAccess(req.user, dto.businessId);
     return this.branchCatalogService.upsert(dto);
+  }
+
+  @Post('copy')
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
+  async copy(@Body() dto: CopyCatalogDto, @Req() req: any) {
+    assertBusinessAccess(req.user, dto.businessId);
+    return this.branchCatalogService.copyCatalog(dto);
   }
 
   @Delete(':id')

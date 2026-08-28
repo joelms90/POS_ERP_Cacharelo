@@ -1489,6 +1489,17 @@ export const api = {
       method: 'DELETE',
     });
   },
+
+  async copyBranchCatalog(data: {
+    businessId: string;
+    fromBranchId: string;
+    toBranchId: string;
+  }): Promise<{ success: boolean; copied: number }> {
+    return apiRequest<{ success: boolean; copied: number }>('/branch-catalog/copy', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
 };
 
 export interface ProductSalesReportLine {

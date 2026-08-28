@@ -97,4 +97,62 @@ export class BranchCatalogService {
       .where(eq(schema.branchProducts.id, id));
     return { success: true };
   }
+
+  async copyCatalog(input: {
+    businessId: string;
+    fromBranchId: string;
+    toBranchId: string;
+  }) {
+    const { businessId, fromBranchId, toBranchId } = input;
+
+    if (fromBranchId === toBranchId) {
+      throw new BadRequestException('El origen y destino deben ser sucursales distintas.');
+    }
+
+    const source = await this.db
+      .select()
+      .from(schema.branchProducts)
+      .where(
+        and(
+          eq(schema.branchProducts.branchId, fromBranchId),
+          eq(schema.branchProducts.isActive, true),
+        ),
+      );
+
+    if (source.length === 0) {
+      return { success: true, copied: 0 };
+    }
+
+    let copied = 0;
+    for (const row of source) {
+      const [existing] = await this.db
+        .select()
+        .from(schema.branchProducts)
+        .where(
+          and(
+            eq(schema.branchProducts.branchId, toBranchId),
+            eq(schema.branchProducts.productId, row.productId),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        await this.db
+          .update(schema.branchProducts)
+          .set({ isSellable: row.isSellable, isActive: true, updatedAt: new Date() })
+          .where(eq(schema.branchProducts.id, existing.id));
+      } else {
+        await this.db.insert(schema.branchProducts).values({
+          businessId,
+          branchId: toBranchId,
+          productId: row.productId,
+          isSellable: row.isSellable,
+          isActive: true,
+        });
+      }
+      copied++;
+    }
+
+    return { success: true, copied };
+  }
 }

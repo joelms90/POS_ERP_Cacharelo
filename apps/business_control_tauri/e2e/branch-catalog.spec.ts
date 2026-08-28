@@ -102,4 +102,53 @@ test.describe('Catálogo por Sucursal (per-branch sellable catalog)', () => {
       await apiDelete(token, `/branch-catalog/${override.id}`);
     }
   });
+
+  test('copies a branch catalog to another branch', async ({ page }) => {
+    const token = await login(page);
+
+    const branches = await apiGet<BranchLike[]>(token, `/branches?businessId=${BUSINESS_ID}`);
+    expect(branches.length).toBeGreaterThanOrEqual(2);
+    const sourceBranch = branches[0];
+    const targetBranch = branches[1];
+
+    // Seed an override on the source branch via API
+    const products = await apiGet<ProductLike[]>(token, `/products?businessId=${BUSINESS_ID}`);
+    const product = products[0];
+
+    await fetch(`${API_URL}/branch-catalog`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        businessId: BUSINESS_ID,
+        branchId: sourceBranch.id,
+        productId: product.id,
+        isSellable: false,
+      }),
+    });
+
+    // Open the page, select the target branch, and copy from the source branch
+    await page.locator('aside nav button', { hasText: 'Catálogo por Sucursal' }).click();
+    await page.locator('[data-testid="catalog-branch-select"]').selectOption(targetBranch.id);
+    await page.locator('[data-testid="catalog-copy-from-select"]').selectOption(sourceBranch.id);
+    await page.locator('button', { hasText: 'Copiar catálogo' }).click();
+
+    await expect(page.getByText('Catálogo copiado')).toBeVisible({ timeout: 10000 });
+
+    // Verify the target branch now has the override
+    const targetOverrides = await apiGet<BranchCatalogEntryLike[]>(
+      token,
+      `/branch-catalog?branchId=${targetBranch.id}`,
+    );
+    const copied = targetOverrides.find((o) => o.productId === product.id);
+    expect(copied).toBeTruthy();
+    expect(copied?.isSellable).toBe(false);
+
+    // Cleanup
+    for (const b of [sourceBranch, targetBranch]) {
+      const list = await apiGet<BranchCatalogEntryLike[]>(token, `/branch-catalog?branchId=${b.id}`);
+      for (const o of list) {
+        await apiDelete(token, `/branch-catalog/${o.id}`);
+      }
+    }
+  });
 });

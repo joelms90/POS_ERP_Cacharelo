@@ -25,6 +25,8 @@ export const BranchCatalogPage: React.FC<BranchCatalogPageProps> = ({ businessId
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [copyFromBranchId, setCopyFromBranchId] = useState('');
+  const [copying, setCopying] = useState(false);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
@@ -100,6 +102,31 @@ export const BranchCatalogPage: React.FC<BranchCatalogPageProps> = ({ businessId
     }
   };
 
+  const handleCopyCatalog = async () => {
+    if (!copyFromBranchId) {
+      showToast('Seleccione la sucursal de origen.', 'warning');
+      return;
+    }
+    if (copyFromBranchId === selectedBranchId) {
+      showToast('El origen y destino deben ser sucursales distintas.', 'warning');
+      return;
+    }
+    setCopying(true);
+    try {
+      const result = await api.copyBranchCatalog({
+        businessId,
+        fromBranchId: copyFromBranchId,
+        toBranchId: selectedBranchId,
+      });
+      showToast(`Catálogo copiado (${result.copied} productos).`, 'success');
+      await loadData(selectedBranchId);
+    } catch (e: any) {
+      showToast(e?.message || 'Error al copiar el catálogo.', 'error');
+    } finally {
+      setCopying(false);
+    }
+  };
+
   const filtered = products.filter(
     (p) =>
       !searchQuery ||
@@ -111,16 +138,33 @@ export const BranchCatalogPage: React.FC<BranchCatalogPageProps> = ({ businessId
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <Heading level={2} className="!text-lg sm:!text-2xl">Catálogo por Sucursal</Heading>
-        <select
-          value={selectedBranchId}
-          onChange={(e) => setSelectedBranchId(e.target.value)}
-          className="bg-charcoal-surface border border-aged-bronze/35 rounded-md px-3 py-2 text-xs text-text-primary focus:outline-none"
-          data-testid="catalog-branch-select"
-        >
-          {branches.map((b) => (
-            <option key={b.id} value={b.id}>{b.name}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2 flex-wrap">
+          <select
+            value={selectedBranchId}
+            onChange={(e) => setSelectedBranchId(e.target.value)}
+            className="bg-charcoal-surface border border-aged-bronze/35 rounded-md px-3 py-2 text-xs text-text-primary focus:outline-none"
+            data-testid="catalog-branch-select"
+          >
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+          <span className="text-[10px] text-text-secondary uppercase tracking-widest">Copiar de:</span>
+          <select
+            value={copyFromBranchId}
+            onChange={(e) => setCopyFromBranchId(e.target.value)}
+            className="bg-charcoal-surface border border-aged-bronze/35 rounded-md px-3 py-2 text-xs text-text-primary focus:outline-none"
+            data-testid="catalog-copy-from-select"
+          >
+            <option value="">Seleccionar sucursal...</option>
+            {branches.filter((b) => b.id !== selectedBranchId).map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+          <Button variant="secondary" size="sm" onClick={handleCopyCatalog} disabled={copying}>
+            {copying ? 'Copiando...' : 'Copiar catálogo'}
+          </Button>
+        </div>
       </div>
 
       <div className="w-full md:w-72">
