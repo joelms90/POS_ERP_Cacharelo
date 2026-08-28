@@ -547,6 +547,7 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                   onChange={(e) => setOrderNumber(e.target.value)}
                   placeholder="PO-001"
                   required
+                  data-testid="po-order-number"
                 />
               </FormField>
 
@@ -556,6 +557,7 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                   onChange={(e) => setProviderId(e.target.value)}
                   className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-sm"
                   required
+                  data-testid="po-provider"
                 >
                   <option value="">Seleccionar...</option>
                   {providers.map((p) => (
@@ -570,6 +572,7 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                   onChange={(e) => setWarehouseId(e.target.value)}
                   className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-sm"
                   required
+                  data-testid="po-warehouse"
                 >
                   <option value="">Seleccionar...</option>
                   {warehouses.map((w) => (
@@ -619,6 +622,7 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                           value={itemQuantity}
                           onChange={(e) => setItemQuantity(e.target.value)}
                           className="text-xs"
+                          data-testid="po-quantity"
                         />
                       </div>
                       <div>
@@ -630,6 +634,7 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                           value={itemEstimatedCost}
                           onChange={(e) => setItemEstimatedCost(e.target.value)}
                           className="text-xs"
+                          data-testid="po-cost"
                         />
                       </div>
                     </div>

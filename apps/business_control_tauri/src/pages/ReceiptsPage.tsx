@@ -356,6 +356,7 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
                     }
                   }}
                   className="w-full bg-charcoal border border-aged-bronze/45 rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-champagne-gold"
+                  data-testid="receipt-po-link"
                 >
                   <option value="">Sin orden de compra (ingreso manual)</option>
                   {purchaseOrders.map((po) => (
@@ -659,6 +660,7 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
                   type="submit"
                   disabled={isSubmitting || itemsList.length === 0}
                   className="bg-champagne-gold hover:bg-champagne-gold/90 text-onyx-surface font-semibold py-2 px-6 rounded shadow-lg uppercase text-xs tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="receipt-submit"
                 >
                   {isSubmitting ? 'Procesando...' : isPoLinked ? 'Registrar Recepción OC' : 'Registrar Entrada'}
                 </Button>
