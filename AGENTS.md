@@ -182,6 +182,10 @@ This agent document contains complete knowledge about deploying all components o
 
 # Production Deployment Quick Reference
 
+> **⚠️ READ FIRST**: [`docs/pre-deployment-checklist.md`](docs/pre-deployment-checklist.md)
+> lists the migrations, one-time data backfills, and rebuild reminders that MUST be run
+> before deploying (backend, admin, or POS).
+
 **Note**: This is a quick reference. For detailed deployment procedures, troubleshooting, and rollback procedures, see [`.claude/deployment-agent.md`](.claude/deployment-agent.md).
 
 Use the existing Makefile targets from the repository root. Prefer these commands over manually reconstructing `gcloud`, `firebase`, or Flutter build commands.

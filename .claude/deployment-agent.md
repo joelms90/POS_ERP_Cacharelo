@@ -4,6 +4,8 @@
 **Last Updated**: 2026-07-18
 **Purpose**: Complete deployment knowledge base for the Cacharelo POS-ERP system
 
+> **⚠️ Before deploying, read [`docs/pre-deployment-checklist.md`](../docs/pre-deployment-checklist.md)** for required migrations, one-time data backfills, and rebuild reminders.
+
 ---
 
 ## System Architecture Overview
