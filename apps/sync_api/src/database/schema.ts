@@ -926,9 +926,7 @@ export const inventoryAlerts = pgTable(
     productId: uuid('product_id')
       .references(() => products.id)
       .notNull(),
-    branchId: uuid('branch_id')
-      .references(() => branches.id)
-      .notNull(),
+    branchId: uuid('branch_id').references(() => branches.id), // null = global (needs purchase) alert
     alertType: varchar('alert_type', { length: 20 }).notNull(), // 'low_stock' | 'out_of_stock'
     threshold: decimal('threshold', { precision: 12, scale: 3 }).notNull(),
     currentQty: decimal('current_qty', { precision: 12, scale: 3 }).notNull(),
@@ -944,6 +942,9 @@ export const inventoryAlerts = pgTable(
     unqActiveAlert: uniqueIndex('unq_ia_product_branch_active')
       .on(table.productId, table.branchId)
       .where(sql`${table.status} IN ('active', 'acknowledged')`),
+    unqActiveGlobalAlert: uniqueIndex('unq_ia_product_global_active')
+      .on(table.productId)
+      .where(sql`${table.branchId} IS NULL AND ${table.status} IN ('active', 'acknowledged')`),
     idxBusinessStatus: index('idx_ia_business_status').on(
       table.businessId,
       table.status,

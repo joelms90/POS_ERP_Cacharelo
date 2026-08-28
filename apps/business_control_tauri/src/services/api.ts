@@ -262,7 +262,7 @@ export interface BranchRequisition {
 export interface InventoryAlert {
   id: string;
   productId: string;
-  branchId: string;
+  branchId: string | null;
   alertType: 'low_stock' | 'out_of_stock';
   threshold: string;
   currentQty: string;
@@ -271,13 +271,14 @@ export interface InventoryAlert {
   resolvedAt: string | null;
   productName: string;
   productSku: string | null;
-  branchName: string;
+  branchName: string | null;
 }
 
 export interface InventoryAlertSummary {
   summary: {
     outOfStock: number;
     lowStock: number;
+    branchAlerts: number;
     totalAlerts: number;
     pendingRequisitions: number;
     draftPurchaseOrders: number;

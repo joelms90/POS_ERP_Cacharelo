@@ -279,6 +279,15 @@ export async function runMigrations() {
     `);
     console.log('✅ Warehouse location type column ensured.');
 
+    // Inventory alerts: branch_id nullable for global alerts + global unique index
+    await db.execute(sql`
+      ALTER TABLE inventory_alerts ALTER COLUMN branch_id DROP NOT NULL;
+    `);
+    await db.execute(
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS unq_ia_product_global_active ON inventory_alerts(product_id) WHERE branch_id IS NULL AND status IN ('active', 'acknowledged');`,
+    );
+    console.log('✅ Global inventory alert support ensured.');
+
     // Ensure specific default business and branch exist
     const businessLines = [
       {

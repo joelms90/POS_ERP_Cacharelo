@@ -169,9 +169,9 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
 
       {summary && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <SummaryCard label="Sin stock (crítico)" value={summary.outOfStock} tone="red" />
-          <SummaryCard label="Bajo mínimo" value={summary.lowStock} tone="amber" />
-          <SummaryCard label="Requisiciones pendientes" value={summary.pendingRequisitions} tone="gold" />
+          <SummaryCard label="Sin stock (global)" value={summary.outOfStock} tone="red" />
+          <SummaryCard label="Bajo mínimo (global)" value={summary.lowStock} tone="amber" />
+          <SummaryCard label="Requisiciones sugeridas" value={summary.branchAlerts} tone="gold" />
           <SummaryCard label="OC en borrador" value={summary.draftPurchaseOrders} tone="green" />
         </div>
       )}
@@ -196,7 +196,9 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
           </div>
         )}
 
-        {visibleAlerts.map((alert) => (
+        {visibleAlerts.map((alert) => {
+          const isGlobal = !alert.branchId;
+          return (
           <div
             key={alert.id}
             className={`flex flex-col sm:flex-row sm:items-center gap-3 bg-charcoal-surface border rounded-lg p-4 ${
@@ -211,29 +213,34 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
                 }`}>
                   {alert.alertType === 'out_of_stock' ? 'Sin stock' : 'Bajo mínimo'}
                 </span>
+                <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-charcoal-surface/60 border border-aged-bronze/20 text-text-secondary">
+                  {isGlobal ? 'Compra sugerida' : 'Requisición sugerida'}
+                </span>
                 {alert.status === 'resolved' && (
                   <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">Resuelta</span>
                 )}
               </div>
               <div className="text-xs text-text-secondary mt-1">
-                {alert.branchName} · Stock actual: <span className="text-text-primary">{alert.currentQty}</span> · Mínimo: <span className="text-text-primary">{alert.threshold}</span>
+                {isGlobal ? 'Todo el negocio (stock global)' : alert.branchName} · Stock actual: <span className="text-text-primary">{alert.currentQty}</span> · Mínimo: <span className="text-text-primary">{alert.threshold}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
               {alert.status !== 'resolved' && (
-                <>
-                  <Button variant="secondary" size="sm" disabled={actionId === alert.id} onClick={() => handleGenerateRequisition(alert)}>
-                    Generar Requisición
-                  </Button>
+                isGlobal ? (
                   <Button variant="primary" size="sm" disabled={actionId === alert.id} onClick={() => handleGeneratePurchaseOrder(alert)}>
                     Generar OC
                   </Button>
-                </>
+                ) : (
+                  <Button variant="secondary" size="sm" disabled={actionId === alert.id} onClick={() => handleGenerateRequisition(alert)}>
+                    Generar Requisición
+                  </Button>
+                )
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <ToastContainer toasts={toasts} onClose={removeToast} />
