@@ -529,7 +529,22 @@ export class AlertsService {
       .where(eq(schema.supplierProducts.productId, productId))
       .orderBy(schema.supplierProducts.cost);
 
-    return rows[0] ?? null;
+    if (rows.length > 0) {
+      return rows[0];
+    }
+
+    // Fallback: use the product's primary provider (products.providerId)
+    const [product] = await this.db
+      .select({ providerId: schema.products.providerId, cost: schema.products.cost })
+      .from(schema.products)
+      .where(eq(schema.products.id, productId))
+      .limit(1);
+
+    if (product?.providerId) {
+      return { providerId: product.providerId, cost: product.cost ?? '0.00' };
+    }
+
+    return null;
   }
 
   private async getGlobalStock(productId: string) {
