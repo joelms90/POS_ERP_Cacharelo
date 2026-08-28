@@ -523,30 +523,14 @@ export class AlertsService {
     const businessId = alerts[0].businessId;
     const globalAlerts = alerts.filter((a) => !a.branchId);
 
-    // Resolve provider + quantity per product, grouped by provider
-    const itemsByProvider = new Map<
-      string,
-      Array<{ productId: string; qty: number; cost: string }>
-    >();
-    const skipped: string[] = [];
-
+    const items: Array<{ productId: string; quantity: number }> = [];
     for (const alert of globalAlerts) {
       const [product] = await this.db
         .select()
         .from(schema.products)
         .where(eq(schema.products.id, alert.productId))
         .limit(1);
-
-      if (!product) {
-        skipped.push(alert.productId);
-        continue;
-      }
-
-      const provider = await this.resolveCheapestProvider(alert.productId);
-      if (!provider) {
-        skipped.push(alert.productId);
-        continue;
-      }
+      if (!product) continue;
 
       const globalStock = await this.getGlobalStock(alert.productId);
       const globalMin = parseFloat(product.minStock || '0');
@@ -554,14 +538,67 @@ export class AlertsService {
       let qty = globalMax - globalStock;
       if (qty <= 0) qty = globalMin > 0 ? globalMin * 2 : 1;
 
+      items.push({ productId: alert.productId, quantity: qty });
+    }
+
+    return this.createPurchaseOrdersForProducts(
+      businessId,
+      userId,
+      items,
+      'Generada desde alertas de inventario (selección múltiple)',
+    );
+  }
+
+  /**
+   * Create draft purchase orders from explicit product IDs + quantities
+   * (e.g. missing ingredients from a production/assembly run), grouped by provider.
+   */
+  async generatePurchaseOrdersByProducts(
+    businessId: string,
+    userId: string,
+    items: Array<{ productId: string; quantity: number }>,
+  ) {
+    return this.createPurchaseOrdersForProducts(
+      businessId,
+      userId,
+      items,
+      'Generada desde Ensamble (insumos faltantes)',
+    );
+  }
+
+  private async createPurchaseOrdersForProducts(
+    businessId: string,
+    userId: string,
+    items: Array<{ productId: string; quantity: number }>,
+    notes: string,
+  ) {
+    if (!items || items.length === 0) {
+      throw new BadRequestException('No hay productos para generar la orden de compra.');
+    }
+
+    const itemsByProvider = new Map<
+      string,
+      Array<{ productId: string; qty: number; cost: string }>
+    >();
+    const skipped: string[] = [];
+
+    for (const it of items) {
+      if (!it.quantity || it.quantity <= 0) continue;
+
+      const provider = await this.resolveCheapestProvider(it.productId);
+      if (!provider) {
+        skipped.push(it.productId);
+        continue;
+      }
+
       const list = itemsByProvider.get(provider.providerId) || [];
-      list.push({ productId: alert.productId, qty, cost: provider.cost });
+      list.push({ productId: it.productId, qty: it.quantity, cost: provider.cost });
       itemsByProvider.set(provider.providerId, list);
     }
 
     if (itemsByProvider.size === 0) {
       throw new BadRequestException(
-        'Ningún producto seleccionado tiene un proveedor registrado.',
+        'Ningún producto tiene un proveedor registrado.',
       );
     }
 
@@ -573,7 +610,7 @@ export class AlertsService {
     }> = [];
 
     await this.db.transaction(async (tx) => {
-      for (const [providerId, items] of itemsByProvider.entries()) {
+      for (const [providerId, list] of itemsByProvider.entries()) {
         const poNumber = await this.nextPoNumber(tx, businessId);
         const [po] = await tx
           .insert(schema.purchaseOrders)
@@ -584,12 +621,12 @@ export class AlertsService {
             poNumber,
             status: 'draft',
             createdBy: userId,
-            notes: 'Generada desde alertas de inventario (selección múltiple)',
+            notes,
           })
           .returning();
 
         await tx.insert(schema.purchaseOrderItems).values(
-          items.map((it) => ({
+          list.map((it) => ({
             poId: po.id,
             productId: it.productId,
             quantityOrdered: it.qty.toFixed(3),
@@ -597,7 +634,7 @@ export class AlertsService {
           })),
         );
 
-        purchaseOrders.push({ purchaseOrderId: po.id, poNumber, itemCount: items.length });
+        purchaseOrders.push({ purchaseOrderId: po.id, poNumber, itemCount: list.length });
       }
     });
 

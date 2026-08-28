@@ -5,7 +5,8 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE } from '../../auth/roles';
 import { assertBusinessAccess } from '../../auth/business-access';
-import { IsUUID, IsArray, IsString } from 'class-validator';
+import { IsUUID, IsArray, IsString, IsNumber, ValidateNested, IsNotEmpty, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 class RefreshDto {
   @IsUUID()
@@ -16,6 +17,26 @@ class BulkGeneratePoDto {
   @IsArray()
   @IsString({ each: true })
   alertIds: string[];
+}
+
+class PoProductItemDto {
+  @IsUUID()
+  @IsNotEmpty()
+  productId: string;
+
+  @IsNumber()
+  @Min(0.01)
+  quantity: number;
+}
+
+class BulkGeneratePoByProductsDto {
+  @IsUUID()
+  businessId: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PoProductItemDto)
+  items: PoProductItemDto[];
 }
 
 @Controller('inventory/alerts')
@@ -82,5 +103,16 @@ export class AlertsController {
   @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
   async generatePurchaseOrders(@Body() dto: BulkGeneratePoDto, @Req() req: any) {
     return this.alertsService.generatePurchaseOrders(dto.alertIds, req.user?.sub);
+  }
+
+  @Post('generate-purchase-orders-by-products')
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
+  async generatePurchaseOrdersByProducts(@Body() dto: BulkGeneratePoByProductsDto, @Req() req: any) {
+    assertBusinessAccess(req.user, dto.businessId);
+    return this.alertsService.generatePurchaseOrdersByProducts(
+      dto.businessId,
+      req.user?.sub,
+      dto.items,
+    );
   }
 }

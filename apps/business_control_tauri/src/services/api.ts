@@ -1445,6 +1445,17 @@ export const api = {
     });
   },
 
+  async generatePurchaseOrdersByProducts(items: Array<{ productId: string; quantity: number }>, businessId: string): Promise<{
+    success: boolean;
+    purchaseOrders: Array<{ purchaseOrderId: string; poNumber: string; itemCount: number }>;
+    skipped: string[];
+  }> {
+    return apiRequest('/inventory/alerts/generate-purchase-orders-by-products', {
+      method: 'POST',
+      body: JSON.stringify({ businessId, items }),
+    });
+  },
+
   async runAutoPurchaseOrders(businessId: string): Promise<{ created: number; purchaseOrderIds: string[] }> {
     return apiRequest(`/inventory/alerts/auto-purchase-orders`, {
       method: 'POST',

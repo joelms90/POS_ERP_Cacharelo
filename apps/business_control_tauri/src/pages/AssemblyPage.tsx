@@ -36,6 +36,7 @@ export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
   const [qtyToProduce, setQtyToProduce] = useState<number>(1);
   const [assemblyNotes, setAssemblyNotes] = useState<string>('');
   const [isAssembling, setIsAssembling] = useState<boolean>(false);
+  const [generatingOc, setGeneratingOc] = useState<boolean>(false);
   
   // Real-time stock state for selected warehouse
   const [warehouseStock, setWarehouseStock] = useState<any[]>([]);
@@ -207,6 +208,29 @@ export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
       alert(err.message || 'Error al procesar el ensamble.');
     } finally {
       setIsAssembling(false);
+    }
+  };
+
+  // Generate a purchase order for the ingredients that are missing stock
+  const handleGenerateOcForMissing = async () => {
+    const missing = recipeChecks.filter((c) => !c.hasEnough);
+    if (missing.length === 0) return;
+
+    setGeneratingOc(true);
+    try {
+      const result = await api.generatePurchaseOrdersByProducts(
+        missing.map((c) => ({
+          productId: c.ingredientProductId,
+          quantity: Math.max(0, c.requiredQty - c.availableQty),
+        })),
+        businessId,
+      );
+      const totalItems = result.purchaseOrders.reduce((sum, po) => sum + po.itemCount, 0);
+      alert(`Se generaron ${result.purchaseOrders.length} OC con ${totalItems} insumos faltantes.`);
+    } catch (err: any) {
+      alert(err.message || 'Error al generar OC de faltantes.');
+    } finally {
+      setGeneratingOc(false);
     }
   };
 
@@ -590,6 +614,17 @@ export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
                           </div>
                         </div>
                       ))}
+                      {recipeChecks.some((c) => !c.hasEnough) && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          disabled={generatingOc}
+                          onClick={handleGenerateOcForMissing}
+                        >
+                          {generatingOc ? 'Generando...' : 'Generar OC de faltantes'}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
