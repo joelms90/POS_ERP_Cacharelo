@@ -25,6 +25,7 @@ export const BranchCatalogPage: React.FC<BranchCatalogPageProps> = ({ businessId
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
   const [copyFromBranchId, setCopyFromBranchId] = useState('');
   const [copying, setCopying] = useState(false);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
@@ -49,12 +50,20 @@ export const BranchCatalogPage: React.FC<BranchCatalogPageProps> = ({ businessId
   const loadData = useCallback(async (branchId: string) => {
     setLoading(true);
     try {
-      const [productsData, overridesData] = await Promise.all([
+      const [productsData, overridesData, stockData] = await Promise.all([
         api.getProducts(businessId, branchId),
         api.getBranchCatalog(branchId),
+        api.getStockLevels(businessId, undefined, branchId),
       ]);
       setProducts(productsData);
       setOverrides(new Map(overridesData.map((o) => [o.productId, o])));
+      const stockMap = new Map<string, number>();
+      for (const s of stockData) {
+        if (s.branchId === branchId && s.productId) {
+          stockMap.set(s.productId, parseFloat(s.quantity || '0'));
+        }
+      }
+      setStockMap(stockMap);
     } catch (e: any) {
       showToast(e?.message || 'Error al cargar el catálogo.', 'error');
     } finally {
@@ -181,10 +190,18 @@ export const BranchCatalogPage: React.FC<BranchCatalogPageProps> = ({ businessId
         <div className="py-16 text-center text-text-secondary text-sm uppercase tracking-widest">Cargando catálogo...</div>
       ) : (
         <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-4 flex-wrap text-xs text-text-secondary bg-charcoal-surface/40 border border-aged-bronze/20 rounded p-3">
+            <span>Productos: <span className="text-text-primary font-semibold">{products.length}</span></span>
+            <span>Vendibles aquí: <span className="text-champagne-gold font-semibold">{products.filter((p) => p.isSellable !== false).length}</span></span>
+            <span>Con stock bajo: <span className="text-error-red font-semibold">{products.filter((p) => { const s = stockMap.get(p.id) ?? 0; const m = parseFloat(p.minStock || '0'); return m > 0 && s < m; }).length}</span></span>
+          </div>
           {filtered.map((p) => {
             const override = overrides.get(p.id);
             const hasOverride = !!override;
             const sellable = p.isSellable !== false;
+            const branchStock = stockMap.get(p.id) ?? 0;
+            const minStock = parseFloat(p.minStock || '0');
+            const isLow = minStock > 0 && branchStock < minStock;
             return (
               <div
                 key={p.id}
@@ -205,6 +222,14 @@ export const BranchCatalogPage: React.FC<BranchCatalogPageProps> = ({ businessId
                 </div>
 
                 <div className="flex items-center gap-3 flex-shrink-0">
+                  <div className="flex flex-col items-end" data-testid={`catalog-stock-${p.id}`}>
+                    <span className={`text-xs font-mono font-semibold ${isLow ? 'text-error-red' : 'text-text-primary'}`}>
+                      {branchStock.toFixed(3)} <span className="text-[10px] text-text-secondary font-normal">stock</span>
+                    </span>
+                    {isLow && (
+                      <span className="text-[9px] text-error-red uppercase tracking-wider">bajo mín ({minStock})</span>
+                    )}
+                  </div>
                   <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer select-none">
                     <input
                       type="checkbox"
