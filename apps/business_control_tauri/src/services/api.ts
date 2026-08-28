@@ -256,6 +256,42 @@ export interface BranchRequisition {
   requestedByName?: string;
 }
 
+export interface InventoryAlert {
+  id: string;
+  productId: string;
+  branchId: string;
+  alertType: 'low_stock' | 'out_of_stock';
+  threshold: string;
+  currentQty: string;
+  status: 'active' | 'acknowledged' | 'resolved';
+  createdAt: string;
+  resolvedAt: string | null;
+  productName: string;
+  productSku: string | null;
+  branchName: string;
+}
+
+export interface InventoryAlertSummary {
+  summary: {
+    outOfStock: number;
+    lowStock: number;
+    totalAlerts: number;
+    pendingRequisitions: number;
+    draftPurchaseOrders: number;
+  };
+  alerts: InventoryAlert[];
+}
+
+export interface BranchStockThreshold {
+  id: string;
+  productId: string;
+  branchId: string;
+  minStock: string;
+  maxStock: string;
+  productName?: string;
+  branchName?: string;
+}
+
 const DEFAULT_API_URL = 'http://localhost:3000/api';
 
 // Retrieve the base URL from env or fallback
@@ -792,6 +828,10 @@ export const api = {
     return apiRequest<ActiveOrder[]>(`/orders/active?branchId=${branchId}`);
   },
 
+  async getActiveOrdersByBusiness(businessId: string): Promise<LiveOrder[]> {
+    return apiRequest<LiveOrder[]>(`/orders/active/business?businessId=${businessId}`);
+  },
+
   async createOrder(payload: {
     branchId: string;
     tableId: string;
@@ -1210,6 +1250,12 @@ export const api = {
     return apiRequest<CashShiftAuditReport>(`/reports/cash-shifts/${id}/audit`);
   },
 
+  async getTicketsToday(businessId: string, branchId?: string): Promise<TicketsTodayReport> {
+    const params = new URLSearchParams({ businessId });
+    if (branchId) params.set('branchId', branchId);
+    return apiRequest<TicketsTodayReport>(`/reports/tickets/today?${params.toString()}`);
+  },
+
   /**
    * Purchase Orders
    */
@@ -1318,6 +1364,82 @@ export const api = {
       body: JSON.stringify(data),
     });
   },
+
+  /**
+   * Intelligent Inventory Control — Panel de Inventario
+   */
+  async getInventoryAlertSummary(businessId: string, branchId?: string): Promise<InventoryAlertSummary> {
+    let url = `/inventory/alerts/summary?businessId=${businessId}`;
+    if (branchId) url += `&branchId=${branchId}`;
+    return apiRequest<InventoryAlertSummary>(url);
+  },
+
+  async getInventoryAlerts(businessId: string, branchId?: string, status?: string): Promise<InventoryAlert[]> {
+    let url = `/inventory/alerts?businessId=${businessId}`;
+    if (branchId) url += `&branchId=${branchId}`;
+    if (status) url += `&status=${status}`;
+    return apiRequest<InventoryAlert[]>(url);
+  },
+
+  async refreshInventoryAlerts(businessId: string): Promise<{ processed: number; created: number; updated: number; resolved: number }> {
+    return apiRequest(`/inventory/alerts/refresh`, {
+      method: 'POST',
+      body: JSON.stringify({ businessId }),
+    });
+  },
+
+  async acknowledgeAlert(id: string): Promise<InventoryAlert> {
+    return apiRequest<InventoryAlert>(`/inventory/alerts/${id}/acknowledge`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  async generateRequisitionFromAlert(id: string): Promise<{ requisitionId: string; quantityRequested: number; skipped?: boolean }> {
+    return apiRequest(`/inventory/alerts/${id}/generate-requisition`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  async generatePurchaseOrderFromAlert(id: string): Promise<{ purchaseOrderId: string; poNumber: string; quantityOrdered: number }> {
+    return apiRequest(`/inventory/alerts/${id}/generate-purchase-order`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  async runAutoPurchaseOrders(businessId: string): Promise<{ created: number; purchaseOrderIds: string[] }> {
+    return apiRequest(`/inventory/alerts/auto-purchase-orders`, {
+      method: 'POST',
+      body: JSON.stringify({ businessId }),
+    });
+  },
+
+  async getBranchThresholds(businessId: string, branchId?: string): Promise<BranchStockThreshold[]> {
+    let url = `/inventory/thresholds?businessId=${businessId}`;
+    if (branchId) url += `&branchId=${branchId}`;
+    return apiRequest<BranchStockThreshold[]>(url);
+  },
+
+  async upsertBranchThreshold(data: {
+    businessId: string;
+    productId: string;
+    branchId: string;
+    minStock?: number;
+    maxStock?: number;
+  }): Promise<BranchStockThreshold> {
+    return apiRequest<BranchStockThreshold>('/inventory/thresholds', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteBranchThreshold(id: string): Promise<{ success: boolean }> {
+    return apiRequest(`/inventory/thresholds/${id}`, {
+      method: 'DELETE',
+    });
+  },
 };
 
 export interface ProductSalesReportLine {
@@ -1418,4 +1540,70 @@ export interface CashShiftAuditReport {
   }>;
   expectedCash: number;
   discrepancy: number;
+}
+
+export interface TicketItem {
+  quantity: number;
+  productName: string;
+  price: number;
+  notes: string | null;
+  assignedGuest: number | null;
+}
+
+export interface TicketPayment {
+  method: string;
+  amount: number;
+  reference: string | null;
+}
+
+export interface TicketEntry {
+  id: string;
+  tableLabel: string;
+  waiterName: string;
+  createdAt: string;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  totalPaid: number;
+  items: TicketItem[];
+  payments: TicketPayment[];
+}
+
+export interface TicketsTodayReport {
+  branchName: string;
+  date: string;
+  tickets: TicketEntry[];
+}
+
+export interface LiveOrderItem {
+  id: string;
+  quantity: number;
+  price: string;
+  notes: string | null;
+  assignedGuest: number | null;
+  productName: string | null;
+}
+
+export interface LiveOrderPayment {
+  amount: string;
+  method: string;
+  reference: string | null;
+}
+
+export interface LiveOrder {
+  id: string;
+  state: string;
+  total: string;
+  subtotal: string;
+  tax: string;
+  discount: string;
+  createdAt: string;
+  branchId: string;
+  branchName: string;
+  tableLabel: string;
+  tableRoom: string;
+  waiterName: string;
+  items: LiveOrderItem[];
+  payments: LiveOrderPayment[];
 }

@@ -208,6 +208,39 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
             </button>
             )}
 
+            {canSee('tickets') && (
+            <button
+              onClick={() => handleTabClick('tickets')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
+                activeTab === 'tickets'
+                  ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
+                  : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-charcoal-surface/50'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className="text-xs">Tickets del Día</span>
+            </button>
+            )}
+
+            {canSee('mesas') && (
+            <button
+              onClick={() => handleTabClick('mesas')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
+                activeTab === 'mesas'
+                  ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
+                  : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-charcoal-surface/50'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span className="text-xs">Mesas Activas</span>
+            </button>
+            )}
+
             {/* Group: Catálogo & Inventario */}
             <div className="px-3 py-1.5 mt-3 select-none">
               <span className="text-[10px] font-bold text-aged-bronze uppercase tracking-widest">
@@ -228,6 +261,22 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
               </svg>
               <span className="text-xs">Productos</span>
+            </button>
+            )}
+
+            {canSee('inventory-dashboard') && (
+            <button
+              onClick={() => handleTabClick('inventory-dashboard')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
+                activeTab === 'inventory-dashboard'
+                  ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
+                  : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-charcoal-surface/50'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+              </svg>
+              <span className="text-xs">Panel de Inventario</span>
             </button>
             )}
 
