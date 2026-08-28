@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { InventoryService } from './inventory.service';
 import { InventoryRepository } from './repositories/inventory.repository';
+import { LedgerService } from './ledger.service';
 import { DRIZZLE_CONNECTION } from '../../database/database.module';
 import { NotFoundException } from '@nestjs/common';
 
@@ -49,6 +50,11 @@ describe('InventoryService - Average Cost Recalculation', () => {
     getDb: jest.fn(),
   };
 
+  const mockLedgerService = {
+    applyMovement: jest.fn().mockResolvedValue(undefined),
+    getStockLevel: jest.fn().mockResolvedValue(0),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -56,6 +62,10 @@ describe('InventoryService - Average Cost Recalculation', () => {
         {
           provide: InventoryRepository,
           useValue: mockInventoryRepository,
+        },
+        {
+          provide: LedgerService,
+          useValue: mockLedgerService,
         },
         {
           provide: DRIZZLE_CONNECTION,
@@ -84,11 +94,8 @@ describe('InventoryService - Average Cost Recalculation', () => {
         [{ id: productId, cost: '5.00', businessId }], // 3. Product info lookup
         [{ quantity: '10.000' }], // 4. Stock levels sum
         [], // 5. Product cost update
-        [{ id: 'stock-level-id', quantity: '10.000' }], // 6. Destination stock lookup
-        [], // 7. Update stock levels
-        [], // 8. Log stock movement
-        [{ productId, quantityOrdered: '15.000', quantityReceived: '15.000' }], // 9. PO items status check
-        [{ id: poId, status: 'received' }], // 10. Update PO status
+        [{ productId, quantityOrdered: '15.000', quantityReceived: '15.000' }], // 6. PO items status check
+        [{ id: poId, status: 'received' }], // 7. Update PO status
       ];
 
       const mockDb = createMockDb(dbRows);
@@ -115,11 +122,8 @@ describe('InventoryService - Average Cost Recalculation', () => {
         [{ id: productId, cost: '5.00', businessId }], // 3. Product info lookup
         [{ quantity: '0.000' }], // 4. Stock levels sum
         [], // 5. Product cost update
-        [], // 6. Destination stock lookup (empty)
-        [], // 7. Insert stock levels
-        [], // 8. Log stock movement
-        [{ productId, quantityOrdered: '15.000', quantityReceived: '10.000' }], // 9. PO items status check
-        [{ id: poId, status: 'partially_received' }], // 10. Update PO status
+        [{ productId, quantityOrdered: '15.000', quantityReceived: '10.000' }], // 6. PO items status check
+        [{ id: poId, status: 'partially_received' }], // 7. Update PO status
       ];
 
       const mockDb = createMockDb(dbRows);
@@ -145,11 +149,8 @@ describe('InventoryService - Average Cost Recalculation', () => {
         [{ id: productId, cost: '5.00', businessId }], // 3. Product info lookup
         [{ quantity: '-5.000' }], // 4. Stock levels sum
         [], // 5. Product cost update
-        [{ id: 'stock-level-id', quantity: '-5.000' }], // 6. Destination stock lookup
-        [], // 7. Update stock levels
-        [], // 8. Log stock movement
-        [{ productId, quantityOrdered: '15.000', quantityReceived: '15.000' }], // 9. PO items status check
-        [{ id: poId, status: 'received' }], // 10. Update PO status
+        [{ productId, quantityOrdered: '15.000', quantityReceived: '15.000' }], // 6. PO items status check
+        [{ id: poId, status: 'received' }], // 7. Update PO status
       ];
 
       const mockDb = createMockDb(dbRows);

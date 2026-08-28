@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InventoryRepository } from './repositories/inventory.repository';
+import { LedgerService } from './ledger.service';
 import { CreateReceiptDto } from './dto/create-receipt.dto';
 import { CreateProductionRunDto } from './dto/create-production-run.dto';
 import * as schema from '../../database/schema';
@@ -7,7 +8,10 @@ import { eq, and, gte, lte, sql, desc, inArray } from 'drizzle-orm';
 
 @Injectable()
 export class InventoryService {
-  constructor(private readonly inventoryRepository: InventoryRepository) {}
+  constructor(
+    private readonly inventoryRepository: InventoryRepository,
+    private readonly ledgerService: LedgerService,
+  ) {}
 
   async getStockLevels(businessId: string, warehouseId?: string, branchId?: string) {
     return this.inventoryRepository.getStockLevels(businessId, warehouseId, branchId);
@@ -75,51 +79,16 @@ export class InventoryService {
 
         savedItems.push(savedItem);
 
-        // Update Stock levels
-        const conditions = [eq(schema.stockLevels.productId, item.productId)];
-        if (warehouseId) {
-          conditions.push(eq(schema.stockLevels.warehouseId, warehouseId));
-        } else {
-          conditions.push(eq(schema.stockLevels.branchId, branchId!));
-        }
-
-        const matchStock = await tx
-          .select()
-          .from(schema.stockLevels)
-          .where(and(...conditions))
-          .limit(1);
-
-        if (matchStock.length > 0) {
-          const currentQty = parseFloat(matchStock[0].quantity);
-          const newQty = (currentQty + item.quantity).toString();
-          
-          await tx
-            .update(schema.stockLevels)
-            .set({
-              quantity: newQty,
-              updatedAt: new Date(),
-            })
-            .where(eq(schema.stockLevels.id, matchStock[0].id));
-        } else {
-          await tx
-            .insert(schema.stockLevels)
-            .values({
-              productId: item.productId,
-              warehouseId: warehouseId || null,
-              branchId: branchId || null,
-              quantity: item.quantity.toString(),
-              updatedAt: new Date(),
-            });
-        }
-
-        // Record stock movement
-        await tx.insert(schema.inventoryMovements).values({
+        // Record stock movement through the ledger (updates read model + audit)
+        await this.ledgerService.applyMovement(tx, {
           businessId,
           productId: item.productId,
+          quantityDelta: item.quantity,
+          eventType: 'receipt',
           warehouseId: warehouseId || null,
           branchId: branchId || null,
-          quantity: item.quantity.toString(),
-          type: 'receipt',
+          unitCost: item.unitCost?.toString() ?? null,
+          referenceType: 'receipt',
           referenceId: receipt.id,
           documentNumber: documentNumber || null,
           notes: notes || null,
@@ -197,65 +166,7 @@ export class InventoryService {
 
     // 3. Execute transaction: decrement ingredients stock, increment parent stock, log run
     return db.transaction(async (tx) => {
-      // Decrement ingredient stocks
-      for (const item of recipe) {
-        const decrementQty = parseFloat(item.quantityNeeded) * quantityProduced;
-
-        // Fetch current stock row inside transaction
-        const [stock] = await tx
-          .select()
-          .from(schema.stockLevels)
-          .where(
-            and(
-              eq(schema.stockLevels.productId, item.ingredientProductId),
-              eq(schema.stockLevels.warehouseId, warehouseId),
-            ),
-          )
-          .limit(1);
-
-        const newQty = (parseFloat(stock.quantity) - decrementQty).toString();
-        await tx
-          .update(schema.stockLevels)
-          .set({
-            quantity: newQty,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.stockLevels.id, stock.id));
-      }
-
-      // Increment parent stock
-      const [parentStock] = await tx
-        .select()
-        .from(schema.stockLevels)
-        .where(
-          and(
-            eq(schema.stockLevels.productId, productId),
-            eq(schema.stockLevels.warehouseId, warehouseId),
-          ),
-        )
-        .limit(1);
-
-      if (parentStock) {
-        const newQty = (parseFloat(parentStock.quantity) + quantityProduced).toString();
-        await tx
-          .update(schema.stockLevels)
-          .set({
-            quantity: newQty,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.stockLevels.id, parentStock.id));
-      } else {
-        await tx
-          .insert(schema.stockLevels)
-          .values({
-            productId,
-            warehouseId,
-            quantity: quantityProduced.toString(),
-            updatedAt: new Date(),
-          });
-      }
-
-      // Insert production run record
+      // Insert production run record first (reference for ledger entries)
       const [run] = await tx
         .insert(schema.productionRuns)
         .values({
@@ -267,12 +178,13 @@ export class InventoryService {
         .returning();
 
       // Record output movement (assembled product entry)
-      await tx.insert(schema.inventoryMovements).values({
+      await this.ledgerService.applyMovement(tx, {
         businessId,
         productId,
+        quantityDelta: quantityProduced,
+        eventType: 'production_output',
         warehouseId,
-        quantity: quantityProduced.toString(),
-        type: 'production_output',
+        referenceType: 'production_run',
         referenceId: run.id,
         notes: notes || null,
       });
@@ -280,12 +192,13 @@ export class InventoryService {
       // Record input movements (ingredients deduction)
       for (const item of recipe) {
         const decrementQty = parseFloat(item.quantityNeeded) * quantityProduced;
-        await tx.insert(schema.inventoryMovements).values({
+        await this.ledgerService.applyMovement(tx, {
           businessId,
           productId: item.ingredientProductId,
+          quantityDelta: -decrementQty,
+          eventType: 'production_input',
           warehouseId,
-          quantity: (-decrementQty).toString(),
-          type: 'production_input',
+          referenceType: 'production_run',
           referenceId: run.id,
           notes: `Insumo consumido en receta para ensamble de ${product.name}`,
         });
@@ -372,67 +285,44 @@ export class InventoryService {
         const unitCost = product.cost;
         const totalCost = (parseFloat(unitCost) * item.quantity).toFixed(2);
 
-        // A. Decrement stock from source
-        const sourceCond = [eq(schema.stockLevels.productId, item.productId)];
-        if (fromWarehouseId) {
-          sourceCond.push(eq(schema.stockLevels.warehouseId, fromWarehouseId));
-        } else {
-          sourceCond.push(eq(schema.stockLevels.branchId, fromBranchId));
-        }
+        // A. Validate + decrement stock from source (via ledger)
+        const sourceStock = await this.ledgerService.getStockLevel(
+          tx,
+          item.productId,
+          fromWarehouseId || null,
+          fromBranchId || null,
+        );
 
-        const [sourceStock] = await tx
-          .select()
-          .from(schema.stockLevels)
-          .where(and(...sourceCond))
-          .limit(1);
-
-        if (!sourceStock || parseFloat(sourceStock.quantity) < item.quantity) {
+        if (sourceStock < item.quantity) {
           throw new BadRequestException(`Stock insuficiente en origen para el producto ${product.name}`);
         }
 
-        const newSourceQty = (parseFloat(sourceStock.quantity) - item.quantity).toString();
-        await tx
-          .update(schema.stockLevels)
-          .set({
-            quantity: newSourceQty,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.stockLevels.id, sourceStock.id));
+        await this.ledgerService.applyMovement(tx, {
+          businessId,
+          productId: item.productId,
+          quantityDelta: -item.quantity,
+          eventType: 'transfer_out',
+          warehouseId: fromWarehouseId || null,
+          branchId: fromBranchId || null,
+          unitCost,
+          referenceType: 'transfer',
+          referenceId: transfer.id,
+          notes: `Traspaso enviado`,
+        });
 
-        // B. Increment stock at destination
-        const destCond = [eq(schema.stockLevels.productId, item.productId)];
-        if (toWarehouseId) {
-          destCond.push(eq(schema.stockLevels.warehouseId, toWarehouseId));
-        } else {
-          destCond.push(eq(schema.stockLevels.branchId, toBranchId));
-        }
-
-        const [destStock] = await tx
-          .select()
-          .from(schema.stockLevels)
-          .where(and(...destCond))
-          .limit(1);
-
-        if (destStock) {
-          const newDestQty = (parseFloat(destStock.quantity) + item.quantity).toString();
-          await tx
-            .update(schema.stockLevels)
-            .set({
-              quantity: newDestQty,
-              updatedAt: new Date(),
-            })
-            .where(eq(schema.stockLevels.id, destStock.id));
-        } else {
-          await tx
-            .insert(schema.stockLevels)
-            .values({
-              productId: item.productId,
-              warehouseId: toWarehouseId || null,
-              branchId: toBranchId || null,
-              quantity: item.quantity.toString(),
-              updatedAt: new Date(),
-            });
-        }
+        // B. Increment stock at destination (via ledger)
+        await this.ledgerService.applyMovement(tx, {
+          businessId,
+          productId: item.productId,
+          quantityDelta: item.quantity,
+          eventType: 'transfer_in',
+          warehouseId: toWarehouseId || null,
+          branchId: toBranchId || null,
+          unitCost,
+          referenceType: 'transfer',
+          referenceId: transfer.id,
+          notes: `Traspaso recibido`,
+        });
 
         // C. Record transfer item details
         await tx
@@ -444,29 +334,6 @@ export class InventoryService {
             unitCost,
             totalCost,
           });
-
-        // Record stock movements
-        await tx.insert(schema.inventoryMovements).values({
-          businessId,
-          productId: item.productId,
-          warehouseId: fromWarehouseId || null,
-          branchId: fromBranchId || null,
-          quantity: (-item.quantity).toString(),
-          type: 'transfer_out',
-          referenceId: transfer.id,
-          notes: `Traspaso enviado`,
-        });
-
-        await tx.insert(schema.inventoryMovements).values({
-          businessId,
-          productId: item.productId,
-          warehouseId: toWarehouseId || null,
-          branchId: toBranchId || null,
-          quantity: item.quantity.toString(),
-          type: 'transfer_in',
-          referenceId: transfer.id,
-          notes: `Traspaso recibido`,
-        });
       }
 
       return {
@@ -638,34 +505,14 @@ export class InventoryService {
     const diff = quantity - oldQty;
 
     await db.transaction(async (tx) => {
-      if (existing) {
-        await tx
-          .update(schema.stockLevels)
-          .set({
-            quantity: quantity.toString(),
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.stockLevels.id, existing.id));
-      } else {
-        await tx
-          .insert(schema.stockLevels)
-          .values({
-            productId,
-            warehouseId: warehouseId || null,
-            branchId: branchId || null,
-            quantity: quantity.toString(),
-            updatedAt: new Date(),
-          });
-      }
-
       if (diff !== 0) {
-        await tx.insert(schema.inventoryMovements).values({
+        await this.ledgerService.applyMovement(tx, {
           businessId: product.businessId,
           productId,
+          quantityDelta: diff,
+          eventType: 'adjustment',
           warehouseId: warehouseId || null,
           branchId: branchId || null,
-          quantity: diff.toString(),
-          type: 'adjustment',
           notes: `Ajuste manual de stock (anterior: ${oldQty}, nuevo: ${quantity})`,
         });
       }
@@ -765,50 +612,18 @@ export class InventoryService {
           })
           .where(eq(schema.products.id, item.productId));
 
-        // 3. Update stock levels at destination
-        const stockConditions = [eq(schema.stockLevels.productId, item.productId)];
-        if (destinationWarehouseId) {
-          stockConditions.push(eq(schema.stockLevels.warehouseId, destinationWarehouseId));
-        } else {
-          stockConditions.push(eq(schema.stockLevels.branchId, destinationBranchId!));
-        }
-
-        const [existingStock] = await tx
-          .select()
-          .from(schema.stockLevels)
-          .where(and(...stockConditions))
-          .limit(1);
-
-        if (existingStock) {
-          const newQty = (parseFloat(existingStock.quantity || '0') + item.quantityReceived).toString();
-          await tx
-            .update(schema.stockLevels)
-            .set({
-              quantity: newQty,
-              updatedAt: new Date(),
-            })
-            .where(eq(schema.stockLevels.id, existingStock.id));
-        } else {
-          await tx
-            .insert(schema.stockLevels)
-            .values({
-              productId: item.productId,
-              warehouseId: destinationWarehouseId || null,
-              branchId: destinationBranchId || null,
-              quantity: item.quantityReceived.toString(),
-              updatedAt: new Date(),
-            });
-        }
-
-        // 4. Log stock movement
-        await tx.insert(schema.inventoryMovements).values({
+        // 3. Update stock levels at destination (via ledger)
+        await this.ledgerService.applyMovement(tx, {
           businessId,
           productId: item.productId,
+          quantityDelta: item.quantityReceived,
+          eventType: 'receipt',
           warehouseId: destinationWarehouseId || null,
           branchId: destinationBranchId || null,
-          quantity: item.quantityReceived.toString(),
-          type: 'receipt',
+          unitCost: item.unitCostActual.toString(),
+          referenceType: 'purchase_order',
           referenceId: poId,
+          documentNumber: po.poNumber,
           notes: notes || `Recepción de Orden de Compra ${po.poNumber}`,
         });
       }
