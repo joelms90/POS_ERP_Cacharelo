@@ -629,58 +629,84 @@ export class AlertsService {
       totalStock: parseFloat(r.total_stock || '0'),
     }));
 
-    const created: string[] = [];
+    // Products already present in an existing draft PO (avoid duplicates)
+    const existingItems = await this.db
+      .select({ productId: schema.purchaseOrderItems.productId })
+      .from(schema.purchaseOrderItems)
+      .innerJoin(
+        schema.purchaseOrders,
+        eq(schema.purchaseOrderItems.poId, schema.purchaseOrders.id),
+      )
+      .where(
+        and(
+          eq(schema.purchaseOrders.businessId, businessId),
+          eq(schema.purchaseOrders.status, 'draft'),
+        ),
+      );
+
+    const alreadyOrdered = new Set(existingItems.map((i) => i.productId));
+
+    // Resolve provider + quantity per product, grouped by provider
+    const itemsByProvider = new Map<
+      string,
+      Array<{ productId: string; qty: number; cost: string }>
+    >();
+    const skipped: string[] = [];
 
     for (const lp of lowProducts) {
-      const provider = await this.resolveCheapestProvider(lp.productId);
-      if (!provider) continue;
+      if (alreadyOrdered.has(lp.productId)) continue;
 
-      // Check existing draft PO for same product
-      const [existingPo] = await this.db
-        .select()
-        .from(schema.purchaseOrders)
-        .where(
-          and(
-            eq(schema.purchaseOrders.businessId, businessId),
-            eq(schema.purchaseOrders.status, 'draft'),
-          ),
-        )
-        .limit(1);
+      const provider = await this.resolveCheapestProvider(lp.productId);
+      if (!provider) {
+        skipped.push(lp.productId);
+        continue;
+      }
 
       let qty = lp.maxStock - lp.totalStock;
       if (qty <= 0) qty = lp.minStock > 0 ? lp.minStock * 2 : 1;
 
-      if (existingPo) {
-        // Update existing draft PO item quantity (skip duplicate)
-        continue;
-      }
-
-      const warehouse = await this.resolveDefaultWarehouse(businessId);
-
-      const [po] = await this.db
-        .insert(schema.purchaseOrders)
-        .values({
-          businessId,
-          providerId: provider.providerId,
-          warehouseId: warehouse ? warehouse.id : null,
-          poNumber: await this.nextPoNumber(this.db, businessId),
-          status: 'draft',
-          createdBy: userId,
-          notes: 'Generada automáticamente por stock global bajo el mínimo.',
-        })
-        .returning();
-
-      await this.db.insert(schema.purchaseOrderItems).values({
-        poId: po.id,
-        productId: lp.productId,
-        quantityOrdered: qty.toFixed(3),
-        unitCostEstimated: provider.cost,
-      });
-
-      created.push(po.id);
+      const list = itemsByProvider.get(provider.providerId) || [];
+      list.push({ productId: lp.productId, qty, cost: provider.cost });
+      itemsByProvider.set(provider.providerId, list);
     }
 
-    return { created: created.length, purchaseOrderIds: created };
+    if (itemsByProvider.size === 0) {
+      return { created: 0, purchaseOrderIds: [], skipped };
+    }
+
+    const warehouse = await this.resolveDefaultWarehouse(businessId);
+    const created: string[] = [];
+
+    await this.db.transaction(async (tx) => {
+      for (const [providerId, items] of itemsByProvider.entries()) {
+        const poNumber = await this.nextPoNumber(tx, businessId);
+        const [po] = await tx
+          .insert(schema.purchaseOrders)
+          .values({
+            businessId,
+            providerId,
+            warehouseId: warehouse ? warehouse.id : null,
+            poNumber,
+            status: 'draft',
+            createdBy: userId,
+            notes: 'Generada automáticamente por stock global bajo el mínimo.',
+          })
+          .returning();
+
+        await tx.insert(schema.purchaseOrderItems).values(
+          items.map((it) => ({
+            poId: po.id,
+            productId: it.productId,
+            quantityOrdered: it.qty.toFixed(3),
+            unitCostEstimated: it.cost,
+          })),
+        );
+
+        created.push(po.id);
+      }
+    });
+
+    return { created: created.length, purchaseOrderIds: created, skipped };
   }
 
   // ---------------------------------------------------------------------------
