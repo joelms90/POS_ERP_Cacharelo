@@ -19,6 +19,9 @@ const PRODUCTION_STRATEGY_LABELS: Record<string, string> = {
   work_order: 'Orden de Trabajo',
 };
 
+const BULK_UOMS = ['kg', 'g', 'l', 'ml'];
+const productDecimals = (uom?: string) => (uom && BULK_UOMS.includes(uom) ? 3 : 0);
+
 interface InventoryPageProps {
   businessId: string;
 }
@@ -1180,7 +1183,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                             
                             const minStock = parseFloat(p.minStock || '0');
                             const isLowStock = minStock > 0 && prodStock < minStock;
-                            const displayStock = p.isIngredient ? prodStock.toFixed(3) : prodStock.toFixed(0);
+                            const displayStock = productDecimals(p.uom) > 0 ? prodStock.toFixed(3) : prodStock.toFixed(0);
 
                             return (
                               <tr key={p.id} className="hover:bg-charcoal-surface/20 transition-colors">
@@ -1454,7 +1457,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                         {(stockLevels
                           .filter(sl => sl.productId === auditProduct.id)
                           .reduce((sum, sl) => sum + parseFloat(sl.quantity || '0'), 0)
-                        ).toFixed(auditProduct.isIngredient ? 3 : 0)}
+                        ).toFixed(productDecimals(auditProduct.uom))}
                       </span>
                     </div>
 
@@ -1462,7 +1465,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                     <div className="p-4 bg-charcoal-surface/30 border border-aged-bronze/10 rounded-lg flex flex-col gap-1">
                       <span className="text-[10px] text-text-secondary uppercase">Suma de Existencias Física</span>
                       <span className="text-xl font-bold font-mono text-text-primary">
-                        {(auditLocations.reduce((sum, loc) => sum + loc.quantity, 0)).toFixed(auditProduct.isIngredient ? 3 : 0)}
+                        {(auditLocations.reduce((sum, loc) => sum + loc.quantity, 0)).toFixed(productDecimals(auditProduct.uom))}
                       </span>
                     </div>
 
@@ -1506,7 +1509,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                           <div key={i} className="p-3 bg-charcoal-surface border border-aged-bronze/15 rounded flex justify-between items-center">
                             <span className="text-xs text-text-primary font-medium">{loc.warehouseName || loc.branchName || 'Ubicación'}</span>
                             <span className="text-xs font-bold font-mono text-champagne-gold">
-                              {loc.quantity.toFixed(auditProduct.isIngredient ? 3 : 0)}
+                              {loc.quantity.toFixed(productDecimals(auditProduct.uom))}
                             </span>
                           </div>
                         ))
@@ -1586,13 +1589,13 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                                         ? 'text-success-green' 
                                         : 'text-error-red'
                                   }`}>
-                                    {isPositive ? '+' : ''}{m.quantity.toFixed(auditProduct.isIngredient ? 3 : 0)}
+                                    {isPositive ? '+' : ''}{m.quantity.toFixed(productDecimals(auditProduct.uom))}
                                   </td>
                                   <td className="py-2 px-3 text-right font-mono text-text-secondary">
-                                    {m.previousBalance.toFixed(auditProduct.isIngredient ? 3 : 0)}
+                                    {m.previousBalance.toFixed(productDecimals(auditProduct.uom))}
                                   </td>
                                   <td className="py-2 px-3 text-right font-mono font-semibold text-text-primary">
-                                    {m.finalBalance.toFixed(auditProduct.isIngredient ? 3 : 0)}
+                                    {m.finalBalance.toFixed(productDecimals(auditProduct.uom))}
                                   </td>
                                   <td className="py-2 px-3 text-text-secondary truncate max-w-[120px]" title={m.createdByName}>
                                     {m.createdByName || 'Sistema'}
