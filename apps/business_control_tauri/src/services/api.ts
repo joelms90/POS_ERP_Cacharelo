@@ -272,6 +272,8 @@ export interface InventoryAlert {
   productName: string;
   productSku: string | null;
   branchName: string | null;
+  itemType?: string;
+  hasProvider?: boolean;
   transferableQty: number | null;
 }
 

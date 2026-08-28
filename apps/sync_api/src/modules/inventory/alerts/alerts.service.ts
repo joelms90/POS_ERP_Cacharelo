@@ -235,6 +235,8 @@ export class AlertsService {
         resolvedAt: schema.inventoryAlerts.resolvedAt,
         productName: schema.products.name,
         productSku: schema.products.sku,
+        itemType: schema.products.itemType,
+        providerId: schema.products.providerId,
         branchName: schema.branches.name,
       })
       .from(schema.inventoryAlerts)
@@ -265,10 +267,12 @@ export class AlertsService {
     }
 
     return alerts.map((a) => {
-      if (!a.branchId) return { ...a, transferableQty: null };
+      if (!a.branchId) {
+        return { ...a, hasProvider: !!a.providerId, transferableQty: null };
+      }
       const global = globalStockMap.get(a.productId) ?? 0;
       const branchQty = parseFloat(a.currentQty || '0');
-      return { ...a, transferableQty: global - branchQty };
+      return { ...a, hasProvider: !!a.providerId, transferableQty: global - branchQty };
     });
   }
 

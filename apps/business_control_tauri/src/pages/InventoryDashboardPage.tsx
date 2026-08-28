@@ -145,8 +145,13 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
     });
   };
 
+  const canBuy = (a: InventoryAlert) => a.itemType === 'raw_material' && !!a.hasProvider;
+
   const selectableAlerts = alerts.filter(
-    (a) => !a.branchId && (a.status === 'active' || a.status === 'acknowledged'),
+    (a) =>
+      !a.branchId &&
+      canBuy(a) &&
+      (a.status === 'active' || a.status === 'acknowledged'),
   );
   const allSelected = selectableAlerts.length > 0 && selectableAlerts.every((a) => selectedIds.has(a.id));
 
@@ -266,6 +271,9 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
         {visibleAlerts.map((alert) => {
           const isGlobal = !alert.branchId;
           const hasTransferable = (alert.transferableQty ?? 0) > 0;
+          const isRawMaterial = alert.itemType === 'raw_material';
+          const isRequisition = !isGlobal && hasTransferable;
+          const buyable = isRawMaterial && !!alert.hasProvider;
           return (
           <div
             key={alert.id}
@@ -274,7 +282,7 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
               alert.alertType === 'out_of_stock' ? 'border-error-red/40' : 'border-aged-bronze/30'
             }`}
           >
-            {isGlobal && alert.status !== 'resolved' && (
+            {isGlobal && alert.status !== 'resolved' && canBuy(alert) && (
               <input
                 type="checkbox"
                 checked={selectedIds.has(alert.id)}
@@ -292,7 +300,11 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
                   {alert.alertType === 'out_of_stock' ? 'Sin stock' : 'Bajo mínimo'}
                 </span>
                 <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-charcoal-surface/60 border border-aged-bronze/20 text-text-secondary">
-                  {isGlobal || !hasTransferable ? 'Compra sugerida' : 'Requisición sugerida'}
+                  {isRequisition
+                    ? 'Requisición sugerida'
+                    : isRawMaterial
+                      ? 'Compra sugerida'
+                      : 'Producción sugerida'}
                 </span>
                 {alert.status === 'resolved' && (
                   <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">Resuelta</span>
@@ -310,14 +322,22 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
 
             <div className="flex items-center gap-2 flex-shrink-0">
               {alert.status !== 'resolved' && (
-                isGlobal || !hasTransferable ? (
-                  <Button variant="primary" size="sm" data-testid={`alert-generate-oc-${alert.id}`} disabled={actionId === alert.id} onClick={() => handleGeneratePurchaseOrder(alert)}>
-                    Generar OC
-                  </Button>
-                ) : (
+                isRequisition ? (
                   <Button variant="secondary" size="sm" data-testid={`alert-generate-req-${alert.id}`} disabled={actionId === alert.id} onClick={() => handleGenerateRequisition(alert)}>
                     Generar Requisición
                   </Button>
+                ) : buyable ? (
+                  <Button variant="primary" size="sm" data-testid={`alert-generate-oc-${alert.id}`} disabled={actionId === alert.id} onClick={() => handleGeneratePurchaseOrder(alert)}>
+                    Generar OC
+                  </Button>
+                ) : isRawMaterial ? (
+                  <span className="text-[10px] text-text-secondary italic px-2 py-1 rounded bg-charcoal-surface/40 border border-aged-bronze/20">
+                    Sin proveedor registrado
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-text-secondary italic px-2 py-1 rounded bg-charcoal-surface/40 border border-aged-bronze/20">
+                    Producir en Ensamble
+                  </span>
                 )
               )}
             </div>
