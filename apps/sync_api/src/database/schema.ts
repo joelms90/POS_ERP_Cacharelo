@@ -972,3 +972,37 @@ export const businessInventorySettings = pgTable('business_inventory_settings', 
     .notNull(),
   updatedBy: uuid('updated_by').references(() => users.id),
 });
+
+// Per-branch catalog: overrides which products a branch can sell (e.g. sell an
+// insumo at a retail branch, or hide a finished good from a specific branch).
+export const branchProducts = pgTable(
+  'branch_products',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    businessId: uuid('business_id')
+      .references(() => businesses.id)
+      .notNull(),
+    branchId: uuid('branch_id')
+      .references(() => branches.id)
+      .notNull(),
+    productId: uuid('product_id')
+      .references(() => products.id)
+      .notNull(),
+    isSellable: boolean('is_sellable').default(true).notNull(),
+    isActive: boolean('is_active').default(true).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    unqBranchProduct: uniqueIndex('unq_branch_products').on(
+      table.branchId,
+      table.productId,
+    ),
+    idxBranch: index('idx_branch_products_branch').on(table.branchId),
+    idxProduct: index('idx_branch_products_product').on(table.productId),
+  }),
+);

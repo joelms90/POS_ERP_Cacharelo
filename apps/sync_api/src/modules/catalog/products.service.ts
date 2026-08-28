@@ -74,8 +74,31 @@ export class ProductsService {
     private readonly ledgerService: LedgerService,
   ) {}
 
-  async findAll(businessId?: string, categoryId?: string) {
-    return this.productsRepository.findAll(businessId, categoryId);
+  async findAll(businessId?: string, categoryId?: string, branchId?: string) {
+    const products = await this.productsRepository.findAll(businessId, categoryId);
+
+    if (branchId && products.length > 0) {
+      // Override isSellable using the per-branch catalog (branch_products)
+      const rows = await this.productsRepository
+        .getDb()
+        .select()
+        .from(schema.branchProducts)
+        .where(
+          and(
+            eq(schema.branchProducts.branchId, branchId),
+            eq(schema.branchProducts.isActive, true),
+          ),
+        );
+
+      const overrideMap = new Map(rows.map((r) => [r.productId, r.isSellable]));
+
+      return products.map((p) => {
+        const override = overrideMap.get(p.id);
+        return override === undefined ? p : { ...p, isSellable: override };
+      });
+    }
+
+    return products;
   }
 
   async findOne(id: string) {

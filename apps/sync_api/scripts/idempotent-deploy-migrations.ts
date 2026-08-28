@@ -382,6 +382,24 @@ async function main() {
     `);
     console.log('Global inventory alert support ensured.');
 
+    // 16. Per-branch catalog (branch_products)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "branch_products" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "business_id" uuid NOT NULL REFERENCES "public"."businesses"("id"),
+        "branch_id" uuid NOT NULL REFERENCES "public"."branches"("id"),
+        "product_id" uuid NOT NULL REFERENCES "public"."products"("id"),
+        "is_sellable" boolean DEFAULT true NOT NULL,
+        "is_active" boolean DEFAULT true NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      );
+    `);
+    await client.query('CREATE UNIQUE INDEX IF NOT EXISTS "unq_branch_products" ON "branch_products" USING btree ("branch_id","product_id");');
+    await client.query('CREATE INDEX IF NOT EXISTS "idx_branch_products_branch" ON "branch_products" USING btree ("branch_id");');
+    await client.query('CREATE INDEX IF NOT EXISTS "idx_branch_products_product" ON "branch_products" USING btree ("product_id");');
+    console.log('Branch products table ensured.');
+
     console.log('✅ Idempotent migrations executed successfully!');
   } catch (error) {
     console.error('❌ Failed to run idempotent migrations:', error);

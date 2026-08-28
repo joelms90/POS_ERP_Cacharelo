@@ -288,6 +288,30 @@ export async function runMigrations() {
     );
     console.log('✅ Global inventory alert support ensured.');
 
+    // Per-branch catalog (branch_products)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS branch_products (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        business_id uuid NOT NULL REFERENCES businesses(id),
+        branch_id uuid NOT NULL REFERENCES branches(id),
+        product_id uuid NOT NULL REFERENCES products(id),
+        is_sellable boolean NOT NULL DEFAULT true,
+        is_active boolean NOT NULL DEFAULT true,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+    await db.execute(
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS unq_branch_products ON branch_products(branch_id, product_id);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_branch_products_branch ON branch_products(branch_id);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_branch_products_product ON branch_products(product_id);`,
+    );
+    console.log('✅ Branch products table ensured.');
+
     // Ensure specific default business and branch exist
     const businessLines = [
       {
