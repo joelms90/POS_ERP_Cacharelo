@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, Length, IsOptional, IsUUID } from 'class-validator';
+import { IsString, IsNotEmpty, Length, IsOptional, IsUUID, IsIn } from 'class-validator';
 
 export class CreateWarehouseDto {
   @IsUUID()
@@ -18,4 +18,9 @@ export class CreateWarehouseDto {
   @IsString()
   @IsOptional()
   address?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(['warehouse', 'factory', 'transit'])
+  locationType?: string;
 }

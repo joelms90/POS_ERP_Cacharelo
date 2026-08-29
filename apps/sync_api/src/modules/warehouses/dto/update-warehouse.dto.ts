@@ -1,4 +1,4 @@
-import { IsString, Length, IsOptional } from 'class-validator';
+import { IsString, Length, IsOptional, IsIn } from 'class-validator';
 
 export class UpdateWarehouseDto {
   @IsString()
@@ -14,4 +14,9 @@ export class UpdateWarehouseDto {
   @IsString()
   @IsOptional()
   address?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(['warehouse', 'factory', 'transit'])
+  locationType?: string;
 }

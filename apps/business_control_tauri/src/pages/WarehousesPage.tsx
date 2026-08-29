@@ -17,6 +17,7 @@ export const WarehousesPage: React.FC<WarehousesPageProps> = ({ businessId }) =>
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [address, setAddress] = useState('');
+  const [locationType, setLocationType] = useState<'warehouse' | 'factory'>('warehouse');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
@@ -57,12 +58,14 @@ export const WarehousesPage: React.FC<WarehousesPageProps> = ({ businessId }) =>
         name: name.trim(),
         code: code.trim() || undefined,
         address: address.trim() || undefined,
+        locationType,
       }, businessId);
       
       showToast('Bodega creada exitosamente.', 'success');
       setName('');
       setCode('');
       setAddress('');
+      setLocationType('warehouse');
       fetchWarehouses();
     } catch (error: any) {
       showToast(error.message || 'Error al crear la bodega.', 'error');
@@ -122,6 +125,20 @@ export const WarehousesPage: React.FC<WarehousesPageProps> = ({ businessId }) =>
                   onChange={(e) => setName(e.target.value)}
                   className="w-full bg-charcoal border border-aged-bronze/45 rounded-md px-3 py-2 text-sm text-text-primary placeholder-text-secondary/50 focus:outline-none focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold/30 transition-colors"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
+                  Tipo de Bodega *
+                </label>
+                <select
+                  value={locationType}
+                  onChange={(e) => setLocationType(e.target.value as 'warehouse' | 'factory')}
+                  className="w-full bg-charcoal border border-aged-bronze/45 rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold/30 transition-colors"
+                >
+                  <option value="warehouse">Bodega / Almacén</option>
+                  <option value="factory">Fábrica de Ensamble</option>
+                </select>
               </div>
 
               <div>
@@ -199,6 +216,7 @@ export const WarehousesPage: React.FC<WarehousesPageProps> = ({ businessId }) =>
                     <tr className="bg-charcoal/40 text-[10px] text-text-secondary uppercase tracking-wider border-b border-aged-bronze/20">
                       <th className="px-6 py-3 font-semibold">Código</th>
                       <th className="px-6 py-3 font-semibold">Nombre</th>
+                      <th className="px-6 py-3 font-semibold">Tipo</th>
                       <th className="px-6 py-3 font-semibold">Dirección</th>
                       <th className="px-6 py-3 font-semibold text-right">Acciones</th>
                     </tr>
@@ -211,6 +229,13 @@ export const WarehousesPage: React.FC<WarehousesPageProps> = ({ businessId }) =>
                         </td>
                         <td className="px-6 py-4 font-semibold text-text-primary">
                           {w.name}
+                        </td>
+                        <td className="px-6 py-4 text-xs">
+                          {w.locationType === 'factory' ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-wider bg-champagne-gold/15 text-champagne-gold">Fábrica</span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-wider bg-charcoal/60 text-text-secondary">Bodega</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-xs text-text-secondary max-w-[200px] truncate">
                           {w.address || '-'}

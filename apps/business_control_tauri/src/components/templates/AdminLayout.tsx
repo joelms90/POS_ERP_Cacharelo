@@ -296,6 +296,22 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
             </button>
             )}
 
+            {canSee('warehouse-inventory') && (
+            <button
+              onClick={() => handleTabClick('warehouse-inventory')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
+                activeTab === 'warehouse-inventory'
+                  ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
+                  : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-charcoal-surface/50'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+              <span className="text-xs">Inventario por Bodega</span>
+            </button>
+            )}
+
             {canSee('categories') && (
             <button
               onClick={() => handleTabClick('categories')}

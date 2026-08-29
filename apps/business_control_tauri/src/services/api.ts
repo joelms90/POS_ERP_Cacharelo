@@ -36,6 +36,7 @@ export interface Warehouse {
   name: string;
   code?: string;
   address?: string;
+  locationType?: 'warehouse' | 'factory' | 'transit' | string;
   isActive: boolean;
   createdAt?: string;
 }

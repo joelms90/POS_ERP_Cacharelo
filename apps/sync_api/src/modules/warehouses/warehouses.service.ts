@@ -24,6 +24,7 @@ export class WarehousesService {
       ...createWarehouseDto,
       code: createWarehouseDto.code || null,
       address: createWarehouseDto.address || null,
+      locationType: createWarehouseDto.locationType || 'warehouse',
       isActive: true,
       version: 1,
     });

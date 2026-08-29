@@ -23,14 +23,15 @@ import { TicketsPage } from './pages/TicketsPage';
 import { MesasActivasPage } from './pages/MesasActivasPage';
 import { InventoryDashboardPage } from './pages/InventoryDashboardPage';
 import { BranchCatalogPage } from './pages/BranchCatalogPage';
+import { WarehouseInventoryPage } from './pages/WarehouseInventoryPage';
 import { api } from './services/api';
 
-export type AdminTab = 'administrators' | 'personal' | 'inventory-dashboard' | 'branch-catalog' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers' | 'purchase-orders' | 'requisitions' | 'help' | 'reports' | 'tickets' | 'mesas' | 'ticket-settings' | 'pos-simulator';
+export type AdminTab = 'administrators' | 'personal' | 'inventory-dashboard' | 'branch-catalog' | 'warehouse-inventory' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers' | 'purchase-orders' | 'requisitions' | 'help' | 'reports' | 'tickets' | 'mesas' | 'ticket-settings' | 'pos-simulator';
 
 export const roleTabs: Record<string, AdminTab[]> = {
-  owner: ['administrators', 'personal', 'branches', 'ticket-settings', 'pos-simulator', 'inventory-dashboard', 'branch-catalog', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'transfers', 'purchase-orders', 'requisitions', 'reports', 'tickets', 'mesas', 'inquiries', 'help'],
-  inventory_admin: ['inventory-dashboard', 'branch-catalog', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'purchase-orders', 'requisitions', 'help'],
-  support_tech: ['tickets', 'mesas', 'personal', 'inventory-dashboard', 'branch-catalog', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'purchase-orders', 'requisitions', 'help'],
+  owner: ['administrators', 'personal', 'branches', 'ticket-settings', 'pos-simulator', 'inventory-dashboard', 'branch-catalog', 'warehouse-inventory', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'transfers', 'purchase-orders', 'requisitions', 'reports', 'tickets', 'mesas', 'inquiries', 'help'],
+  inventory_admin: ['inventory-dashboard', 'branch-catalog', 'warehouse-inventory', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'purchase-orders', 'requisitions', 'help'],
+  support_tech: ['tickets', 'mesas', 'personal', 'inventory-dashboard', 'branch-catalog', 'warehouse-inventory', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'purchase-orders', 'requisitions', 'help'],
 };
 
 function App() {
@@ -128,6 +129,7 @@ function App() {
         {activeTab === 'personal' && <DashboardPage businessId={activeBusinessId} />}
         {activeTab === 'inventory-dashboard' && <InventoryDashboardPage businessId={activeBusinessId} />}
         {activeTab === 'branch-catalog' && <BranchCatalogPage businessId={activeBusinessId} />}
+        {activeTab === 'warehouse-inventory' && <WarehouseInventoryPage businessId={activeBusinessId} />}
         {activeTab === 'inventory' && <InventoryPage businessId={activeBusinessId} />}
         {activeTab === 'providers' && <ProvidersPage businessId={activeBusinessId} />}
         {activeTab === 'inquiries' && <InquiriesPage />}
