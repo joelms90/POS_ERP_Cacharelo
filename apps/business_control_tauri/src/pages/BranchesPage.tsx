@@ -35,6 +35,29 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
   const [zoom, setZoom] = useState<number>(1.0);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 900, height: 900 });
   const [selectedRoom, setSelectedRoom] = useState<string>('General');
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const handleCopyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch {
+      // Fallback for older browsers / non-secure contexts
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = code;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        setCopiedCode(code);
+        setTimeout(() => setCopiedCode(null), 2000);
+      } catch {
+        // ignore
+      }
+    }
+  };
 
   const fetchTables = async () => {
     if (!configuringTablesBranch) return;
@@ -591,8 +614,31 @@ export const BranchesPage: React.FC<BranchesPageProps> = ({ businessId }) => {
               </div>
             </div>
 
-            <div className="w-full text-center bg-charcoal-surface/40 border border-aged-bronze/20 rounded p-2 text-xs font-mono text-text-primary select-all">
-              {linkingBranch.id}
+            <div className="w-full flex items-center gap-2">
+              <div className="flex-1 text-center bg-charcoal-surface/40 border border-aged-bronze/20 rounded p-2 text-xs font-mono text-text-primary select-all truncate">
+                {linkingBranch.id}
+              </div>
+              <button
+                onClick={() => handleCopyCode(linkingBranch.id)}
+                className="shrink-0 px-3 py-2 rounded border border-aged-bronze/40 bg-charcoal-surface/60 text-champagne-gold hover:border-champagne-gold transition-colors text-xs flex items-center gap-1.5"
+                title="Copiar código"
+              >
+                {copiedCode === linkingBranch.id ? (
+                  <>
+                    <svg className="w-4 h-4 text-success-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Copiado
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Copiar
+                  </>
+                )}
+              </button>
             </div>
             <span className="text-[9px] text-text-secondary mt-1.5 self-start">
               * Si la cámara no responde o es de baja calidad, escriba el código UUID anterior en la terminal.
