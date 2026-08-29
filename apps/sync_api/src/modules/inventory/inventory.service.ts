@@ -492,10 +492,41 @@ export class InventoryService {
         unitCost: schema.stockTransferItems.unitCost,
         totalCost: schema.stockTransferItems.totalCost,
         productName: schema.products.name,
+        itemType: schema.products.itemType,
+        providerId: schema.products.providerId,
       })
       .from(schema.stockTransferItems)
       .innerJoin(schema.products, eq(schema.stockTransferItems.productId, schema.products.id))
       .where(eq(schema.stockTransferItems.transferId, transferId));
+
+    // Origin stock availability for each item (for the "Falta" indication)
+    const itemProductIds = items.map((i) => i.productId);
+    let originStockMap = new Map<string, number>();
+    if (itemProductIds.length > 0) {
+      const originCond = [
+        inArray(schema.stockLevels.productId, itemProductIds),
+      ];
+      if (transfer.fromWarehouseId) {
+        originCond.push(eq(schema.stockLevels.warehouseId, transfer.fromWarehouseId));
+      } else if (transfer.fromBranchId) {
+        originCond.push(eq(schema.stockLevels.branchId, transfer.fromBranchId));
+      }
+      const stockRows = await db
+        .select({
+          productId: schema.stockLevels.productId,
+          quantity: schema.stockLevels.quantity,
+        })
+        .from(schema.stockLevels)
+        .where(and(...originCond));
+      for (const r of stockRows) {
+        originStockMap.set(r.productId, parseFloat(r.quantity || '0'));
+      }
+    }
+
+    const itemsWithStock = items.map((i) => ({
+      ...i,
+      availableQty: originStockMap.get(i.productId) ?? 0,
+    }));
 
     const warehouses = await db
       .select()
@@ -515,7 +546,7 @@ export class InventoryService {
       fromBranchName: transfer.fromBranchId ? brMap.get(transfer.fromBranchId) : null,
       toWarehouseName: transfer.toWarehouseId ? whMap.get(transfer.toWarehouseId) : null,
       toBranchName: transfer.toBranchId ? brMap.get(transfer.toBranchId) : null,
-      items,
+      items: itemsWithStock,
     };
   }
 

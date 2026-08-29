@@ -5,6 +5,7 @@ import { Heading } from '../components/atoms/Heading';
 import { Input } from '../components/atoms/Input';
 import { FormField } from '../components/molecules/FormField';
 import { Autocomplete } from '../components/molecules/Autocomplete';
+import { Badge } from '../components/atoms/Badge';
 import { ToastContainer } from '../components/molecules/ToastNotification';
 
 interface TransfersPageProps {
@@ -31,7 +32,7 @@ interface TransferRow {
   notes?: string | null;
   transferredAt?: string | null;
   itemCount?: number;
-  items?: Array<{ productId: string; productName: string; quantity: string; unitCost?: string; totalCost?: string }>;
+  items?: Array<{ productId: string; productName: string; quantity: string; unitCost?: string; totalCost?: string; availableQty?: number; itemType?: string; providerId?: string | null }>;
 }
 
 export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
@@ -59,6 +60,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
 
   const [viewingTransfer, setViewingTransfer] = useState<TransferRow | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
+  const [generatingOc, setGeneratingOc] = useState(false);
 
   // Reports state
   const [showReports, setShowReports] = useState(false);
@@ -225,6 +227,35 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
       showToast(err.message || 'Error al recibir el traspaso.', 'error');
     } finally {
       setActioningId(null);
+    }
+  };
+
+  // Generate a purchase order for the transfer items that are short at the origin
+  const handleGenerateOcForMissing = async () => {
+    if (!viewingTransfer?.items) return;
+    const missing = viewingTransfer.items
+      .filter((i) => (i.availableQty ?? 0) < parseFloat(i.quantity || '0'))
+      .filter((i) => i.itemType === 'raw_material' && !!i.providerId);
+    if (missing.length === 0) {
+      showToast('No hay insumos con proveedor entre los faltantes.', 'warning');
+      return;
+    }
+    setGeneratingOc(true);
+    try {
+      const result = await api.generatePurchaseOrdersByProducts(
+        missing.map((i) => ({
+          productId: i.productId,
+          quantity: parseFloat(i.quantity || '0') - (i.availableQty ?? 0),
+        })),
+        businessId,
+      );
+      const totalItems = result.purchaseOrders.reduce((sum, po) => sum + po.itemCount, 0);
+      showToast(`Se generaron ${result.purchaseOrders.length} OC con ${totalItems} insumos faltantes.`);
+      await handleView(viewingTransfer.id);
+    } catch (err: any) {
+      showToast(err.message || 'Error al generar OC de faltantes.', 'error');
+    } finally {
+      setGeneratingOc(false);
     }
   };
 
@@ -612,15 +643,26 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                       <tr className="bg-charcoal-surface/60 border-b border-aged-bronze/35 text-[11px] font-semibold text-text-secondary uppercase tracking-wider">
                         <th className="px-4 py-3">Producto</th>
                         <th className="px-4 py-3 text-right">Cantidad</th>
+                        <th className="px-4 py-3 text-right">Disponible</th>
+                        <th className="px-4 py-3 text-center">Estado</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-aged-bronze/20">
-                      {viewingTransfer.items.map((item, idx) => (
-                        <tr key={idx}>
-                          <td className="px-4 py-3 font-medium text-text-primary">{item.productName}</td>
-                          <td className="px-4 py-3 text-right font-mono text-champagne-gold">{item.quantity}</td>
-                        </tr>
-                      ))}
+                      {viewingTransfer.items.map((item, idx) => {
+                        const qty = parseFloat(item.quantity || '0');
+                        const avail = item.availableQty ?? 0;
+                        const short = avail < qty;
+                        return (
+                          <tr key={idx}>
+                            <td className="px-4 py-3 font-medium text-text-primary">{item.productName}</td>
+                            <td className="px-4 py-3 text-right font-mono text-champagne-gold">{qty}</td>
+                            <td className={`px-4 py-3 text-right font-mono ${short ? 'text-error-red' : 'text-text-secondary'}`}>{avail}</td>
+                            <td className="px-4 py-3 text-center">
+                              {short ? <Badge variant="error">Falta {qty - avail}</Badge> : <Badge variant="success">OK</Badge>}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 ) : (
@@ -628,7 +670,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                 )}
               </div>
 
-              <div className="p-6 border-t border-aged-bronze/25">
+              <div className="p-6 border-t border-aged-bronze/25 flex flex-col gap-2">
                 {viewingTransfer.status === 'in_transit' && (
                   <Button
                     variant="primary"
@@ -647,6 +689,16 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                     onClick={() => handleShip(viewingTransfer.id)}
                   >
                     {actioningId === viewingTransfer.id ? 'Enviando...' : 'Enviar Traspaso'}
+                  </Button>
+                )}
+                {viewingTransfer.items?.some((i) => (i.availableQty ?? 0) < parseFloat(i.quantity || '0') && i.itemType === 'raw_material' && !!i.providerId) && (
+                  <Button
+                    variant="secondary"
+                    fullWidth
+                    disabled={generatingOc}
+                    onClick={handleGenerateOcForMissing}
+                  >
+                    {generatingOc ? 'Generando...' : 'Generar OC de faltantes'}
                   </Button>
                 )}
               </div>
