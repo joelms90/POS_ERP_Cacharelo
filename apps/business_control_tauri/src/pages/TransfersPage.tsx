@@ -119,7 +119,6 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
   }, [fetchData]);
 
   const resetForm = () => {
-    setIsCreating(false);
     setFromType('warehouse');
     setFromId(warehouses.length > 0 ? warehouses[0].id : '');
     setToType('branch');
@@ -186,6 +185,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
         businessId,
       );
       showToast('Traspaso enviado. Stock en tránsito.', 'success');
+      setIsCreating(false);
       resetForm();
       await fetchData();
     } catch (err: any) {
@@ -624,7 +624,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                 <Button type="submit" className="flex-1" disabled={isSubmitting}>
                   {isSubmitting ? 'Enviando...' : 'Enviar Traspaso'}
                 </Button>
-                <Button type="button" variant="secondary" className="flex-1" onClick={resetForm}>Cancelar</Button>
+                <Button type="button" variant="secondary" className="flex-1" onClick={() => setIsCreating(false)}>Cancelar</Button>
               </div>
             </form>
           </div>

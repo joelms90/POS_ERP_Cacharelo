@@ -128,17 +128,37 @@ export class RequisitionsRepository {
         .returning();
 
       // Create requisition items
+      let insertedItems: Array<typeof schema.branchRequisitionItems.$inferSelect> = [];
       if (data.items && data.items.length > 0) {
-        await tx.insert(schema.branchRequisitionItems).values(
-          data.items.map((item) => ({
-            requisitionId: requisition.id,
-            productId: item.productId,
-            quantityRequested: item.quantityRequested.toString(),
-          })),
-        );
+        insertedItems = await tx
+          .insert(schema.branchRequisitionItems)
+          .values(
+            data.items.map((item) => ({
+              requisitionId: requisition.id,
+              productId: item.productId,
+              quantityRequested: item.quantityRequested.toString(),
+            })),
+          )
+          .returning();
       }
 
-      return this.findByIdWithItems(requisition.id);
+      // Attach product names within the same transaction
+      const productIds = insertedItems.map((i) => i.productId);
+      const products = productIds.length
+        ? await tx
+            .select({ id: schema.products.id, name: schema.products.name })
+            .from(schema.products)
+            .where(inArray(schema.products.id, productIds))
+        : [];
+      const nameMap = new Map(products.map((p) => [p.id, p.name]));
+
+      return {
+        ...requisition,
+        items: insertedItems.map((item) => ({
+          ...item,
+          productName: nameMap.get(item.productId) || null,
+        })),
+      };
     });
   }
 

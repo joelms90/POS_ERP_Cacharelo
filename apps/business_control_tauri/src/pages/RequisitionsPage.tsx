@@ -91,7 +91,6 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
   }, [fetchData]);
 
   const resetForm = () => {
-    setIsCreating(false);
     setFromBranchId(branches.length > 0 ? branches[0].id : '');
     setToWarehouseId(warehouses.length > 0 ? warehouses[0].id : '');
     setReqNotes('');
@@ -179,6 +178,7 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
         items: items.map((it) => ({ productId: it.productId, quantityRequested: it.quantityRequested })),
       });
       showToast('Requisición creada exitosamente.', 'success');
+      setIsCreating(false);
       resetForm();
       await fetchData();
     } catch (err: any) {
@@ -553,7 +553,7 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
                 <Button type="submit" className="flex-1" disabled={isSubmitting}>
                   {isSubmitting ? 'Enviando...' : 'Enviar Requisición'}
                 </Button>
-                <Button type="button" variant="secondary" className="flex-1" onClick={resetForm}>Cancelar</Button>
+                <Button type="button" variant="secondary" className="flex-1" onClick={() => setIsCreating(false)}>Cancelar</Button>
               </div>
             </form>
           </div>
