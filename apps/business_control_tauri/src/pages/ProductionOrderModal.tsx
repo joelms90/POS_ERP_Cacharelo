@@ -137,7 +137,12 @@ export const ProductionOrderModal: React.FC<ProductionOrderModalProps> = ({
         businessId,
       );
       const totalItems = result.purchaseOrders.reduce((sum, po) => sum + po.itemCount, 0);
-      onToast(`Se generaron ${result.purchaseOrders.length} OC con ${totalItems} insumos.`);
+      const skippedCount = result.skipped?.length || 0;
+      let msg = `Se generaron ${result.purchaseOrders.length} OC con ${totalItems} insumos.`;
+      if (skippedCount > 0) {
+        msg += ` ${skippedCount} insumo(s) sin proveedor registrado.`;
+      }
+      onToast(msg, skippedCount > 0 ? 'warning' : 'success');
     } catch (e: any) {
       onToast(e?.message || 'Error al generar OC de faltantes.', 'error');
     } finally {

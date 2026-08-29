@@ -80,7 +80,7 @@ interface ToastContainerProps {
 
 export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onClose }) => {
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-auto">
+    <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-auto">
       {toasts.map((toast) => (
         <ToastNotification
           key={toast.id}
