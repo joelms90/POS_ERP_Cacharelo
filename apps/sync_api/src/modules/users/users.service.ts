@@ -6,10 +6,14 @@ import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 import * as bcrypt from 'bcrypt';
 import { ADMIN_ROLES, UserRole } from '../auth/roles';
+import { BranchesRepository } from '../branches/repositories/branches.repository';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly usersRepository: UsersRepository) {}
+  constructor(
+    private readonly usersRepository: UsersRepository,
+    private readonly branchesRepository: BranchesRepository,
+  ) {}
 
   async findAll(businessId?: string, branchId?: string) {
     const users = await this.usersRepository.findAll(businessId, branchId);
@@ -27,6 +31,7 @@ export class UsersService {
   async create(createUserDto: CreateUserDto) {
     const { businessId, branchId, pin, email, password, role, roles, ...rest } = createUserDto;
     const normalizedRoles = this.normalizeRoles(roles, role);
+    await this.validateBranchForBusiness(businessId, branchId);
 
     // Enforce unique email if provided
     if (email) {
@@ -134,6 +139,7 @@ export class UsersService {
     }
 
     if (branchId !== undefined) {
+      await this.validateBranchForBusiness(user.businessId, branchId);
       updates.branchId = branchId || null;
     }
 
@@ -298,6 +304,24 @@ export class UsersService {
       });
     }
     return Array.from(unique.values());
+  }
+
+  private async validateBranchForBusiness(
+    businessId: string | null | undefined,
+    branchId: string | null | undefined,
+  ) {
+    if (!branchId) return;
+    if (!businessId) {
+      throw new BadRequestException('businessId is required when assigning a branch.');
+    }
+
+    const branch = await this.branchesRepository.findById(branchId);
+    if (!branch) {
+      throw new BadRequestException('La sucursal seleccionada no existe.');
+    }
+    if (branch.businessId !== businessId) {
+      throw new BadRequestException('La sucursal seleccionada no pertenece a este negocio.');
+    }
   }
 
   private generateRandomPin(): string {

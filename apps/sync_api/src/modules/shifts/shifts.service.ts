@@ -27,6 +27,9 @@ export class ShiftsService {
       throw new ConflictException('A cash shift is already active for this cashier and branch.');
     }
 
+    // Auto-close any other open shifts for this branch (stale/abandoned by other cashiers)
+    await this.shiftsRepository.closeAllOpenForBranch(branchId);
+
     return this.shiftsRepository.create({
       branchId,
       cashierId,

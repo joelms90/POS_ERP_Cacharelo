@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../common/colors.dart';
 import '../common/app_state.dart';
 
@@ -16,6 +17,7 @@ class ShiftControlPanel extends StatefulWidget {
 class _ShiftControlPanelState extends State<ShiftControlPanel> {
   final TextEditingController _floatController = TextEditingController();
   final TextEditingController _dropController = TextEditingController();
+  final TextEditingController _dropNoteController = TextEditingController();
   final TextEditingController _closeNotesController = TextEditingController();
   final Map<double, TextEditingController> _denominationControllers = {
     for (final value in _denominations) value: TextEditingController(),
@@ -39,6 +41,7 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
   void dispose() {
     _floatController.dispose();
     _dropController.dispose();
+    _dropNoteController.dispose();
     _closeNotesController.dispose();
     for (final controller in _denominationControllers.values) {
       controller.dispose();
@@ -234,8 +237,11 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
         ),
       );
 
-      final String reason =
+      final String userNote = _dropNoteController.text.trim();
+      final String reasonBase =
           isAdd ? 'Ingreso de caja manual' : 'Retiro de caja manual';
+      final String reason =
+          userNote.isEmpty ? reasonBase : '$reasonBase: $userNote';
       final bool success = isAdd
           ? await widget.state.addCashDrop(amount, reason: reason)
           : await widget.state.removeCashDrop(amount, reason: reason);
@@ -246,6 +252,7 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
 
       if (success) {
         _dropController.clear();
+        _dropNoteController.clear();
         if (mounted) {
           Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -290,14 +297,30 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        content: TextField(
-          controller: _dropController,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Monto en \$',
-            hintText: '0.00',
-          ),
-          style: const TextStyle(color: EmpireColors.textPrimary),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _dropController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Monto en \$',
+                hintText: '0.00',
+              ),
+              style: const TextStyle(color: EmpireColors.textPrimary),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _dropNoteController,
+              decoration: InputDecoration(
+                labelText: 'Nota (opcional)',
+                hintText: isAdd ? 'Ej: Cambio de billetes' : 'Ej: Pago a proveedor',
+              ),
+              style: const TextStyle(color: EmpireColors.textPrimary),
+              maxLength: 200,
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -393,22 +416,98 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
                     ),
                     const SizedBox(height: 8),
                     ..._denominations.map(
-                      (value) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: TextField(
-                          controller: _denominationControllers[value],
-                          keyboardType: TextInputType.number,
-                          onChanged: (_) => setDialogState(() {}),
-                          decoration: InputDecoration(
-                            labelText:
-                                '\$${value == value.roundToDouble() ? value.toInt() : value}',
-                            hintText: 'Cantidad',
+                      (value) {
+                        final controller = _denominationControllers[value]!;
+                        final count = int.tryParse(controller.text.trim()) ?? 0;
+                        final subtotal = value * count;
+                        final label = value == value.roundToDouble()
+                            ? '\$${value.toInt()}'
+                            : '\$${value.toStringAsFixed(1)}';
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            children: [
+                              // Denomination label
+                              SizedBox(
+                                width: 48,
+                                child: Text(
+                                  label,
+                                  style: const TextStyle(
+                                    color: EmpireColors.champagneGold,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              // Minus button
+                              _DenomButton(
+                                icon: Icons.remove,
+                                onTap: () {
+                                  if (count > 0) {
+                                    controller.text = (count - 1).toString();
+                                    setDialogState(() {});
+                                  }
+                                },
+                              ),
+                              const SizedBox(width: 4),
+                              // Count input
+                              SizedBox(
+                                width: 64,
+                                child: TextField(
+                                  controller: controller,
+                                  textAlign: TextAlign.center,
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  onChanged: (_) => setDialogState(() {}),
+                                  decoration: const InputDecoration(
+                                    hintText: '0',
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      vertical: 10,
+                                      horizontal: 6,
+                                    ),
+                                  ),
+                                  style: TextStyle(
+                                    color: count > 0
+                                        ? EmpireColors.textPrimary
+                                        : EmpireColors.textSecondary,
+                                    fontWeight: count > 0
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              // Plus button
+                              _DenomButton(
+                                icon: Icons.add,
+                                onTap: () {
+                                  controller.text = (count + 1).toString();
+                                  setDialogState(() {});
+                                },
+                              ),
+                              const SizedBox(width: 8),
+                              // Subtotal for this denomination
+                              Expanded(
+                                child: Text(
+                                  '= \$${subtotal.toStringAsFixed(2)}',
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(
+                                    color: count > 0
+                                        ? EmpireColors.textPrimary
+                                        : EmpireColors.textSecondary
+                                            .withValues(alpha: 0.4),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          style: const TextStyle(
-                            color: EmpireColors.textPrimary,
-                          ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 8),
                     TextField(
@@ -807,6 +906,36 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
               child: const Text('CORTE Z (CIERRE DE CAJA)'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DenomButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _DenomButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: EmpireColors.agedBronze.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: EmpireColors.agedBronze.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: EmpireColors.champagneGold,
         ),
       ),
     );

@@ -512,7 +512,14 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
   }
 
   Widget _buildPrintStationSection() {
-    final stations = widget.state.onlinePrintStations;
+    final localName = widget.state.localDeviceName.trim().toLowerCase();
+    final stations = widget.state.onlinePrintStations
+        .where(
+          (s) =>
+              s.stationId != widget.state.localStationId &&
+              s.deviceName.trim().toLowerCase() != localName,
+        )
+        .toList();
     final selectedStationId = widget.state.lastSelectedPrintStationId;
 
     return Container(
@@ -745,49 +752,36 @@ class _BluetoothSettingsDialogState extends State<BluetoothSettingsDialog> {
             children: [
               Expanded(
                 child: ChoiceChip(
-                  label: const Text('📱 50mm (26 cols)',
-                      style: TextStyle(fontSize: 10)),
-                  selected: current == '50mm',
-                  onSelected: (selected) {
-                    if (selected) widget.state.setPrinterPaperWidth('50mm');
+                  label: const Text('📱 58mm (26 cols)',
+                      style: TextStyle(fontSize: 11)),
+                  selected: current != '80mm',
+                  onSelected: (selected) async {
+                    if (selected) {
+                      await widget.state.setPrinterPaperWidth('58mm');
+                      if (mounted) setState(() {});
+                    }
                   },
                   selectedColor: EmpireColors.champagneGold,
                   backgroundColor: EmpireColors.charcoalSurface,
                   labelStyle: TextStyle(
-                    color: current == '50mm'
+                    color: current != '80mm'
                         ? EmpireColors.obsidian
                         : EmpireColors.textPrimary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 8),
               Expanded(
                 child: ChoiceChip(
-                  label: const Text('📱 58mm (32 cols)',
-                      style: TextStyle(fontSize: 10)),
-                  selected: current == '58mm',
-                  onSelected: (selected) {
-                    if (selected) widget.state.setPrinterPaperWidth('58mm');
-                  },
-                  selectedColor: EmpireColors.champagneGold,
-                  backgroundColor: EmpireColors.charcoalSurface,
-                  labelStyle: TextStyle(
-                    color: current == '58mm'
-                        ? EmpireColors.obsidian
-                        : EmpireColors.textPrimary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: ChoiceChip(
-                  label: const Text('🖥️ 80mm (48 cols)',
-                      style: TextStyle(fontSize: 10)),
+                  label: const Text('🖥️ 80mm (42 cols)',
+                      style: TextStyle(fontSize: 11)),
                   selected: current == '80mm',
-                  onSelected: (selected) {
-                    if (selected) widget.state.setPrinterPaperWidth('80mm');
+                  onSelected: (selected) async {
+                    if (selected) {
+                      await widget.state.setPrinterPaperWidth('80mm');
+                      if (mounted) setState(() {});
+                    }
                   },
                   selectedColor: EmpireColors.champagneGold,
                   backgroundColor: EmpireColors.charcoalSurface,

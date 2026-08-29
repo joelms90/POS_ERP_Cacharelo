@@ -569,6 +569,8 @@ export const productionRuns = pgTable('production_runs', {
   warehouseId: uuid('warehouse_id')
     .references(() => warehouses.id)
     .notNull(),
+  destinationWarehouseId: uuid('destination_warehouse_id')
+    .references(() => warehouses.id),
   productId: uuid('product_id')
     .references(() => products.id)
     .notNull(),
@@ -576,9 +578,13 @@ export const productionRuns = pgTable('production_runs', {
     precision: 12,
     scale: 3,
   }).notNull(),
-  assembledAt: timestamp('assembled_at', { withTimezone: true })
-    .defaultNow()
-    .notNull(),
+  actualQuantityProduced: decimal('actual_quantity_produced', {
+    precision: 12,
+    scale: 3,
+  }),
+  status: varchar('status', { length: 20 }).default('completed').notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  assembledAt: timestamp('assembled_at', { withTimezone: true }),
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .defaultNow()

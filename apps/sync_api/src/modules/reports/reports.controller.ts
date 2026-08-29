@@ -1,5 +1,6 @@
-import { Controller, Get, Query, BadRequestException, Param } from '@nestjs/common';
+import { Controller, Get, Query, BadRequestException, Param, UseGuards } from '@nestjs/common';
 import { ReportsService } from './reports.service';
+import { AdminGuard } from '../auth/guards/admin.guard';
 
 @Controller('reports')
 export class ReportsController {
@@ -130,5 +131,17 @@ export class ReportsController {
     @Param('id') id: string,
   ) {
     return this.reportsService.getCashShiftAuditReport(id);
+  }
+
+  @Get('tickets/today')
+  @UseGuards(AdminGuard)
+  async getTicketsToday(
+    @Query('businessId') businessId: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    if (!businessId) {
+      throw new BadRequestException('El parámetro businessId es obligatorio.');
+    }
+    return this.reportsService.getTicketsToday(businessId, branchId);
   }
 }

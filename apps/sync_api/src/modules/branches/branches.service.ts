@@ -1,11 +1,16 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { BranchesRepository } from './repositories/branches.repository';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
+import { SyncGateway } from '../sync/sync.gateway';
 
 @Injectable()
 export class BranchesService {
-  constructor(private readonly branchesRepository: BranchesRepository) {}
+  constructor(
+    private readonly branchesRepository: BranchesRepository,
+    @Inject(forwardRef(() => SyncGateway))
+    private readonly syncGateway: SyncGateway,
+  ) {}
 
   async findAll(businessId?: string) {
     return this.branchesRepository.findAll(businessId);
@@ -77,7 +82,16 @@ export class BranchesService {
   }
 
   async updateTable(tableId: string, data: any) {
-    return this.branchesRepository.updateTable(tableId, data);
+    const result = await this.branchesRepository.updateTable(tableId, data);
+    if (data.state && result?.branchId) {
+      this.syncGateway.broadcastChange(result.branchId, {
+        tipo: 'cambio',
+        changes: [
+          { entity: 'branchTables', entityId: tableId, payload: { state: data.state } },
+        ],
+      });
+    }
+    return result;
   }
 
   async generateTables(branchId: string, mode: 'cafeteria' | 'mostrador') {

@@ -54,6 +54,16 @@ export const UserForm: React.FC<UserFormProps> = ({
   const isEditing = Boolean(editingUser);
 
   useEffect(() => {
+    setBranchId('');
+  }, [businessId]);
+
+  useEffect(() => {
+    if (branchId && !branches.some((branch) => branch.id === branchId)) {
+      setBranchId('');
+    }
+  }, [branchId, branches]);
+
+  useEffect(() => {
     if (!editingUser) {
       setName('');
       setPin('');
@@ -128,11 +138,14 @@ export const UserForm: React.FC<UserFormProps> = ({
 
     setIsLoading(true);
     try {
+      const validBranchId = branches.some((branch) => branch.id === branchId)
+        ? branchId
+        : undefined;
       const payload = {
         name: name.trim(),
         role: roles[0],
         roles,
-        branchId: branchId || undefined,
+        branchId: validBranchId,
         ...(pin ? { pin } : {}),
       };
 

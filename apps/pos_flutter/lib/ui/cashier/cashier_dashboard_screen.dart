@@ -3,6 +3,7 @@ import '../common/colors.dart';
 import '../common/app_state.dart';
 import '../widgets/printer_monitor_panel.dart';
 import '../widgets/printer_settings_dialog.dart';
+import '../widgets/app_version_badge.dart';
 import '../login_screen.dart';
 import 'shift_control_panel.dart';
 import 'split_checkout_view.dart';
@@ -319,6 +320,8 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                   ],
                 ),
               ),
+              const SizedBox(width: 10),
+              AppVersionBadge(version: widget.state.appVersion),
               const SizedBox(width: 12),
 
               // --- SUB-GROUP 1: Section Navigation ---

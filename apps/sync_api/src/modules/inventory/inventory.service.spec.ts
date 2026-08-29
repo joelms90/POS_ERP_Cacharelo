@@ -19,6 +19,7 @@ describe('InventoryService - Average Cost Recalculation', () => {
         select: jest.fn().mockImplementation(() => recordCall('select')),
         from: jest.fn().mockImplementation(() => recordCall('from')),
         leftJoin: jest.fn().mockImplementation(() => recordCall('leftJoin')),
+        innerJoin: jest.fn().mockImplementation(() => recordCall('innerJoin')),
         where: jest.fn().mockImplementation(() => recordCall('where')),
         limit: jest.fn().mockImplementation(() => recordCall('limit')),
         update: jest.fn().mockImplementation(() => recordCall('update')),
@@ -167,6 +168,95 @@ describe('InventoryService - Average Cost Recalculation', () => {
       const updatedProduct = mockDb.getUpdatedProduct();
       expect(updatedProduct).toBeDefined();
       expect(updatedProduct.cost).toBe('9'); // Default to actual cost
+    });
+  });
+
+  describe('Production Order (OP) Lifecycle', () => {
+    const warehouseId = 'wh-origin-1';
+    const destWarehouseId = 'wh-dest-2';
+    const productId = 'prod-finished-1';
+    const ingredientId = 'prod-raw-1';
+    const businessId = 'bus-uuid-1';
+    const runId = 'op-uuid-1';
+
+    it('should create a planned OP with pending status without deducting stock', async () => {
+      const dbRows = [
+        [{ id: 'rec-1', parentProductId: productId, ingredientProductId: ingredientId, quantityNeeded: '2' }], // 1. Recipe
+        [{ id: productId, businessId, name: 'Pizza Margherita' }], // 2. Product
+        [{ id: runId, status: 'pending' }], // 3. Insert productionRun returning
+      ];
+
+      const mockDb = createMockDb(dbRows);
+      mockInventoryRepository.getDb.mockReturnValue(mockDb);
+
+      const result = await service.assembleProduct({
+        warehouseId,
+        destinationWarehouseId: destWarehouseId,
+        productId,
+        quantityProduced: 5,
+        status: 'pending',
+        notes: 'Producción programada',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('pending');
+      expect(result.productionRunId).toBe(runId);
+      expect(mockLedgerService.applyMovement).not.toHaveBeenCalled();
+    });
+
+    it('should start a pending OP and transition to in_progress', async () => {
+      const dbRows = [
+        [{ id: runId, status: 'pending' }], // 1. Find run
+        [], // 2. Update status
+      ];
+
+      const mockDb = createMockDb(dbRows);
+      mockInventoryRepository.getDb.mockReturnValue(mockDb);
+
+      const result = await service.startProductionRun(runId);
+
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('in_progress');
+      expect(result.productionRunId).toBe(runId);
+    });
+
+    it('should complete an OP, updating status and applying ledger movements to origin and destination warehouses', async () => {
+      const dbRows = [
+        [{ id: runId, productId, warehouseId, destinationWarehouseId: destWarehouseId, quantityProduced: '5', status: 'in_progress' }], // 1. Find run
+        [{ id: 'rec-1', parentProductId: productId, ingredientProductId: ingredientId, quantityNeeded: '2', ingredientName: 'Harina' }], // 2. Recipe
+        [{ quantity: '20.000' }], // 3. Stock check for ingredient
+        [{ id: productId, businessId, name: 'Pizza Margherita' }], // 4. Product
+        [], // 5. Update OP record
+      ];
+
+      const mockDb = createMockDb(dbRows);
+      mockInventoryRepository.getDb.mockReturnValue(mockDb);
+
+      const result = await service.completeProductionRun(runId, {
+        actualQuantityProduced: 5,
+        destinationWarehouseId: destWarehouseId,
+        notes: 'Producción finalizada exitosamente',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('completed');
+      // Should have 2 movements: 1 production_output (destination) + 1 production_input (origin)
+      expect(mockLedgerService.applyMovement).toHaveBeenCalledTimes(2);
+    });
+
+    it('should cancel a pending OP', async () => {
+      const dbRows = [
+        [{ id: runId, status: 'pending' }], // 1. Find run
+        [], // 2. Update status
+      ];
+
+      const mockDb = createMockDb(dbRows);
+      mockInventoryRepository.getDb.mockReturnValue(mockDb);
+
+      const result = await service.cancelProductionRun(runId);
+
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('cancelled');
     });
   });
 });

@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'common/colors.dart';
 import 'common/app_state.dart';
 import 'common/update_dialog.dart';
+import 'widgets/app_version_badge.dart';
 import 'waiter/waiter_ordering_screen.dart';
 import 'cashier/cashier_dashboard_screen.dart';
 import 'kitchen/kitchen_dashboard_screen.dart';
@@ -25,18 +26,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // Terminal Activation Controllers
   final TextEditingController _jsonController = TextEditingController();
-  final TextEditingController _businessIdController = TextEditingController(
-    text: 'd3b07384-d113-4a0e-a555-e5b12824bf01',
-  );
+  final TextEditingController _businessIdController = TextEditingController();
   final TextEditingController _branchIdController = TextEditingController();
-  final TextEditingController _businessNameController = TextEditingController(
-    text: 'Empire POS',
-  );
-  final TextEditingController _branchNameController = TextEditingController(
-    text: 'Sucursal Centro',
-  );
+  final TextEditingController _businessNameController = TextEditingController();
+  final TextEditingController _branchNameController = TextEditingController();
   final TextEditingController _apiUrlController = TextEditingController(
-    text: 'https://pos-sync-api-232144991863.us-central1.run.app/api',
+    text: configuredDefaultApiUrl,
   );
 
   bool _showManualConfig = false;
@@ -471,10 +466,12 @@ class _LoginScreenState extends State<LoginScreen> {
         nextScreen = KitchenDashboardScreen(state: widget.state);
         break;
       case UserRole.encargado:
-        nextScreen = EncargadoDashboardScreen(state: widget.state, showFullFeatures: false);
+        nextScreen = EncargadoDashboardScreen(
+            state: widget.state, showFullFeatures: false);
         break;
       case UserRole.responsable:
-        nextScreen = EncargadoDashboardScreen(state: widget.state, showFullFeatures: true);
+        nextScreen = EncargadoDashboardScreen(
+            state: widget.state, showFullFeatures: true);
         break;
       default:
         return;
@@ -654,6 +651,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                               fontSize: 10,
                                             ),
                                       ),
+                                      const SizedBox(height: 8),
+                                      AppVersionBadge(version: widget.state.appVersion),
                                       SizedBox(height: titleGap),
 
                                       // PIN Code indicators
@@ -861,6 +860,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
+                  AppVersionBadge(version: widget.state.appVersion),
                 ],
               ),
             ],

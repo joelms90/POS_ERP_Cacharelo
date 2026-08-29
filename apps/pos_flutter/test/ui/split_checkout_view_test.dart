@@ -219,7 +219,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // Clear SnackBar so it doesn't block the bottom buttons
-    ScaffoldMessenger.of(tester.element(find.byType(SplitCheckoutView))).clearSnackBars();
+    ScaffoldMessenger.of(tester.element(find.byType(SplitCheckoutView)))
+        .clearSnackBars();
     await tester.pumpAndSettle();
 
     // Verification:
@@ -236,7 +237,8 @@ void main() {
     await tester.tap(pagarBtn);
     await tester.pumpAndSettle();
 
-    ScaffoldMessenger.of(tester.element(find.byType(SplitCheckoutView))).clearSnackBars();
+    ScaffoldMessenger.of(tester.element(find.byType(SplitCheckoutView)))
+        .clearSnackBars();
     await tester.pumpAndSettle();
 
     expect(mockTable.state, TableState.billing);
@@ -258,7 +260,9 @@ void main() {
     tester.view.resetDevicePixelRatio();
   });
 
-  testWidgets('SplitCheckoutView disables payment button when no items selected in item-split mode', (
+  testWidgets(
+      'SplitCheckoutView disables payment button when no items selected in item-split mode',
+      (
     WidgetTester tester,
   ) async {
     tester.view.physicalSize = const Size(1280, 800);
@@ -282,6 +286,87 @@ void main() {
       find.widgetWithText(ElevatedButton, 'PROCESAR COBRO'),
     );
     expect(pagarBtn.onPressed, isNull);
+
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+
+  testWidgets('SplitCheckoutView charges by assigned comensal totals', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+
+    var successCount = 0;
+    await tester.pumpWidget(createViewUnderTest(onSuccess: () {
+      successCount++;
+    }));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('POR\nCOMENSAL'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('División por Comensal'), findsOneWidget);
+    expect(find.text('P1  \$20.00'), findsOneWidget);
+    expect(find.text('P2  \$10.00'), findsOneWidget);
+
+    await tester.tap(find.text('INICIAR COBROS'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cobrar P1'), findsOneWidget);
+    expect(find.textContaining('1 producto(s) • \$20.00'), findsOneWidget);
+
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Monto recibido'), '25');
+    await tester.pumpAndSettle();
+    expect(find.text('\$5.00'), findsAtLeastNWidgets(1));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'COBRAR'));
+    await tester.pumpAndSettle();
+
+    expect(mockTable.items.length, 1);
+    expect(mockTable.state, TableState.billing);
+    expect(state.printJobs, isEmpty);
+    expect(find.text('Cobrar P2'), findsOneWidget);
+    expect(find.textContaining('1 producto(s) • \$10.00'), findsOneWidget);
+
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Monto recibido'), '10');
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ElevatedButton, 'COBRAR Y CERRAR'));
+    await tester.pumpAndSettle();
+
+    expect(mockTable.items, isEmpty);
+    expect(mockTable.state, TableState.cleaning);
+    expect(successCount, 1);
+    expect(state.printJobs.length, 1);
+    expect(state.printJobs.single.title, contains('Resumen Final'));
+
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+
+  testWidgets('SplitCheckoutView blocks zero-total comensales', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+
+    await tester.pumpWidget(createViewUnderTest(onSuccess: () {}));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('POR\nCOMENSAL'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.add_circle_outline).first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('P3  \$0.00'), findsOneWidget);
+    expect(find.textContaining('Sin productos: P3'), findsOneWidget);
+
+    final startButton = tester.widget<ElevatedButton>(
+      find.widgetWithText(ElevatedButton, 'INICIAR COBROS'),
+    );
+    expect(startButton.onPressed, isNull);
 
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();

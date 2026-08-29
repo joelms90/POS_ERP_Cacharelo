@@ -61,7 +61,7 @@ describe('RequisitionsService', () => {
 
       const result = await service.findByBranch('branch-1');
       expect(result).toEqual(list);
-      expect(repository.findByBranch).toHaveBeenCalledWith('branch-1');
+      expect(repository.findByBranch).toHaveBeenCalledWith('branch-1', undefined);
     });
   });
 

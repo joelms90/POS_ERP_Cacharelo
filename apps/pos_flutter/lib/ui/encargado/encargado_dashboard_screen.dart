@@ -4,6 +4,7 @@ import '../common/app_state.dart';
 import '../login_screen.dart';
 import '../widgets/printer_monitor_panel.dart';
 import '../widgets/printer_settings_dialog.dart';
+import '../widgets/app_version_badge.dart';
 import '../requisitions/create_requisition.dart';
 import 'encargado_pos_tab.dart';
 import 'encargado_orders_tab.dart';
@@ -200,6 +201,8 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
                   fontSize: 12,
                 ),
               ),
+              const SizedBox(width: 10),
+              AppVersionBadge(version: widget.state.appVersion),
             ],
           ),
           const Spacer(),

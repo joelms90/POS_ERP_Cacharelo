@@ -7,6 +7,8 @@ import 'package:pos_flutter/ui/waiter/payment_flow_dialog.dart';
 
 class FakeSecureStorageService extends SecureStorageService {
   List<Map<String, dynamic>> pendingSaleSyncJobs = [];
+  List<Map<String, dynamic>> pendingOrderSyncJobs = [];
+  List<Map<String, dynamic>> readyPickupOrders = [];
 
   @override
   Future<Map<String, String>?> getTerminalConfig() async => null;
@@ -22,6 +24,26 @@ class FakeSecureStorageService extends SecureStorageService {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> getPendingOrderSyncJobs() async =>
+      pendingOrderSyncJobs;
+
+  @override
+  Future<void> savePendingOrderSyncJobs(List<Map<String, dynamic>> jobs) async {
+    pendingOrderSyncJobs =
+        jobs.map((job) => Map<String, dynamic>.from(job)).toList();
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getReadyPickupOrders() async =>
+      readyPickupOrders;
+
+  @override
+  Future<void> saveReadyPickupOrders(List<Map<String, dynamic>> orders) async {
+    readyPickupOrders =
+        orders.map((order) => Map<String, dynamic>.from(order)).toList();
+  }
+
+  @override
   Future<Map<String, dynamic>?> getTicketFiscalConfig() async => null;
 
   @override
@@ -31,7 +53,11 @@ class FakeSecureStorageService extends SecureStorageService {
   Future<Map<String, String>?> getSavedPrinter() async => null;
 
   @override
-  Future<Map<String, dynamic>?> verifyOfflineCredentials(String pin) async =>
+  Future<Map<String, dynamic>?> verifyOfflineCredentials(
+    String pin, {
+    String? businessId,
+    String? branchId,
+  }) async =>
       null;
 }
 

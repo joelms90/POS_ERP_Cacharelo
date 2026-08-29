@@ -400,6 +400,26 @@ async function main() {
     await client.query('CREATE INDEX IF NOT EXISTS "idx_branch_products_product" ON "branch_products" USING btree ("product_id");');
     console.log('Branch products table ensured.');
 
+    // 17. Production Orders (OP) lifecycle and destination warehouse support
+    await client.query(`
+      ALTER TABLE "production_runs" 
+      ADD COLUMN IF NOT EXISTS "destination_warehouse_id" uuid REFERENCES "warehouses"("id"),
+      ADD COLUMN IF NOT EXISTS "status" varchar(20) DEFAULT 'completed' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "actual_quantity_produced" numeric(12, 3),
+      ADD COLUMN IF NOT EXISTS "started_at" timestamp with time zone;
+    `);
+    await client.query(`
+      ALTER TABLE "production_runs" ALTER COLUMN "assembled_at" DROP NOT NULL;
+    `);
+    await client.query(`
+      UPDATE "production_runs"
+      SET "status" = 'completed',
+          "actual_quantity_produced" = COALESCE("actual_quantity_produced", "quantity_produced"),
+          "destination_warehouse_id" = COALESCE("destination_warehouse_id", "warehouse_id")
+      WHERE "status" IS NULL OR "destination_warehouse_id" IS NULL;
+    `);
+    console.log('Production runs OP lifecycle and routing columns ensured.');
+
     console.log('✅ Idempotent migrations executed successfully!');
   } catch (error) {
     console.error('❌ Failed to run idempotent migrations:', error);

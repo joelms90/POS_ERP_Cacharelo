@@ -15,6 +15,7 @@ interface PosSimulatorPageProps {
 }
 
 type ToastType = 'success' | 'error' | 'warning';
+type CorteSimulationType = 'x' | 'z';
 
 const TAX_RATE = 0.16;
 
@@ -60,6 +61,134 @@ const userHasRole = (user: Employee, role: string) => {
   return roles.includes(role as any);
 };
 
+const buildCorteSimulation = (
+  type: CorteSimulationType,
+  branchName: string,
+  cashierName: string,
+) => {
+  const openedAt = new Date(Date.now() - 1000 * 60 * 60 * 6);
+  const generatedAt = new Date();
+  const initialFloat = 1000;
+  const cashSales = 1840;
+  const cardSales = 1265;
+  const otherSales = 0;
+  const manualCashIn = 250;
+  const manualCashOut = 400;
+  const expectedCash = initialFloat + cashSales + manualCashIn - manualCashOut;
+  const denominationCounts = {
+    '500': 3,
+    '200': 4,
+    '100': 2,
+    '50': 1,
+    '20': 7,
+  };
+  const actualCash =
+    type === 'z'
+      ? Object.entries(denominationCounts).reduce(
+          (sum, [value, count]) => sum + Number(value) * count,
+          0,
+        )
+      : null;
+  const cashDifference = actualCash === null ? null : actualCash - expectedCash;
+  const title =
+    type === 'x' ? 'Corte X - Arqueo Parcial' : 'Corte Z - Cierre de Caja';
+  const snapshot = {
+    shiftInfo: {
+      id: 'sim_shift_0001',
+      cashierName,
+      branchName,
+      status: type === 'x' ? 'open' : 'closed',
+      openedAt: openedAt.toISOString(),
+      closedAt: type === 'z' ? generatedAt.toISOString() : null,
+    },
+    summary: {
+      initialFloat,
+      cashSales,
+      cardSales,
+      otherSales,
+      totalSales: cashSales + cardSales + otherSales,
+      manualCashIn,
+      manualCashOut,
+      expectedCash,
+      actualCash,
+      cashDifference,
+    },
+    salesByPaymentMethod: [
+      { paymentMethod: 'cash', total: cashSales, count: 12 },
+      { paymentMethod: 'card', total: cardSales, count: 7 },
+    ],
+    cashMovements: [
+      {
+        type: 'cash-in',
+        amount: manualCashIn,
+        reason: 'Cambio adicional',
+        createdAt: new Date(openedAt.getTime() + 1000 * 60 * 90).toISOString(),
+      },
+      {
+        type: 'cash-out',
+        amount: manualCashOut,
+        reason: 'Retiro a administracion',
+        createdAt: new Date(openedAt.getTime() + 1000 * 60 * 220).toISOString(),
+      },
+    ],
+    denominationCounts: type === 'z' ? denominationCounts : null,
+    closeNotes:
+      type === 'z'
+        ? 'Simulacion: el cajero documenta la diferencia antes de cerrar.'
+        : null,
+    generatedAt: generatedAt.toISOString(),
+    simulated: true,
+  };
+
+  const ticketLines = [
+    title.toUpperCase(),
+    `Fecha: ${generatedAt.toLocaleString('es-MX')}`,
+    `Sucursal: ${branchName}`,
+    `Operador: ${cashierName}`,
+    `Apertura: ${openedAt.toLocaleString('es-MX')}`,
+    type === 'z' ? `Cierre: ${generatedAt.toLocaleString('es-MX')}` : '',
+    '',
+    'VENTAS',
+    `Efectivo: ${formatCurrency(cashSales)}`,
+    `Tarjeta: ${formatCurrency(cardSales)}`,
+    `Otros: ${formatCurrency(otherSales)}`,
+    `Total ventas: ${formatCurrency(cashSales + cardSales + otherSales)}`,
+    '',
+    'EFECTIVO EN CAJA',
+    `Fondo inicial: ${formatCurrency(initialFloat)}`,
+    `Ventas efectivo: ${formatCurrency(cashSales)}`,
+    `Ingresos: ${formatCurrency(manualCashIn)}`,
+    `Retiros: ${formatCurrency(manualCashOut)}`,
+    `Esperado sistema: ${formatCurrency(expectedCash)}`,
+    type === 'z' ? `Contado fisico: ${formatCurrency(actualCash || 0)}` : '',
+    type === 'z' ? `Diferencia: ${formatCurrency(cashDifference || 0)}` : '',
+    type === 'z' ? '' : '',
+    type === 'z' ? 'DENOMINACIONES' : '',
+    ...(type === 'z'
+      ? Object.entries(denominationCounts).map(
+          ([value, count]) =>
+            `$${value} x ${count} = ${formatCurrency(Number(value) * count)}`,
+        )
+      : []),
+    '',
+    'MOVIMIENTOS',
+    `cash-in ${formatCurrency(manualCashIn)} - Cambio adicional`,
+    `cash-out ${formatCurrency(manualCashOut)} - Retiro a administracion`,
+    type === 'z' ? '' : '',
+    type === 'z' ? 'NOTAS' : '',
+    type === 'z'
+      ? 'Simulacion: el cajero documenta la diferencia antes de cerrar.'
+      : '',
+  ].filter((line, index, lines) => line !== '' || lines[index - 1] !== '');
+
+  return {
+    type,
+    title,
+    ticket: ticketLines.join('\n'),
+    snapshot,
+  };
+};
+
 export const PosSimulatorPage: React.FC<PosSimulatorPageProps> = ({ businessId }) => {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState('');
@@ -75,6 +204,7 @@ export const PosSimulatorPage: React.FC<PosSimulatorPageProps> = ({ businessId }
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+  const [corteSimulation, setCorteSimulation] = useState<ReturnType<typeof buildCorteSimulation> | null>(null);
 
   const showToast = useCallback((message: string, type: ToastType = 'success') => {
     setToast({ message, type });
@@ -259,6 +389,15 @@ export const PosSimulatorPage: React.FC<PosSimulatorPageProps> = ({ businessId }
     } finally {
       setBusy(null);
     }
+  };
+
+  const handleSimulateCorte = (type: CorteSimulationType) => {
+    const branchName =
+      branches.find((branch) => branch.id === selectedBranchId)?.name ||
+      'Sucursal simulada';
+    setCorteSimulation(
+      buildCorteSimulation(type, branchName, 'Cajero Simulador'),
+    );
   };
 
   return (
@@ -455,6 +594,21 @@ export const PosSimulatorPage: React.FC<PosSimulatorPageProps> = ({ businessId }
             <p className="text-xs text-text-secondary mt-1">Ve órdenes activas, solicita cuenta y cobra.</p>
           </div>
 
+          <div className="grid grid-cols-2 gap-2 rounded border border-aged-bronze/20 bg-charcoal-surface/30 p-3">
+            <button
+              onClick={() => handleSimulateCorte('x')}
+              className="px-3 py-2 rounded border border-aged-bronze/40 text-[11px] text-text-secondary hover:text-champagne-gold hover:border-champagne-gold/60 transition-all"
+            >
+              Simular Corte X
+            </button>
+            <button
+              onClick={() => handleSimulateCorte('z')}
+              className="px-3 py-2 rounded bg-champagne-gold text-obsidian text-[11px] font-bold hover:bg-white transition-all"
+            >
+              Simular Corte Z
+            </button>
+          </div>
+
           <div className="flex-1 overflow-y-auto flex flex-col gap-3 pr-1">
             {selectedBranchOrders.length === 0 ? (
               <div className="h-full min-h-[220px] flex items-center justify-center border border-dashed border-aged-bronze/25 rounded text-sm text-text-secondary">
@@ -519,6 +673,49 @@ export const PosSimulatorPage: React.FC<PosSimulatorPageProps> = ({ businessId }
           </div>
         </section>
       </div>
+
+      {corteSimulation && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-5xl max-h-[90vh] overflow-hidden rounded border border-aged-bronze/40 bg-obsidian shadow-2xl flex flex-col">
+            <div className="flex items-start justify-between gap-4 border-b border-aged-bronze/20 p-5">
+              <div>
+                <h3 className="text-champagne-gold text-lg font-semibold">
+                  {corteSimulation.title}
+                </h3>
+                <p className="text-xs text-text-secondary mt-1">
+                  Vista simulada. No se guarda informacion ni se llama al API.
+                </p>
+              </div>
+              <button
+                onClick={() => setCorteSimulation(null)}
+                className="px-3 py-1 rounded border border-aged-bronze/40 text-text-secondary hover:text-champagne-gold hover:border-champagne-gold/60"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-y-auto p-5">
+              <section className="min-h-[420px] rounded border border-aged-bronze/25 bg-charcoal-surface/40 p-4">
+                <h4 className="text-xs uppercase tracking-widest text-text-secondary mb-3">
+                  Ticket que se imprimiria
+                </h4>
+                <pre className="whitespace-pre-wrap font-mono text-xs leading-5 text-text-primary bg-black/30 rounded p-4 overflow-x-auto">
+                  {corteSimulation.ticket}
+                </pre>
+              </section>
+
+              <section className="min-h-[420px] rounded border border-aged-bronze/25 bg-charcoal-surface/40 p-4">
+                <h4 className="text-xs uppercase tracking-widest text-text-secondary mb-3">
+                  Snapshot que se guardaria
+                </h4>
+                <pre className="whitespace-pre-wrap font-mono text-xs leading-5 text-text-primary bg-black/30 rounded p-4 overflow-x-auto">
+                  {JSON.stringify(corteSimulation.snapshot, null, 2)}
+                </pre>
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

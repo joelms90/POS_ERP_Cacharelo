@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../common/colors.dart';
 import '../common/app_state.dart';
 import '../widgets/offline_status_bar.dart';
+import '../widgets/app_version_badge.dart';
 import '../login_screen.dart';
 
 class KitchenDashboardScreen extends StatefulWidget {
@@ -152,7 +153,9 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
                   fontSize: 13,
                 ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 12),
+              AppVersionBadge(version: widget.state.appVersion),
+              const SizedBox(width: 12),
               PopupMenuButton<String>(
                 icon: const Icon(
                   Icons.settings,

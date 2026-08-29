@@ -32,14 +32,16 @@ This is a **monorepo** with multiple independent apps. Multiple development sess
    git checkout -b 011-purchase-orders-requisitions/admin      # for apps/business_control_tauri/
    ```
 
-## Essential Documentation
+## Essential Documentation & Quick Lookup
 
 | Document | Purpose | When to Read |
 |----------|---------|--------------|
-| [`.claude/workspaces.md`](.claude/workspaces.md) | **Active workspace tracking** | **ALWAYS read FIRST** before starting work |
-| [`.claude/monorepo-branch-strategy.md`](.claude/monorepo-branch-strategy.md) | **Multi-session coordination guide** | When working in parallel with other sessions |
+| [`docs/AGENT_NAVIGATION_GUIDE.md`](docs/AGENT_NAVIGATION_GUIDE.md) | **Where to look by domain** | Before starting any code changes |
+| [`.claude/workspaces.md`](.claude/workspaces.md) | **Active workspace tracking** | ALWAYS read FIRST before starting work |
+| [`HANDOFF.md`](HANDOFF.md) | **Latest session state & handoff** | When picking up or resuming work |
+| [`INVENTORY_ARCHITECTURE.md`](INVENTORY_ARCHITECTURE.md) | **Inventory, BOM & OP architecture** | Before modifying inventory/production |
+| [`docs/pre-deployment-checklist.md`](docs/pre-deployment-checklist.md) | **DB migrations & deploy checklist** | Before migrating DB or deploying |
 | [`.claude/deployment-agent.md`](.claude/deployment-agent.md) | **Deployment operations manual** | When deploying any component |
-| [`.claude/README.md`](.claude/README.md) | **Directory index** | Quick navigation to all docs |
 
 ## App Boundaries
 

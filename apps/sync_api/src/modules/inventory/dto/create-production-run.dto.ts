@@ -6,6 +6,10 @@ export class CreateProductionRunDto {
   warehouseId: string;
 
   @IsUUID()
+  @IsOptional()
+  destinationWarehouseId?: string;
+
+  @IsUUID()
   @IsNotEmpty()
   productId: string;
 
@@ -16,5 +20,10 @@ export class CreateProductionRunDto {
 
   @IsString()
   @IsOptional()
+  status?: 'pending' | 'completed';
+
+  @IsString()
+  @IsOptional()
   notes?: string;
 }
+

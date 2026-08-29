@@ -1,0 +1,17 @@
+# Cursor Agent Rules
+
+Master Instructions: This repository follows the multi-agent coordination protocol and navigation guidelines in:
+- AGENTS.md
+- docs/AGENT_NAVIGATION_GUIDE.md
+- HANDOFF.md
+
+Quick Navigation:
+- Database & Migrations: docs/pre-deployment-checklist.md, apps/sync_api/src/database/schema.ts
+- Inventory & Production (OP): INVENTORY_ARCHITECTURE.md
+- Admin Dashboard: apps/business_control_tauri/src/services/api.ts
+- POS Flutter: apps/pos_flutter/lib/ui/common/app_state.dart
+- Local Testing: docs/App local testing.md
+- Deployments: .claude/deployment-agent.md
+
+Session Wrap-Up Protocol:
+Before ending a session, update HANDOFF.md, affected domain architecture docs, .claude/workspaces.md, and ensure builds pass cleanly.

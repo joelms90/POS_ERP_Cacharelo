@@ -3,6 +3,7 @@ import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
 import { eq, and, isNull, desc } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 @Injectable()
 export class InventoryRepository {
@@ -29,20 +30,23 @@ export class InventoryRepository {
         id: schema.stockLevels.id,
         productId: schema.stockLevels.productId,
         productName: schema.products.name,
-        isIngredient: schema.products.isIngredient,
-        isActive: schema.products.isActive,
+        sku: schema.products.sku,
+        warehouseId: schema.stockLevels.warehouseId,
+        warehouseName: schema.warehouses.name,
+        branchId: schema.stockLevels.branchId,
+        branchName: schema.branches.name,
         quantity: schema.stockLevels.quantity,
         updatedAt: schema.stockLevels.updatedAt,
-        warehouseId: schema.stockLevels.warehouseId,
-        branchId: schema.stockLevels.branchId,
       })
       .from(schema.stockLevels)
       .innerJoin(schema.products, eq(schema.stockLevels.productId, schema.products.id))
+      .leftJoin(schema.warehouses, eq(schema.stockLevels.warehouseId, schema.warehouses.id))
+      .leftJoin(schema.branches, eq(schema.stockLevels.branchId, schema.branches.id))
       .where(
         and(
           eq(schema.products.businessId, businessId),
           ...conditions,
-        )
+        ),
       );
   }
 
@@ -50,12 +54,15 @@ export class InventoryRepository {
     return this.db
       .select({
         id: schema.inventoryReceipts.id,
+        providerId: schema.inventoryReceipts.providerId,
         providerName: schema.providers.name,
         documentNumber: schema.inventoryReceipts.documentNumber,
+        warehouseId: schema.inventoryReceipts.warehouseId,
+        warehouseName: schema.warehouses.name,
+        branchId: schema.inventoryReceipts.branchId,
+        branchName: schema.branches.name,
         receivedAt: schema.inventoryReceipts.receivedAt,
         notes: schema.inventoryReceipts.notes,
-        warehouseName: schema.warehouses.name,
-        branchName: schema.branches.name,
       })
       .from(schema.inventoryReceipts)
       .innerJoin(schema.providers, eq(schema.inventoryReceipts.providerId, schema.providers.id))
@@ -65,19 +72,32 @@ export class InventoryRepository {
   }
 
   async getProductionRuns(businessId: string) {
+    const originWarehouse = alias(schema.warehouses, 'origin_warehouse');
+    const destinationWarehouse = alias(schema.warehouses, 'destination_warehouse');
+
     return this.db
       .select({
         id: schema.productionRuns.id,
-        warehouseName: schema.warehouses.name,
+        warehouseId: schema.productionRuns.warehouseId,
+        warehouseName: originWarehouse.name,
+        destinationWarehouseId: schema.productionRuns.destinationWarehouseId,
+        destinationWarehouseName: destinationWarehouse.name,
+        productId: schema.productionRuns.productId,
         productName: schema.products.name,
+        productSku: schema.products.sku,
         quantityProduced: schema.productionRuns.quantityProduced,
+        actualQuantityProduced: schema.productionRuns.actualQuantityProduced,
+        status: schema.productionRuns.status,
+        startedAt: schema.productionRuns.startedAt,
         assembledAt: schema.productionRuns.assembledAt,
         notes: schema.productionRuns.notes,
+        createdAt: schema.productionRuns.createdAt,
       })
       .from(schema.productionRuns)
-      .innerJoin(schema.warehouses, eq(schema.productionRuns.warehouseId, schema.warehouses.id))
+      .innerJoin(originWarehouse, eq(schema.productionRuns.warehouseId, originWarehouse.id))
+      .leftJoin(destinationWarehouse, eq(schema.productionRuns.destinationWarehouseId, destinationWarehouse.id))
       .innerJoin(schema.products, eq(schema.productionRuns.productId, schema.products.id))
-      .where(eq(schema.warehouses.businessId, businessId))
-      .orderBy(desc(schema.productionRuns.assembledAt));
+      .where(eq(originWarehouse.businessId, businessId))
+      .orderBy(desc(schema.productionRuns.createdAt));
   }
 }

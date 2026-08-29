@@ -9,6 +9,7 @@
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
+    "dev": "nest start --watch",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
@@ -23,6 +24,8 @@
     "db:clean-today": "ts-node src/database/clean-today-sales.ts",
     "db:clean-old-history": "ts-node src/database/clean-old-sales-history.ts",
     "db:clean-all-sales": "ts-node src/database/clean-all-sales-history.ts",
+    "db:query-tickets-hoy": "ts-node src/database/query-tickets-hoy.ts",
+    "db:pull-prod": "./scripts/sync-db-from-prod.sh",
     "migrate": "tsx scripts/run-migrations.ts"
   },
   "dependencies": {

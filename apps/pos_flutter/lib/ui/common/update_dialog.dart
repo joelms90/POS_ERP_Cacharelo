@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../common/colors.dart';
 import '../../services/version_service.dart';
@@ -463,16 +464,23 @@ class UpdateCheckButton extends StatefulWidget {
 class _UpdateCheckButtonState extends State<UpdateCheckButton> {
   bool _isChecking = false;
   UpdateCheckResult? _lastResult;
+  Timer? _initialCheckTimer;
 
   @override
   void initState() {
     super.initState();
     // Perform initial check after a short delay (don't block login)
-    Future.delayed(const Duration(seconds: 2), () {
+    _initialCheckTimer = Timer(const Duration(seconds: 2), () {
       if (mounted) {
         _checkForUpdates(silent: true);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _initialCheckTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _checkForUpdates({bool silent = false}) async {

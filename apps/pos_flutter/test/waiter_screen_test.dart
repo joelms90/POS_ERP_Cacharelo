@@ -635,4 +635,57 @@ void main() {
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
   });
+
+  testWidgets('Waiter ready pickup dialog uses durable pickup list',
+      (WidgetTester tester) async {
+    final state = AppState();
+    state.currentUserRole = UserRole.waiter;
+    state.currentUserName = 'Juan (Mesero)';
+    state.readyPickupOrders = [
+      KitchenOrder(
+        id: 'ready-ticket-1',
+        tableLabel: 'Mesa Persistida',
+        items: [
+          OrderItem(
+            item: const MenuItem(
+              id: 'product-1',
+              name: 'Cafe Americano',
+              price: 25,
+              category: 'Bebidas',
+            ),
+            quantity: 2,
+            isSent: true,
+          ),
+        ],
+        timestamp: DateTime(2026, 8, 5),
+        status: 'ready',
+        station: 'barra',
+      ),
+    ];
+
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(
+          useMaterial3: true,
+          splashFactory: NoSplash.splashFactory,
+        ),
+        home: WaiterOrderingScreen(state: state),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('1'), findsWidgets);
+    await tester.tap(find.byTooltip('Pedidos Listos para Entregar'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Mesa Persistida'), findsOneWidget);
+    expect(find.textContaining('2x Cafe Americano'), findsOneWidget);
+
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
 }

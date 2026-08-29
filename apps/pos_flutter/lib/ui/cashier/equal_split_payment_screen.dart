@@ -45,7 +45,8 @@ class EqualSplitPaymentScreen extends StatefulWidget {
   });
 
   @override
-  State<EqualSplitPaymentScreen> createState() => _EqualSplitPaymentScreenState();
+  State<EqualSplitPaymentScreen> createState() =>
+      _EqualSplitPaymentScreenState();
 }
 
 class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
@@ -53,7 +54,8 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
   int _currentStep = 0; // Current payment step (0-indexed)
   List<PaymentStepData> _payments = []; // Collected payments
   double _selectedDiscount = 0.0;
-  final Map<int, double> _customPersonAmounts = {}; // Per-person custom override amounts
+  final Map<int, double> _customPersonAmounts =
+      {}; // Per-person custom override amounts
 
   final TextEditingController _cashController = TextEditingController();
   final TextEditingController _cardRefController = TextEditingController();
@@ -97,6 +99,7 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
 
   double get _currentAmountToPay => getPersonAmount(_currentStep);
 
+  // ignore: unused_element
   double get _totalCollected {
     double sum = 0.0;
     for (int i = 0; i < _currentStep; i++) {
@@ -105,6 +108,7 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
     return sum;
   }
 
+  // ignore: unused_element
   bool get _isConfigStep => _currentStep == -1;
   bool get _isLastPayment => _currentStep == _splitCount - 1;
 
@@ -115,7 +119,8 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
       _customPersonAmounts.removeWhere((key, value) => key >= _splitCount);
       _payments = List.generate(
         _splitCount,
-        (index) => index < _payments.length ? _payments[index] : PaymentStepData(),
+        (index) =>
+            index < _payments.length ? _payments[index] : PaymentStepData(),
       );
     });
   }
@@ -139,11 +144,13 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
           backgroundColor: EmpireColors.onyxSurface,
           title: Row(
             children: [
-              const Icon(Icons.edit, color: EmpireColors.champagneGold, size: 20),
+              const Icon(Icons.edit,
+                  color: EmpireColors.champagneGold, size: 20),
               const SizedBox(width: 8),
               Text(
                 'Monto Persona ${personIndex + 1}',
-                style: const TextStyle(color: EmpireColors.textGold, fontSize: 16),
+                style:
+                    const TextStyle(color: EmpireColors.textGold, fontSize: 16),
               ),
             ],
           ),
@@ -153,13 +160,15 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
             children: [
               Text(
                 'Total Mesa (${widget.table.label}): \$${widget.table.total.toStringAsFixed(2)}',
-                style: const TextStyle(color: EmpireColors.textSecondary, fontSize: 12),
+                style: const TextStyle(
+                    color: EmpireColors.textSecondary, fontSize: 12),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: controller,
                 autofocus: true,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 style: const TextStyle(
                   color: EmpireColors.textPrimary,
                   fontSize: 20,
@@ -167,13 +176,18 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
                 ),
                 decoration: InputDecoration(
                   prefixText: '\$ ',
-                  prefixStyle: const TextStyle(color: EmpireColors.champagneGold, fontSize: 20, fontWeight: FontWeight.bold),
+                  prefixStyle: const TextStyle(
+                      color: EmpireColors.champagneGold,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold),
                   filled: true,
                   fillColor: EmpireColors.charcoalSurface,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: EmpireColors.champagneGold, width: 2),
+                    borderSide: const BorderSide(
+                        color: EmpireColors.champagneGold, width: 2),
                   ),
                 ),
               ),
@@ -184,7 +198,11 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
                 children: [50, 100, 150, 200, 300, 500].map((preset) {
                   return ActionChip(
                     backgroundColor: EmpireColors.charcoalSurface,
-                    label: Text('\$$preset', style: const TextStyle(color: EmpireColors.champagneGold, fontSize: 12, fontWeight: FontWeight.bold)),
+                    label: Text('\$$preset',
+                        style: const TextStyle(
+                            color: EmpireColors.champagneGold,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold)),
                     onPressed: () {
                       controller.text = preset.toDouble().toStringAsFixed(2);
                     },
@@ -202,11 +220,13 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
                   });
                   Navigator.of(context).pop();
                 },
-                child: const Text('Restablecer Equitativo', style: TextStyle(color: EmpireColors.warningOrange)),
+                child: const Text('Restablecer Equitativo',
+                    style: TextStyle(color: EmpireColors.warningOrange)),
               ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar', style: TextStyle(color: EmpireColors.textSecondary)),
+              child: const Text('Cancelar',
+                  style: TextStyle(color: EmpireColors.textSecondary)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -247,7 +267,8 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
       setState(() {
         _currentStep--;
         final prevPayment = _payments[_currentStep];
-        if (prevPayment.paymentMethod == 'Efectivo' && prevPayment.cashReceived != null) {
+        if (prevPayment.paymentMethod == 'Efectivo' &&
+            prevPayment.cashReceived != null) {
           _cashController.text = prevPayment.cashReceived!.toStringAsFixed(2);
         }
         if (prevPayment.cardRefCode != null) {
@@ -264,7 +285,8 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
     if (currentPayment.paymentMethod == 'Efectivo') {
       final cash = double.tryParse(_cashController.text) ?? 0.0;
       if (cash < targetAmount) {
-        _showError('El efectivo recibido es menor que el monto a pagar (\$${targetAmount.toStringAsFixed(2)})');
+        _showError(
+            'El efectivo recibido es menor que el monto a pagar (\$${targetAmount.toStringAsFixed(2)})');
         return false;
       }
       currentPayment.cashReceived = cash;
@@ -300,6 +322,7 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
       isEqualSplit: true,
       splitCount: 1, // We're done, final payment
       originalSplitCount: _splitCount,
+      printCustomerTicket: false,
       // Pass all payment data as metadata (backend will need to handle this)
       // For now, we process the last payment method used
       // TODO: Backend should be updated to accept array of payments
@@ -456,12 +479,17 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
-                onPressed: _currentStep > 0 ? null : () => _updateSplitCount(_splitCount - 1),
+                onPressed: _currentStep > 0
+                    ? null
+                    : () => _updateSplitCount(_splitCount - 1),
                 icon: const Icon(Icons.remove_circle_outline),
-                color: _currentStep > 0 ? EmpireColors.textSecondary : EmpireColors.champagneGold,
+                color: _currentStep > 0
+                    ? EmpireColors.textSecondary
+                    : EmpireColors.champagneGold,
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 decoration: BoxDecoration(
                   color: EmpireColors.onyxSurface,
                   borderRadius: BorderRadius.circular(8),
@@ -476,9 +504,13 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
                 ),
               ),
               IconButton(
-                onPressed: _currentStep > 0 ? null : () => _updateSplitCount(_splitCount + 1),
+                onPressed: _currentStep > 0
+                    ? null
+                    : () => _updateSplitCount(_splitCount + 1),
                 icon: const Icon(Icons.add_circle_outline),
-                color: _currentStep > 0 ? EmpireColors.textSecondary : EmpireColors.champagneGold,
+                color: _currentStep > 0
+                    ? EmpireColors.textSecondary
+                    : EmpireColors.champagneGold,
               ),
             ],
           ),
@@ -535,17 +567,25 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
             border: Border.all(
               color: isCurrent
                   ? EmpireColors.champagneGold
-                  : (isCompleted ? EmpireColors.successGreen : EmpireColors.agedBronzeDark),
+                  : (isCompleted
+                      ? EmpireColors.successGreen
+                      : EmpireColors.agedBronzeDark),
               width: isCurrent ? 2 : 1,
             ),
           ),
           child: Row(
             children: [
               Icon(
-                isCompleted ? Icons.check_circle : (isCurrent ? Icons.radio_button_checked : Icons.radio_button_unchecked),
+                isCompleted
+                    ? Icons.check_circle
+                    : (isCurrent
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked),
                 color: isCompleted
                     ? EmpireColors.successGreen
-                    : (isCurrent ? EmpireColors.champagneGold : EmpireColors.textSecondary),
+                    : (isCurrent
+                        ? EmpireColors.champagneGold
+                        : EmpireColors.textSecondary),
                 size: 24,
               ),
               const SizedBox(width: 12),
@@ -558,17 +598,22 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
                         Text(
                           'Persona ${index + 1}',
                           style: TextStyle(
-                            color: isCurrent ? EmpireColors.champagneGold : EmpireColors.textPrimary,
-                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                            color: isCurrent
+                                ? EmpireColors.champagneGold
+                                : EmpireColors.textPrimary,
+                            fontWeight:
+                                isCurrent ? FontWeight.bold : FontWeight.normal,
                             fontSize: 13,
                           ),
                         ),
                         if (isCustom) ...[
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 1),
                             decoration: BoxDecoration(
-                              color: EmpireColors.champagneGold.withOpacity(0.2),
+                              color:
+                                  EmpireColors.champagneGold.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
@@ -600,10 +645,12 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
               ),
               // Amount display & edit chip
               InkWell(
-                onTap: isCompleted ? null : () => _showOverrideAmountDialog(index),
+                onTap:
+                    isCompleted ? null : () => _showOverrideAmountDialog(index),
                 borderRadius: BorderRadius.circular(6),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: isCustom
                         ? EmpireColors.champagneGold.withOpacity(0.2)
@@ -719,7 +766,8 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
                     });
                   }
                 },
-                selectedColor: EmpireColors.champagneGold.withValues(alpha: 0.3),
+                selectedColor:
+                    EmpireColors.champagneGold.withValues(alpha: 0.3),
                 backgroundColor: EmpireColors.charcoalSurface,
                 labelStyle: TextStyle(
                   color: currentPayment.paymentMethod == 'Efectivo'
@@ -747,7 +795,8 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
                     });
                   }
                 },
-                selectedColor: EmpireColors.champagneGold.withValues(alpha: 0.3),
+                selectedColor:
+                    EmpireColors.champagneGold.withValues(alpha: 0.3),
                 backgroundColor: EmpireColors.charcoalSurface,
                 labelStyle: TextStyle(
                   color: currentPayment.paymentMethod == 'Tarjeta'
@@ -803,7 +852,8 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: EmpireColors.champagneGold, width: 2),
+              borderSide:
+                  const BorderSide(color: EmpireColors.champagneGold, width: 2),
             ),
           ),
         ),
@@ -819,7 +869,8 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: EmpireColors.charcoalSurface,
                 foregroundColor: EmpireColors.champagneGold,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
               child: Text('\$$amount'),
             );
@@ -861,7 +912,8 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: EmpireColors.champagneGold, width: 2),
+              borderSide:
+                  const BorderSide(color: EmpireColors.champagneGold, width: 2),
             ),
           ),
         ),
@@ -883,19 +935,24 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
       ),
       child: Column(
         children: [
-          _buildSummaryRow('Monto a pagar:', '\$${target.toStringAsFixed(2)}', isTotal: true),
-          if (_payments[_currentStep].paymentMethod == 'Efectivo' && cashReceived > 0) ...[
+          _buildSummaryRow('Monto a pagar:', '\$${target.toStringAsFixed(2)}',
+              isTotal: true),
+          if (_payments[_currentStep].paymentMethod == 'Efectivo' &&
+              cashReceived > 0) ...[
             const Divider(color: EmpireColors.agedBronzeDark, height: 24),
-            _buildSummaryRow('Efectivo recibido:', '\$${cashReceived.toStringAsFixed(2)}'),
+            _buildSummaryRow(
+                'Efectivo recibido:', '\$${cashReceived.toStringAsFixed(2)}'),
             if (cashChange > 0)
-              _buildSummaryRow('Cambio:', '\$${cashChange.toStringAsFixed(2)}', isHighlighted: true),
+              _buildSummaryRow('Cambio:', '\$${cashChange.toStringAsFixed(2)}',
+                  isHighlighted: true),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isTotal = false, bool isHighlighted = false}) {
+  Widget _buildSummaryRow(String label, String value,
+      {bool isTotal = false, bool isHighlighted = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -904,7 +961,9 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
           Text(
             label,
             style: TextStyle(
-              color: isHighlighted ? EmpireColors.successGreen : EmpireColors.textSecondary,
+              color: isHighlighted
+                  ? EmpireColors.successGreen
+                  : EmpireColors.textSecondary,
               fontSize: isTotal ? 15 : 13,
               fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
             ),
@@ -912,7 +971,11 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
           Text(
             value,
             style: TextStyle(
-              color: isHighlighted ? EmpireColors.successGreen : (isTotal ? EmpireColors.champagneGold : EmpireColors.textPrimary),
+              color: isHighlighted
+                  ? EmpireColors.successGreen
+                  : (isTotal
+                      ? EmpireColors.champagneGold
+                      : EmpireColors.textPrimary),
               fontSize: isTotal ? 16 : 14,
               fontWeight: FontWeight.bold,
             ),
@@ -953,7 +1016,9 @@ class _EqualSplitPaymentScreenState extends State<EqualSplitPaymentScreen> {
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: _isLastPayment ? EmpireColors.successGreen : EmpireColors.champagneGold,
+              backgroundColor: _isLastPayment
+                  ? EmpireColors.successGreen
+                  : EmpireColors.champagneGold,
               foregroundColor: EmpireColors.obsidian,
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),

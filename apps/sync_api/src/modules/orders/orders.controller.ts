@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { AddOrderItemsDto } from './dto/add-order-items.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { AdminGuard } from '../auth/guards/admin.guard';
 
 @Controller('orders')
 export class OrdersController {
@@ -18,6 +19,13 @@ export class OrdersController {
   @HttpCode(HttpStatus.OK)
   async findActive(@Query('branchId') branchId: string) {
     return this.ordersService.findActiveByBranch(branchId);
+  }
+
+  @Get('active/business')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AdminGuard)
+  async findActiveByBusiness(@Query('businessId') businessId: string) {
+    return this.ordersService.findActiveByBusiness(businessId);
   }
 
   @Get(':id')

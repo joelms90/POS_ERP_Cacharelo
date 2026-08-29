@@ -13,6 +13,7 @@ describe('OrdersService', () => {
     findById: jest.fn(),
     findActiveByBranch: jest.fn(),
     addItems: jest.fn(),
+    findExistingOrderItemClientUuids: jest.fn(),
     updateOrderAndTableState: jest.fn(),
     createPayment: jest.fn(),
   };
@@ -47,13 +48,14 @@ describe('OrdersService', () => {
   describe('create', () => {
     it('should create order and items successfully', async () => {
       const createDto = {
+        clientUuid: 'client-order-1',
         branchId: 'branch-1',
         tableId: 'table-1',
         waiterId: 'waiter-1',
         subtotal: '100.00',
         total: '116.00',
         items: [
-          { productId: 'prod-1', quantity: 2, price: '50.00' },
+          { clientUuid: 'client-item-1', productId: 'prod-1', quantity: 2, price: '50.00' },
         ],
       };
 
@@ -62,7 +64,15 @@ describe('OrdersService', () => {
       const result = await service.create(createDto);
       expect(result).toBeDefined();
       expect(result.id).toBe('order-1');
-      expect(repository.create).toHaveBeenCalled();
+      expect(repository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ clientUuid: 'client-order-1' }),
+        [
+          expect.objectContaining({
+            clientUuid: 'client-item-1',
+            productId: 'prod-1',
+          }),
+        ],
+      );
     });
   });
 
@@ -81,6 +91,7 @@ describe('OrdersService', () => {
       };
 
       mockOrdersRepository.findById.mockResolvedValue(order);
+      mockOrdersRepository.findExistingOrderItemClientUuids.mockResolvedValue(new Set());
       mockOrdersRepository.addItems.mockResolvedValue({
         id: 'order-1',
         subtotal: '200.00',
@@ -97,6 +108,39 @@ describe('OrdersService', () => {
       const result = await service.addItems('order-1', addItemsDto);
       expect(result.subtotal).toBe('200.00');
       expect(result.total).toBe('232.00');
+    });
+
+    it('should return the current order without adding duplicate clientUuid items', async () => {
+      const order = {
+        id: 'order-1',
+        branchId: 'branch-1',
+        tableId: 'table-1',
+        waiterId: 'waiter-1',
+        subtotal: '100.00',
+        discount: '0.00',
+        tax: '16.00',
+        total: '116.00',
+        state: 'open',
+      };
+
+      mockOrdersRepository.findById.mockResolvedValue(order);
+      mockOrdersRepository.findExistingOrderItemClientUuids.mockResolvedValue(
+        new Set(['client-item-1']),
+      );
+
+      const result = await service.addItems('order-1', {
+        items: [
+          {
+            clientUuid: 'client-item-1',
+            productId: 'prod-2',
+            quantity: 2,
+            price: '50.00',
+          },
+        ],
+      });
+
+      expect(result).toBe(order);
+      expect(repository.addItems).not.toHaveBeenCalled();
     });
 
     it('should throw ConflictException if order is not in open state', async () => {

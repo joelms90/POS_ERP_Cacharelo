@@ -51,4 +51,20 @@ export class ShiftsRepository {
       .returning();
     return results[0];
   }
+
+  async closeAllOpenForBranch(branchId: string) {
+    await this.db
+      .update(schema.cashShifts)
+      .set({
+        status: 'closed',
+        closedAt: new Date(),
+        closeNotes: 'Auto-cierre: nuevo turno abierto',
+      })
+      .where(
+        and(
+          eq(schema.cashShifts.branchId, branchId),
+          eq(schema.cashShifts.status, 'open'),
+        ),
+      );
+  }
 }

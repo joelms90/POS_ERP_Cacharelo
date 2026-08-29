@@ -17,6 +17,8 @@ class SecureStorageService {
   static const String _saltKeyName = 'local_pin_salt';
   static const String _usersCacheKey = 'cached_offline_users';
   static const String _pendingSaleSyncJobsKey = 'pending_sale_sync_jobs';
+  static const String _pendingOrderSyncJobsKey = 'pending_order_sync_jobs';
+  static const String _readyPickupOrdersKey = 'ready_pickup_orders';
   static const String _ticketFiscalConfigKey = 'ticket_fiscal_config';
   static const String _pendingRequisitionsKey = 'pending_requisitions_list';
   static const String _cachedIngredientsKey = 'cached_ingredients_list';
@@ -153,6 +155,8 @@ class SecureStorageService {
     required String pin,
     required String role,
     List<String>? roles,
+    String? businessId,
+    String? branchId,
   }) async {
     final hashedPin = await hashPin(pin);
     final normalizedRoles = _normalizeRoles(roles, role);
@@ -175,22 +179,20 @@ class SecureStorageService {
       'pinHash': hashedPin,
       'role': normalizedRoles.first,
       'roles': normalizedRoles,
+      'businessId': businessId,
+      'branchId': branchId,
     });
 
     await _write(_usersCacheKey, jsonEncode(users));
   }
 
   // Overwrite operators cache from dynamic sync
-  Future<void> cacheOperatorsOffline(List<dynamic> operators) async {
-    final usersJson = await _read(_usersCacheKey);
+  Future<void> cacheOperatorsOffline(
+    List<dynamic> operators, {
+    String? businessId,
+    String? branchId,
+  }) async {
     List<dynamic> users = [];
-    if (usersJson != null) {
-      try {
-        users = jsonDecode(usersJson);
-      } catch (e) {
-        users = [];
-      }
-    }
 
     for (var op in operators) {
       final String name = op['name'] ?? '';
@@ -208,6 +210,8 @@ class SecureStorageService {
           'role': roles.first,
           'roles': roles,
           'isBcrypt': true,
+          'businessId': businessId,
+          'branchId': branchId,
         });
       }
     }
@@ -216,7 +220,11 @@ class SecureStorageService {
   }
 
   // Verify a PIN offline by hashing it and checking it against the secure storage cache
-  Future<Map<String, dynamic>?> verifyOfflineCredentials(String pin) async {
+  Future<Map<String, dynamic>?> verifyOfflineCredentials(
+    String pin, {
+    String? businessId,
+    String? branchId,
+  }) async {
     final hashedPin = await hashPin(pin);
     final usersJson = await _read(_usersCacheKey);
     if (usersJson == null) return null;
@@ -239,12 +247,22 @@ class SecureStorageService {
         }
 
         if (pinMatches) {
+          final id = user['id'] as String? ?? '';
+          if (!_isUuid(id)) {
+            continue;
+          }
+          if (!_matchesScope(user,
+              businessId: businessId, branchId: branchId)) {
+            continue;
+          }
           final roles = _normalizeRoles(user['roles'], user['role'] as String?);
           return {
-            'id': user['id'] as String? ?? '',
+            'id': id,
             'name': user['name'] as String,
             'role': roles.first,
             'roles': roles,
+            'businessId': user['businessId'] as String?,
+            'branchId': user['branchId'] as String?,
           };
         }
       }
@@ -252,6 +270,26 @@ class SecureStorageService {
       return null;
     }
     return null;
+  }
+
+  bool _matchesScope(
+    dynamic user, {
+    String? businessId,
+    String? branchId,
+  }) {
+    if (user is! Map) return false;
+    final cachedBusinessId = user['businessId']?.toString();
+    final cachedBranchId = user['branchId']?.toString();
+    if (_isUuid(businessId) && cachedBusinessId != businessId) return false;
+    if (_isUuid(branchId) && cachedBranchId != branchId) return false;
+    return true;
+  }
+
+  bool _isUuid(String? value) {
+    if (value == null) return false;
+    return RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(value);
   }
 
   List<String> _normalizeRoles(dynamic roles, String? fallbackRole) {
@@ -283,7 +321,7 @@ class SecureStorageService {
     try {
       final List<dynamic> decoded = jsonDecode(jobsJson);
       return decoded
-          .where((job) => job is Map)
+          .whereType<Map>()
           .map((job) => Map<String, dynamic>.from(job))
           .toList();
     } catch (e) {
@@ -296,13 +334,53 @@ class SecureStorageService {
     await _write(_pendingSaleSyncJobsKey, jsonEncode(jobs));
   }
 
+  Future<List<Map<String, dynamic>>> getPendingOrderSyncJobs() async {
+    final jobsJson = await _read(_pendingOrderSyncJobsKey);
+    if (jobsJson == null || jobsJson.isEmpty) return [];
+
+    try {
+      final List<dynamic> decoded = jsonDecode(jobsJson);
+      return decoded
+          .whereType<Map>()
+          .map((job) => Map<String, dynamic>.from(job))
+          .toList();
+    } catch (e) {
+      debugPrint('Error reading pending order sync jobs: $e');
+      return [];
+    }
+  }
+
+  Future<void> savePendingOrderSyncJobs(List<Map<String, dynamic>> jobs) async {
+    await _write(_pendingOrderSyncJobsKey, jsonEncode(jobs));
+  }
+
+  Future<List<Map<String, dynamic>>> getReadyPickupOrders() async {
+    final raw = await _read(_readyPickupOrdersKey);
+    if (raw == null || raw.isEmpty) return [];
+
+    try {
+      final List<dynamic> decoded = jsonDecode(raw);
+      return decoded
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } catch (e) {
+      debugPrint('Error reading ready pickup orders: $e');
+      return [];
+    }
+  }
+
+  Future<void> saveReadyPickupOrders(List<Map<String, dynamic>> orders) async {
+    await _write(_readyPickupOrdersKey, jsonEncode(orders));
+  }
+
   Future<List<Map<String, dynamic>>> getPendingRequisitions() async {
     final raw = await _read(_pendingRequisitionsKey);
     if (raw == null || raw.isEmpty) return [];
     try {
       final List<dynamic> decoded = jsonDecode(raw);
       return decoded
-          .where((item) => item is Map)
+          .whereType<Map>()
           .map((item) => Map<String, dynamic>.from(item))
           .toList();
     } catch (e) {
@@ -363,6 +441,22 @@ class SecureStorageService {
         'station_${DateTime.now().millisecondsSinceEpoch}_$suffix';
     await _write(_localStationIdKey, stationId);
     return stationId;
+  }
+
+  static const _deviceIdKey = 'pos_device_id';
+
+  Future<String> getOrCreateDeviceId() async {
+    final existing = await _read(_deviceIdKey);
+    if (existing != null && existing.isNotEmpty) {
+      return existing;
+    }
+    final random = Random.secure();
+    final suffix = List<int>.generate(6, (_) => random.nextInt(256))
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+        .join();
+    final deviceId = 'device_${DateTime.now().millisecondsSinceEpoch}_$suffix';
+    await _write(_deviceIdKey, deviceId);
+    return deviceId;
   }
 
   Future<void> saveLastPrintStationId(String stationId) async {

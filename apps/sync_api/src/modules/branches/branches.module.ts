@@ -1,11 +1,12 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BranchesController } from './branches.controller';
 import { BranchesService } from './branches.service';
 import { BranchesRepository } from './repositories/branches.repository';
 import { DatabaseModule } from '../../database/database.module';
+import { SyncModule } from '../sync/sync.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, forwardRef(() => SyncModule)],
   controllers: [BranchesController],
   providers: [BranchesService, BranchesRepository],
   exports: [BranchesService, BranchesRepository],

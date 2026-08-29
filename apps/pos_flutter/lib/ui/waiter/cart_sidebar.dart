@@ -10,7 +10,7 @@ class CartSidebar extends StatefulWidget {
   final Future<bool> Function() onRemoveGuest;
   final VoidCallback? onBillingRequested;
   final VoidCallback onBackToMenu;
-  final Function(
+  final Future<bool> Function(
     List<OrderItem> finalItems,
     int guests,
     ComandaPrintSelection printSelection,
@@ -37,6 +37,7 @@ class CartSidebar extends StatefulWidget {
 class _CartSidebarState extends State<CartSidebar> {
   late List<OrderItem> _cartItems;
   int _guests = 1;
+  bool _isSubmitting = false;
 
   Widget _buildGuestBadge(String guestLabel) {
     final match = RegExp(r'P(\d+)').firstMatch(guestLabel);
@@ -196,8 +197,10 @@ class _CartSidebarState extends State<CartSidebar> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   ElevatedButton(
-                    onPressed: () =>
-                        Navigator.of(context).pop(ComandaPrintSelection.auto),
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => Navigator.of(context)
+                            .pop(ComandaPrintSelection.auto),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: EmpireColors.champagneGold,
                       foregroundColor: EmpireColors.obsidian,
@@ -207,8 +210,10 @@ class _CartSidebarState extends State<CartSidebar> {
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton(
-                    onPressed: () =>
-                        Navigator.of(context).pop(ComandaPrintSelection.none),
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => Navigator.of(context)
+                            .pop(ComandaPrintSelection.none),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: EmpireColors.charcoalSurface,
                       foregroundColor: EmpireColors.textPrimary,
@@ -222,7 +227,9 @@ class _CartSidebarState extends State<CartSidebar> {
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(null),
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => Navigator.of(context).pop(null),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: EmpireColors.textSecondary),
                       foregroundColor: EmpireColors.textPrimary,
@@ -239,7 +246,11 @@ class _CartSidebarState extends State<CartSidebar> {
     );
 
     if (result != null) {
-      widget.onConfirm(_cartItems, _guests, result);
+      setState(() => _isSubmitting = true);
+      final sent = await widget.onConfirm(_cartItems, _guests, result);
+      if (mounted && !sent) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -617,62 +628,73 @@ class _CartSidebarState extends State<CartSidebar> {
               const SizedBox(width: 16),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: _cartItems.isEmpty
-                      ? () async {
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              backgroundColor: EmpireColors.obsidian,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: const BorderSide(
-                                    color: EmpireColors.agedBronze, width: 1.5),
-                              ),
-                              title: const Text(
-                                'Liberar Mesa',
-                                style: TextStyle(
-                                  color: EmpireColors.champagneGold,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              content: Text(
-                                '¿Deseas liberar la ${widget.table.label}? Todos los platillos actuales se eliminarán y la mesa quedará libre.',
-                                style: const TextStyle(
-                                    color: EmpireColors.textPrimary),
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(false),
-                                  child: const Text(
-                                    'CANCELAR',
+                  onPressed: _isSubmitting
+                      ? null
+                      : _cartItems.isEmpty
+                          ? () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  backgroundColor: EmpireColors.obsidian,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: const BorderSide(
+                                        color: EmpireColors.agedBronze,
+                                        width: 1.5),
+                                  ),
+                                  title: const Text(
+                                    'Liberar Mesa',
                                     style: TextStyle(
-                                        color: EmpireColors.textSecondary),
+                                      color: EmpireColors.champagneGold,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
+                                  content: Text(
+                                    '¿Deseas liberar la ${widget.table.label}? Todos los platillos actuales se eliminarán y la mesa quedará libre.',
+                                    style: const TextStyle(
+                                        color: EmpireColors.textPrimary),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(false),
+                                      child: const Text(
+                                        'CANCELAR',
+                                        style: TextStyle(
+                                            color: EmpireColors.textSecondary),
+                                      ),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(true),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: EmpireColors.errorRed,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      child: const Text(
+                                        'LIBERAR',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                ElevatedButton(
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(true),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: EmpireColors.errorRed,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  child: const Text(
-                                    'LIBERAR',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (confirm == true) {
-                            widget.onConfirm([], 0, ComandaPrintSelection.none);
-                          }
-                        }
-                      : ((!_cartItems.any((i) => !i.isSent))
-                          ? null
-                          : _showConfirmOrderDialog),
+                              );
+                              if (confirm == true) {
+                                setState(() => _isSubmitting = true);
+                                final sent = await widget.onConfirm(
+                                  [],
+                                  0,
+                                  ComandaPrintSelection.none,
+                                );
+                                if (mounted && !sent) {
+                                  setState(() => _isSubmitting = false);
+                                }
+                              }
+                            }
+                          : ((!_cartItems.any((i) => !i.isSent))
+                              ? null
+                              : _showConfirmOrderDialog),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     backgroundColor: _cartItems.isEmpty
@@ -685,7 +707,11 @@ class _CartSidebarState extends State<CartSidebar> {
                     disabledForegroundColor: EmpireColors.textSecondary,
                   ),
                   child: Text(
-                    _cartItems.isEmpty ? 'LIBERAR MESA' : 'CONFIRMAR PEDIDO',
+                    _isSubmitting
+                        ? 'ENVIANDO...'
+                        : (_cartItems.isEmpty
+                            ? 'LIBERAR MESA'
+                            : 'CONFIRMAR PEDIDO'),
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,

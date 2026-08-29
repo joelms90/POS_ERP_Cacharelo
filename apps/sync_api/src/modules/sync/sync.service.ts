@@ -11,6 +11,10 @@ import { SyncGateway } from './sync.gateway';
 @Injectable()
 export class SyncService implements OnModuleInit {
   private readonly logger = new Logger(SyncService.name);
+  private lastTakeawaySelfHealAt = 0;
+  private readonly takeawaySelfHealIntervalMs = Number(
+    process.env.TAKEAWAY_SELF_HEAL_INTERVAL_MS ?? 60_000,
+  );
 
   constructor(
     @Inject(DRIZZLE_CONNECTION)
@@ -385,22 +389,7 @@ export class SyncService implements OnModuleInit {
   }
 
   async pull(pullSyncDto: PullSyncDto) {
-    // Self-healing: Reset any 'Para Llevar' table that is stuck in occupied/billing/cleaning but has no active orders
-    try {
-      await this.db.execute(sql`
-        UPDATE branch_tables
-        SET state = 'free', updated_at = NOW()
-        WHERE room = 'Para Llevar'
-          AND state != 'free'
-          AND id NOT IN (
-            SELECT table_id FROM orders
-            WHERE state IN ('open', 'billing')
-              AND deleted_at IS NULL
-          )
-      `);
-    } catch (err) {
-      this.logger.error('Failed to run self-healing query for takeaway tables:', err);
-    }
+    await this.maybeHealTakeawayTables(pullSyncDto.branchId);
 
     const lastSyncedAt = pullSyncDto.lastSyncedAt
       ? new Date(pullSyncDto.lastSyncedAt)
@@ -477,6 +466,47 @@ export class SyncService implements OnModuleInit {
         cashTransactions,
       },
     };
+  }
+
+  private async maybeHealTakeawayTables(branchId?: string) {
+    const now = Date.now();
+    if (now - this.lastTakeawaySelfHealAt < this.takeawaySelfHealIntervalMs) {
+      return;
+    }
+
+    this.lastTakeawaySelfHealAt = now;
+
+    try {
+      if (branchId) {
+        await this.db.execute(sql`
+          UPDATE branch_tables
+          SET state = 'free', updated_at = NOW()
+          WHERE branch_id = ${branchId}
+            AND room = 'Para Llevar'
+            AND state != 'free'
+            AND id NOT IN (
+              SELECT table_id FROM orders
+              WHERE branch_id = ${branchId}
+                AND state IN ('open', 'billing')
+                AND deleted_at IS NULL
+            )
+        `);
+      } else {
+        await this.db.execute(sql`
+          UPDATE branch_tables
+          SET state = 'free', updated_at = NOW()
+          WHERE room = 'Para Llevar'
+            AND state != 'free'
+            AND id NOT IN (
+              SELECT table_id FROM orders
+              WHERE state IN ('open', 'billing')
+                AND deleted_at IS NULL
+            )
+        `);
+      }
+    } catch (err) {
+      this.logger.error('Failed to run self-healing query for takeaway tables:', err);
+    }
   }
 
   async ack(ackSyncDto: AckSyncDto) {

@@ -4,6 +4,10 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { AddOrderItemsDto } from './dto/add-order-items.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { SyncGateway } from '../sync/sync.gateway';
+import { DRIZZLE_CONNECTION } from '../../database/database.module';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import * as schema from '../../database/schema';
+import { eq, and } from 'drizzle-orm';
 
 @Injectable()
 export class OrdersService {
@@ -11,12 +15,15 @@ export class OrdersService {
     private readonly ordersRepository: OrdersRepository,
     @Inject(forwardRef(() => SyncGateway))
     private readonly syncGateway: SyncGateway,
+    @Inject(DRIZZLE_CONNECTION)
+    private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
   async create(createOrderDto: CreateOrderDto) {
     const { items, ...orderData } = createOrderDto;
 
     const itemsToInsert = items.map((item) => ({
+      clientUuid: item.clientUuid || null,
       productId: item.productId,
       quantity: item.quantity,
       price: item.price,
@@ -42,6 +49,10 @@ export class OrdersService {
           { entity: 'branchTables', entityId: result.tableId, payload: { state: 'occupied' } }
         ]
       });
+      this._logChanges(result.branchId, [
+        { entity: 'orders', entityId: result.id, payload: { id: result.id, tableId: result.tableId, state: result.state } },
+        { entity: 'branchTables', entityId: result.tableId, payload: { state: 'occupied' } },
+      ]);
     }
 
     return result;
@@ -59,6 +70,10 @@ export class OrdersService {
     return this.ordersRepository.findActiveByBranch(branchId);
   }
 
+  async findActiveByBusiness(businessId: string) {
+    return this.ordersRepository.findActiveByBusiness(businessId);
+  }
+
   async addItems(orderId: string, addOrderItemsDto: AddOrderItemsDto) {
     const order = await this.findOne(orderId);
 
@@ -66,13 +81,32 @@ export class OrdersService {
       throw new ConflictException(`Cannot add items to an order in state: ${order.state}`);
     }
 
-    const newItems = addOrderItemsDto.items;
+    let newItems = addOrderItemsDto.items;
+    const clientUuids = newItems
+      .map((item) => item.clientUuid)
+      .filter((clientUuid): clientUuid is string => Boolean(clientUuid));
+    if (clientUuids.length > 0) {
+      const existingClientUuids = await this.ordersRepository.findExistingOrderItemClientUuids(
+        orderId,
+        clientUuids,
+      );
+      if (existingClientUuids.size > 0) {
+        newItems = newItems.filter(
+          (item) => !item.clientUuid || !existingClientUuids.has(item.clientUuid),
+        );
+      }
+    }
+
+    if (newItems.length === 0) {
+      return order;
+    }
 
     // Calculate new totals
     let addedSubtotal = 0;
     const itemsToInsert = newItems.map((item) => {
       addedSubtotal += parseFloat(item.price) * item.quantity;
       return {
+        clientUuid: item.clientUuid || null,
         productId: item.productId,
         quantity: item.quantity,
         price: item.price,
@@ -181,5 +215,21 @@ export class OrdersService {
     }
 
     return result;
+  }
+
+  private async _logChanges(branchId: string, entries: Array<{ entity: string; entityId: string; payload: any }>) {
+    try {
+      for (const entry of entries) {
+        await this.db.insert(schema.changeLog).values({
+          entity: entry.entity,
+          entityId: entry.entityId,
+          branchId: branchId,
+          versionAt: new Date(),
+          payload: entry.payload,
+        });
+      }
+    } catch (e) {
+      // Non-critical — broadcast is already done
+    }
   }
 }

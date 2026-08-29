@@ -7,9 +7,10 @@ import { JwtModule } from '@nestjs/jwt';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
+import { BranchesModule } from '../branches/branches.module';
 
 @Module({
-  imports: [JwtModule.register({})],
+  imports: [JwtModule.register({}), BranchesModule],
   controllers: [UsersController, AdminUsersController],
   providers: [UsersService, UsersRepository, JwtAuthGuard, RolesGuard, AdminGuard],
   exports: [UsersService, UsersRepository],

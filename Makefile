@@ -1,6 +1,9 @@
 # Makefile for Empire POS-ERP project
 
-.PHONY: help install db-up db-down db-status db-migrate db-seed db-rollback db-reset db-clean db-clean-prod db-clean-today db-clean-today-prod db-clean-old-history-prod db-clean-all-history-sales-prod db-proxy dev-backend dev-frontend lint test infra-init infra-plan infra-apply provision-infra infra-destroy backend-migrate backend-deploy backend-deploy-fast backend-status backend-logs landing-install landing-build landing-deploy landing-infra admin-build admin-deploy admin-deploy-gcs flutter-web-build flutter-web-dev flutter-web-serve flutter-web-deploy flutter-portal-deploy flutter-apk-build flutter-clean flutter-macos-build flutter-windows-build flutter-android-build flutter-desktop-releases flutter-all-releases flutter-release-info
+.PHONY: help install db-up db-down db-status db-migrate db-seed db-rollback db-reset db-pull-prod db-sync-from-prod db-clean db-clean-prod db-clean-today db-clean-today-prod db-clean-old-history-prod db-clean-all-history-sales-prod db-proxy dev-backend dev-backend-local dev-backend-prod dev-frontend lint test active-orders infra-init infra-plan infra-apply provision-infra infra-destroy backend-migrate backend-deploy backend-deploy-fast backend-status backend-logs landing-install landing-build landing-deploy landing-infra admin-install admin-dev admin-dev-prod admin-dev-local admin-test-e2e admin-test-e2e-ui admin-build admin-deploy admin-deploy-gcs flutter-web-build flutter-web-dev flutter-web-dev-prod flutter-web-dev-local flutter-macos-dev flutter-macos-dev-prod flutter-macos-dev-local flutter-macos-build-debug flutter-macos-2x-local flutter-macos-2x-prod flutter-web-serve flutter-web-deploy flutter-portal-deploy flutter-apk-build flutter-clean flutter-macos-build flutter-windows-build flutter-android-build flutter-desktop-releases flutter-all-releases flutter-release-info flutter-bump-version
+
+active-orders:
+	@cd apps/sync_api && npx tsx scripts/get-active-orders.ts $(BRANCH_ID)
 
 # Default target: show help
 help:
@@ -20,6 +23,8 @@ help:
 	@echo "  db-seed               Populate database with default users and roles seed data"
 	@echo "  db-rollback           Rollback the last batch of database migrations"
 	@echo "  db-reset              Reset the database (tear down, bring up, migrate, and seed)"
+	@echo "  db-pull-prod          Copy entire PRODUCTION database into LOCAL PostgreSQL (1:1 mirror)"
+	@echo "  db-sync-from-prod     Alias to db-pull-prod"
 	@echo "  db-clean                         Delete all LOCAL transactional data (keeps users and branches)"
 	@echo "  db-clean-prod                    Delete all PRODUCTION transactional data (DANGER!)"
 	@echo "  db-clean-today                   Delete today's LOCAL sales data only (keeps historical data)"
@@ -29,8 +34,10 @@ help:
 	@echo "  db-proxy                         Start Cloud SQL Auth Proxy locally for DBeaver access"
 	@echo ""
 	@echo "Run & Development Targets:"
-	@echo "  dev-backend      Run Express backend API with hot-reload"
-	@echo "  dev-frontend     Start the Flutter application locally"
+	@echo "  dev-backend        Run NestJS backend on localhost:3000 (alias to dev-backend-local)"
+	@echo "  dev-backend-local  Run NestJS backend on localhost:3000 connected to LOCAL Postgres (port 5432)"
+	@echo "  dev-backend-prod   Run NestJS backend on localhost:3000 connected to PRODUCTION Cloud SQL (via proxy port 5433)"
+	@echo "  dev-frontend       Start the Flutter application locally"
 	@echo ""
 	@echo "Quality Assurance Targets:"
 	@echo "  lint             Analyze Flutter code quality and run linter"
@@ -56,9 +63,26 @@ help:
 	@echo "  landing-deploy   Build and deploy landing page to Firebase Hosting"
 	@echo "  landing-infra    Apply Terraform changes for landing page infrastructure"
 	@echo ""
-	@echo "Flutter Build Targets:"
+	@echo "Admin Dashboard Targets:"
+	@echo "  admin-install     Install dependencies for admin dashboard (React/Vite)"
+	@echo "  admin-dev         Start admin dashboard connected to LIVE Cloud Run API (port 1420)"
+	@echo "  admin-dev-local   Start admin dashboard connected to LOCAL API on localhost:3000"
+	@echo "  admin-dev-prod    Alias to admin-dev (connected to LIVE Cloud Run API)"
+	@echo "  admin-test-e2e    Run Playwright end-to-end navigation tests"
+	@echo "  admin-test-e2e-ui Run Playwright interactive UI test runner"
+	@echo "  admin-build       Build static admin dashboard assets"
+	@echo "  admin-deploy      Deploy admin dashboard to Firebase Hosting"
+	@echo ""
+	@echo "Flutter Build & Run Targets:"
+	@echo "  flutter-macos-dev        Start Flutter POS in macOS desktop mode (connected to LIVE Cloud Run API)"
+	@echo "  flutter-macos-dev-prod   Alias to flutter-macos-dev (connected to LIVE Cloud Run API)"
+	@echo "  flutter-macos-dev-local  Start Flutter POS in macOS desktop mode connected to LOCAL backend (port 3000)"
+	@echo "  flutter-macos-2x-prod    Build debug app & launch 2 macOS windows connected to LIVE Cloud Run API"
+	@echo "  flutter-macos-2x-local   Build debug app & launch 2 macOS windows connected to LOCAL backend (port 3000)"
+	@echo "  flutter-web-dev          Run Flutter web app in Chrome (connected to LIVE Cloud Run API)"
+	@echo "  flutter-web-dev-prod     Alias to flutter-web-dev (connected to LIVE Cloud Run API)"
+	@echo "  flutter-web-dev-local    Run Flutter web app in Chrome connected to LOCAL backend (port 3000)"
 	@echo "  flutter-web-build        Build Flutter web app for production (output: build/web/)"
-	@echo "  flutter-web-dev          Run Flutter web app in development mode with Chrome"
 	@echo "  flutter-web-serve        Serve built web app locally for testing (port 8000)"
 	@echo "  flutter-web-deploy       Build and deploy Flutter web app to Google Cloud Storage"
 	@echo "  flutter-apk-build        Build Android APK for production"
@@ -129,6 +153,11 @@ db-reset: db-down db-up
 	@echo "Applying seeds..."
 	cd apps/sync_api && npm run seed:run
 	@echo "Database reset complete."
+
+db-sync-from-prod: db-pull-prod
+
+db-pull-prod:
+	@./apps/sync_api/scripts/sync-db-from-prod.sh
 
 db-clean:
 	@echo "⚠️  WARNING: This will delete all LOCAL transactional data (products, orders, inventory)!"
@@ -359,10 +388,60 @@ db-clean-all-history-sales-prod:
 			exit $$EXIT_CODE; \
 		fi
 
+# Query Targets
+db-tickets-hoy:
+	@echo "🔍 Querying tickets cobrados hoy (local dev DB)..."
+	@mkdir -p apps/sync_api/data
+	@cd apps/sync_api && \
+		npx ts-node src/database/query-tickets-hoy.ts $(BRANCH) $(OUTPUT)
+
+db-tickets-hoy-prod:
+	@echo "🔍 Querying tickets cobrados hoy (production DB)..."
+	@echo "Output files will be written to apps/sync_api/data/"
+	@mkdir -p apps/sync_api/data
+	@echo "Checking for cloud-sql-proxy..."
+	@if ! command -v cloud-sql-proxy > /dev/null 2>&1; then \
+		echo "❌ cloud-sql-proxy not found!"; \
+		echo "Install it with: brew install cloud-sql-proxy"; \
+		exit 1; \
+	fi
+	@echo "✓ cloud-sql-proxy found"
+	@echo "Starting Cloud SQL Proxy..."
+	@cloud-sql-proxy fresh-sensor-497515-d3:us-central1:pos-db-instance --port 5433 & \
+		PROXY_PID=$$! && \
+		sleep 5 && \
+		echo "Running query..." && \
+		cd apps/sync_api && \
+		DATABASE_URL="postgresql://pos_user:pos-secure-db-pass-2026!@localhost:5433/pos_db" \
+		npx ts-node src/database/query-tickets-hoy.ts $(BRANCH) $(OUTPUT) ; \
+		EXIT_CODE=$$? ; \
+		echo "Stopping proxy..." && \
+		kill $$PROXY_PID 2>/dev/null || true ; \
+		exit $$EXIT_CODE
+
 # Run & Development Targets
-dev-backend:
-	@echo "Starting backend dev server..."
-	cd apps/sync_api && npm run dev
+dev-backend: dev-backend-local
+
+dev-backend-local:
+	@echo "======================================================================="
+	@echo "🚀 Starting NestJS Backend on localhost:3000 (LOCAL Postgres: port 5432)"
+	@echo "======================================================================="
+	@cd apps/sync_api && \
+		PORT=3000 \
+		NODE_ENV=development \
+		DATABASE_URL="postgres://pos_user:pos_password@localhost:5432/pos_dev" \
+		npm run dev
+
+dev-backend-prod:
+	@echo "======================================================================="
+	@echo "🚀 Starting NestJS Backend on localhost:3000 (PROD DB via Proxy: port 5433)"
+	@echo "⚠️  Ensure 'make db-proxy' is running in a separate terminal!"
+	@echo "======================================================================="
+	@cd apps/sync_api && \
+		PORT=3000 \
+		NODE_ENV=development \
+		DATABASE_URL="postgresql://pos_user:pos-secure-db-pass-2026!@localhost:5433/pos_db" \
+		npm run dev
 
 dev-frontend:
 	@echo "Starting Flutter client app..."
@@ -463,7 +542,7 @@ backend-deploy:
 			--max-instances 10 \
 			--allow-unauthenticated \
 			--add-cloudsql-instances fresh-sensor-497515-d3:us-central1:pos-db-instance \
-			--set-env-vars "NODE_ENV=production,DATABASE_URL=postgresql://pos_user:pos-secure-db-pass-2026!@/pos_db?host=/cloudsql/fresh-sensor-497515-d3:us-central1:pos-db-instance"
+			--set-env-vars "NODE_ENV=production,DATABASE_URL=postgresql://pos_user:pos-secure-db-pass-2026!@/pos_db?host=/cloudsql/fresh-sensor-497515-d3:us-central1:pos-db-instance,PG_POOL_MAX=5,PG_IDLE_TIMEOUT_MS=30000,PG_CONNECTION_TIMEOUT_MS=5000,TAKEAWAY_SELF_HEAL_INTERVAL_MS=60000"
 	@echo ""
 	@echo "✅ Deployment complete!"
 	@echo ""
@@ -489,7 +568,7 @@ backend-deploy-fast:
 			--max-instances 10 \
 			--allow-unauthenticated \
 			--add-cloudsql-instances fresh-sensor-497515-d3:us-central1:pos-db-instance \
-			--set-env-vars "NODE_ENV=production,DATABASE_URL=postgresql://pos_user:pos-secure-db-pass-2026!@/pos_db?host=/cloudsql/fresh-sensor-497515-d3:us-central1:pos-db-instance"
+			--set-env-vars "NODE_ENV=production,DATABASE_URL=postgresql://pos_user:pos-secure-db-pass-2026!@/pos_db?host=/cloudsql/fresh-sensor-497515-d3:us-central1:pos-db-instance,PG_POOL_MAX=5,PG_IDLE_TIMEOUT_MS=30000,PG_CONNECTION_TIMEOUT_MS=5000,TAKEAWAY_SELF_HEAL_INTERVAL_MS=60000"
 	@echo ""
 	@echo "✅ Deployment complete!"
 	@echo ""
@@ -547,6 +626,34 @@ landing-infra:
 	cd apps/landing_page/infra && terraform apply -auto-approve -lock=false
 
 # Admin Dashboard Targets
+admin-install:
+	@echo "Installing admin dashboard dependencies..."
+	cd apps/business_control_tauri && pnpm install
+
+admin-dev: admin-dev-prod
+
+admin-dev-prod:
+	@echo "======================================================================="
+	@echo "🚀 Starting Admin Dashboard connected to LIVE Cloud Run API"
+	@echo "   Frontend: http://localhost:1420 -> Backend: https://pos-sync-api-232144991863.us-central1.run.app/api"
+	@echo "======================================================================="
+	cd apps/business_control_tauri && pnpm dev:prod
+
+admin-dev-local:
+	@echo "======================================================================="
+	@echo "🚀 Starting Admin Dashboard connected to LOCAL API (localhost:3000)"
+	@echo "   Frontend: http://localhost:1420 -> Backend: http://localhost:3000/api"
+	@echo "======================================================================="
+	cd apps/business_control_tauri && pnpm dev:local
+
+admin-test-e2e:
+	@echo "Running Playwright E2E tests for Admin Dashboard..."
+	cd apps/business_control_tauri && pnpm test:e2e
+
+admin-test-e2e-ui:
+	@echo "Opening Playwright interactive UI test runner..."
+	cd apps/business_control_tauri && pnpm test:e2e:ui
+
 admin-build:
 	@echo "Building static admin dashboard assets..."
 	cd apps/business_control_tauri && VITE_API_URL=https://pos-sync-api-232144991863.us-central1.run.app/api pnpm build
@@ -582,9 +689,51 @@ flutter-web-build:
 	@echo "✓ Build complete! Output: apps/pos_flutter/build/web/"
 	@echo "  To deploy, run: make flutter-web-deploy"
 
-flutter-web-dev:
-	@echo "Starting Flutter web app in development mode..."
-	cd apps/pos_flutter && flutter run -d chrome
+flutter-macos-dev: flutter-macos-dev-prod
+
+flutter-macos-dev-prod:
+	@echo "Starting Flutter POS in macOS desktop mode (connected to LIVE Cloud Run API)..."
+	cd apps/pos_flutter && flutter run -d macos --dart-define=API_URL=https://pos-sync-api-232144991863.us-central1.run.app/api
+
+flutter-macos-dev-local:
+	@echo "Starting Flutter POS in macOS desktop mode connected to LOCAL backend (http://localhost:3000/api)..."
+	cd apps/pos_flutter && flutter run -d macos --dart-define=API_URL=http://localhost:3000/api
+
+flutter-macos-build-debug:
+	@echo "Building macOS debug application (Local Backend)..."
+	cd apps/pos_flutter && flutter build macos --debug --dart-define=API_URL=http://localhost:3000/api
+
+flutter-macos-build-debug-prod:
+	@echo "Building macOS debug application (LIVE Cloud Run API)..."
+	cd apps/pos_flutter && flutter build macos --debug --dart-define=API_URL=https://pos-sync-api-232144991863.us-central1.run.app/api
+
+flutter-macos-2x-local: flutter-macos-build-debug
+	@echo "======================================================================="
+	@echo "🚀 Launching 2 independent macOS Flutter POS instances (Local Backend)"
+	@echo "======================================================================="
+	@open -n apps/pos_flutter/build/macos/Build/Products/Debug/pos_flutter.app
+	@sleep 1
+	@open -n apps/pos_flutter/build/macos/Build/Products/Debug/pos_flutter.app
+	@echo "✓ 2 macOS Flutter POS windows opened!"
+
+flutter-macos-2x-prod: flutter-macos-build-debug-prod
+	@echo "======================================================================="
+	@echo "🚀 Launching 2 independent macOS Flutter POS instances (LIVE Cloud Run API)"
+	@echo "======================================================================="
+	@open -n apps/pos_flutter/build/macos/Build/Products/Debug/pos_flutter.app
+	@sleep 1
+	@open -n apps/pos_flutter/build/macos/Build/Products/Debug/pos_flutter.app
+	@echo "✓ 2 macOS Flutter POS windows opened!"
+
+flutter-web-dev: flutter-web-dev-prod
+
+flutter-web-dev-prod:
+	@echo "Starting Flutter web app in Chrome (connected to LIVE Cloud Run API)..."
+	cd apps/pos_flutter && flutter run -d chrome --dart-define=API_URL=https://pos-sync-api-232144991863.us-central1.run.app/api
+
+flutter-web-dev-local:
+	@echo "Starting Flutter POS in Chrome connected to LOCAL backend (http://localhost:3000/api)..."
+	cd apps/pos_flutter && flutter run -d chrome --dart-define=API_URL=http://localhost:3000/api
 
 flutter-web-serve:
 	@echo "Serving built web app locally on http://localhost:8000"
@@ -608,6 +757,9 @@ flutter-portal-deploy: flutter-apk-build flutter-web-build
 	@echo "✓ Portal deployment complete!"
 	@echo "  🌐 Download Portal live at: https://cacharelo-pos.web.app/descargas.html (PIN: 9876)"
 	@echo ""
+
+flutter-bump-version:
+	@node apps/pos_flutter/scripts/bump-version.js
 
 flutter-apk-build:
 	@echo "Building Android APK for production..."
@@ -794,4 +946,3 @@ flutter-release-info:
 	@echo "   - INSTALL-WINDOWS.md - Windows installation guide"
 	@echo "   - INSTALL-MACOS.md   - macOS installation guide"
 	@echo ""
-

@@ -8,14 +8,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pos_flutter/main.dart';
 import 'package:pos_flutter/ui/common/app_state.dart';
 
 void main() {
   testWidgets('Login screen loads smoke test', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
-    // Build our app and trigger a frame.
-    final appState = AppState();
+    PackageInfo.setMockInitialValues(
+      appName: 'pos_flutter',
+      packageName: 'com.cacharelo.pos',
+      version: '1.0.1',
+      buildNumber: '3',
+      buildSignature: '',
+    );
+    late AppState appState;
+    await tester.runAsync(() async {
+      appState = AppState();
+      await appState.initializationFuture;
+    });
     appState.isTerminalConfigured = true;
     appState.terminalBusinessName = 'Cacharelo Restaurant';
     appState.terminalBranchName = 'Sucursal Centro';
@@ -24,7 +35,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
 
     await tester.pumpWidget(MyApp(state: appState));
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     // Verify that our login screen loads and displays the branding text.
     expect(find.text('Cacharelo Restaurant'), findsOneWidget);

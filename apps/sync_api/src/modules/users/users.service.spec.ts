@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { UsersRepository } from './repositories/users.repository';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { BranchesRepository } from '../branches/repositories/branches.repository';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -17,6 +18,9 @@ describe('UsersService', () => {
     update: jest.fn(),
     softDelete: jest.fn(),
   };
+  const mockBranchesRepository = {
+    findById: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -25,6 +29,10 @@ describe('UsersService', () => {
         {
           provide: UsersRepository,
           useValue: mockUsersRepository,
+        },
+        {
+          provide: BranchesRepository,
+          useValue: mockBranchesRepository,
         },
       ],
     }).compile();
@@ -96,6 +104,24 @@ describe('UsersService', () => {
         businessId: 'bus-1',
       });
       expect(repository.create).toHaveBeenCalled();
+    });
+
+    it('should reject branch assignments from another business', async () => {
+      const createUserDto = {
+        name: 'New Waiter',
+        pin: '1234',
+        role: 'waiter' as const,
+        businessId: 'bus-1',
+        branchId: 'branch-2',
+      };
+
+      mockBranchesRepository.findById.mockResolvedValue({
+        id: 'branch-2',
+        businessId: 'bus-2',
+      });
+
+      await expect(service.create(createUserDto)).rejects.toThrow(BadRequestException);
+      expect(repository.create).not.toHaveBeenCalled();
     });
 
     it('should throw ConflictException if PIN is already assigned', async () => {

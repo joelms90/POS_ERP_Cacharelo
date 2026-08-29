@@ -15,6 +15,17 @@ export class PrintingRepository {
 
   async upsertStation(dto: PrintStationHeartbeatDto) {
     const now = new Date();
+    // Delete stale entries for the same branchId + deviceName with a different stationId
+    await this.db
+      .delete(schema.printStations)
+      .where(
+        and(
+          eq(schema.printStations.branchId, dto.branchId),
+          eq(schema.printStations.deviceName, dto.deviceName),
+          sql`${schema.printStations.stationId} != ${dto.stationId}`,
+        ),
+      );
+
     const [station] = await this.db
       .insert(schema.printStations)
       .values({

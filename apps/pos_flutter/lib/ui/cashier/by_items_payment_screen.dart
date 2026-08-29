@@ -59,7 +59,8 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
   void initState() {
     super.initState();
     // Initialize with all items as remaining
-    _remainingItemIndexes = List.generate(widget.table.items.length, (index) => index);
+    _remainingItemIndexes =
+        List.generate(widget.table.items.length, (index) => index);
   }
 
   @override
@@ -74,18 +75,6 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
     for (final index in _selectedItemIndexes) {
       if (index < widget.table.items.length) {
         sum += widget.table.items[index].totalPrice;
-      }
-    }
-    return sum;
-  }
-
-  double get _totalPaid {
-    double sum = 0.0;
-    for (final payment in _payments) {
-      for (final index in payment.itemIndexes) {
-        if (index < widget.table.items.length) {
-          sum += widget.table.items[index].totalPrice;
-        }
       }
     }
     return sum;
@@ -124,7 +113,8 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
     if (_currentPaymentMethod == 'Efectivo') {
       final cash = double.tryParse(_cashController.text) ?? 0.0;
       if (cash < _selectedItemsTotal) {
-        _showError('El efectivo recibido es menor que el total de artículos (\$${_selectedItemsTotal.toStringAsFixed(2)})');
+        _showError(
+            'El efectivo recibido es menor que el total de artículos (\$${_selectedItemsTotal.toStringAsFixed(2)})');
         return false;
       }
     } else {
@@ -147,9 +137,8 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
       cashReceived: _currentPaymentMethod == 'Efectivo'
           ? double.tryParse(_cashController.text)
           : null,
-      cardRefCode: _currentPaymentMethod == 'Tarjeta'
-          ? _cardRefController.text
-          : null,
+      cardRefCode:
+          _currentPaymentMethod == 'Tarjeta' ? _cardRefController.text : null,
     );
 
     setState(() {
@@ -169,7 +158,8 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: EmpireColors.successGreen,
-          content: Text('Pago ${_payments.length} registrado. Quedan ${_remainingItemIndexes.length} artículo(s).'),
+          content: Text(
+              'Pago ${_payments.length} registrado. Quedan ${_remainingItemIndexes.length} artículo(s).'),
         ),
       );
     }
@@ -205,6 +195,7 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
           cashChange: cashChange,
           isEqualSplit: false,
           itemIndicesToPay: currentIndices,
+          printCustomerTicket: false,
         );
 
         removedOriginalIndices.addAll(sortedIndices);
@@ -213,6 +204,7 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
       widget.table.activePaymentType = null;
       widget.table.paymentsMadeInSession = 0;
       widget.table.originalSplitCountInSession = null;
+      widget.state.finalizeCompletedSplitCheckout(table.id);
 
       widget.onComplete();
     } catch (e) {
@@ -351,11 +343,15 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
                     Row(
                       children: [
                         TextButton(
-                          onPressed: _remainingItemIndexes.isEmpty ? null : _selectAllRemaining,
+                          onPressed: _remainingItemIndexes.isEmpty
+                              ? null
+                              : _selectAllRemaining,
                           child: const Text('Todos'),
                         ),
                         TextButton(
-                          onPressed: _selectedItemIndexes.isEmpty ? null : _clearSelection,
+                          onPressed: _selectedItemIndexes.isEmpty
+                              ? null
+                              : _clearSelection,
                           child: const Text('Limpiar'),
                         ),
                       ],
@@ -387,23 +383,30 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
                   decoration: BoxDecoration(
                     color: isPaid
                         ? EmpireColors.charcoalSurface.withValues(alpha: 0.5)
-                        : (isSelected ? EmpireColors.champagneGold.withValues(alpha: 0.2) : EmpireColors.charcoalSurface),
+                        : (isSelected
+                            ? EmpireColors.champagneGold.withValues(alpha: 0.2)
+                            : EmpireColors.charcoalSurface),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: isSelected
                           ? EmpireColors.champagneGold
-                          : (isPaid ? EmpireColors.successGreen : EmpireColors.agedBronzeDark),
+                          : (isPaid
+                              ? EmpireColors.successGreen
+                              : EmpireColors.agedBronzeDark),
                       width: isSelected ? 2 : 1,
                     ),
                   ),
                   child: CheckboxListTile(
                     value: isPaid ? true : isSelected,
-                    onChanged: isPaid ? null : (_) => _toggleItemSelection(index),
+                    onChanged:
+                        isPaid ? null : (_) => _toggleItemSelection(index),
                     enabled: !isPaid,
                     title: Text(
                       item.item.name,
                       style: TextStyle(
-                        color: isPaid ? EmpireColors.textSecondary : EmpireColors.textPrimary,
+                        color: isPaid
+                            ? EmpireColors.textSecondary
+                            : EmpireColors.textPrimary,
                         decoration: isPaid ? TextDecoration.lineThrough : null,
                       ),
                     ),
@@ -415,7 +418,8 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
                       ),
                     ),
                     secondary: isPaid
-                        ? const Icon(Icons.check_circle, color: EmpireColors.successGreen)
+                        ? const Icon(Icons.check_circle,
+                            color: EmpireColors.successGreen)
                         : null,
                     activeColor: EmpireColors.champagneGold,
                   ),
@@ -512,7 +516,8 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
       decoration: BoxDecoration(
         color: EmpireColors.charcoalSurface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: EmpireColors.champagneGold.withValues(alpha: 0.3)),
+        border: Border.all(
+            color: EmpireColors.champagneGold.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -590,7 +595,8 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
                     setState(() => _currentPaymentMethod = 'Efectivo');
                   }
                 },
-                selectedColor: EmpireColors.champagneGold.withValues(alpha: 0.3),
+                selectedColor:
+                    EmpireColors.champagneGold.withValues(alpha: 0.3),
                 backgroundColor: EmpireColors.charcoalSurface,
               ),
             ),
@@ -611,7 +617,8 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
                     setState(() => _currentPaymentMethod = 'Tarjeta');
                   }
                 },
-                selectedColor: EmpireColors.champagneGold.withValues(alpha: 0.3),
+                selectedColor:
+                    EmpireColors.champagneGold.withValues(alpha: 0.3),
                 backgroundColor: EmpireColors.charcoalSurface,
               ),
             ),
@@ -660,7 +667,8 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: EmpireColors.champagneGold, width: 2),
+              borderSide:
+                  const BorderSide(color: EmpireColors.champagneGold, width: 2),
             ),
           ),
         ),
@@ -676,7 +684,8 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: EmpireColors.charcoalSurface,
                 foregroundColor: EmpireColors.champagneGold,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
               child: Text('\$$amount'),
             );
@@ -718,7 +727,8 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: EmpireColors.champagneGold, width: 2),
+              borderSide:
+                  const BorderSide(color: EmpireColors.champagneGold, width: 2),
             ),
           ),
         ),
@@ -728,7 +738,9 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
 
   Widget _buildPaymentSummary() {
     final cashReceived = double.tryParse(_cashController.text) ?? 0.0;
-    final cashChange = cashReceived > _selectedItemsTotal ? cashReceived - _selectedItemsTotal : 0.0;
+    final cashChange = cashReceived > _selectedItemsTotal
+        ? cashReceived - _selectedItemsTotal
+        : 0.0;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -739,19 +751,24 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
       ),
       child: Column(
         children: [
-          _buildSummaryRow('Total artículos:', '\$${_selectedItemsTotal.toStringAsFixed(2)}', isTotal: true),
+          _buildSummaryRow(
+              'Total artículos:', '\$${_selectedItemsTotal.toStringAsFixed(2)}',
+              isTotal: true),
           if (_currentPaymentMethod == 'Efectivo' && cashReceived > 0) ...[
             const Divider(color: EmpireColors.agedBronzeDark, height: 24),
-            _buildSummaryRow('Efectivo recibido:', '\$${cashReceived.toStringAsFixed(2)}'),
+            _buildSummaryRow(
+                'Efectivo recibido:', '\$${cashReceived.toStringAsFixed(2)}'),
             if (cashChange > 0)
-              _buildSummaryRow('Cambio:', '\$${cashChange.toStringAsFixed(2)}', isHighlighted: true),
+              _buildSummaryRow('Cambio:', '\$${cashChange.toStringAsFixed(2)}',
+                  isHighlighted: true),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isTotal = false, bool isHighlighted = false}) {
+  Widget _buildSummaryRow(String label, String value,
+      {bool isTotal = false, bool isHighlighted = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -760,7 +777,9 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
           Text(
             label,
             style: TextStyle(
-              color: isHighlighted ? EmpireColors.successGreen : EmpireColors.textSecondary,
+              color: isHighlighted
+                  ? EmpireColors.successGreen
+                  : EmpireColors.textSecondary,
               fontSize: isTotal ? 15 : 13,
               fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
             ),
@@ -768,7 +787,11 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
           Text(
             value,
             style: TextStyle(
-              color: isHighlighted ? EmpireColors.successGreen : (isTotal ? EmpireColors.champagneGold : EmpireColors.textPrimary),
+              color: isHighlighted
+                  ? EmpireColors.successGreen
+                  : (isTotal
+                      ? EmpireColors.champagneGold
+                      : EmpireColors.textPrimary),
               fontSize: isTotal ? 16 : 14,
               fontWeight: FontWeight.bold,
             ),
@@ -780,12 +803,15 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
 
   Widget _buildActionButtons() {
     return ElevatedButton.icon(
-      onPressed: (_selectedItemIndexes.isEmpty || _isProcessing) ? null : _processCurrentPayment,
+      onPressed: (_selectedItemIndexes.isEmpty || _isProcessing)
+          ? null
+          : _processCurrentPayment,
       icon: _isProcessing
           ? const SizedBox(
               width: 18,
               height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2, color: EmpireColors.textSecondary),
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: EmpireColors.textSecondary),
             )
           : Icon(_allItemsPaid ? Icons.check : Icons.arrow_forward),
       label: Text(
@@ -799,7 +825,9 @@ class _ByItemsPaymentScreenState extends State<ByItemsPaymentScreen> {
       style: ElevatedButton.styleFrom(
         backgroundColor: _selectedItemIndexes.isEmpty
             ? EmpireColors.charcoalSurface
-            : (_allItemsPaid ? EmpireColors.successGreen : EmpireColors.champagneGold),
+            : (_allItemsPaid
+                ? EmpireColors.successGreen
+                : EmpireColors.champagneGold),
         foregroundColor: _selectedItemIndexes.isEmpty
             ? EmpireColors.textSecondary
             : EmpireColors.obsidian,

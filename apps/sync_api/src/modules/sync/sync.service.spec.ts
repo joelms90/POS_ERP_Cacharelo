@@ -18,6 +18,7 @@ describe('SyncService', () => {
     where: jest.fn(async () => selectRows),
     update: jest.fn().mockReturnThis(),
     set: jest.fn().mockReturnThis(),
+    execute: jest.fn().mockResolvedValue({}),
   };
 
   const mockSyncGateway = {
@@ -152,11 +153,26 @@ describe('SyncService', () => {
   describe('pull', () => {
     it('should pull changes successfully', async () => {
       const result = await service.pull({
+        branchId: '11111111-1111-4111-8111-111111111111',
         lastSyncedAt: '2026-06-25T00:00:00.000Z',
       });
       expect(result).toBeDefined();
       expect(result.timestamp).toBeDefined();
       expect(result.changes).toBeDefined();
+      expect(mockDb.execute).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throttle takeaway self-healing during frequent pulls', async () => {
+      await service.pull({
+        branchId: '11111111-1111-4111-8111-111111111111',
+        lastSyncedAt: '2026-06-25T00:00:00.000Z',
+      });
+      await service.pull({
+        branchId: '11111111-1111-4111-8111-111111111111',
+        lastSyncedAt: '2026-06-25T00:00:00.000Z',
+      });
+
+      expect(mockDb.execute).toHaveBeenCalledTimes(1);
     });
   });
 

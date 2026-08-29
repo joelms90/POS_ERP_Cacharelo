@@ -10,10 +10,10 @@ import '../widgets/custom_toast.dart';
 import '../widgets/printer_monitor_panel.dart';
 import '../widgets/printer_settings_dialog.dart';
 import '../login_screen.dart';
+import '../widgets/app_version_badge.dart';
 import 'modifier_dialog.dart';
 import 'cart_sidebar.dart';
 import 'payment_flow_dialog.dart';
-import 'zone_tabs.dart';
 
 class WaiterOrderingScreen extends StatefulWidget {
   final AppState state;
@@ -46,8 +46,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
   void _selectOrderingTable(TableModel? table) {
     // 1. Save the draft cart of the previous active table before switching
     if (activeOrderingTable != null) {
-      final String prevKey =
-          (activeOrderingTable!.id ?? activeOrderingTable!.label).toString();
+      final String prevKey = activeOrderingTable!.id.toString();
       _draftCarts[prevKey] = List.from(currentCart);
     }
 
@@ -60,7 +59,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
         selectedGuestIndex = 0;
       } else {
         // 2. Load the draft cart for the new table, or fall back to already synced items
-        final String newKey = (table.id ?? table.label).toString();
+        final String newKey = table.id.toString();
         if (table.state == TableState.free ||
             table.state == TableState.cleaning) {
           _draftCarts.remove(newKey);
@@ -237,10 +236,9 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                             );
                                             if (activeOrderingTable != null) {
                                               _draftCarts.remove(
-                                                  (activeOrderingTable!.id ??
-                                                          activeOrderingTable!
-                                                              .label)
-                                                      .toString());
+                                                activeOrderingTable!.id
+                                                    .toString(),
+                                              );
                                             }
                                             setState(() {
                                               activeOrderingTable = null;
@@ -253,9 +251,13 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                           () => isCartOpen = false,
                                         ),
                                         onConfirm: (finalItems, guests,
-                                            printSelection) {
-                                          widget.state.submitOrder(
-                                            activeOrderingTable!.id,
+                                            printSelection) async {
+                                          final table = activeOrderingTable;
+                                          if (table == null) return false;
+
+                                          final synced =
+                                              await widget.state.submitOrder(
+                                            table.id,
                                             finalItems,
                                             guests,
                                             activeGenders,
@@ -263,6 +265,26 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                             targetStationId:
                                                 printSelection.stationId,
                                           );
+
+                                          if (!context.mounted) return synced;
+
+                                          if (!synced) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                backgroundColor:
+                                                    EmpireColors.errorRed,
+                                                content: Text(
+                                                  'No se pudo enviar la comanda de ${table.label} a cocina. Revisa conexión/sucursal y vuelve a intentar.',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                            return false;
+                                          }
 
                                           final printMessage =
                                               switch (printSelection.mode) {
@@ -282,7 +304,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                               backgroundColor:
                                                   EmpireColors.successGreen,
                                               content: Text(
-                                                '¡Pedido confirmado para la ${activeOrderingTable!.label}! $printMessage',
+                                                '¡Pedido confirmado para la ${table.label}! $printMessage',
                                                 style: const TextStyle(
                                                   fontWeight: FontWeight.bold,
                                                 ),
@@ -290,26 +312,22 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                             ),
                                           );
 
-                                          if (activeOrderingTable != null) {
-                                            _draftCarts.remove(
-                                                (activeOrderingTable!.id ??
-                                                        activeOrderingTable!
-                                                            .label)
-                                                    .toString());
-                                          }
+                                          _draftCarts.remove(
+                                            table.id.toString(),
+                                          );
                                           setState(() {
                                             activeOrderingTable = null;
                                             currentCart = [];
                                             isCartOpen = false;
                                           });
+                                          return true;
                                         },
                                         onCancel: () {
                                           if (activeOrderingTable != null) {
                                             _draftCarts.remove(
-                                                (activeOrderingTable!.id ??
-                                                        activeOrderingTable!
-                                                            .label)
-                                                    .toString());
+                                              activeOrderingTable!.id
+                                                  .toString(),
+                                            );
                                           }
                                           setState(() {
                                             activeOrderingTable = null;
@@ -591,7 +609,8 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
 
               // --- User Profile Chip ---
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: EmpireColors.charcoalSurface,
                   borderRadius: BorderRadius.circular(20),
@@ -622,6 +641,10 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                   ],
                 ),
               ),
+
+              const SizedBox(width: 10),
+
+              AppVersionBadge(version: widget.state.appVersion),
 
               const SizedBox(width: 12),
 
@@ -2068,8 +2091,7 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
   }
 
   Widget _buildReadyOrdersHeaderButton(BuildContext context) {
-    final readyOrders =
-        widget.state.kitchenOrders.where((o) => o.status == 'ready').toList();
+    final readyOrders = widget.state.readyPickupOrders;
 
     final count = readyOrders.length;
 
@@ -2121,24 +2143,33 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
         return ListenableBuilder(
           listenable: widget.state,
           builder: (context, _) {
-            final readyOrders = widget.state.kitchenOrders
-                .where((o) => o.status == 'ready')
-                .toList();
+            final readyOrders = widget.state.readyPickupOrders;
 
             return AlertDialog(
               backgroundColor: EmpireColors.onyxSurface,
               surfaceTintColor: Colors.transparent,
-              title: const Row(
+              title: Row(
                 children: [
-                  Icon(Icons.room_service, color: EmpireColors.successGreen),
-                  SizedBox(width: 10),
-                  Text(
-                    'Pedidos Listos para Entregar',
-                    style: TextStyle(
-                      color: EmpireColors.champagneGold,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                  const Icon(Icons.room_service,
+                      color: EmpireColors.successGreen),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Pedidos Listos para Entregar',
+                      style: TextStyle(
+                        color: EmpireColors.champagneGold,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
+                  ),
+                  IconButton(
+                    tooltip: 'Sincronizar',
+                    icon: const Icon(Icons.refresh,
+                        color: EmpireColors.champagneGold),
+                    onPressed: () {
+                      widget.state.syncKitchenOrders();
+                    },
                   ),
                 ],
               ),
@@ -2251,8 +2282,8 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
                                         horizontal: 12, vertical: 8),
                                   ),
                                   onPressed: () {
-                                    widget.state.updateKitchenOrderStatus(
-                                        order.id, 'served');
+                                    widget.state
+                                        .markReadyPickupOrderServed(order.id);
                                   },
                                 ),
                               ],

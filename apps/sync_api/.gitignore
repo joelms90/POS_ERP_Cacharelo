@@ -1,6 +1,6 @@
-# Local NestJS / Node files
-node_modules/
+# Build output
 dist/
+data/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

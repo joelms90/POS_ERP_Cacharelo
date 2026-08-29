@@ -2,6 +2,10 @@ import { IsUUID, IsNotEmpty, IsNumberString, IsArray, IsOptional, ValidateNested
 import { Type } from 'class-transformer';
 
 export class OrderItemDto {
+  @IsString()
+  @IsOptional()
+  clientUuid?: string;
+
   @IsUUID()
   @IsNotEmpty()
   productId: string;
@@ -24,6 +28,10 @@ export class OrderItemDto {
 }
 
 export class CreateOrderDto {
+  @IsString()
+  @IsOptional()
+  clientUuid?: string;
+
   @IsUUID()
   @IsNotEmpty()
   branchId: string;

@@ -5,6 +5,7 @@ import '../common/colors.dart';
 import '../common/app_state.dart';
 import 'equal_split_payment_screen.dart';
 import 'by_items_payment_screen.dart';
+import 'guest_split_payment_screen.dart';
 
 class SplitCheckoutView extends StatefulWidget {
   final TableModel table;
@@ -28,6 +29,7 @@ enum PaymentType {
   simple, // Cobro Simple - regular full payment
   equalSplit, // División Equitativa
   byItems, // Por Artículos
+  byGuest, // Por Comensal
 }
 
 class _SplitCheckoutViewState extends State<SplitCheckoutView> {
@@ -248,6 +250,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
       itemIndicesToPay: _selectedPaymentType == PaymentType.equalSplit
           ? null
           : List.from(selectedItemIndexes),
+      printCustomerTicket: false,
     );
 
     // Clear controllers
@@ -842,6 +845,7 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildRightCheckoutPanel(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1407,6 +1411,31 @@ class _SplitCheckoutViewState extends State<SplitCheckoutView> {
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (context) => ByItemsPaymentScreen(
+                          table: widget.table,
+                          state: widget.state,
+                          onCancel: () {
+                            Navigator.of(context).pop();
+                          },
+                          onComplete: () {
+                            Navigator.of(context).pop();
+                            widget.onSuccess();
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _PaymentTypeButton(
+                  label: 'POR\nCOMENSAL',
+                  icon: Icons.groups,
+                  selected: _selectedPaymentType == PaymentType.byGuest,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => GuestSplitPaymentScreen(
                           table: widget.table,
                           state: widget.state,
                           onCancel: () {
