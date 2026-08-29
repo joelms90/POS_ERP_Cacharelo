@@ -3,6 +3,7 @@ import { InventoryRepository } from './repositories/inventory.repository';
 import { LedgerService } from './ledger.service';
 import { CreateReceiptDto } from './dto/create-receipt.dto';
 import { CreateProductionRunDto } from './dto/create-production-run.dto';
+import { CompleteProductionRunDto } from './dto/complete-production-run.dto';
 import * as schema from '../../database/schema';
 import { eq, and, gte, lte, sql, desc, inArray } from 'drizzle-orm';
 
@@ -108,8 +109,16 @@ export class InventoryService {
   }
 
   async assembleProduct(createProductionRunDto: CreateProductionRunDto) {
-    const { warehouseId, productId, quantityProduced, notes } = createProductionRunDto;
+    const {
+      warehouseId,
+      destinationWarehouseId,
+      productId,
+      quantityProduced,
+      status = 'completed',
+      notes,
+    } = createProductionRunDto;
     const db = this.inventoryRepository.getDb();
+    const destWarehouseId = destinationWarehouseId || warehouseId;
 
     // 1. Fetch the recipe components for this assembled product
     const recipe = await db
@@ -128,11 +137,45 @@ export class InventoryService {
       throw new BadRequestException('El producto seleccionado no tiene una receta configurada (ingredientes).');
     }
 
-    // 2. Perform BOM validation: check stock levels for each ingredient in the warehouse
+    // Fetch product to resolve businessId
+    const [product] = await db
+      .select()
+      .from(schema.products)
+      .where(eq(schema.products.id, productId))
+      .limit(1);
+
+    if (!product) {
+      throw new NotFoundException(`Producto con ID ${productId} no encontrado`);
+    }
+    const businessId = product.businessId;
+
+    // If creating a planned / pending OP:
+    if (status === 'pending') {
+      const [run] = await db
+        .insert(schema.productionRuns)
+        .values({
+          warehouseId,
+          destinationWarehouseId: destWarehouseId,
+          productId,
+          quantityProduced: quantityProduced.toString(),
+          status: 'pending',
+          assembledAt: null,
+          notes: notes || null,
+        })
+        .returning();
+
+      return {
+        success: true,
+        productionRunId: run.id,
+        status: 'pending',
+      };
+    }
+
+    // Otherwise, direct / immediate assembly (status === 'completed'):
+    // Perform BOM validation: check stock levels for each ingredient in the origin warehouse
     for (const item of recipe) {
       const requiredQty = parseFloat(item.quantityNeeded) * quantityProduced;
 
-      // Find stock level for the ingredient in this warehouse
       const [stock] = await db
         .select()
         .from(schema.stockLevels)
@@ -152,44 +195,35 @@ export class InventoryService {
       }
     }
 
-    // Fetch product to resolve businessId
-    const [product] = await db
-      .select()
-      .from(schema.products)
-      .where(eq(schema.products.id, productId))
-      .limit(1);
-
-    if (!product) {
-      throw new NotFoundException(`Producto con ID ${productId} no encontrado`);
-    }
-    const businessId = product.businessId;
-
-    // 3. Execute transaction: decrement ingredients stock, increment parent stock, log run
+    // Execute transaction: decrement ingredients stock, increment parent stock in destination warehouse, log run
     return db.transaction(async (tx) => {
-      // Insert production run record first (reference for ledger entries)
       const [run] = await tx
         .insert(schema.productionRuns)
         .values({
           warehouseId,
+          destinationWarehouseId: destWarehouseId,
           productId,
           quantityProduced: quantityProduced.toString(),
+          actualQuantityProduced: quantityProduced.toString(),
+          status: 'completed',
+          assembledAt: new Date(),
           notes: notes || null,
         })
         .returning();
 
-      // Record output movement (assembled product entry)
+      // Record output movement (assembled product entry in destination warehouse)
       await this.ledgerService.applyMovement(tx, {
         businessId,
         productId,
         quantityDelta: quantityProduced,
         eventType: 'production_output',
-        warehouseId,
+        warehouseId: destWarehouseId,
         referenceType: 'production_run',
         referenceId: run.id,
         notes: notes || null,
       });
 
-      // Record input movements (ingredients deduction)
+      // Record input movements (ingredients deduction from origin warehouse)
       for (const item of recipe) {
         const decrementQty = parseFloat(item.quantityNeeded) * quantityProduced;
         await this.ledgerService.applyMovement(tx, {
@@ -207,8 +241,189 @@ export class InventoryService {
       return {
         success: true,
         productionRunId: run.id,
+        status: 'completed',
       };
     });
+  }
+
+  async startProductionRun(id: string) {
+    const db = this.inventoryRepository.getDb();
+    const [run] = await db
+      .select()
+      .from(schema.productionRuns)
+      .where(eq(schema.productionRuns.id, id))
+      .limit(1);
+
+    if (!run) {
+      throw new NotFoundException(`Orden de producción con ID ${id} no encontrada`);
+    }
+
+    if (run.status !== 'pending') {
+      throw new BadRequestException(`Solo se pueden iniciar órdenes en estado pendiente (Estado actual: ${run.status})`);
+    }
+
+    await db
+      .update(schema.productionRuns)
+      .set({
+        status: 'in_progress',
+        startedAt: new Date(),
+      })
+      .where(eq(schema.productionRuns.id, id));
+
+    return {
+      success: true,
+      productionRunId: id,
+      status: 'in_progress',
+    };
+  }
+
+  async completeProductionRun(id: string, completeDto: CompleteProductionRunDto) {
+    const db = this.inventoryRepository.getDb();
+    const [run] = await db
+      .select()
+      .from(schema.productionRuns)
+      .where(eq(schema.productionRuns.id, id))
+      .limit(1);
+
+    if (!run) {
+      throw new NotFoundException(`Orden de producción con ID ${id} no encontrada`);
+    }
+
+    if (run.status === 'completed') {
+      throw new BadRequestException('Esta orden de producción ya fue completada.');
+    }
+    if (run.status === 'cancelled') {
+      throw new BadRequestException('Esta orden de producción fue cancelada y no puede completarse.');
+    }
+
+    const actualQuantity = completeDto.actualQuantityProduced ?? parseFloat(run.quantityProduced);
+    const destWarehouseId = completeDto.destinationWarehouseId || run.destinationWarehouseId || run.warehouseId;
+
+    // 1. Fetch recipe
+    const recipe = await db
+      .select({
+        id: schema.recipes.id,
+        parentProductId: schema.recipes.parentProductId,
+        ingredientProductId: schema.recipes.ingredientProductId,
+        quantityNeeded: schema.recipes.quantityNeeded,
+        ingredientName: schema.products.name,
+      })
+      .from(schema.recipes)
+      .innerJoin(schema.products, eq(schema.recipes.ingredientProductId, schema.products.id))
+      .where(eq(schema.recipes.parentProductId, run.productId));
+
+    if (recipe.length === 0) {
+      throw new BadRequestException('El producto no tiene una receta configurada.');
+    }
+
+    // 2. Validate ingredient stock in origin warehouse
+    for (const item of recipe) {
+      const requiredQty = parseFloat(item.quantityNeeded) * actualQuantity;
+      const [stock] = await db
+        .select()
+        .from(schema.stockLevels)
+        .where(
+          and(
+            eq(schema.stockLevels.productId, item.ingredientProductId),
+            eq(schema.stockLevels.warehouseId, run.warehouseId),
+          ),
+        )
+        .limit(1);
+
+      const availableQty = stock ? parseFloat(stock.quantity) : 0;
+      if (availableQty < requiredQty) {
+        throw new BadRequestException(
+          `Stock insuficiente para el ingrediente "${item.ingredientName}". Requerido: ${requiredQty.toFixed(3)}, Disponible: ${availableQty.toFixed(3)}`,
+        );
+      }
+    }
+
+    // 3. Fetch product for businessId & name
+    const [product] = await db
+      .select()
+      .from(schema.products)
+      .where(eq(schema.products.id, run.productId))
+      .limit(1);
+
+    const businessId = product.businessId;
+
+    // 4. Transaction: ledger movements & status update
+    return db.transaction(async (tx) => {
+      // Update OP record
+      await tx
+        .update(schema.productionRuns)
+        .set({
+          status: 'completed',
+          actualQuantityProduced: actualQuantity.toString(),
+          destinationWarehouseId: destWarehouseId,
+          assembledAt: new Date(),
+          notes: completeDto.notes || run.notes,
+        })
+        .where(eq(schema.productionRuns.id, id));
+
+      // Record output movement (entry of finished goods into destination warehouse)
+      await this.ledgerService.applyMovement(tx, {
+        businessId,
+        productId: run.productId,
+        quantityDelta: actualQuantity,
+        eventType: 'production_output',
+        warehouseId: destWarehouseId,
+        referenceType: 'production_run',
+        referenceId: run.id,
+        notes: completeDto.notes || run.notes || null,
+      });
+
+      // Record input movements (deduction of raw materials from origin warehouse)
+      for (const item of recipe) {
+        const decrementQty = parseFloat(item.quantityNeeded) * actualQuantity;
+        await this.ledgerService.applyMovement(tx, {
+          businessId,
+          productId: item.ingredientProductId,
+          quantityDelta: -decrementQty,
+          eventType: 'production_input',
+          warehouseId: run.warehouseId,
+          referenceType: 'production_run',
+          referenceId: run.id,
+          notes: `Insumo consumido en OP para ensamble de ${product.name}`,
+        });
+      }
+
+      return {
+        success: true,
+        productionRunId: id,
+        status: 'completed',
+      };
+    });
+  }
+
+  async cancelProductionRun(id: string) {
+    const db = this.inventoryRepository.getDb();
+    const [run] = await db
+      .select()
+      .from(schema.productionRuns)
+      .where(eq(schema.productionRuns.id, id))
+      .limit(1);
+
+    if (!run) {
+      throw new NotFoundException(`Orden de producción con ID ${id} no encontrada`);
+    }
+
+    if (run.status === 'completed') {
+      throw new BadRequestException('No se puede cancelar una orden de producción ya completada.');
+    }
+
+    await db
+      .update(schema.productionRuns)
+      .set({
+        status: 'cancelled',
+      })
+      .where(eq(schema.productionRuns.id, id));
+
+    return {
+      success: true,
+      productionRunId: id,
+      status: 'cancelled',
+    };
   }
 
   async getTransfers(businessId: string) {
@@ -233,8 +448,22 @@ export class InventoryService {
     const whMap = new Map(warehouses.map(w => [w.id, w.name]));
     const brMap = new Map(branches.map(b => [b.id, b.name]));
 
+    // Attach item counts
+    const transferIds = transfers.map((t) => t.id);
+    const itemCounts = await db
+      .select({
+        transferId: schema.stockTransferItems.transferId,
+        itemCount: sql<number>`count(*)::int`,
+      })
+      .from(schema.stockTransferItems)
+      .where(inArray(schema.stockTransferItems.transferId, transferIds))
+      .groupBy(schema.stockTransferItems.transferId);
+
+    const countMap = new Map(itemCounts.map((c) => [c.transferId, Number(c.itemCount)]));
+
     return transfers.map(t => ({
       ...t,
+      itemCount: countMap.get(t.id) || 0,
       fromWarehouseName: t.fromWarehouseId ? whMap.get(t.fromWarehouseId) : null,
       fromBranchName: t.fromBranchId ? brMap.get(t.fromBranchId) : null,
       toWarehouseName: t.toWarehouseId ? whMap.get(t.toWarehouseId) : null,

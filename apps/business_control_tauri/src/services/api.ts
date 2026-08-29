@@ -433,7 +433,14 @@ async function apiRequest<T>(
     let errorMessage = `API Error: ${response.status} ${response.statusText}`;
     try {
       const errorJson = await response.json();
-      errorMessage = errorJson.error || errorJson.message || errorMessage;
+      const msg = errorJson.message;
+      if (Array.isArray(msg)) {
+        errorMessage = msg[0] || errorJson.error || errorMessage;
+      } else if (typeof msg === 'string' && msg.trim()) {
+        errorMessage = msg;
+      } else {
+        errorMessage = errorJson.error || errorMessage;
+      }
     } catch {
       // ignore JSON parse error
     }
@@ -989,17 +996,54 @@ export const api = {
   },
 
   /**
-   * Execute a production run assembly
+   * Execute a production run assembly or create a planned OP
    */
   async assembleProduct(payload: {
     warehouseId: string;
+    destinationWarehouseId?: string;
     productId: string;
     quantityProduced: number;
+    status?: 'pending' | 'completed';
     notes?: string;
-  }): Promise<{ success: boolean; productionRunId: string }> {
-    return apiRequest<{ success: boolean; productionRunId: string }>('/inventory/production', {
+  }): Promise<{ success: boolean; productionRunId: string; status?: string }> {
+    return apiRequest<{ success: boolean; productionRunId: string; status?: string }>('/inventory/production', {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  },
+
+  /**
+   * Start a production run (pending -> in_progress)
+   */
+  async startProductionRun(id: string): Promise<{ success: boolean; productionRunId: string; status: string }> {
+    return apiRequest<{ success: boolean; productionRunId: string; status: string }>(`/inventory/production/${id}/start`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Complete a production run (deducts stock and adds finished product)
+   */
+  async completeProductionRun(
+    id: string,
+    payload?: {
+      actualQuantityProduced?: number;
+      destinationWarehouseId?: string;
+      notes?: string;
+    },
+  ): Promise<{ success: boolean; productionRunId: string; status: string }> {
+    return apiRequest<{ success: boolean; productionRunId: string; status: string }>(`/inventory/production/${id}/complete`, {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    });
+  },
+
+  /**
+   * Cancel a production run
+   */
+  async cancelProductionRun(id: string): Promise<{ success: boolean; productionRunId: string; status: string }> {
+    return apiRequest<{ success: boolean; productionRunId: string; status: string }>(`/inventory/production/${id}/cancel`, {
+      method: 'POST',
     });
   },
 
@@ -1573,11 +1617,20 @@ export interface RecipeItem {
 
 export interface ProductionRun {
   id: string;
+  warehouseId?: string;
   warehouseName: string;
+  destinationWarehouseId?: string | null;
+  destinationWarehouseName?: string | null;
+  productId?: string;
   productName: string;
+  productSku?: string;
   quantityProduced: string;
-  assembledAt: string;
+  actualQuantityProduced?: string | null;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  startedAt?: string | null;
+  assembledAt?: string | null;
   notes?: string;
+  createdAt?: string;
 }
 
 export interface SupplierProduct {
