@@ -563,10 +563,7 @@ export class InventoryService {
     const db = this.inventoryRepository.getDb();
 
     return db.transaction(async (tx) => {
-      // Resolve virtual "En Tránsito" warehouse
-      const transitWh = await this.getOrCreateTransitWarehouse(tx, businessId);
-
-      // 1. Create the transfer record (shipped = in transit)
+      // 1. Create the transfer order as "pending" (stock moves only when shipped)
       const [transfer] = await tx
         .insert(schema.stockTransfers)
         .values({
@@ -576,11 +573,11 @@ export class InventoryService {
           toWarehouseId: toWarehouseId || null,
           toBranchId: toBranchId || null,
           notes: notes || null,
-          status: 'in_transit',
+          status: 'pending',
         })
         .returning();
 
-      // 2. Ship: origin -qty, transit +qty
+      // 2. Record transfer item details (no stock movement yet)
       for (const item of items) {
         const [product] = await tx
           .select()
@@ -595,45 +592,6 @@ export class InventoryService {
         const unitCost = product.cost;
         const totalCost = (parseFloat(unitCost) * item.quantity).toFixed(2);
 
-        // A. Validate + decrement stock from source
-        const sourceStock = await this.ledgerService.getStockLevel(
-          tx,
-          item.productId,
-          fromWarehouseId || null,
-          fromBranchId || null,
-        );
-
-        if (sourceStock < item.quantity) {
-          throw new BadRequestException(`Stock insuficiente en origen para el producto ${product.name}`);
-        }
-
-        await this.ledgerService.applyMovement(tx, {
-          businessId,
-          productId: item.productId,
-          quantityDelta: -item.quantity,
-          eventType: 'transfer_out',
-          warehouseId: fromWarehouseId || null,
-          branchId: fromBranchId || null,
-          unitCost,
-          referenceType: 'transfer',
-          referenceId: transfer.id,
-          notes: 'Traspaso enviado',
-        });
-
-        // B. Stock moves into transit location (avoid double-counting while in transit)
-        await this.ledgerService.applyMovement(tx, {
-          businessId,
-          productId: item.productId,
-          quantityDelta: item.quantity,
-          eventType: 'transit_in',
-          warehouseId: transitWh.id,
-          unitCost,
-          referenceType: 'transfer',
-          referenceId: transfer.id,
-          notes: 'En tránsito',
-        });
-
-        // C. Record transfer item details
         await tx
           .insert(schema.stockTransferItems)
           .values({
@@ -648,7 +606,7 @@ export class InventoryService {
       return {
         success: true,
         transferId: transfer.id,
-        status: 'in_transit',
+        status: 'pending',
       };
     });
   }

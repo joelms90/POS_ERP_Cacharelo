@@ -184,7 +184,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
         },
         businessId,
       );
-      showToast('Traspaso enviado. Stock en tránsito.', 'success');
+      showToast('Orden de traspaso creada (pendiente de envío).', 'success');
       setIsCreating(false);
       resetForm();
       await fetchData();
@@ -352,12 +352,12 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
         <div className="flex-1 flex flex-col gap-4 lg:h-full overflow-hidden">
           <div className="flex justify-between items-center">
             <Heading level={2} className="!text-lg sm:!text-2xl !border-none !pb-0 text-champagne-gold">
-              Traspasos
+              Órdenes de Traspaso
             </Heading>
             <div className="flex items-center gap-2">
               <Button variant="secondary" onClick={openReports}>Reportes</Button>
               <Button onClick={() => { setIsCreating(true); resetForm(); }} disabled={isCreating}>
-                + Nuevo Traspaso
+                + Nueva Orden
               </Button>
             </div>
           </div>
@@ -481,8 +481,8 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                 </div>
 
                 <div className="bg-charcoal-surface/40 border-t border-aged-bronze/35 px-6 py-3 flex items-center justify-between text-xs text-text-secondary">
-                  <span>Mostrando {filtered.length} de {transfers.length} traspasos</span>
-                  <span className="font-mono">En tránsito: {transfers.filter((t) => t.status === 'in_transit').length}</span>
+                  <span>Mostrando {filtered.length} de {transfers.length} órdenes</span>
+                  <span className="font-mono">Pendientes: {transfers.filter((t) => t.status === 'pending').length} · En tránsito: {transfers.filter((t) => t.status === 'in_transit').length}</span>
                 </div>
               </div>
             </>
@@ -493,7 +493,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
         {isCreating && (
           <div className="w-full lg:w-96 bg-onyx-surface border border-aged-bronze/40 rounded-lg p-4 lg:p-6 shadow-xl lg:h-full overflow-y-auto">
             <Heading level={3} className="!text-base !border-none !pb-0 text-champagne-gold mb-4">
-              Nuevo Traspaso
+              Nueva Orden de Traspaso
             </Heading>
             <form onSubmit={handleSubmit} className="space-y-4">
               <FormField label="Origen">
@@ -622,7 +622,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
 
               <div className="flex gap-2 pt-2">
                 <Button type="submit" className="flex-1" disabled={isSubmitting}>
-                  {isSubmitting ? 'Enviando...' : 'Enviar Traspaso'}
+                  {isSubmitting ? 'Creando...' : 'Crear Orden'}
                 </Button>
                 <Button type="button" variant="secondary" className="flex-1" onClick={() => setIsCreating(false)}>Cancelar</Button>
               </div>
