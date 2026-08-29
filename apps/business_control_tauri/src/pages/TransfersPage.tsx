@@ -60,6 +60,20 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
   const [viewingTransfer, setViewingTransfer] = useState<TransferRow | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
 
+  // Reports state
+  const [showReports, setShowReports] = useState(false);
+  const [reportMode, setReportMode] = useState<'summary' | 'detailed'>('summary');
+  const [reportSummary, setReportSummary] = useState<any[]>([]);
+  const [reportDetailed, setReportDetailed] = useState<any[]>([]);
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedReportBranchId, setSelectedReportBranchId] = useState('');
+  const [loadingReports, setLoadingReports] = useState(false);
+
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
@@ -236,6 +250,42 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
     );
   };
 
+  const fetchSummaryReport = async () => {
+    setLoadingReports(true);
+    try {
+      const data = await api.getTransfersSummaryReport(businessId, startDate, endDate);
+      setReportSummary(data);
+    } catch (e: any) {
+      showToast(e?.message || 'Error al cargar reporte.', 'error');
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  const fetchDetailedReport = async () => {
+    if (!selectedReportBranchId) {
+      showToast('Seleccione una sucursal.', 'warning');
+      return;
+    }
+    setLoadingReports(true);
+    try {
+      const data = await api.getTransfersDetailedReport(businessId, selectedReportBranchId, startDate, endDate);
+      setReportDetailed(data);
+    } catch (e: any) {
+      showToast(e?.message || 'Error al cargar reporte.', 'error');
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  const openReports = async () => {
+    setShowReports(true);
+    if (!selectedReportBranchId && branches.length > 0) {
+      setSelectedReportBranchId(branches[0].id);
+    }
+    fetchSummaryReport();
+  };
+
   const originLabel = (t: TransferRow) => t.fromWarehouseName || t.fromBranchName || '—';
   const destLabel = (t: TransferRow) => t.toWarehouseName || t.toBranchName || '—';
 
@@ -257,9 +307,12 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
             <Heading level={2} className="!text-lg sm:!text-2xl !border-none !pb-0 text-champagne-gold">
               Traspasos
             </Heading>
-            <Button onClick={() => { setIsCreating(true); resetForm(); }} disabled={isCreating}>
-              + Nuevo Traspaso
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" onClick={openReports}>Reportes</Button>
+              <Button onClick={() => { setIsCreating(true); resetForm(); }} disabled={isCreating}>
+                + Nuevo Traspaso
+              </Button>
+            </div>
           </div>
 
           {error && (
@@ -595,6 +648,110 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                   >
                     {actioningId === viewingTransfer.id ? 'Enviando...' : 'Enviar Traspaso'}
                   </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reports Modal */}
+        {showReports && (
+          <div className="fixed inset-0 bg-obsidian/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in font-sans">
+            <div className="bg-onyx-surface border border-aged-bronze/35 rounded-xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-6 border-b border-aged-bronze/25 flex items-center justify-between">
+                <Heading level={2} className="!text-champagne-gold !border-none !pb-0 font-light font-sans text-lg">
+                  Reportes de Traspasos
+                </Heading>
+                <button onClick={() => setShowReports(false)} className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="p-6 flex flex-col gap-4 overflow-y-auto">
+                {/* Mode toggle + date filters */}
+                <div className="flex flex-col gap-4">
+                  <div className="flex bg-charcoal/40 p-1 border border-aged-bronze/20 rounded-md self-start">
+                    <button
+                      onClick={() => { setReportMode('summary'); fetchSummaryReport(); }}
+                      className={`px-4 py-1.5 text-xs rounded transition-all font-sans tracking-wide ${reportMode === 'summary' ? 'bg-champagne-gold text-onyx-surface font-semibold' : 'text-text-secondary hover:text-text-primary'}`}
+                    >
+                      Resumen
+                    </button>
+                    <button
+                      onClick={() => setReportMode('detailed')}
+                      className={`px-4 py-1.5 text-xs rounded transition-all font-sans tracking-wide ${reportMode === 'detailed' ? 'bg-champagne-gold text-onyx-surface font-semibold' : 'text-text-secondary hover:text-text-primary'}`}
+                    >
+                      Detallado
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-4 items-end">
+                    <div className="flex flex-col gap-1 flex-1">
+                      <label className="text-xs text-text-secondary">Fecha Inicial</label>
+                      <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-charcoal-surface border border-aged-bronze text-text-primary rounded p-2 text-xs focus:outline-none" />
+                    </div>
+                    <div className="flex flex-col gap-1 flex-1">
+                      <label className="text-xs text-text-secondary">Fecha Final</label>
+                      <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-charcoal-surface border border-aged-bronze text-text-primary rounded p-2 text-xs focus:outline-none" />
+                    </div>
+                    {reportMode === 'detailed' && (
+                      <div className="flex flex-col gap-1 flex-1">
+                        <label className="text-xs text-text-secondary">Sucursal</label>
+                        <select value={selectedReportBranchId} onChange={(e) => setSelectedReportBranchId(e.target.value)} className="bg-charcoal-surface border border-aged-bronze text-text-primary rounded p-2 text-xs focus:outline-none">
+                          {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    <Button variant="secondary" onClick={() => reportMode === 'summary' ? fetchSummaryReport() : fetchDetailedReport()}>
+                      Filtrar
+                    </Button>
+                  </div>
+                </div>
+
+                {loadingReports ? (
+                  <div className="py-12 text-center text-text-secondary text-xs">Cargando reporte...</div>
+                ) : reportMode === 'summary' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {reportSummary.length === 0 ? (
+                      <div className="col-span-3 py-8 text-center text-text-secondary italic text-xs">No hay datos en este periodo.</div>
+                    ) : (
+                      reportSummary.map((item) => (
+                        <div key={item.branchId} className="bg-charcoal-surface/40 border border-aged-bronze/10 rounded-lg p-5">
+                          <span className="text-xs text-text-secondary uppercase font-semibold">{item.branchName}</span>
+                          <span className="text-2xl font-bold font-mono text-champagne-gold mt-2 block">${parseFloat(item.totalCost).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto border border-aged-bronze/20 rounded">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-charcoal-surface/60 border-b border-aged-bronze/35 text-[11px] font-semibold text-text-secondary uppercase tracking-wider">
+                          <th className="px-4 py-3">Producto</th>
+                          <th className="px-4 py-3">SKU</th>
+                          <th className="px-4 py-3 text-right">Cantidad</th>
+                          <th className="px-4 py-3 text-right">Costo Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-aged-bronze/20">
+                        {reportDetailed.length === 0 ? (
+                          <tr><td colSpan={4} className="px-4 py-8 text-center text-text-secondary italic">No hay datos en este periodo.</td></tr>
+                        ) : (
+                          reportDetailed.map((item) => (
+                            <tr key={item.productId} className="hover:bg-charcoal-surface/20">
+                              <td className="px-4 py-3 font-medium text-text-primary">{item.productName}</td>
+                              <td className="px-4 py-3 font-mono text-text-secondary">{item.internalCode || item.sku || '-'}</td>
+                              <td className="px-4 py-3 text-right font-mono text-champagne-gold">{item.totalQuantity}</td>
+                              <td className="px-4 py-3 text-right font-mono">${parseFloat(item.totalCost).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>

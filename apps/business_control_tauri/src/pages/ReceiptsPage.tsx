@@ -42,6 +42,7 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [activeRightTab, setActiveRightTab] = useState<'stock' | 'history'>('stock');
+  const [isCreating, setIsCreating] = useState<boolean>(false);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
 
   const [destinationType, setDestinationType] = useState<'branch' | 'warehouse'>('branch');
@@ -290,6 +291,7 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
       }
 
       resetForm();
+      setIsCreating(false);
 
       const [updatedStock, updatedHist, poData] = await Promise.all([
         api.getStockLevels(businessId),
@@ -320,18 +322,22 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-aged-bronze/25 pb-4">
         <div>
           <Heading level={1} className="!border-none !pb-0 tracking-wide font-light">
-            Recepción de Inventario
+            Recepción de Insumos
           </Heading>
           <p className="text-sm text-text-secondary mt-1">
             Registra el ingreso de insumos y mercadería desde proveedores. Vincula una orden de compra o ingresa manualmente.
           </p>
         </div>
+        <Button onClick={() => { setIsCreating(true); resetForm(); }} disabled={isCreating}>
+          + Nueva Recepción
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
         {/* Left Form: Log receipt */}
-        <div className="lg:col-span-5 flex flex-col gap-6">
+        {isCreating && (
+        <div className="lg:col-span-5 lg:order-2 flex flex-col gap-6">
           <div className="border border-aged-bronze/30 bg-onyx-surface p-6 shadow-md rounded-lg">
             <h2 className="text-lg font-display text-champagne-gold tracking-wide mb-4">
               Registrar Compra / Recepción
@@ -656,22 +662,32 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
                   <span className="text-lg font-mono text-champagne-gold font-bold">${calculateGrandTotal()}</span>
                 </div>
 
-                <Button
-                  type="submit"
-                  disabled={isSubmitting || itemsList.length === 0}
-                  className="bg-champagne-gold hover:bg-champagne-gold/90 text-onyx-surface font-semibold py-2 px-6 rounded shadow-lg uppercase text-xs tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
-                  data-testid="receipt-submit"
-                >
-                  {isSubmitting ? 'Procesando...' : isPoLinked ? 'Registrar Recepción OC' : 'Registrar Entrada'}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setIsCreating(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting || itemsList.length === 0}
+                    className="bg-champagne-gold hover:bg-champagne-gold/90 text-onyx-surface font-semibold py-2 px-6 rounded shadow-lg uppercase text-xs tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+                    data-testid="receipt-submit"
+                  >
+                    {isSubmitting ? 'Procesando...' : isPoLinked ? 'Registrar Recepción OC' : 'Registrar Entrada'}
+                  </Button>
+                </div>
               </div>
 
             </form>
           </div>
         </div>
+        )}
 
         {/* Right Panel: View Stock levels and history */}
-        <div className="lg:col-span-7 flex flex-col gap-4">
+        <div className="lg:col-span-7 lg:order-1 flex flex-col gap-4">
 
           {/* Tabs Selector */}
           <div className="flex bg-charcoal/40 p-1 border border-aged-bronze/20 rounded-md self-start">
