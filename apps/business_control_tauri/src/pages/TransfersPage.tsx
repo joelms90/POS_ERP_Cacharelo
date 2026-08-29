@@ -7,6 +7,7 @@ import { FormField } from '../components/molecules/FormField';
 import { Autocomplete } from '../components/molecules/Autocomplete';
 import { Badge } from '../components/atoms/Badge';
 import { ToastContainer } from '../components/molecules/ToastNotification';
+import { ProductionOrderModal } from './ProductionOrderModal';
 
 interface TransfersPageProps {
   businessId: string;
@@ -61,6 +62,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
   const [viewingTransfer, setViewingTransfer] = useState<TransferRow | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [generatingOc, setGeneratingOc] = useState(false);
+  const [producingProduct, setProducingProduct] = useState<{ productId: string; productName: string } | null>(null);
 
   // Reports state
   const [showReports, setShowReports] = useState(false);
@@ -207,6 +209,20 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
     try {
       await api.shipTransfer(id);
       showToast('Traspaso enviado.', 'success');
+      setViewingTransfer(null);
+      await fetchData();
+    } catch (err: any) {
+      showToast(err.message || 'Error al enviar el traspaso.', 'error');
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleShipAvailable = async (id: string) => {
+    setActioningId(id);
+    try {
+      await api.shipTransfer(id, true);
+      showToast('Traspaso enviado con lo disponible.', 'success');
       setViewingTransfer(null);
       await fetchData();
     } catch (err: any) {
@@ -658,7 +674,22 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                             <td className="px-4 py-3 text-right font-mono text-champagne-gold">{qty}</td>
                             <td className={`px-4 py-3 text-right font-mono ${short ? 'text-error-red' : 'text-text-secondary'}`}>{avail}</td>
                             <td className="px-4 py-3 text-center">
-                              {short ? <Badge variant="error">Falta {qty - avail}</Badge> : <Badge variant="success">OK</Badge>}
+                              {short ? (
+                                <div className="flex flex-col items-center gap-1">
+                                  <Badge variant="error">Falta {qty - avail}</Badge>
+                                  {item.itemType !== 'raw_material' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setProducingProduct({ productId: item.productId, productName: item.productName })}
+                                      className="text-champagne-gold hover:underline text-[10px]"
+                                    >
+                                      Producir
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <Badge variant="success">OK</Badge>
+                              )}
                             </td>
                           </tr>
                         );
@@ -682,14 +713,26 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                   </Button>
                 )}
                 {viewingTransfer.status === 'pending' && (
-                  <Button
-                    variant="primary"
-                    fullWidth
-                    disabled={actioningId === viewingTransfer.id}
-                    onClick={() => handleShip(viewingTransfer.id)}
-                  >
-                    {actioningId === viewingTransfer.id ? 'Enviando...' : 'Enviar Traspaso'}
-                  </Button>
+                  <>
+                    <Button
+                      variant="primary"
+                      fullWidth
+                      disabled={actioningId === viewingTransfer.id}
+                      onClick={() => handleShip(viewingTransfer.id)}
+                    >
+                      {actioningId === viewingTransfer.id ? 'Enviando...' : 'Enviar Traspaso'}
+                    </Button>
+                    {viewingTransfer.items?.some((i) => (i.availableQty ?? 0) < parseFloat(i.quantity || '0')) && (
+                      <Button
+                        variant="secondary"
+                        fullWidth
+                        disabled={actioningId === viewingTransfer.id}
+                        onClick={() => handleShipAvailable(viewingTransfer.id)}
+                      >
+                        Ajustar a disponible
+                      </Button>
+                    )}
+                  </>
                 )}
                 {viewingTransfer.items?.some((i) => (i.availableQty ?? 0) < parseFloat(i.quantity || '0') && i.itemType === 'raw_material' && !!i.providerId) && (
                   <Button
@@ -810,6 +853,16 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
           </div>
         )}
       </div>
+
+      {producingProduct && (
+        <ProductionOrderModal
+          businessId={businessId}
+          productId={producingProduct.productId}
+          productName={producingProduct.productName}
+          onClose={() => setProducingProduct(null)}
+          onToast={showToast}
+        />
+      )}
     </div>
   );
 };

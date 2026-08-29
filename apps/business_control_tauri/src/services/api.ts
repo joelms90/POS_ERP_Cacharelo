@@ -1108,10 +1108,10 @@ export const api = {
     });
   },
 
-  async shipTransfer(id: string): Promise<{ success: boolean; transferId: string; status: string }> {
+  async shipTransfer(id: string, adjustToAvailable = false): Promise<{ success: boolean; transferId: string; status: string }> {
     return apiRequest<{ success: boolean; transferId: string; status: string }>(`/inventory/transfers/${id}/ship`, {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify({ adjustToAvailable }),
     });
   },
 

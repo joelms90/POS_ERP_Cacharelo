@@ -717,8 +717,9 @@ export class InventoryService {
     });
   }
 
-  async shipTransfer(transferId: string) {
+  async shipTransfer(transferId: string, options?: { adjustToAvailable?: boolean }) {
     const db = this.inventoryRepository.getDb();
+    const adjustToAvailable = options?.adjustToAvailable === true;
 
     return db.transaction(async (tx) => {
       const [transfer] = await tx
@@ -753,14 +754,29 @@ export class InventoryService {
         );
 
         const qty = parseFloat(item.quantity);
+        let shipQty = qty;
+
         if (sourceStock < qty) {
-          throw new BadRequestException('Stock insuficiente en origen para el traspaso.');
+          if (!adjustToAvailable) {
+            throw new BadRequestException('Stock insuficiente en origen para el traspaso.');
+          }
+          shipQty = Math.max(0, sourceStock);
+        }
+
+        if (shipQty <= 0) continue;
+
+        // If adjusting, update the item quantity to what we can actually ship
+        if (adjustToAvailable && shipQty !== qty) {
+          await tx
+            .update(schema.stockTransferItems)
+            .set({ quantity: shipQty.toString(), totalCost: (parseFloat(item.unitCost || '0') * shipQty).toFixed(2) })
+            .where(eq(schema.stockTransferItems.id, item.id));
         }
 
         await this.ledgerService.applyMovement(tx, {
           businessId: transfer.businessId,
           productId: item.productId,
-          quantityDelta: -qty,
+          quantityDelta: -shipQty,
           eventType: 'transfer_out',
           warehouseId: transfer.fromWarehouseId || null,
           branchId: transfer.fromBranchId || null,
@@ -773,7 +789,7 @@ export class InventoryService {
         await this.ledgerService.applyMovement(tx, {
           businessId: transfer.businessId,
           productId: item.productId,
-          quantityDelta: qty,
+          quantityDelta: shipQty,
           eventType: 'transit_in',
           warehouseId: transitWh.id,
           unitCost: item.unitCost,

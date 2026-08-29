@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Query, Param } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { CreateReceiptDto } from './dto/create-receipt.dto';
 import { CreateProductionRunDto } from './dto/create-production-run.dto';
+import { CompleteProductionRunDto } from './dto/complete-production-run.dto';
 import { CreateTransferDto } from './dto/create-transfer.dto';
 
 @Controller('inventory')
@@ -37,6 +38,24 @@ export class InventoryController {
     return this.inventoryService.assembleProduct(createProductionRunDto);
   }
 
+  @Post('production/:id/start')
+  async startProductionRun(@Param('id') id: string) {
+    return this.inventoryService.startProductionRun(id);
+  }
+
+  @Post('production/:id/complete')
+  async completeProductionRun(
+    @Param('id') id: string,
+    @Body() completeDto: CompleteProductionRunDto,
+  ) {
+    return this.inventoryService.completeProductionRun(id, completeDto);
+  }
+
+  @Post('production/:id/cancel')
+  async cancelProductionRun(@Param('id') id: string) {
+    return this.inventoryService.cancelProductionRun(id);
+  }
+
   @Get('transfers')
   async getTransfers(@Query('businessId') businessId: string) {
     return this.inventoryService.getTransfers(businessId);
@@ -58,8 +77,8 @@ export class InventoryController {
   }
 
   @Post('transfers/:id/ship')
-  async shipTransfer(@Param('id') id: string) {
-    return this.inventoryService.shipTransfer(id);
+  async shipTransfer(@Param('id') id: string, @Body() body: any) {
+    return this.inventoryService.shipTransfer(id, body);
   }
 
   @Get('reports/transfers-summary')
