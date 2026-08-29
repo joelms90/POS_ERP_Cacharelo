@@ -12,7 +12,7 @@ interface AssemblyPageProps {
 }
 
 export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
-  const [activeTab, setActiveTab] = useState<'recipes' | 'assembly'>('recipes');
+  const [activeTab, setActiveTab] = useState<'recipes' | 'assembly'>('assembly');
   
   // Data loading states
   const [products, setProducts] = useState<Product[]>([]);
@@ -389,16 +389,6 @@ export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
       {/* Page Tabs */}
       <div className="flex gap-4 border-b border-aged-bronze/30 pb-3 mb-6">
         <button
-          onClick={() => setActiveTab('recipes')}
-          className={`px-4 py-2 text-sm transition-all border-b-2 ${
-            activeTab === 'recipes'
-              ? 'border-champagne-gold text-champagne-gold font-medium'
-              : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          Gestión de Recetas (BOM)
-        </button>
-        <button
           onClick={() => setActiveTab('assembly')}
           className={`px-4 py-2 text-sm transition-all border-b-2 ${
             activeTab === 'assembly'
@@ -407,6 +397,16 @@ export const AssemblyPage: React.FC<AssemblyPageProps> = ({ businessId }) => {
           }`}
         >
           Ensamble de Productos
+        </button>
+        <button
+          onClick={() => setActiveTab('recipes')}
+          className={`px-4 py-2 text-sm transition-all border-b-2 ${
+            activeTab === 'recipes'
+              ? 'border-champagne-gold text-champagne-gold font-medium'
+              : 'border-transparent text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          Gestión de Recetas (BOM)
         </button>
       </div>
 

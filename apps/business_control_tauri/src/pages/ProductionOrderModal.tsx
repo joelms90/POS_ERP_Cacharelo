@@ -108,21 +108,22 @@ export const ProductionOrderModal: React.FC<ProductionOrderModalProps> = ({
   });
 
   const missing = recipeChecks.filter((c) => !c.hasEnough);
-  const canProduce = recipeChecks.length > 0 && recipeChecks.every((c) => c.hasEnough);
 
   const handleProduce = async () => {
     setProducing(true);
     try {
       await api.assembleProduct({
         warehouseId,
+        destinationWarehouseId: warehouseId,
         productId,
         quantityProduced: qtyToProduce,
+        status: 'pending',
         notes: undefined,
       });
-      onToast(`Ensamble de ${productName} procesado.`);
+      onToast(`Orden de Producción creada (Pendiente) para ${productName}.`);
       onClose();
     } catch (e: any) {
-      onToast(e?.message || 'Error al procesar el ensamble.', 'error');
+      onToast(e?.message || 'Error al crear la orden de producción.', 'error');
     } finally {
       setProducing(false);
     }
@@ -357,10 +358,10 @@ export const ProductionOrderModal: React.FC<ProductionOrderModalProps> = ({
           <Button
             variant="primary"
             fullWidth
-            disabled={producing || !canProduce}
+            disabled={producing || recipeChecks.length === 0}
             onClick={handleProduce}
           >
-            {producing ? 'Procesando...' : 'Procesar Ensamble'}
+            {producing ? 'Creando...' : 'Crear Orden de Producción (Pendiente)'}
           </Button>
           {missing.length > 0 && (
             <Button
