@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { api, Warehouse, RecipeItem } from '../services/api';
+import { api, Warehouse, RecipeItem, Product } from '../services/api';
 import { Button } from '../components/atoms/Button';
 import { Badge } from '../components/atoms/Badge';
+import { Autocomplete } from '../components/molecules/Autocomplete';
 
 interface ProductionOrderModalProps {
   businessId: string;
@@ -27,6 +28,14 @@ export const ProductionOrderModal: React.FC<ProductionOrderModalProps> = ({
   const [producing, setProducing] = useState(false);
   const [generatingOc, setGeneratingOc] = useState(false);
 
+  // Recipe builder (when no recipe exists)
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [draftItems, setDraftItems] = useState<Array<{ ingredientProductId: string; ingredientName: string; quantityNeeded: number; wastePercent: number }>>([]);
+  const [newIngredientId, setNewIngredientId] = useState('');
+  const [newIngredientQty, setNewIngredientQty] = useState('1');
+  const [newIngredientWaste, setNewIngredientWaste] = useState('0');
+  const [savingRecipe, setSavingRecipe] = useState(false);
+
   const loadWarehouses = useCallback(async () => {
     try {
       const whs = await api.getWarehouses(businessId);
@@ -48,6 +57,15 @@ export const ProductionOrderModal: React.FC<ProductionOrderModalProps> = ({
     }
   }, [productId]);
 
+  const loadProducts = useCallback(async () => {
+    try {
+      const prods = await api.getProducts(businessId);
+      setAllProducts(prods);
+    } catch {
+      setAllProducts([]);
+    }
+  }, [businessId]);
+
   const loadStock = useCallback(async () => {
     if (!warehouseId) return;
     try {
@@ -65,7 +83,8 @@ export const ProductionOrderModal: React.FC<ProductionOrderModalProps> = ({
   useEffect(() => {
     loadWarehouses();
     loadRecipe();
-  }, [loadWarehouses, loadRecipe]);
+    loadProducts();
+  }, [loadWarehouses, loadRecipe, loadProducts]);
 
   useEffect(() => {
     loadStock();
@@ -126,6 +145,57 @@ export const ProductionOrderModal: React.FC<ProductionOrderModalProps> = ({
     }
   };
 
+  const ingredientCandidates = allProducts.filter(
+    (p) => p.id !== productId && (p.itemType === 'raw_material' || p.itemType === 'wip' || p.isIngredient === true),
+  );
+
+  const handleAddIngredient = () => {
+    if (!newIngredientId) return;
+    const qty = parseFloat(newIngredientQty);
+    if (isNaN(qty) || qty <= 0) return;
+    const waste = parseFloat(newIngredientWaste || '0') || 0;
+    const prod = allProducts.find((p) => p.id === newIngredientId);
+    if (!prod) return;
+    if (draftItems.some((d) => d.ingredientProductId === newIngredientId)) return;
+
+    setDraftItems((prev) => [
+      ...prev,
+      { ingredientProductId: newIngredientId, ingredientName: prod.name, quantityNeeded: qty, wastePercent: waste },
+    ]);
+    setNewIngredientId('');
+    setNewIngredientQty('1');
+    setNewIngredientWaste('0');
+  };
+
+  const handleRemoveIngredient = (ingredientId: string) => {
+    setDraftItems((prev) => prev.filter((d) => d.ingredientProductId !== ingredientId));
+  };
+
+  const handleSaveRecipe = async () => {
+    if (draftItems.length === 0) {
+      onToast('Añada al menos un insumo a la receta.', 'warning');
+      return;
+    }
+    setSavingRecipe(true);
+    try {
+      await api.setRecipe({
+        parentProductId: productId,
+        items: draftItems.map((d) => ({
+          ingredientProductId: d.ingredientProductId,
+          quantityNeeded: d.quantityNeeded,
+          wastePercent: d.wastePercent,
+        })),
+      });
+      setDraftItems([]);
+      await loadRecipe();
+      onToast('Receta guardada correctamente.');
+    } catch (e: any) {
+      onToast(e?.message || 'Error al guardar la receta.', 'error');
+    } finally {
+      setSavingRecipe(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
       <div
@@ -177,8 +247,82 @@ export const ProductionOrderModal: React.FC<ProductionOrderModalProps> = ({
             {loading ? (
               <div className="py-6 text-center text-text-secondary text-xs">Cargando...</div>
             ) : recipeChecks.length === 0 ? (
-              <div className="text-[10px] text-error-red italic">
-                Este producto no tiene receta configurada. Configúrela en Producción (Recetas).
+              <div className="flex flex-col gap-3">
+                <div className="text-[10px] text-error-red italic">
+                  Este producto no tiene receta configurada. Añada los insumos:
+                </div>
+
+                <div className="flex flex-col gap-2 bg-charcoal-surface/30 border border-aged-bronze/20 rounded p-3">
+                  <Autocomplete
+                    options={ingredientCandidates.map((ing) => ({
+                      id: ing.id,
+                      label: ing.name,
+                      sublabel: ing.sku ? `SKU: ${ing.sku}` : undefined,
+                    }))}
+                    value={newIngredientId}
+                    onChange={setNewIngredientId}
+                    placeholder="Buscar insumo..."
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[9px] text-text-secondary uppercase mb-1">Cantidad</label>
+                      <input
+                        type="number"
+                        step="0.001"
+                        min="0.001"
+                        value={newIngredientQty}
+                        onChange={(e) => setNewIngredientQty(e.target.value)}
+                        className="w-full px-2 py-1.5 bg-charcoal-surface border border-aged-bronze rounded text-xs text-text-primary focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] text-text-secondary uppercase mb-1">Merma %</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={newIngredientWaste}
+                        onChange={(e) => setNewIngredientWaste(e.target.value)}
+                        className="w-full px-2 py-1.5 bg-charcoal-surface border border-aged-bronze rounded text-xs text-text-primary focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <Button type="button" variant="secondary" size="sm" onClick={handleAddIngredient}>
+                    + Añadir insumo
+                  </Button>
+                </div>
+
+                {draftItems.length > 0 && (
+                  <div className="flex flex-col gap-1">
+                    {draftItems.map((d) => (
+                      <div key={d.ingredientProductId} className="flex justify-between items-center text-[11px] border-b border-aged-bronze/10 pb-1">
+                        <span className="text-text-primary">{d.ingredientName}</span>
+                        <span className="text-text-secondary">
+                          {d.quantityNeeded}{d.wastePercent > 0 ? ` · merma ${d.wastePercent}%` : ''}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveIngredient(d.ingredientProductId)}
+                          className="text-error-red hover:text-error-red/80 p-1"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={savingRecipe || draftItems.length === 0}
+                  onClick={handleSaveRecipe}
+                >
+                  {savingRecipe ? 'Guardando...' : 'Guardar Receta'}
+                </Button>
               </div>
             ) : (
               <div className="flex flex-col gap-2">
