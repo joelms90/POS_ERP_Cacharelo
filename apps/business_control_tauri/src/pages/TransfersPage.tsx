@@ -235,7 +235,9 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
       if (req.items && req.items.length > 0) {
         const items = req.items.map((item) => {
           const prod = products.find(p => p.id === item.productId);
-          const qty = parseFloat(String(item.quantityApproved || item.quantityRequested || '0'));
+          const approvedQty = parseFloat(String(item.quantityApproved ?? '0')) || 0;
+          const requestedQty = parseFloat(String(item.quantityRequested ?? '0')) || 0;
+          const qty = approvedQty > 0 ? approvedQty : requestedQty;
           return {
             productId: item.productId,
             productName: prod?.name || item.productName || 'Insumo',
