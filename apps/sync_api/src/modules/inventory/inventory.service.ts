@@ -242,6 +242,54 @@ export class InventoryService {
     }));
   }
 
+  async getTransfer(transferId: string) {
+    const db = this.inventoryRepository.getDb();
+
+    const [transfer] = await db
+      .select()
+      .from(schema.stockTransfers)
+      .where(eq(schema.stockTransfers.id, transferId))
+      .limit(1);
+
+    if (!transfer) {
+      throw new NotFoundException(`Traspaso con ID ${transferId} no encontrado`);
+    }
+
+    const items = await db
+      .select({
+        id: schema.stockTransferItems.id,
+        productId: schema.stockTransferItems.productId,
+        quantity: schema.stockTransferItems.quantity,
+        unitCost: schema.stockTransferItems.unitCost,
+        totalCost: schema.stockTransferItems.totalCost,
+        productName: schema.products.name,
+      })
+      .from(schema.stockTransferItems)
+      .innerJoin(schema.products, eq(schema.stockTransferItems.productId, schema.products.id))
+      .where(eq(schema.stockTransferItems.transferId, transferId));
+
+    const warehouses = await db
+      .select()
+      .from(schema.warehouses)
+      .where(eq(schema.warehouses.businessId, transfer.businessId));
+    const branches = await db
+      .select()
+      .from(schema.branches)
+      .where(eq(schema.branches.businessId, transfer.businessId));
+
+    const whMap = new Map(warehouses.map((w) => [w.id, w.name]));
+    const brMap = new Map(branches.map((b) => [b.id, b.name]));
+
+    return {
+      ...transfer,
+      fromWarehouseName: transfer.fromWarehouseId ? whMap.get(transfer.fromWarehouseId) : null,
+      fromBranchName: transfer.fromBranchId ? brMap.get(transfer.fromBranchId) : null,
+      toWarehouseName: transfer.toWarehouseId ? whMap.get(transfer.toWarehouseId) : null,
+      toBranchName: transfer.toBranchId ? brMap.get(transfer.toBranchId) : null,
+      items,
+    };
+  }
+
   async recordTransfer(dto: any) {
     const { businessId, fromWarehouseId, fromBranchId, toWarehouseId, toBranchId, notes, items } = dto;
 
@@ -402,6 +450,82 @@ export class InventoryService {
       const [updated] = await tx
         .update(schema.stockTransfers)
         .set({ status: 'received', transferredAt: new Date() })
+        .where(eq(schema.stockTransfers.id, transferId))
+        .returning();
+
+      return { success: true, transferId, status: updated.status };
+    });
+  }
+
+  async shipTransfer(transferId: string) {
+    const db = this.inventoryRepository.getDb();
+
+    return db.transaction(async (tx) => {
+      const [transfer] = await tx
+        .select()
+        .from(schema.stockTransfers)
+        .where(eq(schema.stockTransfers.id, transferId))
+        .limit(1);
+
+      if (!transfer) {
+        throw new NotFoundException(`Traspaso con ID ${transferId} no encontrado`);
+      }
+
+      if (transfer.status !== 'pending') {
+        throw new BadRequestException(
+          `El traspaso no se puede enviar en estado "${transfer.status}".`,
+        );
+      }
+
+      const transitWh = await this.getOrCreateTransitWarehouse(tx, transfer.businessId);
+
+      const items = await tx
+        .select()
+        .from(schema.stockTransferItems)
+        .where(eq(schema.stockTransferItems.transferId, transferId));
+
+      for (const item of items) {
+        const sourceStock = await this.ledgerService.getStockLevel(
+          tx,
+          item.productId,
+          transfer.fromWarehouseId || null,
+          transfer.fromBranchId || null,
+        );
+
+        const qty = parseFloat(item.quantity);
+        if (sourceStock < qty) {
+          throw new BadRequestException('Stock insuficiente en origen para el traspaso.');
+        }
+
+        await this.ledgerService.applyMovement(tx, {
+          businessId: transfer.businessId,
+          productId: item.productId,
+          quantityDelta: -qty,
+          eventType: 'transfer_out',
+          warehouseId: transfer.fromWarehouseId || null,
+          branchId: transfer.fromBranchId || null,
+          unitCost: item.unitCost,
+          referenceType: 'transfer',
+          referenceId: transferId,
+          notes: 'Traspaso enviado',
+        });
+
+        await this.ledgerService.applyMovement(tx, {
+          businessId: transfer.businessId,
+          productId: item.productId,
+          quantityDelta: qty,
+          eventType: 'transit_in',
+          warehouseId: transitWh.id,
+          unitCost: item.unitCost,
+          referenceType: 'transfer',
+          referenceId: transferId,
+          notes: 'En tránsito',
+        });
+      }
+
+      const [updated] = await tx
+        .update(schema.stockTransfers)
+        .set({ status: 'in_transit', transferredAt: new Date() })
         .where(eq(schema.stockTransfers.id, transferId))
         .returning();
 

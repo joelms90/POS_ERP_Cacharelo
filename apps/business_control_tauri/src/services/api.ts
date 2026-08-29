@@ -1064,6 +1064,17 @@ export const api = {
     });
   },
 
+  async shipTransfer(id: string): Promise<{ success: boolean; transferId: string; status: string }> {
+    return apiRequest<{ success: boolean; transferId: string; status: string }>(`/inventory/transfers/${id}/ship`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  async getTransfer(id: string): Promise<any> {
+    return apiRequest<any>(`/inventory/transfers/${id}`);
+  },
+
   async adjustStock(payload: {
     productId: string;
     warehouseId?: string;

@@ -42,6 +42,11 @@ export class InventoryController {
     return this.inventoryService.getTransfers(businessId);
   }
 
+  @Get('transfers/:id')
+  async getTransfer(@Param('id') id: string) {
+    return this.inventoryService.getTransfer(id);
+  }
+
   @Post('transfers')
   async recordTransfer(@Body() createTransferDto: CreateTransferDto) {
     return this.inventoryService.recordTransfer(createTransferDto);
@@ -50,6 +55,11 @@ export class InventoryController {
   @Post('transfers/:id/receive')
   async receiveTransfer(@Param('id') id: string) {
     return this.inventoryService.receiveTransfer(id);
+  }
+
+  @Post('transfers/:id/ship')
+  async shipTransfer(@Param('id') id: string) {
+    return this.inventoryService.shipTransfer(id);
   }
 
   @Get('reports/transfers-summary')

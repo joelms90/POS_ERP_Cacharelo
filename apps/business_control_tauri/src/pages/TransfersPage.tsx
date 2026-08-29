@@ -1,66 +1,66 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { api, Warehouse, BranchRequisition } from '../services/api';
+import { api, Warehouse, Branch, Product } from '../services/api';
 import { Button } from '../components/atoms/Button';
 import { Heading } from '../components/atoms/Heading';
 import { Input } from '../components/atoms/Input';
-import { Badge } from '../components/atoms/Badge';
-import { ToastContainer } from '../components/molecules/ToastNotification';
+import { FormField } from '../components/molecules/FormField';
 import { Autocomplete } from '../components/molecules/Autocomplete';
+import { ToastContainer } from '../components/molecules/ToastNotification';
 
 interface TransfersPageProps {
   businessId: string;
 }
 
+interface TransferLineItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+}
+
+interface TransferRow {
+  id: string;
+  fromWarehouseId?: string | null;
+  fromBranchId?: string | null;
+  toWarehouseId?: string | null;
+  toBranchId?: string | null;
+  fromWarehouseName?: string | null;
+  fromBranchName?: string | null;
+  toWarehouseName?: string | null;
+  toBranchName?: string | null;
+  status: string;
+  notes?: string | null;
+  transferredAt?: string | null;
+  itemCount?: number;
+  items?: Array<{ productId: string; productName: string; quantity: string; unitCost?: string; totalCost?: string }>;
+}
+
 export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
-  const [activeTab, setActiveTab] = useState<'create' | 'history' | 'report-summary' | 'report-detailed'>('create');
-  
-  // Data lists
+  const [transfers, setTransfers] = useState<TransferRow[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [branches, setBranches] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [transfers, setTransfers] = useState<any[]>([]);
-  
-  // Report states
-  const [reportSummary, setReportSummary] = useState<any[]>([]);
-  const [reportDetailed, setReportDetailed] = useState<any[]>([]);
-  
-  // Filter states
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(1); // Default to start of month
-    return d.toISOString().split('T')[0];
-  });
-  const [endDate, setEndDate] = useState(() => {
-    return new Date().toISOString().split('T')[0]; // Today
-  });
-  const [selectedReportBranchId, setSelectedReportBranchId] = useState('');
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Loading states
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [receivingId, setReceivingId] = useState<string | null>(null);
-  const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
-
-  // Form states (Create Transfer)
+  const [isCreating, setIsCreating] = useState(false);
   const [fromType, setFromType] = useState<'warehouse' | 'branch'>('warehouse');
   const [fromId, setFromId] = useState('');
   const [toType, setToType] = useState<'warehouse' | 'branch'>('branch');
   const [toId, setToId] = useState('');
   const [notes, setNotes] = useState('');
-  const [itemsList, setItemsList] = useState<Array<{ productId: string; productName: string; quantity: number; cost: string }>>([]);
-  
-  // Requisition integration
-  const [approvedRequisitions, setApprovedRequisitions] = useState<BranchRequisition[]>([]);
-  const [selectedRequisitionId, setSelectedRequisitionId] = useState('');
-  const [isLinkedToRequisition, setIsLinkedToRequisition] = useState(false);
+  const [itemsList, setItemsList] = useState<TransferLineItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Add item form states
   const [selectedProductId, setSelectedProductId] = useState('');
   const [itemQuantity, setItemQuantity] = useState('1');
 
-  // Inline editing
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editingQuantity, setEditingQuantity] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const [viewingTransfer, setViewingTransfer] = useState<TransferRow | null>(null);
+  const [actioningId, setActioningId] = useState<string | null>(null);
+
+  const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -71,240 +71,105 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const loadInitialData = useCallback(async () => {
-    setIsLoading(true);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const [whData, prodData, transData, branchData, reqData] = await Promise.all([
+      const [whData, branchData, prodData, transData] = await Promise.all([
         api.getWarehouses(businessId),
+        api.getBranches(businessId),
         api.getProducts(businessId),
         api.getTransfers(businessId),
-        api.getBranches(businessId),
-        api.getAllRequisitions(businessId),
       ]);
-      
       setWarehouses(whData);
+      setBranches(branchData);
       setProducts(prodData);
       setTransfers(transData);
-      setBranches(branchData);
-      setApprovedRequisitions(reqData.filter(r => r.status === 'approved'));
 
-      if (whData.length > 0) {
-        setFromId(whData[0].id);
-      } else if (branchData.length > 0) {
-        setFromType('branch');
-        setFromId(branchData[0].id);
-      }
-
-      if (branchData.length > 0) {
-        setToId(branchData[0].id);
-        setSelectedReportBranchId(branchData[0].id);
-      } else if (whData.length > 0) {
-        setToType('warehouse');
-        setToId(whData[0].id);
-      }
-      
+      if (whData.length > 0) setFromId(whData[0].id);
+      if (branchData.length > 0) setToId(branchData[0].id);
       if (prodData.length > 0) setSelectedProductId(prodData[0].id);
     } catch (err: any) {
-      showToast(err.message || 'Error al cargar catálogos de traspaso.', 'error');
+      setError('Error al cargar datos');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }, [businessId, showToast]);
+  }, [businessId]);
 
   useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
+    fetchData();
+  }, [fetchData]);
 
-  // Load summary report
-  const fetchSummaryReport = async () => {
-    setIsLoading(true);
-    try {
-      const data = await api.getTransfersSummaryReport(businessId, startDate, endDate);
-      setReportSummary(data);
-    } catch (err: any) {
-      showToast(err.message || 'Error al cargar reporte general.', 'error');
-    } finally {
-      setIsLoading(false);
-    }
+  const resetForm = () => {
+    setIsCreating(false);
+    setFromType('warehouse');
+    setFromId(warehouses.length > 0 ? warehouses[0].id : '');
+    setToType('branch');
+    setToId(branches.length > 0 ? branches[0].id : '');
+    setNotes('');
+    setItemsList([]);
+    setItemQuantity('1');
   };
-
-  // Load detailed report
-  const fetchDetailedReport = async () => {
-    if (!selectedReportBranchId) {
-      showToast('Seleccione un punto de venta destino.', 'warning');
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const data = await api.getTransfersDetailedReport(businessId, selectedReportBranchId, startDate, endDate);
-      setReportDetailed(data);
-    } catch (err: any) {
-      showToast(err.message || 'Error al cargar reporte detallado.', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === 'report-summary') {
-      fetchSummaryReport();
-    } else if (activeTab === 'report-detailed') {
-      fetchDetailedReport();
-    } else if (activeTab === 'history') {
-      api.getTransfers(businessId).then(setTransfers).catch(() => {});
-    }
-  }, [activeTab, startDate, endDate, selectedReportBranchId]);
 
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProductId) return;
-    
+    if (!selectedProductId) {
+      showToast('Seleccione un producto.', 'warning');
+      return;
+    }
     const qty = parseFloat(itemQuantity);
     if (isNaN(qty) || qty <= 0) {
       showToast('La cantidad debe ser mayor a cero.', 'warning');
       return;
     }
+    const prod = products.find((p) => p.id === selectedProductId);
+    const productName = prod ? prod.name : 'Producto';
 
-    const prod = products.find(p => p.id === selectedProductId);
-    if (!prod) return;
-
-    // Check duplicate
-    if (itemsList.some(item => item.productId === selectedProductId)) {
-      showToast('El producto ya está en la lista. Edite o elimine.', 'warning');
-      return;
+    const existing = itemsList.find((it) => it.productId === selectedProductId);
+    if (existing) {
+      const newItems = itemsList.map((it) =>
+        it.productId === selectedProductId ? { ...it, quantity: it.quantity + qty } : it,
+      );
+      setItemsList(newItems);
+    } else {
+      setItemsList((prev) => [...prev, { productId: selectedProductId, productName, quantity: qty }]);
     }
-
-    setItemsList(prev => [...prev, {
-      productId: selectedProductId,
-      productName: prod.name,
-      quantity: qty,
-      cost: prod.cost || '0.00'
-    }]);
-
     setItemQuantity('1');
   };
 
-  const handleRemoveItem = (index: number) => {
-    setItemsList(prev => prev.filter((_, i) => i !== index));
-  };
+  const removeItem = (index: number) => setItemsList(itemsList.filter((_, i) => i !== index));
 
-  const handleStartEditing = (index: number) => {
-    setEditingIndex(index);
-    setEditingQuantity(itemsList[index].quantity.toString());
-  };
-
-  const handleSaveEdit = (index: number) => {
-    const qty = parseFloat(editingQuantity);
-    if (isNaN(qty) || qty <= 0) {
-      showToast('La cantidad debe ser mayor a cero.', 'warning');
-      return;
-    }
-    const newItems = [...itemsList];
-    newItems[index].quantity = qty;
-    setItemsList(newItems);
-    setEditingIndex(null);
-    setEditingQuantity('');
-  };
-
-  const handleCancelEdit = () => {
-    setEditingIndex(null);
-    setEditingQuantity('');
-  };
-
-  const handleLoadRequisition = async (reqId: string) => {
-    if (!reqId) {
-      setIsLinkedToRequisition(false);
-      return;
-    }
-
-    try {
-      const req = await api.getRequisition(reqId);
-      if (!req) return;
-
-      setIsLinkedToRequisition(true);
-
-      // Set source = warehouse (toWarehouseId in req)
-      setFromType('warehouse');
-      setFromId(req.toWarehouseId);
-
-      // Set destination = branch (fromBranchId in req)
-      setToType('branch');
-      setToId(req.fromBranchId);
-
-      // Load items with quantities
-      if (req.items && req.items.length > 0) {
-        const items = req.items.map((item) => {
-          const prod = products.find(p => p.id === item.productId);
-          const approvedQty = parseFloat(String(item.quantityApproved ?? '0')) || 0;
-          const requestedQty = parseFloat(String(item.quantityRequested ?? '0')) || 0;
-          const qty = approvedQty > 0 ? approvedQty : requestedQty;
-          return {
-            productId: item.productId,
-            productName: prod?.name || item.productName || 'Insumo',
-            quantity: qty,
-            cost: prod?.cost || '0',
-          };
-        });
-        setItemsList(items);
-        showToast(`Requisición cargada con ${items.length} productos.`, 'success');
-      }
-    } catch (err) {
-      showToast('Error al cargar requisición.', 'error');
-      setIsLinkedToRequisition(false);
-    }
-  };
-
-  const handleSubmitTransfer = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (itemsList.length === 0) {
-      showToast('Debe agregar al menos un producto a la lista.', 'warning');
-      return;
-    }
     if (!fromId || !toId) {
-      showToast('Especifique origen y destino para el traspaso.', 'warning');
+      showToast('Especifique origen y destino.', 'warning');
       return;
     }
     if (fromType === toType && fromId === toId) {
-      showToast('El origen y el destino no pueden ser idénticos.', 'error');
+      showToast('El origen y el destino no pueden ser idénticos.', 'warning');
+      return;
+    }
+    if (itemsList.length === 0) {
+      showToast('Agregue al menos un producto.', 'warning');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const payload = {
-        fromWarehouseId: fromType === 'warehouse' ? fromId : undefined,
-        fromBranchId: fromType === 'branch' ? fromId : undefined,
-        toWarehouseId: toType === 'warehouse' ? toId : undefined,
-        toBranchId: toType === 'branch' ? toId : undefined,
-        notes: notes.trim() || undefined,
-        items: itemsList.map(item => ({
-          productId: item.productId,
-          quantity: parseFloat(String(item.quantity)) || 0,
-        })),
-      };
-
-      await api.recordTransfer(payload, businessId);
-
-      // If linked to a requisition, mark it as completed
-      if (isLinkedToRequisition && selectedRequisitionId) {
-        try {
-          await api.updateRequisitionStatus(selectedRequisitionId, { status: 'completed', notes: 'Traspaso ejecutado.' });
-        } catch {
-          // Non-critical: transfer succeeded even if requisition update fails
-        }
-      }
-
-      showToast('Traspaso enviado con éxito. Stock movido a tránsito.', 'success');
-      
-      // Reset form
-      setItemsList([]);
-      setNotes('');
-      setSelectedRequisitionId('');
-      setIsLinkedToRequisition(false);
-      
-      // Reload history
-      const transData = await api.getTransfers(businessId);
-      setTransfers(transData);
+      await api.recordTransfer(
+        {
+          fromWarehouseId: fromType === 'warehouse' ? fromId : undefined,
+          fromBranchId: fromType === 'branch' ? fromId : undefined,
+          toWarehouseId: toType === 'warehouse' ? toId : undefined,
+          toBranchId: toType === 'branch' ? toId : undefined,
+          notes: notes.trim() || undefined,
+          items: itemsList.map((it) => ({ productId: it.productId, quantity: it.quantity })),
+        },
+        businessId,
+      );
+      showToast('Traspaso enviado. Stock en tránsito.', 'success');
+      resetForm();
+      await fetchData();
     } catch (err: any) {
       showToast(err.message || 'Error al procesar el traspaso.', 'error');
     } finally {
@@ -312,563 +177,425 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
     }
   };
 
-  const handleReceiveTransfer = async (transferId: string) => {
-    setReceivingId(transferId);
+  const handleView = async (id: string) => {
     try {
-      await api.receiveTransfer(transferId);
-      showToast('Traspaso recibido. Stock actualizado en el destino.', 'success');
-      const transData = await api.getTransfers(businessId);
-      setTransfers(transData);
-    } catch (err: any) {
-      showToast(err.message || 'Error al recibir el traspaso.', 'error');
-    } finally {
-      setReceivingId(null);
+      const full = await api.getTransfer(id);
+      setViewingTransfer(full);
+    } catch {
+      showToast('Error al cargar el traspaso.', 'error');
     }
   };
 
+  const handleShip = async (id: string) => {
+    setActioningId(id);
+    try {
+      await api.shipTransfer(id);
+      showToast('Traspaso enviado.', 'success');
+      setViewingTransfer(null);
+      await fetchData();
+    } catch (err: any) {
+      showToast(err.message || 'Error al enviar el traspaso.', 'error');
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleReceive = async (id: string) => {
+    setActioningId(id);
+    try {
+      await api.receiveTransfer(id);
+      showToast('Traspaso recibido. Stock actualizado en destino.', 'success');
+      setViewingTransfer(null);
+      await fetchData();
+    } catch (err: any) {
+      showToast(err.message || 'Error al recibir el traspaso.', 'error');
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const badges: Record<string, string> = {
+      pending: 'bg-gray-500/20 text-gray-300',
+      in_transit: 'bg-blue-500/20 text-blue-300',
+      received: 'bg-green-500/20 text-green-300',
+      completed: 'bg-green-500/20 text-green-300',
+      cancelled: 'bg-red-500/20 text-red-300',
+    };
+    const labels: Record<string, string> = {
+      pending: 'Pendiente',
+      in_transit: 'En Tránsito',
+      received: 'Recibido',
+      completed: 'Completado',
+      cancelled: 'Cancelado',
+    };
+    return (
+      <span className={`px-2 py-1 rounded text-xs font-medium ${badges[status] || badges.pending}`}>
+        {labels[status] || status}
+      </span>
+    );
+  };
+
+  const originLabel = (t: TransferRow) => t.fromWarehouseName || t.fromBranchName || '—';
+  const destLabel = (t: TransferRow) => t.toWarehouseName || t.toBranchName || '—';
+
+  const filtered = transfers.filter((t) => {
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = !q || originLabel(t).toLowerCase().includes(q) || destLabel(t).toLowerCase().includes(q);
+    const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   return (
-    <div className="flex flex-col h-full gap-6 animate-fade-in text-text-primary">
+    <div className="w-full lg:h-full min-h-full bg-obsidian p-2 lg:p-6 font-sans overflow-y-auto lg:overflow-hidden">
       <ToastContainer toasts={toasts} onClose={removeToast} />
-      
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-aged-bronze/20 pb-4">
-        <div>
-          <Heading level={2} className="!border-none !pb-0 font-sans tracking-wide">
-            Traspasos y Reportes de Sucursal
-          </Heading>
-          <p className="text-xs text-text-secondary mt-1">
-            Envío de mercancía a puntos de venta y control de costos para oficina.
-          </p>
-        </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-aged-bronze/20 bg-onyx-surface p-1 rounded-lg">
-        <button
-          onClick={() => setActiveTab('create')}
-          className={`flex-1 py-2 px-4 rounded text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
-            activeTab === 'create'
-              ? 'bg-charcoal-surface text-champagne-gold border border-champagne-gold/20 shadow-sm'
-              : 'text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          Nuevo Envío
-        </button>
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`flex-1 py-2 px-4 rounded text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
-            activeTab === 'history'
-              ? 'bg-charcoal-surface text-champagne-gold border border-champagne-gold/20 shadow-sm'
-              : 'text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          Historial de Envíos
-        </button>
-        <button
-          onClick={() => setActiveTab('report-summary')}
-          className={`flex-1 py-2 px-4 rounded text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
-            activeTab === 'report-summary'
-              ? 'bg-charcoal-surface text-champagne-gold border border-champagne-gold/20 shadow-sm'
-              : 'text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          Reporte General Costos
-        </button>
-        <button
-          onClick={() => setActiveTab('report-detailed')}
-          className={`flex-1 py-2 px-4 rounded text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
-            activeTab === 'report-detailed'
-              ? 'bg-charcoal-surface text-champagne-gold border border-champagne-gold/20 shadow-sm'
-              : 'text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          Detalle por Sucursal
-        </button>
-      </div>
-
-      {/* Tab Contents */}
-      <div className="flex-1 overflow-y-auto">
-        {isLoading && (
-          <div className="flex justify-center py-12">
-            <svg className="animate-spin h-8 w-8 text-champagne-gold" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
+      <div className="flex flex-col lg:flex-row gap-6 min-h-fit lg:h-full max-w-7xl mx-auto w-full">
+        {/* Left Side: Transfers List */}
+        <div className="flex-1 flex flex-col gap-4 lg:h-full overflow-hidden">
+          <div className="flex justify-between items-center">
+            <Heading level={2} className="!text-lg sm:!text-2xl !border-none !pb-0 text-champagne-gold">
+              Traspasos
+            </Heading>
+            <Button onClick={() => { setIsCreating(true); resetForm(); }} disabled={isCreating}>
+              + Nuevo Traspaso
+            </Button>
           </div>
-        )}
 
-        {!isLoading && activeTab === 'create' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Create form */}
-            <form onSubmit={handleSubmitTransfer} className="lg:col-span-1 bg-onyx-surface p-6 rounded-lg border border-aged-bronze/20 flex flex-col gap-4">
-              {/* Requisition Loader */}
-              <div className="bg-charcoal-surface/40 border border-aged-bronze/15 rounded p-3">
-                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-                  Cargar desde Requisición (opcional)
-                </label>
-                <select
-                  value={selectedRequisitionId}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedRequisitionId(val);
-                    handleLoadRequisition(val);
-                  }}
-                  className="w-full bg-charcoal border border-aged-bronze/45 rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-champagne-gold"
-                >
-                  <option value="">Sin requisición (manual)</option>
-                  {approvedRequisitions.map((req) => {
-                    const branchName = branches.find(b => b.id === req.fromBranchId)?.name || 'Sucursal';
-                    return (
-                      <option key={req.id} value={req.id}>
-                        {branchName} — {req.itemCount || req.items?.length || 0} items
-                      </option>
-                    );
-                  })}
-                </select>
-                {isLinkedToRequisition && (
-                  <button
-                    type="button"
-                    onClick={() => { setSelectedRequisitionId(''); setIsLinkedToRequisition(false); setItemsList([]); }}
-                    className="mt-2 text-xs text-champagne-gold hover:underline"
-                  >
-                    Desvincular requisición
-                  </button>
-                )}
-              </div>
+          {error && (
+            <div className="bg-error-red/10 border border-error-red/30 text-error-red rounded p-3 text-xs">{error}</div>
+          )}
 
-              <span className="text-sm font-semibold text-champagne-gold uppercase tracking-wider">
-                Configuración del Traspaso
-              </span>
-              
-              {/* Origen Selector */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs text-text-secondary font-semibold">Origen del Traspaso</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFromType('warehouse');
-                      if (warehouses.length > 0) setFromId(warehouses[0].id);
-                    }}
-                    className={`flex-1 py-1 rounded text-[10px] font-semibold uppercase tracking-wider border transition-all ${
-                      fromType === 'warehouse'
-                        ? 'bg-champagne-gold/20 text-champagne-gold border-champagne-gold/40'
-                        : 'bg-charcoal-surface text-text-secondary border-aged-bronze/10'
-                    }`}
-                  >
-                    Bodega
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFromType('branch');
-                      if (branches.length > 0) setFromId(branches[0].id);
-                    }}
-                    className={`flex-1 py-1 rounded text-[10px] font-semibold uppercase tracking-wider border transition-all ${
-                      fromType === 'branch'
-                        ? 'bg-champagne-gold/20 text-champagne-gold border-champagne-gold/40'
-                        : 'bg-charcoal-surface text-text-secondary border-aged-bronze/10'
-                    }`}
-                  >
-                    Sucursal
-                  </button>
+          {loading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <svg className="animate-spin h-6 w-6 text-champagne-gold" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+          ) : transfers.length === 0 && !isCreating ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-text-secondary text-xs">
+              <span>No hay traspasos registrados</span>
+            </div>
+          ) : (
+            <>
+              {/* Search and Filters Bar */}
+              <div className="flex flex-col md:flex-row gap-4 bg-onyx-surface border border-aged-bronze/40 rounded p-4 shadow-md shadow-black/10 items-center justify-between">
+                <div className="w-full md:w-72 relative">
+                  <Input
+                    type="text"
+                    placeholder="Buscar por origen o destino..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                  <svg className="w-4 h-4 text-text-secondary absolute left-3.5 top-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </div>
-                <select
-                  value={fromId}
-                  onChange={(e) => setFromId(e.target.value)}
-                  className="bg-charcoal-surface border border-aged-bronze text-text-primary rounded p-2.5 font-sans text-xs focus:outline-none focus:ring-1 focus:ring-champagne-gold cursor-pointer"
-                  required
-                >
-                  {fromType === 'warehouse'
-                    ? warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)
-                    : branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)
-                  }
-                </select>
-              </div>
 
-              {/* Destino Selector */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs text-text-secondary font-semibold">Destino del Traspaso</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setToType('warehouse');
-                      if (warehouses.length > 0) setToId(warehouses[0].id);
-                    }}
-                    className={`flex-1 py-1 rounded text-[10px] font-semibold uppercase tracking-wider border transition-all ${
-                      toType === 'warehouse'
-                        ? 'bg-champagne-gold/20 text-champagne-gold border-champagne-gold/40'
-                        : 'bg-charcoal-surface text-text-secondary border-aged-bronze/10'
-                    }`}
-                  >
-                    Bodega
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setToType('branch');
-                      if (branches.length > 0) setToId(branches[0].id);
-                    }}
-                    className={`flex-1 py-1 rounded text-[10px] font-semibold uppercase tracking-wider border transition-all ${
-                      toType === 'branch'
-                        ? 'bg-champagne-gold/20 text-champagne-gold border-champagne-gold/40'
-                        : 'bg-charcoal-surface text-text-secondary border-aged-bronze/10'
-                    }`}
-                  >
-                    Sucursal
-                  </button>
+                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-text-secondary whitespace-nowrap">Estado:</span>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="px-3 py-1.5 bg-charcoal-surface border border-aged-bronze focus:border-champagne-gold rounded font-sans text-xs text-text-primary transition-all duration-300 focus:outline-none cursor-pointer"
+                    >
+                      <option value="all">Todos los Estados</option>
+                      <option value="pending">Pendiente</option>
+                      <option value="in_transit">En Tránsito</option>
+                      <option value="received">Recibido</option>
+                      <option value="completed">Completado</option>
+                    </select>
+                  </div>
                 </div>
-                <select
-                  value={toId}
-                  onChange={(e) => setToId(e.target.value)}
-                  className="bg-charcoal-surface border border-aged-bronze text-text-primary rounded p-2.5 font-sans text-xs focus:outline-none focus:ring-1 focus:ring-champagne-gold cursor-pointer"
-                  required
-                >
-                  {toType === 'warehouse'
-                    ? warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)
-                    : branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)
-                  }
-                </select>
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs text-text-secondary">Notas / Observaciones</label>
+              {/* Transfers Table Card */}
+              <div className="flex-1 bg-onyx-surface border border-aged-bronze/40 rounded shadow-md shadow-black/20 overflow-hidden flex flex-col min-h-0">
+                <div className="overflow-x-auto flex-1">
+                  <table className="w-full text-left border-collapse select-text">
+                    <thead>
+                      <tr className="bg-charcoal-surface/60 border-b border-aged-bronze/35 text-[11px] font-semibold text-text-secondary uppercase tracking-wider">
+                        <th className="px-6 py-4">Origen</th>
+                        <th className="px-6 py-4">Destino</th>
+                        <th className="px-6 py-4 text-center">Items</th>
+                        <th className="px-6 py-4 text-center">Estado</th>
+                        <th className="px-6 py-4 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-aged-bronze/20 text-sm">
+                      {filtered.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-12 text-center text-text-secondary italic">
+                            {searchQuery || statusFilter !== 'all'
+                              ? 'No se encontraron traspasos que coincidan con la búsqueda.'
+                              : 'No hay traspasos registrados.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        filtered.map((t) => (
+                          <tr key={t.id} className="hover:bg-charcoal-surface/20 transition-colors">
+                            <td className="px-6 py-4 text-text-secondary text-xs">{originLabel(t)}</td>
+                            <td className="px-6 py-4 font-medium text-text-primary text-xs">{destLabel(t)}</td>
+                            <td className="px-6 py-4 text-center font-mono text-xs text-champagne-gold">{t.itemCount || 0}</td>
+                            <td className="px-6 py-4 text-center">{getStatusBadge(t.status)}</td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="inline-flex gap-1 items-center">
+                                <button
+                                  onClick={() => handleView(t.id)}
+                                  className="text-text-secondary hover:text-champagne-gold transition-colors p-1 rounded hover:bg-champagne-gold/5"
+                                  title="Ver detalle"
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                </button>
+                                {t.status === 'pending' && (
+                                  <button
+                                    onClick={() => handleShip(t.id)}
+                                    disabled={actioningId === t.id}
+                                    className="text-blue-400 hover:text-blue-300 transition-colors text-xs px-2 py-1 rounded hover:bg-blue-400/5"
+                                  >
+                                    Enviar
+                                  </button>
+                                )}
+                                {t.status === 'in_transit' && (
+                                  <button
+                                    onClick={() => handleView(t.id)}
+                                    disabled={actioningId === t.id}
+                                    className="text-champagne-gold hover:underline text-xs px-2"
+                                  >
+                                    Recibir
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="bg-charcoal-surface/40 border-t border-aged-bronze/35 px-6 py-3 flex items-center justify-between text-xs text-text-secondary">
+                  <span>Mostrando {filtered.length} de {transfers.length} traspasos</span>
+                  <span className="font-mono">En tránsito: {transfers.filter((t) => t.status === 'in_transit').length}</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Right Side: Create Form */}
+        {isCreating && (
+          <div className="w-full lg:w-96 bg-onyx-surface border border-aged-bronze/40 rounded-lg p-4 lg:p-6 shadow-xl lg:h-full overflow-y-auto">
+            <Heading level={3} className="!text-base !border-none !pb-0 text-champagne-gold mb-4">
+              Nuevo Traspaso
+            </Heading>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <FormField label="Origen">
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
+                      <input type="radio" checked={fromType === 'warehouse'} onChange={() => setFromType('warehouse')} className="accent-champagne-gold" />
+                      Bodega
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
+                      <input type="radio" checked={fromType === 'branch'} onChange={() => setFromType('branch')} className="accent-champagne-gold" />
+                      Sucursal
+                    </label>
+                  </div>
+                  <select
+                    value={fromId}
+                    onChange={(e) => setFromId(e.target.value)}
+                    className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-sm"
+                    required
+                    data-testid="transfer-from"
+                  >
+                    <option value="">Seleccionar...</option>
+                    {fromType === 'warehouse'
+                      ? warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)
+                      : branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+              </FormField>
+
+              <FormField label="Destino">
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
+                      <input type="radio" checked={toType === 'warehouse'} onChange={() => setToType('warehouse')} className="accent-champagne-gold" />
+                      Bodega
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
+                      <input type="radio" checked={toType === 'branch'} onChange={() => setToType('branch')} className="accent-champagne-gold" />
+                      Sucursal
+                    </label>
+                  </div>
+                  <select
+                    value={toId}
+                    onChange={(e) => setToId(e.target.value)}
+                    className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-sm"
+                    required
+                    data-testid="transfer-to"
+                  >
+                    <option value="">Seleccionar...</option>
+                    {toType === 'warehouse'
+                      ? warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)
+                      : branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+              </FormField>
+
+              <FormField label="Notas">
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Ej. Traspaso semanal de insumos..."
-                  className="bg-charcoal-surface border border-aged-bronze text-text-primary rounded p-2.5 font-sans text-xs focus:outline-none focus:ring-1 focus:ring-champagne-gold resize-none h-20"
+                  className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-sm"
+                  rows={2}
                 />
-              </div>
+              </FormField>
 
-              <Button
-                type="submit"
-                disabled={isSubmitting || itemsList.length === 0}
-                className="w-full mt-2"
-              >
-                {isSubmitting ? 'Registrando...' : 'Registrar y Enviar Traspaso'}
-              </Button>
-            </form>
-
-            {/* List and Item adder */}
-            <div className="lg:col-span-2 flex flex-col gap-6 bg-onyx-surface p-6 rounded-lg border border-aged-bronze/20">
-              <span className="text-sm font-semibold text-champagne-gold uppercase tracking-wider">
-                Productos en el Traspaso
-              </span>
-
-              {/* Add item bar */}
-              <form onSubmit={handleAddItem} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end bg-charcoal-surface/40 p-4 rounded border border-aged-bronze/10">
-                <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <label className="text-[10px] text-text-secondary uppercase">Buscar Insumo / Producto</label>
+              {/* Product Adder */}
+              <div className="border-t border-aged-bronze/20 pt-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-champagne-gold mb-3">Agregar Productos</h3>
+                <div className="space-y-2">
+                  <label className="block text-[10px] text-text-secondary uppercase">Buscar Producto</label>
                   <Autocomplete
                     options={products.map((p) => ({
                       id: p.id,
                       label: p.name,
-                      sublabel: `${p.internalCode ? `Código: ${p.internalCode}` : p.sku ? `SKU: ${p.sku}` : ''} - Costo: $${p.cost || '0.00'}`,
+                      sublabel: p.sku ? `SKU: ${p.sku}` : undefined,
                     }))}
                     value={selectedProductId}
                     onChange={setSelectedProductId}
-                    placeholder="Buscar insumo o producto..."
+                    placeholder="Buscar producto..."
                   />
                 </div>
-                <div className="flex gap-2 items-end sm:col-span-1">
-                  <div className="flex flex-col gap-1.5 flex-1">
-                    <label className="text-[10px] text-text-secondary uppercase">Cantidad</label>
-                    <Input
-                      type="number"
-                      step="0.001"
-                      min="0.001"
-                      value={itemQuantity}
-                      onChange={(e) => setItemQuantity(e.target.value)}
-                      className="!py-2"
-                    />
-                  </div>
-                  <Button type="submit" variant="secondary" className="px-4 py-2 text-xs">
-                    Agregar
-                  </Button>
-                </div>
-              </form>
-
-              {/* Items Table list */}
-              <div className="flex-1 overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-aged-bronze/20 text-xs font-semibold text-text-secondary uppercase">
-                      <th className="py-2.5 px-3">Descripción</th>
-                      <th className="py-2.5 px-3 text-center">Cantidad</th>
-                      <th className="py-2.5 px-3 text-center">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-aged-bronze/10 text-xs">
-                    {itemsList.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="py-8 text-center text-text-secondary italic">
-                          No hay productos añadidos al borrador del traspaso.
-                        </td>
-                      </tr>
-                    ) : (
-                      itemsList.map((item, index) => (
-                          <tr key={item.productId} className="hover:bg-charcoal-surface/20">
-                            <td className="py-3 px-3 font-medium text-text-primary">{item.productName}</td>
-                            <td className="py-3 px-3 text-center font-semibold font-mono">
-                              {editingIndex === index ? (
-                                <div className="flex items-center justify-center gap-1">
-                                  <input
-                                    type="number"
-                                    step="any"
-                                    min="0.001"
-                                    value={editingQuantity}
-                                    onChange={(e) => setEditingQuantity(e.target.value)}
-                                    className="w-24 bg-charcoal border border-aged-bronze/45 rounded px-2 py-1 text-xs text-text-primary text-center"
-                                    autoFocus
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') handleSaveEdit(index);
-                                      if (e.key === 'Escape') handleCancelEdit();
-                                    }}
-                                  />
-                                  <button type="button" onClick={() => handleSaveEdit(index)}
-                                    className="text-success-green hover:text-success-green/80 p-1">
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                  </button>
-                                  <button type="button" onClick={handleCancelEdit}
-                                    className="text-text-secondary hover:text-text-primary p-1">
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              ) : (
-                                item.quantity
-                              )}
-                            </td>
-                            <td className="py-3 px-3 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                <button type="button" onClick={() => handleStartEditing(index)}
-                                  className="text-champagne-gold/70 hover:text-champagne-gold p-1" title="Editar cantidad">
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                </button>
-                                <button type="button" onClick={() => handleRemoveItem(index)}
-                                  className="text-red-400 hover:text-red-300 font-bold" title="Quitar">
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      )
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* History Tab */}
-        {!isLoading && activeTab === 'history' && (
-          <div className="bg-onyx-surface p-6 rounded-lg border border-aged-bronze/20">
-            <span className="text-sm font-semibold text-champagne-gold uppercase tracking-wider block mb-4">
-              Historial de Envíos Realizados
-            </span>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-aged-bronze/20 text-xs font-semibold text-text-secondary uppercase">
-                    <th className="py-3 px-4">Fecha/Hora</th>
-                    <th className="py-3 px-4">Origen</th>
-                    <th className="py-3 px-4">Destino</th>
-                    <th className="py-3 px-4">Estado</th>
-                    <th className="py-3 px-4">Notas</th>
-                    <th className="py-3 px-4 text-right">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-aged-bronze/10 text-xs">
-                  {transfers.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-12 text-center text-text-secondary italic">
-                        No se han registrado traspasos de mercancía todavía.
-                      </td>
-                    </tr>
-                  ) : (
-                    transfers.map((t) => (
-                      <tr key={t.id} className="hover:bg-charcoal-surface/20">
-                        <td className="py-3 px-4 font-mono">
-                          {new Date(t.transferredAt).toLocaleString('es-MX', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </td>
-                        <td className="py-3 px-4 text-text-secondary">{t.fromWarehouseName || t.fromBranchName || 'Desconocido'}</td>
-                        <td className="py-3 px-4 text-text-primary font-medium">{t.toWarehouseName || t.toBranchName || 'Desconocido'}</td>
-                        <td className="py-3 px-4">
-                          {t.status === 'in_transit' && <Badge variant="warning">En Tránsito</Badge>}
-                          {t.status === 'received' && <Badge variant="success">Recibido</Badge>}
-                          {t.status === 'pending' && <Badge variant="charcoal">Pendiente</Badge>}
-                          {t.status === 'completed' && <Badge variant="success">Completado</Badge>}
-                          {!['in_transit', 'received', 'pending', 'completed'].includes(t.status) && (
-                            <Badge variant="charcoal">{t.status.toUpperCase()}</Badge>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-text-secondary max-w-xs truncate" title={t.notes}>
-                          {t.notes || '-'}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          {t.status === 'in_transit' && (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              disabled={receivingId === t.id}
-                              onClick={() => handleReceiveTransfer(t.id)}
-                            >
-                              {receivingId === t.id ? 'Recibiendo...' : 'Recibir'}
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Report Summary Tab */}
-        {!isLoading && activeTab === 'report-summary' && (
-          <div className="flex flex-col gap-6">
-            {/* Rango de Fechas Filter bar */}
-            <div className="flex flex-col sm:flex-row gap-4 p-4 bg-onyx-surface rounded-lg border border-aged-bronze/20 items-end">
-              <div className="flex flex-col gap-1 flex-1">
-                <label className="text-xs text-text-secondary">Fecha Inicial</label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="bg-charcoal-surface border border-aged-bronze text-text-primary rounded p-2 text-xs focus:outline-none focus:ring-1 focus:ring-champagne-gold"
-                />
-              </div>
-              <div className="flex flex-col gap-1 flex-1">
-                <label className="text-xs text-text-secondary">Fecha Final</label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="bg-charcoal-surface border border-aged-bronze text-text-primary rounded p-2 text-xs focus:outline-none focus:ring-1 focus:ring-champagne-gold"
-                />
-              </div>
-              <Button onClick={fetchSummaryReport} variant="secondary" className="px-6 py-2 text-xs font-semibold uppercase">
-                Filtrar Reporte
-              </Button>
-            </div>
-
-            {/* Financial Summary panel */}
-            <div className="bg-onyx-surface p-6 rounded-lg border border-aged-bronze/20">
-              <span className="text-sm font-semibold text-champagne-gold uppercase tracking-wider block mb-4">
-                Valor Total Enviado por Punto de Venta (Consolidado)
-              </span>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                {reportSummary.map((item) => (
-                  <div key={item.branchId} className="bg-charcoal-surface/40 border border-aged-bronze/10 rounded-lg p-5 flex flex-col justify-between">
-                    <span className="text-xs text-text-secondary uppercase font-semibold">{item.branchName}</span>
-                    <span className="text-2xl font-bold font-mono text-champagne-gold mt-2">${parseFloat(item.totalCost).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                ))}
-                {reportSummary.length === 0 && (
-                  <div className="col-span-3 py-6 text-center text-text-secondary italic">
-                    No se encontró mercancía enviada en este periodo.
+                {selectedProductId && (
+                  <div className="flex gap-2 items-end mt-2">
+                    <div className="flex-1">
+                      <label className="block text-[10px] text-text-secondary uppercase mb-1">Cantidad</label>
+                      <Input
+                        type="number"
+                        step="0.001"
+                        min="0.001"
+                        value={itemQuantity}
+                        onChange={(e) => setItemQuantity(e.target.value)}
+                        className="text-xs"
+                        data-testid="transfer-quantity"
+                      />
+                    </div>
+                    <Button type="button" variant="secondary" size="sm" onClick={handleAddItem}>Agregar</Button>
                   </div>
                 )}
               </div>
-            </div>
+
+              {/* Items List */}
+              <div className="bg-charcoal/30 border border-aged-bronze/15 rounded p-3 min-h-[100px] max-h-[260px] overflow-y-auto">
+                <span className="block text-[10px] text-text-secondary uppercase tracking-wider mb-2 font-bold">
+                  Productos en el Traspaso
+                </span>
+                {itemsList.length === 0 ? (
+                  <div className="text-center py-6 text-xs text-text-secondary/40">No has agregado productos.</div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {itemsList.map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-center text-xs bg-charcoal/40 border border-aged-bronze/10 rounded px-2.5 py-2">
+                        <span className="font-semibold text-text-primary">{item.productName}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-champagne-gold font-semibold">{item.quantity}</span>
+                          <button type="button" onClick={() => removeItem(idx)} className="text-error-red/80 hover:text-error-red transition-colors p-1">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                  {isSubmitting ? 'Enviando...' : 'Enviar Traspaso'}
+                </Button>
+                <Button type="button" variant="secondary" className="flex-1" onClick={resetForm}>Cancelar</Button>
+              </div>
+            </form>
           </div>
         )}
 
-        {/* Report Detailed Tab */}
-        {!isLoading && activeTab === 'report-detailed' && (
-          <div className="flex flex-col gap-6">
-            {/* Filters */}
-            <div className="flex flex-col md:flex-row gap-4 p-4 bg-onyx-surface rounded-lg border border-aged-bronze/20 items-end">
-              <div className="flex flex-col gap-1 flex-1">
-                <label className="text-xs text-text-secondary">Punto de Venta Destino</label>
-                <select
-                  value={selectedReportBranchId}
-                  onChange={(e) => setSelectedReportBranchId(e.target.value)}
-                  className="bg-charcoal-surface border border-aged-bronze text-text-primary rounded p-2.5 font-sans text-xs focus:outline-none cursor-pointer w-full"
-                >
-                  {branches.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
+        {/* Detail / Receive Modal */}
+        {viewingTransfer && (
+          <div className="fixed inset-0 bg-obsidian/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in font-sans">
+            <div className="bg-onyx-surface border border-aged-bronze/35 rounded-xl max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-6 border-b border-aged-bronze/25 flex items-center justify-between">
+                <div>
+                  <Heading level={2} className="!text-champagne-gold !border-none !pb-0 font-light font-sans text-lg">
+                    Detalle de Traspaso
+                  </Heading>
+                  <div className="flex gap-4 mt-1 text-xs text-text-secondary">
+                    <span>{originLabel(viewingTransfer)} → {destLabel(viewingTransfer)}</span>
+                    <span>{getStatusBadge(viewingTransfer.status)}</span>
+                  </div>
+                  {viewingTransfer.notes && <p className="text-xs text-text-secondary mt-1 italic">Notas: {viewingTransfer.notes}</p>}
+                </div>
+                <button onClick={() => setViewingTransfer(null)} className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <div className="flex flex-col gap-1 flex-1">
-                <label className="text-xs text-text-secondary">Fecha Inicial</label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="bg-charcoal-surface border border-aged-bronze text-text-primary rounded p-2 text-xs focus:outline-none focus:ring-1 focus:ring-champagne-gold"
-                />
-              </div>
-              <div className="flex flex-col gap-1 flex-1">
-                <label className="text-xs text-text-secondary">Fecha Final</label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="bg-charcoal-surface border border-aged-bronze text-text-primary rounded p-2 text-xs focus:outline-none focus:ring-1 focus:ring-champagne-gold"
-                />
-              </div>
-              <Button onClick={fetchDetailedReport} variant="secondary" className="px-6 py-2 text-xs font-semibold uppercase">
-                Generar Detalle
-              </Button>
-            </div>
 
-            {/* Detailed Table */}
-            <div className="bg-onyx-surface p-6 rounded-lg border border-aged-bronze/20">
-              <span className="text-sm font-semibold text-champagne-gold uppercase tracking-wider block mb-4">
-                Desglose Detallado de Mercancía Enviada
-              </span>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-aged-bronze/20 text-xs font-semibold text-text-secondary uppercase">
-                      <th className="py-3 px-4">Descripción del Producto</th>
-                      <th className="py-3 px-4">Código Interno</th>
-                      <th className="py-3 px-4 text-center">Unidades Enviadas</th>
-                      <th className="py-3 px-4 text-right">Costo Total Acumulado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-aged-bronze/10 text-xs">
-                    {reportDetailed.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="py-12 text-center text-text-secondary italic">
-                          No hay registros detallados de mercancía para esta sucursal en el rango de fechas seleccionado.
-                        </td>
+              <div className="overflow-y-auto p-6">
+                {viewingTransfer.items && viewingTransfer.items.length > 0 ? (
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-charcoal-surface/60 border-b border-aged-bronze/35 text-[11px] font-semibold text-text-secondary uppercase tracking-wider">
+                        <th className="px-4 py-3">Producto</th>
+                        <th className="px-4 py-3 text-right">Cantidad</th>
                       </tr>
-                    ) : (
-                      reportDetailed.map((item) => (
-                        <tr key={item.productId} className="hover:bg-charcoal-surface/20">
-                          <td className="py-3 px-4 font-medium text-text-primary">{item.productName}</td>
-                          <td className="py-3 px-4 font-mono text-text-secondary">{item.internalCode || item.sku || '-'}</td>
-                          <td className="py-3 px-4 text-center font-bold font-mono">{item.totalQuantity}</td>
-                          <td className="py-3 px-4 text-right font-semibold font-mono text-champagne-gold">
-                            ${parseFloat(item.totalCost).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                          </td>
+                    </thead>
+                    <tbody className="divide-y divide-aged-bronze/20">
+                      {viewingTransfer.items.map((item, idx) => (
+                        <tr key={idx}>
+                          <td className="px-4 py-3 font-medium text-text-primary">{item.productName}</td>
+                          <td className="px-4 py-3 text-right font-mono text-champagne-gold">{item.quantity}</td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-8 text-text-secondary/50 text-xs">Este traspaso no tiene productos registrados.</div>
+                )}
+              </div>
+
+              <div className="p-6 border-t border-aged-bronze/25">
+                {viewingTransfer.status === 'in_transit' && (
+                  <Button
+                    variant="primary"
+                    fullWidth
+                    disabled={actioningId === viewingTransfer.id}
+                    onClick={() => handleReceive(viewingTransfer.id)}
+                  >
+                    {actioningId === viewingTransfer.id ? 'Recibiendo...' : 'Confirmar Recepción'}
+                  </Button>
+                )}
+                {viewingTransfer.status === 'pending' && (
+                  <Button
+                    variant="primary"
+                    fullWidth
+                    disabled={actioningId === viewingTransfer.id}
+                    onClick={() => handleShip(viewingTransfer.id)}
+                  >
+                    {actioningId === viewingTransfer.id ? 'Enviando...' : 'Enviar Traspaso'}
+                  </Button>
+                )}
               </div>
             </div>
           </div>
