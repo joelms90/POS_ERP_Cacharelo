@@ -8,6 +8,7 @@ interface ProductionOrderModalProps {
   businessId: string;
   productId: string;
   productName: string;
+  initialQuantity?: number;
   onClose: () => void;
   onToast: (message: string, type?: 'success' | 'error' | 'warning') => void;
 }
@@ -16,12 +17,13 @@ export const ProductionOrderModal: React.FC<ProductionOrderModalProps> = ({
   businessId,
   productId,
   productName,
+  initialQuantity,
   onClose,
   onToast,
 }) => {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [warehouseId, setWarehouseId] = useState('');
-  const [qtyToProduce, setQtyToProduce] = useState(1);
+  const [qtyToProduce, setQtyToProduce] = useState(initialQuantity || 1);
   const [recipe, setRecipe] = useState<RecipeItem[]>([]);
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);

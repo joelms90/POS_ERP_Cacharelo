@@ -62,7 +62,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
   const [viewingTransfer, setViewingTransfer] = useState<TransferRow | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [generatingOc, setGeneratingOc] = useState(false);
-  const [producingProduct, setProducingProduct] = useState<{ productId: string; productName: string } | null>(null);
+  const [producingProduct, setProducingProduct] = useState<{ productId: string; productName: string; initialQuantity?: number } | null>(null);
 
   // Reports state
   const [showReports, setShowReports] = useState(false);
@@ -680,7 +680,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                                   {item.itemType !== 'raw_material' && (
                                     <button
                                       type="button"
-                                      onClick={() => setProducingProduct({ productId: item.productId, productName: item.productName })}
+                                      onClick={() => setProducingProduct({ productId: item.productId, productName: item.productName, initialQuantity: Math.max(1, Math.ceil(qty - avail)) })}
                                       className="text-champagne-gold hover:underline text-[10px]"
                                     >
                                       Producir
@@ -859,6 +859,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
           businessId={businessId}
           productId={producingProduct.productId}
           productName={producingProduct.productName}
+          initialQuantity={producingProduct.initialQuantity}
           onClose={() => setProducingProduct(null)}
           onToast={showToast}
         />
