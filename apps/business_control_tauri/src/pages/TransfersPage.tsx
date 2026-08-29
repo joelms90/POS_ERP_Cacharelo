@@ -199,8 +199,8 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
     try {
       const full = await api.getTransfer(id);
       setViewingTransfer(full);
-    } catch {
-      showToast('Error al cargar el traspaso.', 'error');
+    } catch (err: any) {
+      showToast(err.message || 'Error al cargar el traspaso.', 'error');
     }
   };
 

@@ -194,8 +194,8 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
       const full = await api.getRequisition(req.id);
       setViewingReq(full);
       setViewingReqItems(full.items || []);
-    } catch {
-      showToast('Error al cargar detalles.', 'error');
+    } catch (err: any) {
+      showToast(err.message || 'Error al cargar detalles.', 'error');
     } finally {
       setLoading(false);
     }

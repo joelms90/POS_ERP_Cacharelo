@@ -157,7 +157,7 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
       setItemsList(items);
       showToast(`Orden ${po.poNumber} cargada con ${items.length} productos.`, 'success');
     } catch (err: any) {
-      showToast('Error al cargar la orden de compra.', 'error');
+      showToast(err.message || 'Error al cargar la orden de compra.', 'error');
       setIsPoLinked(false);
     }
   };

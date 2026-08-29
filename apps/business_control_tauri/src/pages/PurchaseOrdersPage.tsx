@@ -247,8 +247,8 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
         showToast('Orden de compra creada exitosamente.', 'success');
       }
       resetForm();
-    } catch (err) {
-      showToast('Error al crear la orden de compra.', 'error');
+    } catch (err: any) {
+      showToast(err.message || 'Error al crear la orden de compra.', 'error');
     }
   };
 
@@ -258,8 +258,8 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
         const updated = await api.markPurchaseOrderAsSent(id);
         setPurchaseOrders(purchaseOrders.map((po) => (po.id === id ? updated : po)));
         showToast('Orden marcada como enviada.', 'success');
-      } catch (err) {
-        showToast('Error al actualizar la orden.', 'error');
+      } catch (err: any) {
+        showToast(err.message || 'Error al actualizar la orden.', 'error');
       }
     }
   };
@@ -269,8 +269,8 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
       setLoading(true);
       const po = await api.getPurchaseOrder(id);
       setViewingPo(po);
-    } catch (err) {
-      showToast('Error al cargar detalles de la orden.', 'error');
+    } catch (err: any) {
+      showToast(err.message || 'Error al cargar detalles de la orden.', 'error');
     } finally {
       setLoading(false);
     }
@@ -309,8 +309,8 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
         await api.deletePurchaseOrder(id);
         setPurchaseOrders(purchaseOrders.filter((po) => po.id !== id));
         showToast('Orden de compra eliminada.', 'success');
-      } catch (err) {
-        showToast('Error al eliminar la orden.', 'error');
+      } catch (err: any) {
+        showToast(err.message || 'Error al eliminar la orden.', 'error');
       }
     }
   };
