@@ -1,99 +1,99 @@
 # 🤝 Session Handoff Document
 
 - **Project Name**: POS-ERP Monorepo (`joelms90/POS_ERP_Cacharelo`)
-- **Date & Time**: 2026-07-31 19:07 UTC-6
+- **Date & Time**: 2026-08-29 (session close)
 - **Branch**: `011-purchase-orders-requisitions`
-- **Last Agent**: Antigravity (Google DeepMind Agentic Assistant)
+- **Last Agent**: OpenCode (deepseek-v4-pro)
 
 ---
 
 ## 1. Executive Summary
-During this session, we accomplished major multi-component milestones across the NestJS Sync API backend, the Flutter POS app, and the React/Tauri Admin Dashboard (`https://cacharelo-central.web.app`). Key accomplishments include:
 
-1. **Cafeteria Jáltipan Provisioning**: Provisioned new business *Cafeteria Jaltipan* (`e00079b3-16f2-4ac7-9cd3-0bb10335cb4d`), cloned catalog, and copied branch table layout in Cloud SQL Postgres.
-2. **Device Thermal Paper Width (50mm / 58mm / 80mm)**: Built 3 local printer paper width profiles (`50mm` / 26 cols, `58mm` / 32 cols, `80mm` / 48 cols) stored per device in `SecureStorageService` and dynamically formatted in `AppState`.
-3. **Dynamic Receipt Height & Zero Paper Waste**: Replaced fixed 200mm PDF page format with dynamic receipt height (`lineCount * lineSpacingPt`), eliminating 15cm blank paper tail feeds.
-4. **Bold High-Contrast Thermal Printing**: Updated PDF rendering to `pw.Font.courierBold()` and `fontWeight: pw.FontWeight.bold` at 7.5pt/8.0pt for dark, crisp letters on 50mm printers.
-5. **Flexible Division Equitativa (Custom Split Payment Override)**: Enhanced `EqualSplitPaymentScreen` allowing cashiers to set custom per-person amounts (e.g. $100) with automatic re-balancing of remaining balances among unpaid guests.
-6. **Current Session User Profile Badge**: Added `👤 <currentUserName>` badge chip to top headers in Cashier and Waiter views.
+This session revamped the **inventory system** from a mutable-counter model into an **immutable, ledger-driven model** and unified the operational UI (Órdenes de Compra, Requisiciones, Traspasos, Recepción, Panel de Inventario, Catálogo por Sucursal). Highlights:
 
----
-
-## 2. Current Status & Production Deployments
-
-| Component | Status | Production Endpoint / Artifact |
-| :--- | :--- | :--- |
-| **Backend API (`apps/sync_api`)** | ✅ Live | `https://pos-sync-api-232144991863.us-central1.run.app/api` |
-| **Admin Dashboard (`apps/business_control_tauri`)** | ✅ Live | `https://cacharelo-central.web.app` |
-| **Web POS Client (`apps/pos_flutter`)** | ✅ Live | `https://cacharelo-pos.web.app` |
-| **Public Download Portal** | ✅ Live | `https://cacharelo-pos.web.app/descargas.html` (PIN `9876`) |
-| **Production Database** | ✅ Migrated | Cloud SQL Postgres (`pos-db-instance` with `target_station` column & backfill) |
+1. **Ledger as source of truth** — added `stock_ledger` (+ `item_type`/`production_strategy`/`uom` on `products`) and a `LedgerService` that is the single write choke point. Every stock write now appends a ledger row and updates `stock_levels` as a read model.
+2. **Intelligent inventory control** — `branch_stock_thresholds`, `inventory_alerts` (global vs branch), `business_inventory_settings`, and an idempotent alert engine. The "Panel de Inventario" distinguishes *Compra sugerida* (global low → OC), *Requisición sugerida* (branch low + transferable stock → transfer), and *Producción sugerida* (finished good → Ensamble).
+3. **Per-sucursal stock** — POS sales now deduct the **selling branch's** stock (not the warehouse); warehouse holds bulk until transferred.
+4. **Per-sucursal catalog** — `branch_products` table + "Catálogo por Sucursal" page (per-product sellable toggle, min/max thresholds, copy catalog, live branch stock).
+5. **Unified UX** — OC, Requisiciones, Traspasos and Recepción now share a list + toggleable side-form pattern; Traspasos got a full lifecycle (Pendiente → En Tránsito → Recibido) with ship/receive actions and a "Falta / Generar OC / Producir / Ajustar a disponible" resolution flow.
 
 ---
 
-## 3. Key Changes & File Map
+## 2. Key Changes & File Map
 
-### A. NestJS Backend (`apps/sync_api`)
-*   [`src/database/schema.ts`](./apps/sync_api/src/database/schema.ts): Added `targetStation` column to `categories` table.
-*   [`src/modules/catalog/dto/create-category.dto.ts`](./apps/sync_api/src/modules/catalog/dto/create-category.dto.ts) & [`update-category.dto.ts`](./apps/sync_api/src/modules/catalog/dto/update-category.dto.ts): Added `targetStation` optional validation fields.
-*   [`src/modules/kitchen/repositories/kitchen.repository.ts`](./apps/sync_api/src/modules/kitchen/repositories/kitchen.repository.ts): Refined ticket creation & station item matching logic using `isBarraCategory(categoryName, targetStation)`.
-*   [`scripts/idempotent-deploy-migrations.ts`](./apps/sync_api/scripts/idempotent-deploy-migrations.ts): Added DDL statement `ALTER TABLE categories ADD COLUMN IF NOT EXISTS target_station varchar(20) DEFAULT 'cocina';` and backfilled drink categories to `barra`.
+### A. Backend (`apps/sync_api`)
+
+- `src/database/schema.ts` — added `stockLedger`, `branchStockThresholds`, `inventoryAlerts` (nullable `branchId`), `businessInventorySettings`, `branchProducts`; `products` gains `itemType`/`productionStrategy`/`uom`; `recipes.wastePercent`; `warehouses.locationType`.
+- `src/database/migrate.ts` + `scripts/idempotent-deploy-migrations.ts` — idempotent DDL for all of the above (kept in sync for prod).
+- `src/modules/inventory/ledger.service.ts` — `LedgerService.applyMovement` (append ledger + update read model in one tx).
+- `src/modules/inventory/inventory.service.ts` — receipt/production/transfer/adjust/PO-reception now route through the ledger; `shipTransfer` (with `adjustToAvailable`), `receiveTransfer`, `getTransfer` (items + origin availability), `getTransfers` (itemCount).
+- `src/modules/inventory/alerts/alerts.service.ts` — alert engine (global vs branch), `generatePurchaseOrders` (bulk, grouped by provider), `generatePurchaseOrdersByProducts`, `runAutoPoEngine` (fixed "1 OC for 1 product" bug).
+- `src/modules/inventory/thresholds/thresholds.service.ts` — per-branch min/max.
+- `src/modules/recipes/` — `wastePercent` + BOM validation (parent = finished_good/wip, component ≠ service, no self-ref).
+- `src/modules/orders/repositories/orders.repository.ts` — sale deduction targets the **branch**, not the warehouse.
+- `src/modules/catalog/branch-catalog.service.ts` + `controller` — per-branch catalog (list/upsert/delete/copy); `products.service` accepts `branchId` to override `isSellable`.
+- `scripts/backfill-stock-ledger.ts`, `scripts/reconcile-product-item-type.ts` — one-time backfills (idempotent, dry-run + `--apply`).
 
 ### B. Admin Dashboard (`apps/business_control_tauri`)
-*   [`src/services/api.ts`](./apps/business_control_tauri/src/services/api.ts): Added `targetStation?: 'cocina' | 'barra'` to `Category` interface.
-*   [`src/pages/CategoriesPage.tsx`](./apps/business_control_tauri/src/pages/CategoriesPage.tsx): Added KDS Station selector dropdown (`🍳 Cocina` / `🍹 Barra`), form submission state, and table column badges.
 
-### C. Flutter POS App (`apps/pos_flutter`)
-*   [`lib/ui/common/app_state.dart`](./apps/pos_flutter/lib/ui/common/app_state.dart): Filtered menu items to include only `isSellable == true`, added `station` to `KitchenOrder`, and updated `/api/kitchen/active` parsing.
-*   [`lib/services/version_service.dart`](./apps/pos_flutter/lib/services/version_service.dart): Fixed Android 11+ launchUrl restrictions by bypassing `canLaunchUrl`.
-*   [`lib/ui/kitchen/kitchen_dashboard_screen.dart`](./apps/pos_flutter/lib/ui/kitchen/kitchen_dashboard_screen.dart): Added station selector tabs `[ 🌐 TODAS | 🍳 COCINA | 🍹 BARRA ]` and ticket station badges.
-*   [`lib/ui/waiter/waiter_ordering_screen.dart`](./apps/pos_flutter/lib/ui/waiter/waiter_ordering_screen.dart): Added room service bell button (`🛎️`), badge counter, and `_showReadyOrdersDialog` modal for marking tickets served.
-*   [`web/descargas.html`](./apps/pos_flutter/web/descargas.html): Created password-protected (`9876`) public download portal page.
-*   [`pubspec.yaml`](./apps/pos_flutter/pubspec.yaml): Incremented version to `1.0.1+2`.
+- `src/pages/InventoryDashboardPage.tsx` — Panel de Inventario (summary cards, alerts with type-aware actions, multi-select bulk OC, "Producir" → production modal).
+- `src/pages/BranchCatalogPage.tsx` — Catálogo por Sucursal (sellable toggle, min/max inputs, copy catalog, branch stock).
+- `src/pages/ProductionOrderModal.tsx` — Ensamble modal with inline recipe builder + "Generar OC de faltantes".
+- `src/pages/PurchaseOrdersPage.tsx`, `RequisitionsPage.tsx`, `TransfersPage.tsx`, `ReceiptsPage.tsx` — unified list + side-form layout; Traspasos full lifecycle + reports modal.
+- `src/components/molecules/ToastNotification.tsx` — z-index `z-[100]` so toasts show above modals.
+- `src/services/api.ts` — error handling prefers NestJS `message` over `error`; new endpoints; `getProducts` accepts `branchId`.
+- `src/App.tsx` — persists selected business in localStorage.
+- `e2e/` — `product-create`, `purchase-order-inventory-flow`, `panel-inventory-bulk-oc`, `panel-inventory-oc-alert-resolution`, `branch-out-of-stock-requisition`, `branch-catalog` specs.
 
-### D. Workflow & Scripts
-*   [`.github/workflows/flutter-windows-release.yml`](./.github/workflows/flutter-windows-release.yml): Added `contents: write` permission, set `continue-on-error: true` for artifact uploads, and added `softprops/action-gh-release@v2` step.
-*   [`scripts/delete-github-artifacts.sh`](./scripts/delete-github-artifacts.sh): Helper bash script to clean up GitHub Actions storage artifacts.
+### C. POS (`apps/pos_flutter`)
 
----
-
-## 4. Remaining Tasks & Next Steps for Incoming Agent
-
-1. **Encargado Workflow Implementation**:
-   * Refer to design specification artifact `encargado_workflow_design.md`.
-   * Implement the single-operator split-pane UI for fast take-out ordering and instant direct checkout without table allocation.
-2. **Purchase Order Reusable Component UI**:
-   * Implement reusable product selector and inline price/quantity editing in Create Purchase Order form inside the Admin Dashboard (`https://cacharelo-central.web.app`).
-3. **Commit & Push Local Changes**:
-   * Run `git add . && git commit -m "feat: multi-station KDS, admin station control, ready orders UI, and version fixes" && git push` to sync branch changes.
+- `lib/ui/common/app_state.dart` — `fetchMenuDynamic` passes `terminalBranchId` so each terminal shows its own menu.
 
 ---
 
-## 5. Helpful Commands & Deployment Targets
+## 3. Current Status
+
+| Component | Status | Notes |
+| :--- | :--- | :--- |
+| Backend (`apps/sync_api`) | ✅ Builds | `npm run build` green; new tables/columns migrated locally |
+| Admin (`apps/business_control_tauri`) | ✅ Builds | `npm run build` green; e2e navigation + feature specs pass |
+| POS (`apps/pos_flutter`) | ⚠️ Not rebuilt | branchId change needs `flutter analyze` + rebuild |
+| Migrations (prod) | ⚠️ Not applied | see `docs/pre-deployment-checklist.md` |
+| Data backfills (prod) | ⚠️ Not applied | `backfill-stock-ledger.ts` + `reconcile-product-item-type.ts` |
+
+---
+
+## 4. Next Steps (for the next agent)
+
+1. **Pre-deploy**: follow `docs/pre-deployment-checklist.md` — run `make backend-migrate`, then the two backfill scripts, then deploy backend + admin + POS.
+2. **POS verify/rebuild**: `cd apps/pos_flutter && flutter analyze`, bump version, `make flutter-portal-deploy`.
+3. **Verify per-sucursal model**: correct legacy warehouse stock (adjust), stock branches via Traspasos, set per-branch thresholds.
+4. **Reconciled flag review**: `reconcile-product-item-type.ts` reclassified 3 products (`Empanada Queso`, `Empanada Jamon`, `Coca Cola`) as `raw_material`; confirm if they should be `finished_good`.
+5. **Optional follow-ups**:
+   - Surface `skipped` product **names** (not just count) in "Generar OC de faltantes".
+   - Convert remaining `alert()` error handlers (Assembly, Providers) to toast with `err.message`.
+   - Add stock availability check to the "Nuevo Traspaso" form (before submit).
+
+---
+
+## 5. Helpful Commands
 
 ```bash
-# Backend deployment
-make backend-deploy-fast
+# Backend
+cd apps/sync_api && npm run build && npm test
 
-# Database migration
+# Admin
+cd apps/business_control_tauri && pnpm build && npx playwright test
+
+# POS
+cd apps/pos_flutter && flutter analyze
+
+# Migrations / backfills (prod)
 make backend-migrate
-
-# Admin Dashboard deployment
-make admin-deploy
-
-# Flutter Web POS deployment
-make flutter-web-deploy
-
-# Build Android release APK & Deploy Download Portal + GCP Bucket
-make flutter-portal-deploy
-
-# Build Android release APK locally
-make flutter-apk-build
-
-# Clean GitHub Actions artifacts script
-./scripts/delete-github-artifacts.sh
+cd apps/sync_api && npx tsx scripts/backfill-stock-ledger.ts --apply
+cd apps/sync_api && npx tsx scripts/reconcile-product-item-type.ts --apply
 ```
 
 ---
 
-*Handoff document generated successfully.*
+*Handoff document updated successfully.*

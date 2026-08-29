@@ -4,6 +4,39 @@
 **Generated:** 2026-07-11  
 **Codebase:** Multi-app monorepo - NestJS backend (sync_api), React-Tauri desktop (business_control_tauri), Flutter POS app
 
+> ⚠️ **UPDATED 2026-08-29** — the inventory model changed fundamentally. See **§0. Recent Changes** below before reading the (now partially outdated) sections that follow.
+
+---
+
+## 0. Recent Changes (2026-08-29)
+
+### 0.1 Inventory is now ledger-driven (immutable)
+
+- **New table `stock_ledger`** — the single source of truth. Every stock movement is an immutable row with `quantity_delta` (+ in / − out) and `event_type` (`receipt`, `sale`, `production_input/output`, `transfer_out/in`, `transit_in/out`, `adjustment`, `initial`).
+- `stock_levels` is now a **read model** kept in sync by `LedgerService.applyMovement()` inside the same transaction. Business logic must NOT write `stock_levels` directly.
+- Stock on hand is `SUM(quantity_delta) GROUP BY product, location`.
+
+### 0.2 Product model
+
+- `products` gained `item_type` (`raw_material` | `wip` | `finished_good` | `service`), `production_strategy` (`none` | `backflush` | `work_order`), and `uom`.
+- Legacy `is_sellable`/`is_ingredient` are **derived** from `item_type` (see `scripts/reconcile-product-item-type.ts`).
+
+### 0.3 Per-sucursal stock & catalog
+
+- **Sales deduct the selling branch's stock** (no longer the warehouse).
+- **`branch_products`** = per-branch catalog override (which products a sucursal can sell; can mark an insumo sellable, or hide a finished good).
+- **`branch_stock_thresholds`** = per-branch min/max (fallback to `products.minStock`/`maxStock`).
+
+### 0.4 Intelligent inventory control
+
+- **`inventory_alerts`** — `branchId NULL` = global "compra sugerida" (global stock < `products.minStock` → OC); `branchId` set = "requisición sugerida" (branch stock < branch threshold, only when there is transferable stock).
+- **`business_inventory_settings`** — auto-requisition flag + default warehouse.
+
+### 0.5 Transfers use a transit location
+
+- `warehouses.location_type` supports a virtual `En Tránsito` warehouse.
+- Transfer lifecycle: `pending` → (ship: origin −qty, transit +qty) `in_transit` → (receive: transit −qty, destination +qty) `received`.
+
 ---
 
 ## 1. DATABASE SCHEMA ANALYSIS
@@ -200,35 +233,49 @@
   4. Destination stock incremented
   5. Two movement records logged (transfer_out, transfer_in)
 
-### 1.6 Production/Assembly System
+### 1.6 Production / Assembly & Production Orders (OP) System
 
-#### Recipes Table
+#### Recipes Table (BOM)
 - **Location:** `recipes` table
-- **Purpose:** Bill of Materials (BOM) for assembled products
+- **Purpose:** Bill of Materials (BOM) for assembled / manufactured products
 - **Key Fields:**
   - `id` (UUID, PK)
-  - `parentProductId` (FK → products) - finished product
-  - `ingredientProductId` (FK → products) - input material
-  - `quantityNeeded` (decimal 12,3) - amount of ingredient per unit
+  - `parentProductId` (FK → products) - finished good or WIP product
+  - `ingredientProductId` (FK → products) - raw material or WIP input
+  - `quantityNeeded` (decimal 12,3) - amount of ingredient per 1 unit of parent product
+  - `wastePercent` (decimal 5,2) - estimated shrinkage/waste percentage
   - `createdAt, updatedAt`
 
-#### Production Runs Table
+#### Production Runs / Orders (OP) Table
 - **Location:** `production_runs` table
-- **Purpose:** Record of assembly/production activities
+- **Purpose:** Tracks planned production orders (OP) and immediate assemblies across warehouses
 - **Key Fields:**
   - `id` (UUID, PK)
-  - `warehouseId` (FK → warehouses)
-  - `productId` (FK → products) - product being assembled
-  - `quantityProduced` (decimal 12,3)
-  - `assembledAt`
-  - `notes`
-  - `createdAt`
-- **Process:**
-  1. Recipe validation (sufficient ingredient stock)
-  2. Decrement ingredient stocks
-  3. Increment finished product stock
-  4. Record production run
-  5. Log production_input and production_output movements
+  - `warehouseId` (FK → warehouses) - **Origin Warehouse** (where raw materials/ingredients are deducted)
+  - `destinationWarehouseId` (FK → warehouses, optional) - **Destination Warehouse** (where finished goods are delivered/stocked)
+  - `productId` (FK → products) - finished product being produced
+  - `quantityProduced` (decimal 12,3) - planned target quantity
+  - `actualQuantityProduced` (decimal 12,3, nullable) - actual quantity produced/yield upon completion
+  - `status` (varchar 20, default `'completed'`) - `'pending'` | `'in_progress'` | `'completed'` | `'cancelled'`
+  - `startedAt` (timestamp with time zone, nullable) - when production was started by kitchen/plant
+  - `assembledAt` (timestamp with time zone, nullable) - when production was completed
+  - `notes` (text, optional) - instructions, batch notes, or quality remarks
+  - `createdAt` (timestamp with time zone)
+
+#### OP Operational Workflows:
+1. **Planned Production Order (OP) Workflow**:
+   - **Step 1 (Creation - `pending`)**: Admin/manager plans a production batch, specifying target product, planned quantity, Origin Warehouse (raw materials), and Destination Warehouse (delivery destination). Insumos are NOT deducted yet.
+   - **Step 2 (Execution - `in_progress`)**: Kitchen/plant operator starts the OP via `POST /api/inventory/production/:id/start`. Sets `startedAt = now()`.
+   - **Step 3 (Completion & Yield - `completed`)**: Operator marks OP as finished via `POST /api/inventory/production/:id/complete` confirming `actualQuantityProduced`, final `destinationWarehouseId`, and yield notes.
+     - Validates ingredient availability in origin warehouse.
+     - Decrements ingredient stocks from Origin Warehouse (`eventType: 'production_input'`).
+     - Increments finished product stock in Destination Warehouse (`eventType: 'production_output'`).
+     - Updates OP record to `status: 'completed'`, `assembledAt: now()`.
+   - **Cancellation (`cancelled`)**: Pending or in-progress OPs can be cancelled via `POST /api/inventory/production/:id/cancel` with zero stock impact.
+
+2. **Direct / Express Assembly Workflow**:
+   - For immediate restaurant prep (e.g. salsa batch made on the spot).
+   - Created with `status: 'completed'`, performing stock validations and immediate ledger movements in a single atomic database transaction.
 
 ### 1.7 POS Order System
 

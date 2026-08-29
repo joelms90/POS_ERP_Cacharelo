@@ -2,11 +2,25 @@
 
 **Purpose**: Track which development sessions (terminals/developers/assistants) are working on which parts of the monorepo to prevent conflicts.
 
-**Last Updated**: 2026-07-18 14:30
+**Last Updated**: 2026-08-29
 
 ---
 
 ## Currently Active Sessions
+
+_None._
+
+---
+
+## Completed Sessions
+
+### Session: Inventory Revamp (ledger, alerts, catalog, UX)
+- **Session Name**: `inventory-revamp`
+- **Branch**: `011-purchase-orders-requisitions`
+- **Primary Focus**: immutable `stock_ledger`, intelligent alerts, per-sucursal catalog & stock, unified OC/Requisiciones/Traspasos/Recepción UX
+- **Apps Touched**: `apps/sync_api/`, `apps/business_control_tauri/`, `apps/pos_flutter/` (minor)
+- **Status**: ✅ Completed (see `HANDOFF.md`)
+- **Locks released**: backend, admin, POS
 
 ### Session 1: Deployment & Infrastructure Documentation
 - **Session Name**: `cacharelo-easy-deployments`
@@ -14,28 +28,23 @@
 - **Branch**: `011-purchase-orders-requisitions`
 - **Primary Focus**: Deployment workflows and multi-session coordination documentation
 - **Apps Touched**: None (documentation only)
-- **Started**: 2026-07-18 14:00
 - **Shared Files Modified**:
   - `.claude/deployment-agent.md` (created)
   - `.claude/README.md` (created)
   - `.claude/monorepo-branch-strategy.md` (created)
   - `.claude/workspaces.md` (created)
   - `AGENTS.md` (added coordination guidelines)
-- **Status**: ✅ Active
-- **Next Steps**: Await instructions for deployment workflow enhancements
+- **Status**: ✅ Completed
 
 ---
 
 ## Planned/Future Sessions
 
-### Session 2: POS Flutter Development (Planned)
+### Session: POS Flutter verify & rebuild
 - **Session Name**: TBD
-- **Developer/Terminal**: TBD
-- **Branch**: TBD (recommendation: `011-purchase-orders-requisitions/pos`)
-- **Primary Focus**: Branch requisition creation UI in Flutter POS
+- **Branch**: `011-purchase-orders-requisitions`
+- **Primary Focus**: `flutter analyze` + rebuild web POS (branch-aware menu)
 - **Apps Touched**: `apps/pos_flutter/`
-- **Dependencies**: Backend API completion
-- **Shared Files**: `specs/011-purchase-orders-requisitions/`
 - **Status**: 🔵 Planned
 
 ---
