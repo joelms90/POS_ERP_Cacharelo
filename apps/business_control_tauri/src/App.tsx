@@ -36,12 +36,28 @@ export const roleTabs: Record<string, AdminTab[]> = {
 function App() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('personal');
-  const [activeBusinessId, setActiveBusinessId] = useState<string>('d3b07384-d113-4a0e-a555-e5b12824bf01');
+  const [activeBusinessId, setActiveBusinessId] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('BC-Active-Business');
+      return saved || 'd3b07384-d113-4a0e-a555-e5b12824bf01';
+    } catch {
+      return 'd3b07384-d113-4a0e-a555-e5b12824bf01';
+    }
+  });
   const [globalError, setGlobalError] = useState<string | null>(null);
   const allowedTabs = roleTabs[user?.role || 'owner'] || roleTabs.owner;
   const allowedBusinessIds = user?.role === 'inventory_admin' || user?.role === 'support_tech'
     ? (user.businessAccess?.map((access) => access.businessId) || (user.businessId ? [user.businessId] : []))
     : undefined;
+
+  // Persist the selected business so a refresh doesn't reset to the default
+  useEffect(() => {
+    try {
+      localStorage.setItem('BC-Active-Business', activeBusinessId);
+    } catch {
+      // ignore storage errors (e.g. private mode)
+    }
+  }, [activeBusinessId]);
 
   useEffect(() => {
     if (!allowedTabs.includes(activeTab)) {
