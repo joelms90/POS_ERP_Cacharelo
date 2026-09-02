@@ -35,7 +35,15 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
 const BULK_UOMS = ['kg', 'g', 'l', 'ml'];
 const decimals = (uom?: string) => (uom && BULK_UOMS.includes(uom) ? 3 : 0);
 
-type TypeFilter = 'all' | 'warehouse' | 'factory';
+type LocationType = 'warehouse' | 'factory' | 'branch' | 'transit';
+type TypeFilter = 'all' | 'warehouse' | 'factory' | 'branch';
+
+const effectiveType = (s: StockLevel): LocationType => {
+  if (s.warehouseLocationType === 'transit') return 'transit';
+  if (s.warehouseLocationType === 'factory') return 'factory';
+  if (s.warehouseId == null) return 'branch';
+  return 'warehouse';
+};
 
 export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ businessId }) => {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -76,11 +84,8 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
   }, [fetchData]);
 
   const filteredWarehouses = useMemo(() => {
-    return warehouses.filter((w) => {
-      if (typeFilter === 'all') return true;
-      const type = w.locationType || 'warehouse';
-      return type === typeFilter;
-    });
+    if (typeFilter === 'all' || typeFilter === 'branch') return warehouses;
+    return warehouses.filter((w) => (w.locationType || 'warehouse') === typeFilter);
   }, [warehouses, typeFilter]);
 
   useEffect(() => {
@@ -92,18 +97,17 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
   const rows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return stock.filter((s) => {
-      if ((s.warehouseLocationType || 'warehouse') === 'transit') return false;
+      const type = effectiveType(s);
+      if (type === 'transit') return false;
       if (selectedWarehouseId && s.warehouseId !== selectedWarehouseId) return false;
-      if (typeFilter !== 'all') {
-        const type = s.warehouseLocationType || 'warehouse';
-        if (type !== typeFilter) return false;
-      }
+      if (typeFilter !== 'all' && type !== typeFilter) return false;
       if (!q) return true;
       return (
         (s.productName || '').toLowerCase().includes(q) ||
         (s.sku || '').toLowerCase().includes(q) ||
         (s.internalCode || '').toLowerCase().includes(q) ||
-        (s.warehouseName || '').toLowerCase().includes(q)
+        (s.warehouseName || '').toLowerCase().includes(q) ||
+        (s.branchName || '').toLowerCase().includes(q)
       );
     });
   }, [stock, selectedWarehouseId, typeFilter, searchQuery]);
@@ -114,9 +118,21 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
     return { totalUnits, distinctProducts };
   }, [rows]);
 
-  const typeBadge = (type?: string | null) => {
+  const locationCounts = useMemo(() => {
+    const warehousesCount = warehouses.filter((w) => (w.locationType || 'warehouse') === 'warehouse').length;
+    const factoriesCount = warehouses.filter((w) => w.locationType === 'factory').length;
+    const branchesCount = new Set(
+      stock.filter((s) => s.warehouseId == null && s.branchId != null).map((s) => s.branchId),
+    ).size;
+    return { warehousesCount, factoriesCount, branchesCount };
+  }, [warehouses, stock]);
+
+  const typeBadge = (type: LocationType) => {
     if (type === 'factory') {
       return <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-wider bg-champagne-gold/15 text-champagne-gold">Fábrica</span>;
+    }
+    if (type === 'branch') {
+      return <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-wider bg-emerald-500/15 text-emerald-400">Sucursal</span>;
     }
     if (type === 'transit') {
       return <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-wider bg-warning-yellow/15 text-warning-yellow">Tránsito</span>;
@@ -131,10 +147,10 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-aged-bronze/25 pb-4">
         <div>
           <Heading level={1} className="!border-none !pb-0 tracking-wide font-light">
-            Inventario por Bodega
+            Inventario en Bodegas y Sucursales
           </Heading>
           <p className="text-sm text-text-secondary mt-1">
-            Consulta el stock de cada bodega o fábrica de ensamble.
+            Consulta el stock de cada bodega, fábrica de ensamble y sucursal.
           </p>
         </div>
       </div>
@@ -165,9 +181,10 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
               onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
               className="px-3 py-1.5 bg-charcoal-surface border border-aged-bronze focus:border-champagne-gold rounded font-sans text-xs text-text-primary transition-all duration-300 focus:outline-none cursor-pointer"
             >
-              <option value="all">Todas (Bodega y Fábrica)</option>
+              <option value="all">Todas las ubicaciones</option>
               <option value="warehouse">Solo Bodegas</option>
               <option value="factory">Solo Fábricas</option>
+              <option value="branch">Solo Sucursales</option>
             </select>
           </div>
 
@@ -217,8 +234,8 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
                   <th className="px-6 py-4">Producto</th>
                   <th className="px-6 py-4">Código</th>
                   <th className="px-6 py-4">Tipo Producto</th>
-                  <th className="px-6 py-4">Bodega</th>
-                  <th className="px-6 py-4">Tipo Bodega</th>
+                  <th className="px-6 py-4">Ubicación</th>
+                  <th className="px-6 py-4">Tipo</th>
                   <th className="px-6 py-4 text-right">Stock</th>
                   <th className="px-6 py-4 text-right">Actualizado</th>
                 </tr>
@@ -236,8 +253,8 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
                       <td className="px-6 py-4 font-medium text-text-primary text-xs">{r.productName}</td>
                       <td className="px-6 py-4 text-text-secondary text-xs font-mono">{r.internalCode || r.sku || '—'}</td>
                       <td className="px-6 py-4 text-text-secondary text-xs">{ITEM_TYPE_LABELS[r.itemType || ''] || r.itemType || '—'}</td>
-                      <td className="px-6 py-4 text-text-primary text-xs">{r.warehouseName || '—'}</td>
-                      <td className="px-6 py-4 text-xs">{typeBadge(r.warehouseLocationType)}</td>
+                      <td className="px-6 py-4 text-text-primary text-xs">{r.warehouseName || r.branchName || '—'}</td>
+                      <td className="px-6 py-4 text-xs">{typeBadge(effectiveType(r))}</td>
                       <td className="px-6 py-4 text-right font-mono font-semibold text-champagne-gold text-xs">
                         {parseFloat(r.quantity || '0').toFixed(decimals(r.uom))} <span className="text-text-secondary text-[10px]">{r.uom || ''}</span>
                       </td>
@@ -254,7 +271,7 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
 
         <div className="bg-charcoal-surface/40 border-t border-aged-bronze/35 px-6 py-3 flex items-center justify-between text-xs text-text-secondary">
           <span>Mostrando {rows.length} líneas de stock</span>
-          <span className="font-mono">Bodegas/Fábricas: {filteredWarehouses.length}</span>
+          <span className="font-mono">Bodegas: {locationCounts.warehousesCount} · Fábricas: {locationCounts.factoriesCount} · Sucursales: {locationCounts.branchesCount}</span>
         </div>
       </div>
     </div>
