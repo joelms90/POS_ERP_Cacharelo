@@ -92,6 +92,7 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
   const rows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return stock.filter((s) => {
+      if ((s.warehouseLocationType || 'warehouse') === 'transit') return false;
       if (selectedWarehouseId && s.warehouseId !== selectedWarehouseId) return false;
       if (typeFilter !== 'all') {
         const type = s.warehouseLocationType || 'warehouse';
