@@ -23,6 +23,7 @@ export class CategoriesService {
     return this.categoriesRepository.create({
       ...createCategoryDto,
       description: createCategoryDto.description || null,
+      targetStation: createCategoryDto.targetStation || null,
     });
   }
 

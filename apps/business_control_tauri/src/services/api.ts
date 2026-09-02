@@ -96,7 +96,7 @@ export interface Category {
   businessId: string;
   name: string;
   description?: string;
-  targetStation?: 'cocina' | 'barra';
+  targetStation?: 'cocina' | 'barra' | '' | null;
   createdAt?: string;
   updatedAt?: string;
 }
