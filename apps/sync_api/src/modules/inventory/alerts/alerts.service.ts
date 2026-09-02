@@ -824,10 +824,11 @@ export class AlertsService {
   }
 
   private async nextPoNumber(db: any, businessId: string): Promise<string> {
+    // po_number has a GLOBAL unique constraint, so the sequence must be global
+    // (not per-business) to avoid collisions across businesses.
     const rows = await db
       .select({ poNumber: schema.purchaseOrders.poNumber })
-      .from(schema.purchaseOrders)
-      .where(eq(schema.purchaseOrders.businessId, businessId));
+      .from(schema.purchaseOrders);
 
     const maxNum = rows.reduce((max: number, r: any) => {
       const m = String(r.poNumber || '').match(/^OC-(\d+)$/);
