@@ -1,0 +1,679 @@
+menu:
+  restaurant: Cacharelo
+  currency: MXN
+  logo: /branding/cacharelo-cofee-gold-logo.png
+  slogan: Buen café, grandes momentos
+  contact: cafecacharelo.com · @cafecacharelocafe
+  cover:
+    enabled: true
+    title: ''
+    subtitle: ''
+    slogan: BUEN CAFÉ, GRANDES MOMENTOS
+    footer: DESAYUNOS  •  COMIDAS  •  CAFÉ  •  MOMENTOS
+    tagline: Aquí sabe mejor
+    backgroundImage: /backgrounds/cafe-interior-cover.png
+    cardMode: full-bleed
+    style: minimal-gold
+    backgroundOverlayOpacity: 0.25
+    backgroundBlur: 0
+  theme:
+    name: Cacharelo Imperial
+    pageSize: letter
+    pageBackground: '#FAF7F2'
+    textColor: '#2D2926'
+    accentColor: '#C8A265'
+    secondaryColor: '#5C5449'
+    borderColor: '#C8A265'
+    headingFont: cormorant
+    bodyFont: montserrat
+    cardStyle: cacharelo-classic
+    dishBackdrop: soft-shadow
+    showPageNumbers: true
+  categories:
+    - id: ensaladas
+      name: ENSALADAS
+      subtitle: Frescura en cada bocado
+      description: null
+      dishes:
+        - id: capresse
+          name: CAPRESSE
+          description: Rodajas de jitomate y queso mozzarella fresco marinadas con vinagre balsámico y nuestra mezcla italiana.
+          price: 177
+          image: /dishes/caprese_plate.png
+        - id: cesar
+          name: CESAR
+          description: Lechuga aderezada acompañada de croutones, huevo cocido y queso parmesano rallado.
+          price: 162
+          image: /dishes/cesar_salad.png
+        - id: cesar-con-pollo
+          name: CESAR CON POLLO
+          description: >-
+            Lechuga aderezada acompañada de croutones, huevo cocido, queso parmesano rallado y pechuga de pollo a la
+            italiana.
+          price: 189
+          image: /dishes/cesar_pollo.png
+        - id: del-chef
+          name: DEL CHEF
+          description: Lechuga con nuestra vinagreta de cítricos, queso manchego, pechuga de pollo y huevo cocido.
+          price: null
+          review_required: true
+          notes: El texto OCR contiene fragmentos adicionales de jamón y queso; revisar contra el menú original.
+        - id: waldorf
+          name: WALDORF
+          description: Lechuga aderezada acompañada de manzana, blueberries, nuez pecana, queso mozzarella fresco y apio.
+          price: 175
+    - id: desayunos-huevos-al-gusto
+      name: DESAYUNOS
+      subtitle: Huevos al gusto
+      description: null
+      dishes:
+        - id: revueltos-con-jamon
+          name: REVUELTOS CON JAMÓN
+          description: Acompañados de pan tostado, aguacate y frijoles maneados de la casa.
+          price: 166
+          image: /dishes/huevos_board.png
+        - id: revueltos-a-la-mexicana
+          name: REVUELTOS A LA MEXICANA
+          description: Con cebolla, jitomate y chile picados, acompañado con pan tostado, aguacate y frijoles maneados de la casa.
+          price: 166
+          image: /dishes/huevos_board.png
+        - id: huevos-benedictinos
+          name: HUEVOS BENEDICTINOS
+          description: >-
+            Huevos pochés servidos en bagel con dip de queso y jamón, bañados con salsa holandesa, con un toque de
+            parmesano y perejil.
+          price: 194
+          image: /dishes/huevos_board.png
+        - id: huevos-cacharelo
+          name: HUEVOS CACHARELO
+          description: >-
+            Huevos pochés sobre salsa pomodoro con queso mozzarella fresco y un toque picante, bañados en salsa
+            holandesa con parmesano y albahaca, acompañados con pan tostado.
+          price: 212
+          image: /dishes/huevos_board.png
+        - id: espinacas-y-queso
+          name: DE ESPINACAS Y QUESO
+          description: Acompañado de pan tostado, aguacate y frijoles maneados de la casa.
+          price: 185
+        - id: champinones-y-queso
+          name: DE CHAMPIÑONES Y QUESO
+          description: Acompañado de pan tostado, aguacate y frijoles maneados de la casa.
+          price: 178
+        - id: claras-espinaca-panela
+          name: DE CLARAS CON ESPINACA Y QUESO PANELA
+          description: Acompañados de pan tostado, aguacate y frijoles maneados de la casa.
+          price: 180
+        - id: omelette-jamon-queso
+          name: OMELETTE DE JAMÓN Y QUESO
+          description: Acompañado de pan tostado, aguacate y frijoles maneados de la casa.
+          price: 178
+          image: /dishes/huevos_board.png
+    - id: desayunos-especialidades
+      name: DESAYUNOS
+      subtitle: Especialidades
+      description: null
+      dishes:
+        - id: mineras
+          name: MINERAS
+          description: >-
+            Rellenas de pollo, bañadas con salsa verde de la casa y acompañadas de crema, queso panela, cebolla y
+            aguacate.
+          price: 175
+          image: /dishes/foccacia.png
+        - id: chilaquiles-cacharelo
+          name: CHILAQUILES CACHARELO
+          description: Verdes con pollo, huevos fritos, crema, queso y cebolla.
+          price: 196
+          image: /dishes/huevos_board.png
+    - id: waffles-belgas
+      name: DESAYUNOS
+      subtitle: Waffles belgas
+      description: null
+      dishes:
+        - id: waffle-fresa-crema
+          name: CON FRESA Y CREMA
+          description: null
+          price: 129
+          image: /dishes/wafles.png
+        - id: waffle-yogurt
+          name: CON YOGURT
+          description: Fruta de temporada acompañada de miel de abeja, yogurt y granola.
+          price: 135
+          image: /dishes/wafles.png
+        - id: waffle-frutos-rojos
+          name: DE FRUTOS ROJOS
+          description: 'Mix de berries: blueberries, zarzamoras, frambuesas y fresas, acompañadas de queso cottage.'
+          price: 178
+          image: /dishes/wafles.png
+        - id: waffle-fruta-temporada
+          name: CON FRUTA DE TEMPORADA
+          description: Fruta de temporada acompañada de miel de abeja y granola.
+          price: 148
+          image: /dishes/wafles.png
+        - id: waffle-extra-141
+          name: 'ESPECIALIDAD #5'
+          description: null
+          price: 141
+          review_required: true
+          notes: El nombre asociado a este precio no es claro en el OCR.
+    - id: croissant
+      name: CROISSANT
+      subtitle: null
+      description: null
+      dishes:
+        - id: croissant-jamon-queso
+          name: DE JAMÓN Y QUESO
+          description: Preparado con jitomate horneado a las finas hierbas, lechuga y nuestro aderezo de mayonesa chipotle.
+          price: 135
+          image: /dishes/croissant.png
+        - id: croissant-huevo-tocino
+          name: DE HUEVO CON TOCINO
+          description: Preparado con jitomate horneado a las finas hierbas, queso panela y aderezo de mayonesa chipotle.
+          price: 147
+          image: /dishes/croissant.png
+        - id: croissant-italiano
+          name: ITALIANO
+          description: >-
+            Relleno de queso mozzarella fresco, jitomate a las finas hierbas y lechuga con vinagre balsámico y aceite de
+            oliva.
+          price: null
+          image: /dishes/croissant.png
+          review_required: true
+    - id: sandwiches
+      name: SANDWICHES
+      subtitle: null
+      description: null
+      dishes:
+        - id: cacharelo-club
+          name: CACHARELO CLUB
+          description: >-
+            De dos pisos, pan tostado preparado con jamón, queso, pollo a las finas hierbas, huevo frito, tocino y
+            lechuga marinada con vinagre balsámico.
+          price: 205
+          image: /dishes/sandwich.png
+        - id: croque-monsieur
+          name: CROQUE MONSIEUR
+          description: De dos pisos, pan tostado relleno de jamón y queso manchego gratinado.
+          price: 142
+          image: /dishes/sandwich.png
+        - id: croque-madame
+          name: CROQUE MADAME
+          description: De dos pisos, pan tostado relleno de jamón y queso manchego gratinado con un huevo frito encima.
+          price: 160
+          image: /dishes/sandwich.png
+        - id: montecristo
+          name: MONTECRISTO
+          description: De dos pisos, capeado, relleno de jamón, queso manchego, pollo y jitomate horneado a las finas hierbas.
+          price: 172
+          image: /dishes/sandwich.png
+    - id: baguettes
+      name: BAGUETTES
+      subtitle: null
+      description: null
+      dishes:
+        - id: baguette-pollo-cajun
+          name: POLLO CAJÚN
+          description: >-
+            Acompañada de queso mozzarella fresco, jitomate horneado a las finas hierbas y lechuga marinada con vinagre
+            balsámico.
+          price: null
+          image: /dishes/cesar_pollo.png
+          review_required: true
+        - id: baguette-arrachera
+          name: DE ARRACHERA
+          description: Con frijoles maneados, cebolla caramelizada, queso manchego, aderezo de mayonesa chipotle y jitomate.
+          price: 200
+          image: /dishes/foccacia.png
+        - id: baguette-jamon-queso
+          name: DE JAMÓN Y QUESO
+          description: Acompañado de jitomate horneado, lechuga marinada con vinagre balsámico y aderezo de mayonesa chipotle.
+          price: 160
+          image: /dishes/foccacia.png
+        - id: baguette-tres-quesos
+          name: A LOS 3 QUESOS
+          description: Con queso mozzarella fresco, queso panela y queso manchego.
+          price: 170
+          image: /dishes/foccacia.png
+        - id: baguette-item-180
+          name: BAGUETTE ESPECIAL
+          description: null
+          price: 180
+          review_required: true
+          notes: El nombre del producto asociado a $180.00 no es confiable en el OCR.
+    - id: bagels
+      name: BAGELS
+      subtitle: null
+      description: null
+      review_required: true
+      notes: >
+        El encabezado de esta sección no aparece claramente en el OCR, pero los productos parecen corresponder a una
+        sección distinta de baguettes.
+      dishes:
+        - id: bagel-jamon-queso
+          name: DE JAMÓN Y QUESO
+          description: Acompañado de jitomate a las finas hierbas, lechuga marinada con vinagre balsámico y dip de queso.
+          price: 155
+          image: /dishes/bagel.png
+        - id: bagel-salmon-ahumado
+          name: DE SALMÓN AHUMADO
+          description: >-
+            Con queso mozzarella fresco, jitomate a las finas hierbas, lechuga marinada con vinagre balsámico y dip de
+            queso.
+          price: 218
+          image: /dishes/bagel.png
+        - id: bagel-fresa-nutella
+          name: DE FRESA CON NUTELLA
+          description: Con queso crema.
+          price: 145
+          image: /dishes/bagel.png
+    - id: pan-artesanal
+      name: PAN ARTESANAL
+      subtitle: null
+      description: |
+        Nuestro pan artesanal es horneado al día, todos con un toque de azúcar glass.
+      dishes:
+        - id: croissant-natural
+          name: CROISSANT
+          description: null
+          price: 53
+          image: /dishes/croissant.png
+        - id: croissant-almendra
+          name: CROISSANT DE ALMENDRA
+          description: null
+          price: 65
+          image: /dishes/croissant.png
+        - id: chocolatin
+          name: CHOCOLATÍN
+          description: null
+          price: 65
+          image: /dishes/croissant.png
+        - id: rol-canela
+          name: ROL DE CANELA
+          description: null
+          price: null
+          review_required: true
+        - id: croissant-nutella-queso
+          name: CROISSANT RELLENO DE NUTELLA CON QUESO
+          description: null
+          price: null
+          image: /dishes/croissant.png
+          review_required: true
+        - id: croissant-frutos-rojos
+          name: CROISSANT RELLENO DE FRUTOS ROJOS
+          description: null
+          price: 88
+          image: /dishes/croissant.png
+        - id: croissant-pina
+          name: CROISSANT RELLENO DE PIÑA
+          description: null
+          price: null
+          image: /dishes/croissant.png
+          review_required: true
+    - id: extras
+      name: EXTRAS
+      subtitle: null
+      description: null
+      review_required: true
+      dishes:
+        - id: dish-extras-0
+          name: AGUACATE 80 GR
+          description: null
+          price: null
+        - id: dish-extras-1
+          name: FRAMBUESA
+          description: null
+          price: 30
+        - id: dish-extras-2
+          name: CAFÉ SHOT 2 OZ
+          description: null
+          price: null
+        - id: dish-extras-3
+          name: ARRACHERA
+          description: null
+          price: null
+        - id: dish-extras-4
+          name: MELÓN
+          description: null
+          price: 20
+        - id: dish-extras-5
+          name: FRESA
+          description: null
+          price: null
+        - id: dish-extras-6
+          name: PIÑA
+          description: null
+          price: 15
+        - id: dish-extras-7
+          name: LECHE 2 OZ
+          description: null
+          price: null
+        - id: dish-extras-8
+          name: TOCINO
+          description: null
+          price: null
+        - id: dish-extras-9
+          name: JUGO DE LIMÓN
+          description: null
+          price: 15
+        - id: dish-extras-10
+          name: LECHE DE AVENA
+          description: null
+          price: null
+        - id: dish-extras-11
+          name: HUEVO
+          description: null
+          price: null
+        - id: dish-extras-12
+          name: YOGURT
+          description: null
+          price: 20
+        - id: dish-extras-13
+          name: LECHE DE ALMENDRA
+          description: null
+          price: null
+        - id: dish-extras-14
+          name: FRIJOLES MANEADOS
+          description: null
+          price: 20
+        - id: dish-extras-15
+          name: JITOMATE A LAS FINAS HIERBAS
+          description: null
+          price: null
+        - id: dish-extras-16
+          name: GRANOLA
+          description: null
+          price: null
+        - id: dish-extras-17
+          name: PAN TOSTADO 2 PZ
+          description: null
+          price: 20
+        - id: dish-extras-18
+          name: DIP DE QUESO
+          description: null
+          price: null
+        - id: dish-extras-19
+          name: CREMA BATIDA
+          description: null
+          price: null
+        - id: dish-extras-20
+          name: PAN BAGUETTE
+          description: null
+          price: null
+        - id: dish-extras-21
+          name: JAMÓN
+          description: null
+          price: null
+        - id: dish-extras-22
+          name: MERMELADA DE FRUTOS ROJOS
+          description: null
+          price: null
+        - id: dish-extras-23
+          name: JARABE
+          description: null
+          price: null
+        - id: dish-extras-24
+          name: QUESO MANCHEGO
+          description: null
+          price: 30
+        - id: dish-extras-25
+          name: MERMELADA DE PIÑA
+          description: null
+          price: null
+        - id: dish-extras-26
+          name: QUESO MOZZARELLA
+          description: null
+          price: 45
+        - id: dish-extras-27
+          name: JARABE CARAMELO
+          description: null
+          price: null
+        - id: dish-extras-28
+          name: NUTELLA
+          description: null
+          price: null
+        - id: dish-extras-29
+          name: MIEL
+          description: null
+          price: 15
+        - id: dish-extras-30
+          name: JARABE AMARETTO
+          description: null
+          price: null
+        - id: dish-extras-31
+          name: FRUTOS ROJOS
+          description: null
+          price: null
+        - id: dish-extras-32
+          name: BLUEBERRIES
+          description: null
+          price: null
+        - id: dish-extras-33
+          name: CHAMPIÑÓN
+          description: null
+          price: null
+        - id: dish-extras-34
+          name: ZARZAMORA
+          description: null
+          price: null
+    - id: bebidas-calientes
+      name: BEBIDAS
+      subtitle: Calientes
+      description: null
+      notes:
+        - Preparamos su bebida con leche entera o deslactosada sin costo extra.
+        - 'Leches vegetales con costo extra: almendra y avena.'
+      dishes:
+        - id: espresso-sencillo
+          name: ESPRESSO SENCILLO
+          description: null
+          price: 40
+          review_required: true
+        - id: doble-cortado
+          name: DOBLE CORTADO
+          description: null
+          price: 69
+          review_required: true
+        - id: americano
+          name: AMERICANO
+          description: null
+          price: 99
+          review_required: true
+        - id: capuccino-caliente
+          name: CAPUCCINO
+          description: null
+          price: 92
+          review_required: true
+        - id: chocolate-caliente
+          name: CHOCOLATE
+          description: null
+          price: 100
+          review_required: true
+        - id: latte-caliente
+          name: LATTE
+          description: null
+          price: 101
+          review_required: true
+        - id: moka-caliente
+          name: MOKA
+          description: null
+          price: null
+          review_required: true
+        - id: flat-white
+          name: FLAT WHITE
+          description: null
+          price: 102
+          review_required: true
+    - id: tes
+      name: TÉS
+      subtitle: null
+      description: null
+      dishes:
+        - id: te-sabores
+          name: TÉ DE SABORES
+          description: Jengibre, jamaica, limón, manzanilla, menta y manzana/anís.
+          price: 92
+        - id: chai
+          name: CHAI
+          description: null
+          price: 111
+        - id: te-negro
+          name: TÉ NEGRO
+          description: null
+          price: 104
+        - id: tizana-frutos
+          name: TIZANA DE FRUTOS
+          description: null
+          price: 104
+        - id: tizana-manzana
+          name: TIZANA DE MANZANA
+          description: null
+          price: 104
+    - id: bebidas-frias
+      name: BEBIDAS
+      subtitle: Frías
+      description: null
+      dishes:
+        - id: dish-bebidas-frias-0
+          name: CAPUCCINO
+          description: null
+          price: 108
+        - id: dish-bebidas-frias-1
+          name: CHOCOLATE
+          description: null
+          price: 109
+        - id: dish-bebidas-frias-2
+          name: LATTE
+          description: null
+          price: 109
+        - id: dish-bebidas-frias-3
+          name: MOKA
+          description: null
+          price: 111
+        - id: dish-bebidas-frias-4
+          name: MATCHA
+          description: null
+          price: 121
+    - id: frappes
+      name: FRAPPÉ
+      subtitle: null
+      description: null
+      dishes:
+        - id: dish-frappes-0
+          name: CAFÉ
+          description: null
+          price: 108
+        - id: dish-frappes-1
+          name: CAPUCCINO
+          description: null
+          price: 121
+        - id: dish-frappes-2
+          name: MOKA
+          description: null
+          price: 121
+        - id: dish-frappes-3
+          name: MATCHA
+          description: null
+          price: null
+          review_required: true
+        - id: dish-frappes-4
+          name: CHOCOLATE
+          description: null
+          price: 119
+          review_required: true
+    - id: smoothies
+      name: SMOOTHIES
+      subtitle: null
+      description: null
+      dishes:
+        - id: smoothie-mango
+          name: MANGO
+          description: A base de agua.
+          price: null
+          review_required: true
+        - id: smoothie-platano
+          name: PLÁTANO
+          description: A base de leche.
+          price: null
+          review_required: true
+        - id: smoothie-frutos-rojos
+          name: FRUTOS ROJOS
+          description: A base de leche.
+          price: null
+          review_required: true
+    - id: jugos
+      name: JUGOS
+      subtitle: null
+      description: Nuestros jugos son 100% naturales.
+      dishes:
+        - id: jugo-naranja
+          name: NARANJA
+          description: null
+          price: 71
+          review_required: true
+        - id: jugo-verde
+          name: VERDE
+          description: Apio, piña, nopal, espinaca y naranja.
+          price: 97
+          review_required: true
+        - id: jugo-detox
+          name: DETOX
+          description: Mix de berries con naranja.
+          price: 108
+          review_required: true
+        - id: jugo-extra
+          name: JUGO CHAMOY & TAJÍN
+          description: Con chamoy y Tajín.
+          price: 111
+          review_required: true
+        - id: jugo-extra-123
+          name: JUGO ESPECIAL
+          description: null
+          price: 123
+          review_required: true
+    - id: refrescos
+      name: REFRESCOS
+      subtitle: null
+      description: null
+      dishes:
+        - id: dish-refrescos-0
+          name: COCA-COLA
+          description: null
+          price: null
+        - id: dish-refrescos-1
+          name: COCA-COLA ZERO
+          description: null
+          price: null
+        - id: dish-refrescos-2
+          name: SPRITE
+          description: null
+          price: null
+        - id: dish-refrescos-3
+          name: FANTA
+          description: null
+          price: null
+        - id: dish-refrescos-4
+          name: MUNDET
+          description: null
+          price: null
+        - id: dish-refrescos-5
+          name: TOPO CHICO
+          description: null
+          price: null
+        - id: dish-refrescos-6
+          name: AGUA FIEL 500 ML
+          description: null
+          price: null
+    - id: agua-zoe
+      name: AGUA ZOE
+      subtitle: null
+      description: null
+      dishes:
+        - id: agua-zoe-500
+          name: AGUA ZOE 500 ML
+          description: null
+          price: 47
+          review_required: true
+        - id: agua-zoe-twist
+          name: AGUA ZOE TWIST SABORES
+          description: Esencia de frutos rojos, mandarina o sandía con hierbabuena.
+          price: 47

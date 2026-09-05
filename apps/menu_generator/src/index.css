@@ -1,0 +1,150 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-cormorant: 'Cormorant Garamond', Georgia, serif;
+    --font-playfair: 'Playfair Display', Georgia, serif;
+    --font-cinzel: 'Cinzel', Georgia, serif;
+    --font-baskerville: 'Libre Baskerville', Georgia, serif;
+    --font-montserrat: 'Montserrat', sans-serif;
+  }
+}
+
+/* Custom font utilities */
+.font-cormorant { font-family: 'Cormorant Garamond', Georgia, serif; }
+.font-playfair { font-family: 'Playfair Display', Georgia, serif; }
+.font-cinzel { font-family: 'Cinzel', Georgia, serif; }
+.font-baskerville { font-family: 'Libre Baskerville', Georgia, serif; }
+.font-montserrat { font-family: 'Montserrat', sans-serif; }
+.font-script { font-family: 'Great Vibes', 'Pinyon Script', 'Alex Brush', cursive; }
+.font-pinyon { font-family: 'Pinyon Script', cursive; }
+.font-brush { font-family: 'Alex Brush', cursive; }
+
+/* Custom scrollbars for editor */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(24, 24, 27, 0.6);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(113, 113, 122, 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(161, 161, 170, 0.6);
+}
+
+/* Print Rules for Edge-to-Edge Digital & Physical PDF Output */
+@page {
+  size: 8.5in 11in; /* Carta: 215.9 x 279.4 mm */
+  margin: 0 !important;
+}
+
+@media print {
+  /* Force color and graphic preservation across all browsers */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Hide all editor UI, controls, and off-screen headless queues */
+  .no-print,
+  nav,
+  aside,
+  header.app-header,
+  .editor-sidebar,
+  .editor-controls,
+  button,
+  .toast-container,
+  #pdf-render-queue {
+    display: none !important;
+  }
+
+  html,
+  body {
+    width: 8.5in !important;
+    height: 11in !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Reset outer application wrappers, removing all editor zoom scaling, gaps, and scrolls */
+  #root,
+  .print-root-container,
+  .zoom-wrapper {
+    width: 8.5in !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    transform: none !important;
+    scale: 1 !important;
+    background: transparent !important;
+    background-image: none !important;
+    display: block !important;
+  }
+
+  /* Individual Menu Page Container: Fills 100% of the physical page from edge to edge */
+  .menu-page-container {
+    width: 8.5in !important;
+    height: 11in !important;
+    min-width: 8.5in !important;
+    min-height: 11in !important;
+    max-width: 8.5in !important;
+    max-height: 11in !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    overflow: hidden !important;
+    transform: none !important;
+    position: relative !important;
+  }
+
+  /* Inner Menu Page: Matches exact 8.5in x 11in paper dimensions */
+  .menu-page {
+    width: 8.5in !important;
+    height: 11in !important;
+    min-width: 8.5in !important;
+    min-height: 11in !important;
+    max-width: 8.5in !important;
+    max-height: 11in !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
+  }
+
+  /* Dynamic A4 format override when container has data-page-size="a4" */
+  .print-root-container[data-page-size="a4"],
+  .print-root-container[data-page-size="a4"] .zoom-wrapper {
+    width: 210mm !important;
+  }
+
+  .print-root-container[data-page-size="a4"] .menu-page-container,
+  .print-root-container[data-page-size="a4"] .menu-page {
+    width: 210mm !important;
+    height: 297mm !important;
+    min-width: 210mm !important;
+    min-height: 297mm !important;
+    max-width: 210mm !important;
+    max-height: 297mm !important;
+  }
+}

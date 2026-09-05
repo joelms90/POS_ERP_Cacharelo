@@ -2,7 +2,7 @@
 
 **Purpose**: Track which development sessions (terminals/developers/assistants) are working on which parts of the monorepo to prevent conflicts.
 
-**Last Updated**: 2026-08-29
+**Last Updated**: 2026-09-04
 
 ---
 
@@ -13,6 +13,13 @@ _None._
 ---
 
 ## Completed Sessions
+
+### Session: Menu Generator / Catalog Studio
+- **Session Name**: `menu-generator-isolated`
+- **Primary Focus**: Isolated tool for automatic restaurant menu catalog generation (React + Vite + TS + Tailwind + pnpm)
+- **Apps Touched**: `apps/menu_generator/`
+- **Status**: ✅ Completed
+
 
 ### Session: Inventory Revamp (ledger, alerts, catalog, UX)
 - **Session Name**: `inventory-revamp`

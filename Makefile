@@ -73,6 +73,10 @@ help:
 	@echo "  admin-build       Build static admin dashboard assets"
 	@echo "  admin-deploy      Deploy admin dashboard to Firebase Hosting"
 	@echo ""
+	@echo "Menu Studio & Catalog Generator Targets:"
+	@echo "  menu-dev          Start isolated Menu Studio & Catalog Generator (localhost:5180)"
+	@echo "  menu-build        Build Menu Studio production bundle"
+	@echo ""
 	@echo "Flutter Build & Run Targets:"
 	@echo "  flutter-macos-dev        Start Flutter POS in macOS desktop mode (connected to LIVE Cloud Run API)"
 	@echo "  flutter-macos-dev-prod   Alias to flutter-macos-dev (connected to LIVE Cloud Run API)"
@@ -425,21 +429,25 @@ dev-backend: dev-backend-local
 dev-backend-local:
 	@echo "======================================================================="
 	@echo "🚀 Starting NestJS Backend on localhost:3000 (LOCAL Postgres: port 5432)"
+	@echo "   GCP integrations disabled (Firestore/GCS not required locally)"
 	@echo "======================================================================="
 	@cd apps/sync_api && \
 		PORT=3000 \
 		NODE_ENV=development \
+		ENABLE_GCP_INTEGRATIONS=false \
 		DATABASE_URL="postgres://pos_user:pos_password@localhost:5432/pos_dev" \
 		npm run dev
 
 dev-backend-prod:
 	@echo "======================================================================="
 	@echo "🚀 Starting NestJS Backend on localhost:3000 (PROD DB via Proxy: port 5433)"
+	@echo "   GCP integrations enabled (uses local gcloud ADC credentials)"
 	@echo "⚠️  Ensure 'make db-proxy' is running in a separate terminal!"
 	@echo "======================================================================="
 	@cd apps/sync_api && \
 		PORT=3000 \
 		NODE_ENV=development \
+		ENABLE_GCP_INTEGRATIONS=true \
 		DATABASE_URL="postgresql://pos_user:pos-secure-db-pass-2026!@localhost:5433/pos_db" \
 		npm run dev
 
@@ -542,7 +550,7 @@ backend-deploy:
 			--max-instances 10 \
 			--allow-unauthenticated \
 			--add-cloudsql-instances fresh-sensor-497515-d3:us-central1:pos-db-instance \
-			--set-env-vars "NODE_ENV=production,DATABASE_URL=postgresql://pos_user:pos-secure-db-pass-2026!@/pos_db?host=/cloudsql/fresh-sensor-497515-d3:us-central1:pos-db-instance,PG_POOL_MAX=5,PG_IDLE_TIMEOUT_MS=30000,PG_CONNECTION_TIMEOUT_MS=5000,TAKEAWAY_SELF_HEAL_INTERVAL_MS=60000"
+			--set-env-vars "NODE_ENV=production,ENABLE_GCP_INTEGRATIONS=true,DATABASE_URL=postgresql://pos_user:pos-secure-db-pass-2026!@/pos_db?host=/cloudsql/fresh-sensor-497515-d3:us-central1:pos-db-instance,PG_POOL_MAX=5,PG_IDLE_TIMEOUT_MS=30000,PG_CONNECTION_TIMEOUT_MS=5000,TAKEAWAY_SELF_HEAL_INTERVAL_MS=60000"
 	@echo ""
 	@echo "✅ Deployment complete!"
 	@echo ""
@@ -568,7 +576,7 @@ backend-deploy-fast:
 			--max-instances 10 \
 			--allow-unauthenticated \
 			--add-cloudsql-instances fresh-sensor-497515-d3:us-central1:pos-db-instance \
-			--set-env-vars "NODE_ENV=production,DATABASE_URL=postgresql://pos_user:pos-secure-db-pass-2026!@/pos_db?host=/cloudsql/fresh-sensor-497515-d3:us-central1:pos-db-instance,PG_POOL_MAX=5,PG_IDLE_TIMEOUT_MS=30000,PG_CONNECTION_TIMEOUT_MS=5000,TAKEAWAY_SELF_HEAL_INTERVAL_MS=60000"
+			--set-env-vars "NODE_ENV=production,ENABLE_GCP_INTEGRATIONS=true,DATABASE_URL=postgresql://pos_user:pos-secure-db-pass-2026!@/pos_db?host=/cloudsql/fresh-sensor-497515-d3:us-central1:pos-db-instance,PG_POOL_MAX=5,PG_IDLE_TIMEOUT_MS=30000,PG_CONNECTION_TIMEOUT_MS=5000,TAKEAWAY_SELF_HEAL_INTERVAL_MS=60000"
 	@echo ""
 	@echo "✅ Deployment complete!"
 	@echo ""
@@ -674,6 +682,29 @@ admin-deploy-gcs: admin-build
 	gcloud storage rsync -r apps/business_control_tauri/dist gs://empire-pos-admin-dashboard-fresh-sensor-497515-d3
 	@echo "✓ GCS Deployment complete!"
 	@echo ""
+
+# Menu Generator Targets
+.PHONY: menu-install menu-dev menu-build menu-preview
+
+menu-install:
+	@echo "Installing dependencies for Menu Generator..."
+	cd apps/menu_generator && pnpm install
+
+menu-dev:
+	@echo "======================================================================="
+	@echo "🚀 Starting Cacharelo Menu Studio & Catalog Generator (Isolated)"
+	@echo "   URL: http://localhost:5180"
+	@echo "======================================================================="
+	cd apps/menu_generator && pnpm dev
+
+menu-build:
+	@echo "Building Menu Generator..."
+	cd apps/menu_generator && pnpm build
+
+menu-preview:
+	@echo "Previewing Menu Generator build..."
+	cd apps/menu_generator && pnpm preview
+
 	@echo "  🌐 Admin dashboard GCS website is live at:"
 	@echo "     https://empire-pos-admin-dashboard-fresh-sensor-497515-d3.storage.googleapis.com/index.html"
 	@echo ""
