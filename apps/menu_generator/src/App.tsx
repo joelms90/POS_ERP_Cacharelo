@@ -20,12 +20,34 @@ import { PagePreviewContainer } from './components/preview/PagePreviewContainer'
 import { YamlModal } from './components/editor/YamlModal';
 import { generateDigitalPdf } from './utils/pdfGenerator';
 
-const STORAGE_KEY = 'cacharelo_menu_studio_v2';
+const STORAGE_KEY = 'cacharelo_menu_studio_v3';
+const HASH_KEY = 'cacharelo_preset_code_hash_v1';
+
+// Fast 32-bit hash to detect code changes in defaultMenu.ts
+function getCatalogHash(data: any): string {
+  const str = typeof data === 'string' ? data : JSON.stringify(data);
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash * 33) ^ str.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(36);
+}
 
 export function App() {
+  const currentPresetHash = getCatalogHash(CACHARELO_MENU_PRESET);
+
   // Load initial catalog from localStorage or default preset
   const [catalog, setCatalog] = useState<MenuCatalog>(() => {
     try {
+      const savedHash = localStorage.getItem(HASH_KEY);
+      // If defaultMenu.ts was modified in source code, fresh code takes precedence!
+      if (savedHash && savedHash !== currentPresetHash) {
+        console.info('defaultMenu.ts has changed in source code! Loading fresh preset.');
+        localStorage.setItem(HASH_KEY, currentPresetHash);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(CACHARELO_MENU_PRESET));
+        return CACHARELO_MENU_PRESET;
+      }
+
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -49,6 +71,10 @@ export function App() {
     } catch (e) {
       console.warn('Failed to parse saved menu catalog, using default', e);
     }
+    try {
+      localStorage.setItem(HASH_KEY, currentPresetHash);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(CACHARELO_MENU_PRESET));
+    } catch {}
     return CACHARELO_MENU_PRESET;
   });
 
@@ -72,9 +98,37 @@ export function App() {
     }
   }, [catalog]);
 
+  // Hot-reload when defaultMenu.ts is modified in code during development
+  useEffect(() => {
+    try {
+      const savedHash = localStorage.getItem(HASH_KEY);
+      if (savedHash && savedHash !== currentPresetHash) {
+        localStorage.setItem(HASH_KEY, currentPresetHash);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(CACHARELO_MENU_PRESET));
+        setCatalog(CACHARELO_MENU_PRESET);
+        showToast('Cambios detectados en src/data/defaultMenu.ts: Menú actualizado', 'info');
+      }
+    } catch (e) {
+      console.warn('Hash check error', e);
+    }
+  }, [currentPresetHash]);
+
   const showToast = (text: string, type: 'success' | 'info' | 'error' = 'success') => {
     setToastMessage({ text, type });
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleResetToDefaultCode = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.setItem(HASH_KEY, currentPresetHash);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(CACHARELO_MENU_PRESET));
+    } catch (e) {
+      console.warn(e);
+    }
+    setCatalog(CACHARELO_MENU_PRESET);
+    setActivePageIndex(0);
+    showToast('Menú restablecido con éxito desde src/data/defaultMenu.ts');
   };
 
   // Section handlers
@@ -301,6 +355,7 @@ export function App() {
         onPageChange={(idx) => setActivePageIndex(idx)}
         onAddSection={handleAddSection}
         onLoadPreset={handleLoadPreset}
+        onResetToDefaultCode={handleResetToDefaultCode}
         onExportPDF={handleExportPDF}
         onExportPNG={handleExportPNG}
         onSaveJSON={handleSaveJSON}

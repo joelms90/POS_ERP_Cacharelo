@@ -91,8 +91,8 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "del-chef",
                 "name": "DEL CHEF",
-                "description": "Lechuga con nuestra vinagreta de cítricos, queso manchego, pechuga de pollo y huevo cocido.",
-                "price": null,
+                "description": "Lechuga con nuestra vinagreta de cítricos acompañada de jamónjj, queso manchego, pechuga de pollo y huevo cocido.",
+                "price": 185,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -100,11 +100,6 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                     "y": 0,
                     "rotation": 0
                 },
-                "review_required": true,
-                "notes": "El texto OCR contiene fragmentos adicionales de jamón y queso; revisar contra el menú original.",
-                "tags": [
-                    "Revisar"
-                ]
             },
             {
                 "id": "waldorf",
@@ -144,9 +139,23 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 }
             },
             {
+                "id": "revueltos-con-tocino",
+                "name": "REVUELTOS CON TOCINO",
+                "description": "Acompañados de pan tostado, aguacate y frijoles maneados de la casa.",
+                "price": 166,
+                "image": "/dishes/huevos_board.png",
+                "imageMode": "transparent",
+                "imageTransform": {
+                    "scale": 1,
+                    "x": 0,
+                    "y": 0,
+                    "rotation": 0
+                }
+            },
+            {
                 "id": "revueltos-a-la-mexicana",
                 "name": "REVUELTOS A LA MEXICANA",
-                "description": "Con cebolla, jitomate y chile picados, acompañado con pan tostado, aguacate y frijoles maneados de la casa.",
+                "description": "Con cebolla, jitomate y chile picado, acompañado con pan tostado, aguacate y frijoles maneados de la casa.",
                 "price": 166,
                 "image": "/dishes/huevos_board.png",
                 "imageMode": "transparent",
@@ -187,7 +196,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             },
             {
                 "id": "espinacas-y-queso",
-                "name": "DE ESPINACAS Y QUESO",
+                "name": "OMELETTE DE ESPINACAS Y QUESO",
                 "description": "Acompañado de pan tostado, aguacate y frijoles maneados de la casa.",
                 "price": 185,
                 "imageMode": "transparent",
@@ -200,7 +209,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             },
             {
                 "id": "champinones-y-queso",
-                "name": "DE CHAMPIÑONES Y QUESO",
+                "name": "OMELETTE DE CHAMPIÑONES Y QUESO",
                 "description": "Acompañado de pan tostado, aguacate y frijoles maneados de la casa.",
                 "price": 178,
                 "imageMode": "transparent",
@@ -213,7 +222,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             },
             {
                 "id": "claras-espinaca-panela",
-                "name": "DE CLARAS CON ESPINACA Y QUESO PANELA",
+                "name": "OMELETTE DE CLARAS CON ESPINACA Y QUESO PANELA",
                 "description": "Acompañados de pan tostado, aguacate y frijoles maneados de la casa.",
                 "price": 180,
                 "imageMode": "transparent",
@@ -289,6 +298,19 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "waffle-fresa-crema",
                 "name": "CON FRESA Y CREMA",
+                "price": 141,
+                "image": "/dishes/wafles.png",
+                "imageMode": "transparent",
+                "imageTransform": {
+                    "scale": 1,
+                    "x": 0,
+                    "y": 0,
+                    "rotation": 0
+                }
+            },
+            {
+                "id": "waffle-nutella",
+                "name": "CON PLÁTANO Y NUTELLA",
                 "price": 129,
                 "image": "/dishes/wafles.png",
                 "imageMode": "transparent",
@@ -300,8 +322,31 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 }
             },
             {
-                "id": "waffle-yogurt",
-                "name": "CON YOGURT",
+                "id": "waffle-frutos-rojos",
+                "name": "CON FRUTOS ROJOS",
+                "price": 129,
+                "image": "/dishes/wafles.png",
+                "imageMode": "transparent",
+                "imageTransform": {
+                    "scale": 1,
+                    "x": 0,
+                    "y": 0,
+                    "rotation": 0
+                }
+            }
+        ]
+    },
+    {
+        "id": "waffles-belgas",
+        "kicker": "DULCE DESPERTAR",
+        "quote": "",
+        "name": "DESAYUNOS",
+        "subtitle": "BOWLS DE FRUTA",
+        "layoutTemplate": "dense-list",
+        "dishes": [
+            {
+                "id": "bowl-yogurt",
+                "name": "MIXTO",
                 "description": "Fruta de temporada acompañada de miel de abeja, yogurt y granola.",
                 "price": 135,
                 "image": "/dishes/wafles.png",
@@ -314,7 +359,21 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 }
             },
             {
-                "id": "waffle-frutos-rojos",
+                "id": "bowl-yogurt",
+                "name": "CON YOGURT",
+                "description": "Fruta de temporada acompañada de miel de abeja, yogurt y granola.",
+                "price": 148,
+                "image": "/dishes/wafles.png",
+                "imageMode": "transparent",
+                "imageTransform": {
+                    "scale": 1,
+                    "x": 0,
+                    "y": 0,
+                    "rotation": 0
+                }
+            },
+            {
+                "id": "bowl-frutos-rojos",
                 "name": "DE FRUTOS ROJOS",
                 "description": "Mix de berries: blueberries, zarzamoras, frambuesas y fresas, acompañadas de queso cottage.",
                 "price": 178,
@@ -327,37 +386,6 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                     "rotation": 0
                 }
             },
-            {
-                "id": "waffle-fruta-temporada",
-                "name": "CON FRUTA DE TEMPORADA",
-                "description": "Fruta de temporada acompañada de miel de abeja y granola.",
-                "price": 148,
-                "image": "/dishes/wafles.png",
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                }
-            },
-            {
-                "id": "waffle-extra-141",
-                "name": "ESPECIALIDAD #5",
-                "price": 141,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "notes": "El nombre asociado a este precio no es claro en el OCR.",
-                "tags": [
-                    "Revisar"
-                ]
-            }
         ]
     },
     {
@@ -399,7 +427,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "id": "croissant-italiano",
                 "name": "ITALIANO",
                 "description": "Relleno de queso mozzarella fresco, jitomate a las finas hierbas y lechuga con vinagre balsámico y aceite de oliva.",
-                "price": null,
+                "price": 147,
                 "image": "/dishes/croissant.png",
                 "imageMode": "transparent",
                 "imageTransform": {
@@ -425,7 +453,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "cacharelo-club",
                 "name": "CACHARELO CLUB",
-                "description": "De dos pisos, pan tostado preparado con jamón, queso, pollo a las finas hierbas, huevo frito, tocino y lechuga marinada con vinagre balsámico.",
+                "description": "De dos pisos, pan tostado preparado con jamón, queso machego, jitomate horneado, pollo a las finas hierbas, huevo frito, tocino y lechuga marinada con vinagre balsámico.",
                 "price": 205,
                 "image": "/dishes/sandwich.png",
                 "imageMode": "transparent",
@@ -491,7 +519,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "id": "baguette-pollo-cajun",
                 "name": "POLLO CAJÚN",
                 "description": "Acompañada de queso mozzarella fresco, jitomate horneado a las finas hierbas y lechuga marinada con vinagre balsámico.",
-                "price": null,
+                "price": 180,
                 "image": "/dishes/cesar_pollo.png",
                 "imageMode": "transparent",
                 "imageTransform": {
@@ -500,10 +528,6 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                     "y": 0,
                     "rotation": 0
                 },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
             },
             {
                 "id": "baguette-arrachera",
@@ -547,23 +571,6 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                     "rotation": 0
                 }
             },
-            {
-                "id": "baguette-item-180",
-                "name": "BAGUETTE ESPECIAL",
-                "price": 180,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "notes": "El nombre del producto asociado a $180.00 no es confiable en el OCR.",
-                "tags": [
-                    "Revisar"
-                ]
-            }
         ]
     },
     {
@@ -624,7 +631,8 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
         "kicker": "REPOSTERÍA DE LA CASA",
         "quote": "“El dulce placer de compartir”",
         "name": "PAN ARTESANAL",
-        "description": "Nuestro pan artesanal es horneado al día, todos con un toque de azúcar glass.\n",
+        "notes": "Nuestro pan artesanal es horneado al día, todos con un toque de azúcar glass.",
+        "description": "Nuestro pan artesanal es horneado al día, todos con un toque de azúcar glass.",
         "layoutTemplate": "dense-list",
         "dishes": [
             {
@@ -669,7 +677,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "rol-canela",
                 "name": "ROL DE CANELA",
-                "price": null,
+                "price": 59,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -677,15 +685,11 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                     "y": 0,
                     "rotation": 0
                 },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
             },
             {
                 "id": "croissant-nutella-queso",
                 "name": "CROISSANT RELLENO DE NUTELLA CON QUESO",
-                "price": null,
+                "price": 145,
                 "image": "/dishes/croissant.png",
                 "imageMode": "transparent",
                 "imageTransform": {
@@ -694,15 +698,11 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                     "y": 0,
                     "rotation": 0
                 },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
             },
             {
                 "id": "croissant-frutos-rojos",
                 "name": "CROISSANT RELLENO DE FRUTOS ROJOS",
-                "price": 88,
+                "price": 85,
                 "image": "/dishes/croissant.png",
                 "imageMode": "transparent",
                 "imageTransform": {
@@ -715,7 +715,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "croissant-pina",
                 "name": "CROISSANT RELLENO DE PIÑA",
-                "price": null,
+                "price": 88,
                 "image": "/dishes/croissant.png",
                 "imageMode": "transparent",
                 "imageTransform": {
@@ -724,10 +724,6 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                     "y": 0,
                     "rotation": 0
                 },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
             }
         ]
     },
@@ -742,7 +738,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-0",
                 "name": "AGUACATE 80 GR",
-                "price": null,
+                "price": 40,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -766,7 +762,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-2",
                 "name": "CAFÉ SHOT 2 OZ",
-                "price": null,
+                "price": 25,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -778,7 +774,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-3",
                 "name": "ARRACHERA",
-                "price": null,
+                "price": 45,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -802,7 +798,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-5",
                 "name": "FRESA",
-                "price": null,
+                "price": 25,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -826,7 +822,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-7",
                 "name": "LECHE 2 OZ",
-                "price": null,
+                "price": 20,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -838,7 +834,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-8",
                 "name": "TOCINO",
-                "price": null,
+                "price": 40,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -862,7 +858,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-10",
                 "name": "LECHE DE AVENA",
-                "price": null,
+                "price": 20,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -874,7 +870,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-11",
                 "name": "HUEVO",
-                "price": null,
+                "price": 15,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -898,7 +894,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-13",
                 "name": "LECHE DE ALMENDRA",
-                "price": null,
+                "price": 25,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -922,7 +918,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-15",
                 "name": "JITOMATE A LAS FINAS HIERBAS",
-                "price": null,
+                "price": 20,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -934,7 +930,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-16",
                 "name": "GRANOLA",
-                "price": null,
+                "price": 15,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -958,7 +954,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-18",
                 "name": "DIP DE QUESO",
-                "price": null,
+                "price": 30,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -970,7 +966,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-19",
                 "name": "CREMA BATIDA",
-                "price": null,
+                "price": 20,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -982,7 +978,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-20",
                 "name": "PAN BAGUETTE",
-                "price": null,
+                "price": 40,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -994,7 +990,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-21",
                 "name": "JAMÓN",
-                "price": null,
+                "price": 30,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -1006,7 +1002,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-22",
                 "name": "MERMELADA DE FRUTOS ROJOS",
-                "price": null,
+                "price": 20,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -1017,8 +1013,8 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             },
             {
                 "id": "dish-extras-23",
-                "name": "JARABE",
-                "price": null,
+                "name": "JARABE VAINILLA",
+                "price": 25,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -1042,7 +1038,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-25",
                 "name": "MERMELADA DE PIÑA",
-                "price": null,
+                "price": 20,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -1066,7 +1062,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-27",
                 "name": "JARABE CARAMELO",
-                "price": null,
+                "price": 25,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -1078,7 +1074,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-28",
                 "name": "NUTELLA",
-                "price": null,
+                "price": 20,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -1102,7 +1098,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-30",
                 "name": "JARABE AMARETTO",
-                "price": null,
+                "price": 25,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -1114,7 +1110,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-31",
                 "name": "FRUTOS ROJOS",
-                "price": null,
+                "price": 45,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -1126,7 +1122,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-32",
                 "name": "BLUEBERRIES",
-                "price": null,
+                "price": 25,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -1138,7 +1134,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-33",
                 "name": "CHAMPIÑÓN",
-                "price": null,
+                "price": 25,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -1150,7 +1146,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-34",
                 "name": "ZARZAMORA",
-                "price": null,
+                "price": 25,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -1158,7 +1154,56 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                     "y": 0,
                     "rotation": 0
                 }
-            }
+            },
+            {
+                "id": "dish-extras-35",
+                "name": "Espinaca",
+                "price": 20,
+                "imageMode": "transparent",
+                "imageTransform": {
+                    "scale": 1,
+                    "x": 0,
+                    "y": 0,
+                    "rotation": 0
+                }
+            },
+            {
+                "id": "dish-extras-36",
+                "name": "Pollo",
+                "price": 30,
+                "imageMode": "transparent",
+                "imageTransform": {
+                    "scale": 1,
+                    "x": 0,
+                    "y": 0,
+                    "rotation": 0
+                }
+            },
+            {
+                "id": "dish-extras-37",
+                "name": "Crema",
+                "price": 15,
+                "imageMode": "transparent",
+                "imageTransform": {
+                    "scale": 1,
+                    "x": 0,
+                    "y": 0,
+                    "rotation": 0
+                }
+            },
+            {
+                "id": "dish-extras-38",
+                "name": "Queso panela",
+                "price": 30,
+                "imageMode": "transparent",
+                "imageTransform": {
+                    "scale": 1,
+                    "x": 0,
+                    "y": 0,
+                    "rotation": 0
+                }
+            },
+
         ]
     },
     {
@@ -1184,15 +1229,11 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                     "y": 0,
                     "rotation": 0
                 },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
             },
             {
-                "id": "doble-cortado",
-                "name": "DOBLE CORTADO",
-                "price": 69,
+                "id": "espresso-doble",
+                "name": "ESPRESSO DOBLE",
+                "price": 62,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -1200,10 +1241,30 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                     "y": 0,
                     "rotation": 0
                 },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
+            },
+            {
+                "id": "sencillo-cortado",
+                "name": "SENCILLO CORTADO",
+                "price": 56,
+                "imageMode": "transparent",
+                "imageTransform": {
+                    "scale": 1,
+                    "x": 0,
+                    "y": 0,
+                    "rotation": 0
+                },
+            },
+            {
+                "id": "doble-cortado",
+                "name": "DOBLE CORTADO",
+                "price": 68,
+                "imageMode": "transparent",
+                "imageTransform": {
+                    "scale": 1,
+                    "x": 0,
+                    "y": 0,
+                    "rotation": 0
+                },
             },
             {
                 "id": "americano",

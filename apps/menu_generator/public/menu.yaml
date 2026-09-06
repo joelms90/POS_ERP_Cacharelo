@@ -54,10 +54,10 @@ menu:
           image: /dishes/cesar_pollo.png
         - id: del-chef
           name: DEL CHEF
-          description: Lechuga con nuestra vinagreta de cítricos, queso manchego, pechuga de pollo y huevo cocido.
-          price: null
-          review_required: true
-          notes: El texto OCR contiene fragmentos adicionales de jamón y queso; revisar contra el menú original.
+          description: >-
+            Lechuga con nuestra vinagreta de cítricos acompañada de jamónjj, queso manchego, pechuga de pollo y huevo
+            cocido.
+          price: 185
         - id: waldorf
           name: WALDORF
           description: Lechuga aderezada acompañada de manzana, blueberries, nuez pecana, queso mozzarella fresco y apio.
@@ -72,9 +72,14 @@ menu:
           description: Acompañados de pan tostado, aguacate y frijoles maneados de la casa.
           price: 166
           image: /dishes/huevos_board.png
+        - id: revueltos-con-tocino
+          name: REVUELTOS CON TOCINO
+          description: Acompañados de pan tostado, aguacate y frijoles maneados de la casa.
+          price: 166
+          image: /dishes/huevos_board.png
         - id: revueltos-a-la-mexicana
           name: REVUELTOS A LA MEXICANA
-          description: Con cebolla, jitomate y chile picados, acompañado con pan tostado, aguacate y frijoles maneados de la casa.
+          description: Con cebolla, jitomate y chile picado, acompañado con pan tostado, aguacate y frijoles maneados de la casa.
           price: 166
           image: /dishes/huevos_board.png
         - id: huevos-benedictinos
@@ -92,15 +97,15 @@ menu:
           price: 212
           image: /dishes/huevos_board.png
         - id: espinacas-y-queso
-          name: DE ESPINACAS Y QUESO
+          name: OMELETTE DE ESPINACAS Y QUESO
           description: Acompañado de pan tostado, aguacate y frijoles maneados de la casa.
           price: 185
         - id: champinones-y-queso
-          name: DE CHAMPIÑONES Y QUESO
+          name: OMELETTE DE CHAMPIÑONES Y QUESO
           description: Acompañado de pan tostado, aguacate y frijoles maneados de la casa.
           price: 178
         - id: claras-espinaca-panela
-          name: DE CLARAS CON ESPINACA Y QUESO PANELA
+          name: OMELETTE DE CLARAS CON ESPINACA Y QUESO PANELA
           description: Acompañados de pan tostado, aguacate y frijoles maneados de la casa.
           price: 180
         - id: omelette-jamon-queso
@@ -133,29 +138,38 @@ menu:
         - id: waffle-fresa-crema
           name: CON FRESA Y CREMA
           description: null
+          price: 141
+          image: /dishes/wafles.png
+        - id: waffle-nutella
+          name: CON PLÁTANO Y NUTELLA
+          description: null
           price: 129
           image: /dishes/wafles.png
-        - id: waffle-yogurt
-          name: CON YOGURT
+        - id: waffle-frutos-rojos
+          name: CON FRUTOS ROJOS
+          description: null
+          price: 129
+          image: /dishes/wafles.png
+    - id: waffles-belgas
+      name: DESAYUNOS
+      subtitle: BOWLS DE FRUTA
+      description: null
+      dishes:
+        - id: bowl-yogurt
+          name: MIXTO
           description: Fruta de temporada acompañada de miel de abeja, yogurt y granola.
           price: 135
           image: /dishes/wafles.png
-        - id: waffle-frutos-rojos
+        - id: bowl-yogurt
+          name: CON YOGURT
+          description: Fruta de temporada acompañada de miel de abeja, yogurt y granola.
+          price: 148
+          image: /dishes/wafles.png
+        - id: bowl-frutos-rojos
           name: DE FRUTOS ROJOS
           description: 'Mix de berries: blueberries, zarzamoras, frambuesas y fresas, acompañadas de queso cottage.'
           price: 178
           image: /dishes/wafles.png
-        - id: waffle-fruta-temporada
-          name: CON FRUTA DE TEMPORADA
-          description: Fruta de temporada acompañada de miel de abeja y granola.
-          price: 148
-          image: /dishes/wafles.png
-        - id: waffle-extra-141
-          name: 'ESPECIALIDAD #5'
-          description: null
-          price: 141
-          review_required: true
-          notes: El nombre asociado a este precio no es claro en el OCR.
     - id: croissant
       name: CROISSANT
       subtitle: null
@@ -176,7 +190,7 @@ menu:
           description: >-
             Relleno de queso mozzarella fresco, jitomate a las finas hierbas y lechuga con vinagre balsámico y aceite de
             oliva.
-          price: null
+          price: 147
           image: /dishes/croissant.png
           review_required: true
     - id: sandwiches
@@ -187,8 +201,8 @@ menu:
         - id: cacharelo-club
           name: CACHARELO CLUB
           description: >-
-            De dos pisos, pan tostado preparado con jamón, queso, pollo a las finas hierbas, huevo frito, tocino y
-            lechuga marinada con vinagre balsámico.
+            De dos pisos, pan tostado preparado con jamón, queso machego, jitomate horneado, pollo a las finas hierbas,
+            huevo frito, tocino y lechuga marinada con vinagre balsámico.
           price: 205
           image: /dishes/sandwich.png
         - id: croque-monsieur
@@ -216,9 +230,8 @@ menu:
           description: >-
             Acompañada de queso mozzarella fresco, jitomate horneado a las finas hierbas y lechuga marinada con vinagre
             balsámico.
-          price: null
+          price: 180
           image: /dishes/cesar_pollo.png
-          review_required: true
         - id: baguette-arrachera
           name: DE ARRACHERA
           description: Con frijoles maneados, cebolla caramelizada, queso manchego, aderezo de mayonesa chipotle y jitomate.
@@ -234,12 +247,6 @@ menu:
           description: Con queso mozzarella fresco, queso panela y queso manchego.
           price: 170
           image: /dishes/foccacia.png
-        - id: baguette-item-180
-          name: BAGUETTE ESPECIAL
-          description: null
-          price: 180
-          review_required: true
-          notes: El nombre del producto asociado a $180.00 no es confiable en el OCR.
     - id: bagels
       name: BAGELS
       subtitle: null
@@ -269,8 +276,8 @@ menu:
     - id: pan-artesanal
       name: PAN ARTESANAL
       subtitle: null
-      description: |
-        Nuestro pan artesanal es horneado al día, todos con un toque de azúcar glass.
+      description: Nuestro pan artesanal es horneado al día, todos con un toque de azúcar glass.
+      notes: Nuestro pan artesanal es horneado al día, todos con un toque de azúcar glass.
       dishes:
         - id: croissant-natural
           name: CROISSANT
@@ -290,25 +297,22 @@ menu:
         - id: rol-canela
           name: ROL DE CANELA
           description: null
-          price: null
-          review_required: true
+          price: 59
         - id: croissant-nutella-queso
           name: CROISSANT RELLENO DE NUTELLA CON QUESO
           description: null
-          price: null
+          price: 145
           image: /dishes/croissant.png
-          review_required: true
         - id: croissant-frutos-rojos
           name: CROISSANT RELLENO DE FRUTOS ROJOS
           description: null
-          price: 88
+          price: 85
           image: /dishes/croissant.png
         - id: croissant-pina
           name: CROISSANT RELLENO DE PIÑA
           description: null
-          price: null
+          price: 88
           image: /dishes/croissant.png
-          review_required: true
     - id: extras
       name: EXTRAS
       subtitle: null
@@ -318,7 +322,7 @@ menu:
         - id: dish-extras-0
           name: AGUACATE 80 GR
           description: null
-          price: null
+          price: 80
         - id: dish-extras-1
           name: FRAMBUESA
           description: null
@@ -326,11 +330,11 @@ menu:
         - id: dish-extras-2
           name: CAFÉ SHOT 2 OZ
           description: null
-          price: null
+          price: 25
         - id: dish-extras-3
           name: ARRACHERA
           description: null
-          price: null
+          price: 45
         - id: dish-extras-4
           name: MELÓN
           description: null
@@ -338,7 +342,7 @@ menu:
         - id: dish-extras-5
           name: FRESA
           description: null
-          price: null
+          price: 25
         - id: dish-extras-6
           name: PIÑA
           description: null

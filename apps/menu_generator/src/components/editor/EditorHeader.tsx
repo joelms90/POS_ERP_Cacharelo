@@ -13,7 +13,8 @@ import {
   FileCode,
   FileText,
   ChevronDown,
-  Loader2
+  Loader2,
+  RotateCcw
 } from 'lucide-react';
 import type { MenuCatalog } from '../../types/menu';
 
@@ -23,6 +24,7 @@ interface EditorHeaderProps {
   onPageChange: (index: number) => void;
   onAddSection: () => void;
   onLoadPreset: (presetKey: string) => void;
+  onResetToDefaultCode?: () => void;
   onExportPDF: (format?: 'letter' | 'a4', singleOnly?: boolean) => void;
   onExportPNG: () => void;
   onSaveJSON: () => void;
@@ -41,6 +43,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
   onPageChange,
   onAddSection,
   onLoadPreset,
+  onResetToDefaultCode,
   onExportPDF,
   onExportPNG,
   onSaveJSON,
@@ -103,6 +106,18 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
               <option value="pastes">Pastes y Empanadas</option>
               <option value="blank">+ Menú en Blanco</option>
             </select>
+
+            {onResetToDefaultCode && (
+              <button
+                type="button"
+                onClick={onResetToDefaultCode}
+                title="Restablecer menú desde src/data/defaultMenu.ts (limpia la caché local de tu navegador)"
+                className="flex items-center gap-1 px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-amber-500/40 text-zinc-300 hover:text-amber-300 text-xs rounded-lg transition-colors font-medium"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden lg:inline">Recargar Código</span>
+              </button>
+            )}
           </div>
         </div>
 
