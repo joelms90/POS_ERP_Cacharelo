@@ -9,40 +9,31 @@ interface ColumnarTableLayoutProps {
 interface SectionPhotoCardProps {
   image?: string;
   title: string;
-  badge?: string;
   className?: string;
   imageClassName?: string;
 }
 
 /**
  * Editorial Section Photo Card:
- * Represents a beverage category/section in negative space
- * instead of attaching small bullet-like icons to individual dishes.
+ * Elegantly showcases a beverage category photo in negative space,
+ * preserving its full aspect ratio so the product is NEVER cut off.
  */
 const SectionPhotoCard: React.FC<SectionPhotoCardProps> = ({
   image,
   title,
-  badge,
   className = '',
   imageClassName = ''
 }) => {
   if (!image) return null;
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border border-[#C8A265]/40 bg-[#FAF7F2] shadow-sm flex flex-col items-center justify-center shrink-0 group ${className}`}
+      className={`relative overflow-hidden rounded-2xl border border-[#C8A265]/40 bg-[#FAF7F2]/60 shadow-sm flex items-center justify-center shrink-0 group ${className}`}
     >
       <img
         src={image}
         alt={title}
-        className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${imageClassName}`}
+        className={`w-full h-full object-contain p-1 transition-transform duration-500 group-hover:scale-102 ${imageClassName}`}
       />
-      {badge && (
-        <div className="absolute bottom-1.5 inset-x-1.5 flex justify-center pointer-events-none">
-          <span className="text-[7.5px] sm:text-[8px] font-montserrat uppercase tracking-[0.16em] font-semibold text-[#FAF7F2] bg-[#2D2926]/85 px-2 py-0.5 rounded-full backdrop-blur-xs shadow-xs text-center truncate max-w-[95%]">
-            {badge}
-          </span>
-        </div>
-      )}
     </div>
   );
 };
@@ -624,13 +615,12 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
               })}
             </div>
 
-            {/* Section Representative Photo: Frappé */}
+            {/* Section Representative Photo: Frappé (853 x 1280, portrait 2:3) */}
             {frappeImage && (
               <SectionPhotoCard
                 image={frappeImage}
                 title="Frappé"
-                badge="Frappé 16 oz"
-                className="w-28 h-28 sm:w-36 sm:h-36"
+                className="w-28 sm:w-32 md:w-36 aspect-[853/1280]"
               />
             )}
           </div>
@@ -717,13 +707,12 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
               })}
             </div>
 
-            {/* Section Representative Photo: Smoothie */}
+            {/* Section Representative Photo: Smoothie (853 x 1280, portrait 2:3) */}
             {smoothieImage && (
               <SectionPhotoCard
                 image={smoothieImage}
                 title="Smoothie"
-                badge="Smoothie 16 oz"
-                className="w-28 h-28 sm:w-36 sm:h-36"
+                className="w-26 sm:w-30 md:w-32 aspect-[853/1280]"
               />
             )}
           </div>
@@ -804,13 +793,12 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
               })}
             </div>
 
-            {/* Section Representative Photo: Jugos */}
+            {/* Section Representative Photo: Jugos (1066 x 1280, portrait 4:5) */}
             {jugoImage && (
               <SectionPhotoCard
                 image={jugoImage}
                 title="Jugo"
-                badge="Jugo Natural 16 oz"
-                className="w-28 h-28 sm:w-36 sm:h-36"
+                className="w-28 sm:w-32 md:w-34 aspect-[1066/1280]"
               />
             )}
           </div>
@@ -882,13 +870,12 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
               ))}
             </div>
 
-            {/* Section Representative Photo: Refrescos */}
+            {/* Section Representative Photo: Refrescos (1280 x 853, landscape 3:2) */}
             {refrescoImage && (
               <SectionPhotoCard
                 image={refrescoImage}
                 title="Refrescos"
-                badge="Refrescos"
-                className="w-24 h-28 sm:w-32 sm:h-36"
+                className="w-36 sm:w-44 md:w-48 aspect-[1280/853]"
               />
             )}
           </div>
@@ -954,13 +941,12 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
               ))}
             </div>
 
-            {/* Section Representative Photo: Agua Zoé */}
+            {/* Section Representative Photo: Agua Zoé (1280 x 853, landscape 3:2) */}
             {zoeImage && (
               <SectionPhotoCard
                 image={zoeImage}
                 title="Agua Zoé"
-                badge="Agua Alcalina"
-                className="w-28 h-24 sm:w-36 sm:h-28"
+                className="w-36 sm:w-44 md:w-48 aspect-[1280/853]"
               />
             )}
           </div>
@@ -1033,13 +1019,12 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
               ))}
             </div>
 
-            {/* Section Representative Photo: Espresso & Clásicos */}
+            {/* Section Representative Photo: Espresso & Clásicos (1280 x 1069, ~1.2:1) */}
             {classicImage && (
               <SectionPhotoCard
                 image={classicImage}
                 title="Espresso Clásico"
-                badge="Espresso Bar"
-                className="w-28 h-22 sm:w-36 sm:h-24 md:w-40 md:h-26"
+                className="w-32 sm:w-36 md:w-40 aspect-[1280/1069]"
               />
             )}
           </div>
@@ -1056,18 +1041,17 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
                 {renderMultiPriceColumn(calienteMultiDishes, 'Calientes')}
               </div>
 
-              {/* Right Column: Frío + Section Photo in Negative Whitespace */}
+              {/* Right Column: Frío + Section Photo in Negative Whitespace (853 x 1280, portrait 2:3) */}
               <div className="sm:pl-8 flex flex-col justify-between">
                 <div>
                   {renderSinglePriceColumn(frioDishes, 'Frío', 'En las rocas')}
                 </div>
                 {frioImage && (
-                  <div className="mt-3 pt-2 flex justify-center">
+                  <div className="mt-2 pt-1 flex justify-center">
                     <SectionPhotoCard
                       image={frioImage}
                       title="Café Frío en las Rocas"
-                      badge="En las rocas · Selección Fría"
-                      className="w-full max-w-[210px] h-24 sm:h-28"
+                      className="w-28 sm:w-32 md:w-34 aspect-[853/1280]"
                     />
                   </div>
                 )}
