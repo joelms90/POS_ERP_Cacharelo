@@ -9,13 +9,22 @@ interface ColumnarTableLayoutProps {
 export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ section }) => {
   const dishes = section.dishes;
 
-  // Derive price headers (e.g. ['12 oz', '16 oz'])
+  // Separate single-price dishes (e.g. Espresso Sencillo, Doble, Cortados) from multi-size variations (12 oz / 16 oz)
+  const singlePriceDishes = React.useMemo(() => {
+    return dishes.filter((d) => !d.prices || Object.keys(d.prices).length === 0);
+  }, [dishes]);
+
+  const multiPriceDishes = React.useMemo(() => {
+    return dishes.filter((d) => d.prices && Object.keys(d.prices).length > 0);
+  }, [dishes]);
+
+  // Derive price headers (e.g. ['12 oz', '16 oz']) from multi-size dishes
   const headers: string[] = React.useMemo(() => {
     if (section.priceHeaders && section.priceHeaders.length > 0) {
       return section.priceHeaders;
     }
     const headerSet = new Set<string>();
-    dishes.forEach((d) => {
+    multiPriceDishes.forEach((d) => {
       if (d.prices) {
         Object.keys(d.prices).forEach((k) => headerSet.add(k));
       }
@@ -24,7 +33,7 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
       return Array.from(headerSet);
     }
     return ['12 oz', '16 oz'];
-  }, [section.priceHeaders, dishes]);
+  }, [section.priceHeaders, multiPriceDishes]);
 
   const formatPrice = (price?: number | null) => {
     if (price === null || price === undefined || isNaN(price)) return '';
@@ -42,16 +51,16 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
     return [section.notes];
   }, [section.notes]);
 
-  // Split dishes into two balanced parallel columns for high-end cafe layout
-  const isMultiColumn = dishes.length > 5;
-  const half = Math.ceil(dishes.length / 2);
-  const leftDishes = isMultiColumn ? dishes.slice(0, half) : dishes;
-  const rightDishes = isMultiColumn ? dishes.slice(half) : [];
+  // Split multi-size dishes into two balanced columns if more than 3
+  const isMultiColumn = multiPriceDishes.length > 3;
+  const half = Math.ceil(multiPriceDishes.length / 2);
+  const leftMultiDishes = isMultiColumn ? multiPriceDishes.slice(0, half) : multiPriceDishes;
+  const rightMultiDishes = isMultiColumn ? multiPriceDishes.slice(half) : [];
 
-  const renderDishColumn = (columnDishes: Dish[], categoryTitle: string) => (
+  const renderMultiPriceColumn = (columnDishes: Dish[], categoryTitle: string) => (
     <div className="flex-1 flex flex-col justify-start">
       {/* Column Header: Category sub-heading on left, size labels on right */}
-      <div className="flex items-center justify-between pb-1.5 border-b border-[#C8A265]/35 mb-3">
+      <div className="flex items-center justify-between pb-1.5 border-b border-[#C8A265]/35 mb-2.5">
         <span
           className="text-[9px] sm:text-[10px] font-montserrat uppercase tracking-[0.22em] font-semibold opacity-85"
           style={{ color: MUTED_BRONZE }}
@@ -72,7 +81,7 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
       </div>
 
       {/* Dish rows */}
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {columnDishes.map((dish) => (
           <div key={dish.id} className="group relative">
             {/* Top row: Name + dotted leader + multi-size prices */}
@@ -116,7 +125,7 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
             {/* Description */}
             {dish.description && (
               <p
-                className="text-[10px] sm:text-[11px] font-montserrat leading-relaxed opacity-85 mt-0.5 pr-28 line-clamp-2"
+                className="text-[10px] sm:text-[10.5px] font-montserrat leading-relaxed opacity-85 mt-0.5 pr-28 line-clamp-2"
                 style={{ color: CHARCOAL }}
               >
                 {dish.description}
@@ -144,35 +153,99 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
   );
 
   return (
-    <div className="w-full flex-1 flex flex-col justify-between py-2 px-2 sm:px-4">
-      {/* Main 2-Column Table Grid with Central Hairline Divider */}
-      <div
-        className={
-          isMultiColumn
-            ? 'grid grid-cols-1 sm:grid-cols-2 gap-y-6 sm:gap-y-0 w-full'
-            : 'max-w-xl mx-auto w-full'
-        }
-      >
-        {/* Left Column with right border divider */}
-        <div className={isMultiColumn ? 'sm:pr-8 sm:border-r sm:border-[#C8A265]/35 flex flex-col justify-start' : ''}>
-          {renderDishColumn(leftDishes, isMultiColumn ? 'Espressos & Clásicos' : 'Selección')}
-        </div>
-
-        {/* Right Column with left padding */}
-        {isMultiColumn && (
-          <div className="sm:pl-8 flex flex-col justify-start">
-            {renderDishColumn(rightDishes, 'Especialidades & Leches')}
+    <div className="w-full flex-1 flex flex-col justify-around py-1 px-2 sm:px-4">
+      {/* 1. SECCIÓN SUPERIOR: Barra de Espresso / Bebidas de Precio Único (como normalmente aparecen) */}
+      {singlePriceDishes.length > 0 && (
+        <div className="w-full mb-3">
+          {/* Subheader */}
+          <div className="flex items-center justify-between pb-1 border-b border-[#C8A265]/35 mb-2.5">
+            <span
+              className="text-[9px] sm:text-[10px] font-montserrat uppercase tracking-[0.25em] font-semibold opacity-85"
+              style={{ color: MUTED_BRONZE }}
+            >
+              Barra de Espresso & Clásicos
+            </span>
+            <span
+              className="text-[9px] font-montserrat uppercase tracking-[0.2em] font-medium opacity-65"
+              style={{ color: WARM_GOLD }}
+            >
+              Extracción Tradicional
+            </span>
           </div>
-        )}
-      </div>
 
-      {/* Decorative Notes Box (e.g. Milk & preparation options) */}
+          {/* Regular dishes in balanced 2-column grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 sm:gap-x-10 gap-y-2.5">
+            {singlePriceDishes.map((dish) => (
+              <div key={dish.id} className="group relative">
+                <div className="flex items-baseline justify-between gap-1.5">
+                  <h4
+                    className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight shrink-0"
+                    style={{ color: CHARCOAL }}
+                  >
+                    {dish.name || 'Especialidad'}
+                  </h4>
+
+                  {/* Dotted leader */}
+                  <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
+
+                  {/* Single Price */}
+                  {dish.price !== null && dish.price !== undefined && (
+                    <span
+                      className="text-sm sm:text-base font-cormorant font-bold tracking-wide shrink-0"
+                      style={{ color: WARM_GOLD }}
+                    >
+                      {formatPrice(dish.price)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Description */}
+                {dish.description && (
+                  <p
+                    className="text-[10px] sm:text-[10.5px] font-montserrat leading-relaxed opacity-85 mt-0.5 line-clamp-2"
+                    style={{ color: CHARCOAL }}
+                  >
+                    {dish.description}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 2. SECCIÓN INFERIOR: Tabla de Bebidas con Variaciones 12 oz & 16 oz */}
+      {multiPriceDishes.length > 0 && (
+        <div className="w-full flex flex-col justify-start">
+          <div
+            className={
+              isMultiColumn
+                ? 'grid grid-cols-1 sm:grid-cols-2 gap-y-4 sm:gap-y-0 w-full'
+                : 'max-w-xl mx-auto w-full'
+            }
+          >
+            {/* Left Column with central dividing border */}
+            <div className={isMultiColumn ? 'sm:pr-8 sm:border-r sm:border-[#C8A265]/35 flex flex-col justify-start' : ''}>
+              {renderMultiPriceColumn(leftMultiDishes, 'Especialidades')}
+            </div>
+
+            {/* Right Column */}
+            {isMultiColumn && (
+              <div className="sm:pl-8 flex flex-col justify-start">
+                {renderMultiPriceColumn(rightMultiDishes, 'Café & Bebidas')}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 3. NOTAS AL PIE: Opciones de Leches y Preparación */}
       {notesList.length > 0 && (
-        <div className="mt-4 pt-2.5 border-t border-[#C8A265]/40 flex flex-col items-center justify-center text-center px-4 bg-[#FAF7F2]/60 rounded-lg py-1.5">
+        <div className="mt-3 pt-2 border-t border-[#C8A265]/40 flex flex-col items-center justify-center text-center px-4 bg-[#FAF7F2]/60 rounded-lg py-1.5">
           {notesList.map((note, idx) => (
             <p
               key={idx}
-              className="text-[10px] sm:text-[11px] font-montserrat font-medium italic tracking-wide text-[#5C5449] opacity-90 leading-tight my-0.5"
+              className="text-[10px] sm:text-[10.5px] font-montserrat font-medium italic tracking-wide text-[#5C5449] opacity-90 leading-tight my-0.5"
             >
               * {note}
             </p>

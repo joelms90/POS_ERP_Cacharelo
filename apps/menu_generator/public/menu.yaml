@@ -490,30 +490,18 @@ menu:
           name: ESPRESSO SENCILLO
           description: Extracción corta de café puro y concentrado.
           price: 40
-          prices:
-            12 oz: 40
-            16 oz: null
         - id: espresso-doble
           name: ESPRESSO DOBLE
           description: Doble extracción de espresso.
           price: 62
-          prices:
-            12 oz: 62
-            16 oz: null
         - id: sencillo-cortado
           name: SENCILLO CORTADO
           description: Espresso con un toque de leche vaporizada.
           price: 56
-          prices:
-            12 oz: 56
-            16 oz: null
         - id: doble-cortado
           name: DOBLE CORTADO
           description: Doble espresso cortado con leche vaporizada.
           price: 68
-          prices:
-            12 oz: 68
-            16 oz: null
         - id: americano
           name: AMERICANO
           description: Extracción de café espresso con agua caliente.

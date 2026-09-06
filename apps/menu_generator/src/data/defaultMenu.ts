@@ -1223,41 +1223,25 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "id": "espresso-sencillo",
                 "name": "ESPRESSO SENCILLO",
                 "description": "Extracción corta de café puro y concentrado.",
-                "price": 40,
-                "prices": {
-                    "12 oz": 40,
-                    "16 oz": null
-                }
+                "price": 40
             },
             {
                 "id": "espresso-doble",
                 "name": "ESPRESSO DOBLE",
                 "description": "Doble extracción de espresso.",
-                "price": 62,
-                "prices": {
-                    "12 oz": 62,
-                    "16 oz": null
-                }
+                "price": 62
             },
             {
                 "id": "sencillo-cortado",
                 "name": "SENCILLO CORTADO",
                 "description": "Espresso con un toque de leche vaporizada.",
-                "price": 56,
-                "prices": {
-                    "12 oz": 56,
-                    "16 oz": null
-                }
+                "price": 56
             },
             {
                 "id": "doble-cortado",
                 "name": "DOBLE CORTADO",
                 "description": "Doble espresso cortado con leche vaporizada.",
-                "price": 68,
-                "prices": {
-                    "12 oz": 68,
-                    "16 oz": null
-                }
+                "price": 68
             },
             {
                 "id": "americano",
