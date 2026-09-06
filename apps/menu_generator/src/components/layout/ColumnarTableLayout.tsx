@@ -48,33 +48,31 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
   const leftDishes = isMultiColumn ? dishes.slice(0, half) : dishes;
   const rightDishes = isMultiColumn ? dishes.slice(half) : [];
 
-  const renderDishColumn = (columnDishes: Dish[], showHeader = true) => (
+  const renderDishColumn = (columnDishes: Dish[], categoryTitle: string) => (
     <div className="flex-1 flex flex-col justify-start">
-      {/* Column Header: Size labels aligned with the prices */}
-      {showHeader && (
-        <div className="flex items-center justify-between pb-1.5 border-b border-[#C8A265]/35 mb-2.5">
-          <span
-            className="text-[9px] sm:text-[10px] font-montserrat uppercase tracking-[0.22em] font-semibold opacity-75"
-            style={{ color: MUTED_BRONZE }}
-          >
-            Selección
-          </span>
-          <div className="flex items-center gap-2 sm:gap-3">
-            {headers.map((header, idx) => (
-              <span
-                key={idx}
-                className="w-14 sm:w-16 text-right text-[10px] sm:text-[11px] font-montserrat font-bold uppercase tracking-[0.16em]"
-                style={{ color: WARM_GOLD }}
-              >
-                {header}
-              </span>
-            ))}
-          </div>
+      {/* Column Header: Category sub-heading on left, size labels on right */}
+      <div className="flex items-center justify-between pb-1.5 border-b border-[#C8A265]/35 mb-3">
+        <span
+          className="text-[9px] sm:text-[10px] font-montserrat uppercase tracking-[0.22em] font-semibold opacity-85"
+          style={{ color: MUTED_BRONZE }}
+        >
+          {categoryTitle}
+        </span>
+        <div className="flex items-center gap-2 sm:gap-3">
+          {headers.map((header, idx) => (
+            <span
+              key={idx}
+              className="w-14 sm:w-16 text-center text-[10px] sm:text-[11px] font-montserrat font-bold uppercase tracking-[0.16em]"
+              style={{ color: WARM_GOLD }}
+            >
+              {header}
+            </span>
+          ))}
         </div>
-      )}
+      </div>
 
       {/* Dish rows */}
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         {columnDishes.map((dish) => (
           <div key={dish.id} className="group relative">
             {/* Top row: Name + dotted leader + multi-size prices */}
@@ -86,10 +84,10 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
                 {dish.name || 'Especialidad'}
               </h4>
 
-              {/* Dotted leader */}
+              {/* Dotted leader: connects dish name to price columns */}
               <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
 
-              {/* Prices aligned under headers */}
+              {/* Price Columns: exactly aligned under the size headers */}
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                 {headers.map((header, idx) => {
                   let priceVal: number | null | undefined = null;
@@ -100,16 +98,17 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
                   }
 
                   return (
-                    <div key={idx} className="w-14 sm:w-16 text-right">
+                    <div key={idx} className="w-14 sm:w-16 text-center flex items-center justify-center">
                       {priceVal !== null && priceVal !== undefined ? (
                         <span
-                          className="text-sm sm:text-base font-cormorant font-bold tracking-wide"
+                          className="text-sm sm:text-base font-cormorant font-bold tracking-wide w-full text-right"
                           style={{ color: WARM_GOLD }}
                         >
                           {formatPrice(priceVal)}
                         </span>
                       ) : (
-                        <span className="text-xs font-montserrat text-[#5C5449]/40 font-medium">
+                        /* Clean, centered placeholder em-dash strictly contained in its column */
+                        <span className="w-full text-center text-xs font-montserrat font-semibold text-[#C8A265]/40 tracking-widest select-none">
                           —
                         </span>
                       )}
@@ -151,16 +150,25 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
 
   return (
     <div className="w-full flex-1 flex flex-col justify-between py-2 px-2 sm:px-4">
-      {/* Main 2-Column Table Grid */}
+      {/* Main 2-Column Table Grid with Central Hairline Divider */}
       <div
         className={
           isMultiColumn
-            ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-8 sm:gap-x-10 gap-y-4'
+            ? 'grid grid-cols-1 sm:grid-cols-2 gap-y-6 sm:gap-y-0 w-full'
             : 'max-w-xl mx-auto w-full'
         }
       >
-        {renderDishColumn(leftDishes, true)}
-        {isMultiColumn && renderDishColumn(rightDishes, true)}
+        {/* Left Column with right border divider */}
+        <div className={isMultiColumn ? 'sm:pr-8 sm:border-r sm:border-[#C8A265]/35 flex flex-col justify-start' : ''}>
+          {renderDishColumn(leftDishes, isMultiColumn ? 'Espressos & Clásicos' : 'Selección')}
+        </div>
+
+        {/* Right Column with left padding */}
+        {isMultiColumn && (
+          <div className="sm:pl-8 flex flex-col justify-start">
+            {renderDishColumn(rightDishes, 'Especialidades & Leches')}
+          </div>
+        )}
       </div>
 
       {/* Decorative Notes Box (e.g. Milk & preparation options) */}
