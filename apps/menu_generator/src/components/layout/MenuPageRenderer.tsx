@@ -123,7 +123,6 @@ export const MenuPageRenderer: React.FC<MenuPageRendererProps> = ({
 
   const layout = getLayout();
   const kickerText = section.kicker || 'NUESTRA COCINA, TU MOMENTO';
-  const quoteText = section.quote || '“Comer bien también es un placer”';
 
   return (
     <div
@@ -221,45 +220,29 @@ export const MenuPageRenderer: React.FC<MenuPageRendererProps> = ({
           )}
         </div>
 
-        {/* Right: Unified Brand Header Lockup (Cup Icon + CACHARELO + — CAFETERÍA —, with centered slogan) */}
-        <div className="flex flex-col items-center justify-center shrink-0 border border-[#C8A265]/35 rounded-xl px-4 py-2 bg-[#FAF7F2]/60 shadow-[0_1px_3px_rgba(45,41,38,0.03)]">
-          {/* Brand Unit: Cup + Name & Subtitle */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            {restaurant.name?.toLowerCase().includes('cacharelo') || !restaurant.logo || restaurant.logo.includes('cacharelo') ? (
-              <CachareloCupIcon className="h-7 sm:h-8 w-auto text-[#C8A265] shrink-0 drop-shadow-xs" />
-            ) : (
-              <img
-                src={restaurant.logo}
-                alt={restaurant.name}
-                className="h-7 sm:h-8 w-auto object-contain drop-shadow-xs"
-              />
-            )}
-
-            <div className="flex flex-col items-center text-center">
-              <span
-                className="font-cormorant font-bold text-lg sm:text-xl lg:text-[21px] tracking-[0.2em] uppercase leading-none"
-                style={{ color: CHARCOAL }}
-              >
-                {restaurant.name}
-              </span>
-              <span
-                className="text-[7.5px] sm:text-[8px] font-montserrat uppercase tracking-[0.3em] font-semibold mt-1 leading-none"
-                style={{ color: WARM_GOLD }}
-              >
-                — CAFETERÍA —
-              </span>
-            </div>
-          </div>
-
-          {/* Slogan: Centered underneath the ENTIRE composition */}
-          <div className="mt-1.5 text-center w-full">
+        {/* Right: Minimalist Brand Header (Logo + CAFETERÍA below, transparent, no borders) */}
+        <div className="flex flex-col items-center justify-center shrink-0">
+          {restaurant.logo ? (
+            <img
+              src={restaurant.logo}
+              alt={restaurant.name}
+              className="h-10 sm:h-12 w-auto object-contain drop-shadow-xs"
+            />
+          ) : (
             <span
-              className="font-cormorant italic font-medium text-xs sm:text-[13px] tracking-wide"
-              style={{ color: '#4A4238' }}
+              className="font-cormorant font-bold text-xl sm:text-2xl uppercase tracking-[0.2em] leading-none"
+              style={{ color: CHARCOAL }}
             >
-              {quoteText}
+              {restaurant.name}
             </span>
-          </div>
+          )}
+
+          <span
+            className="text-[8px] sm:text-[9px] font-montserrat uppercase tracking-[0.3em] font-semibold mt-1 leading-none"
+            style={{ color: WARM_GOLD }}
+          >
+            — CAFETERÍA —
+          </span>
         </div>
       </header>
 
