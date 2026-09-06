@@ -18,6 +18,7 @@ export interface Dish {
   imageMode?: ImageMode;
   imageTransform?: ImageTransform;
   tags?: string[];
+  group?: string;
   featured?: boolean;
   review_required?: boolean;
   notes?: string;

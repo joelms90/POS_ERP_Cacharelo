@@ -337,7 +337,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
         ]
     },
     {
-        "id": "waffles-belgas",
+        "id": "bowls-de-fruta",
         "kicker": "DULCE DESPERTAR",
         "quote": "",
         "name": "DESAYUNOS",
@@ -1211,7 +1211,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
         "kicker": "CAFETERÍA DE ESPECIALIDAD",
         "quote": "“Buen café, grandes momentos”",
         "name": "BEBIDAS",
-        "subtitle": "Calientes",
+        "subtitle": "Calientes & Frías",
         "priceHeaders": ["12 oz", "16 oz"],
         "layoutTemplate": "columnar-table",
         "notes": [
@@ -1305,507 +1305,294 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                     "12 oz": 83,
                     "16 oz": 102
                 }
+            },
+            {
+                "id": "capuccino-frio",
+                "name": "CAPUCCINO",
+                "price": 108,
+                "group": "frio"
+            },
+            {
+                "id": "chocolate-frio",
+                "name": "CHOCOLATE",
+                "price": 109,
+                "group": "frio"
+            },
+            {
+                "id": "latte-frio",
+                "name": "LATTE",
+                "price": 109,
+                "group": "frio"
+            },
+            {
+                "id": "moka-frio",
+                "name": "MOKA",
+                "price": 111,
+                "group": "frio"
+            },
+            {
+                "id": "matcha-frio",
+                "name": "MATCHA",
+                "price": 121,
+                "group": "frio"
             }
         ]
     },
     {
         "id": "tes",
-        "kicker": "INFUSIONES DEL MUNDO",
-        "quote": "“Momentos de calma y bienestar”",
-        "name": "TÉS",
-        "layoutTemplate": "dense-list",
+        "kicker": "INFUSIONES & FRAPPÉ",
+        "quote": "“Momentos de calma y frescura”",
+        "name": "BEBIDAS",
+        "subtitle": "Infusiones & Frappé",
+        "priceHeaders": [
+            "Caliente 12oz",
+            "Caliente 16oz",
+            "Frío 16oz"
+        ],
+        "layoutTemplate": "columnar-table",
         "dishes": [
             {
                 "id": "te-sabores",
                 "name": "TÉ DE SABORES",
-                "description": "Jengibre, jamaica, limón, manzanilla, menta y manzana/anís.",
-                "price": 92,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
+                "description": "Sabores de té: Jengibre, Jamaica, Limón, Manzanilla, Menta, Manzana/Anís.",
+                "group": "te",
+                "prices": {
+                    "Caliente 12oz": 40,
+                    "Caliente 16oz": 56,
+                    "Frío 16oz": 74
                 }
             },
             {
                 "id": "chai",
                 "name": "CHAI",
-                "price": 111,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
+                "group": "te",
+                "prices": {
+                    "Caliente 12oz": 92,
+                    "Caliente 16oz": 111,
+                    "Frío 16oz": 136
                 }
             },
             {
                 "id": "te-negro",
                 "name": "TÉ NEGRO",
-                "price": 104,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
+                "group": "te",
+                "prices": {
+                    "Caliente 12oz": 104,
+                    "Caliente 16oz": 111,
+                    "Frío 16oz": 120
                 }
             },
             {
                 "id": "tizana-frutos",
-                "name": "TIZANA DE FRUTOS",
-                "price": 104,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
+                "name": "TIZANA FRUTOS",
+                "group": "te",
+                "prices": {
+                    "Caliente 12oz": 104,
+                    "Caliente 16oz": 109,
+                    "Frío 16oz": 118
                 }
             },
             {
-                "id": "tizana-manzana",
-                "name": "TIZANA DE MANZANA",
-                "price": 104,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                }
-            }
-        ]
-    },
-    {
-        "id": "bebidas-frias",
-        "kicker": "REFRÉSCATE",
-        "quote": "“El balance perfecto en frío”",
-        "name": "BEBIDAS",
-        "subtitle": "Frías",
-        "layoutTemplate": "dense-list",
-        "dishes": [
-            {
-                "id": "dish-bebidas-frias-0",
-                "name": "CAPUCCINO",
-                "price": 108,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
+                "id": "tisana-manzana",
+                "name": "TISANA MANZANA",
+                "group": "te",
+                "prices": {
+                    "Caliente 12oz": 104,
+                    "Caliente 16oz": 109,
+                    "Frío 16oz": 118
                 }
             },
             {
-                "id": "dish-bebidas-frias-1",
-                "name": "CHOCOLATE",
-                "price": 109,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                }
-            },
-            {
-                "id": "dish-bebidas-frias-2",
-                "name": "LATTE",
-                "price": 109,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                }
-            },
-            {
-                "id": "dish-bebidas-frias-3",
-                "name": "MOKA",
-                "price": 111,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                }
-            },
-            {
-                "id": "dish-bebidas-frias-4",
-                "name": "MATCHA",
-                "price": 121,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                }
-            }
-        ]
-    },
-    {
-        "id": "frappes",
-        "kicker": "MOMENTO FRAPPÉ",
-        "quote": "“Cremosos, refrescantes y deliciosos”",
-        "name": "FRAPPÉ",
-        "layoutTemplate": "dense-list",
-        "dishes": [
-            {
-                "id": "dish-frappes-0",
+                "id": "frappe-cafe",
                 "name": "CAFÉ",
-                "price": 108,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
+                "group": "frappe",
+                "price": 80,
+                "prices": {
+                    "16oz": 80
                 }
             },
             {
-                "id": "dish-frappes-1",
+                "id": "frappe-capuccino",
                 "name": "CAPUCCINO",
-                "price": 121,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
+                "group": "frappe",
+                "price": 108,
+                "prices": {
+                    "16oz": 108
                 }
             },
             {
-                "id": "dish-frappes-2",
+                "id": "frappe-moka",
                 "name": "MOKA",
+                "group": "frappe",
                 "price": 121,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
+                "prices": {
+                    "16oz": 121
                 }
             },
             {
-                "id": "dish-frappes-3",
+                "id": "frappe-matcha",
                 "name": "MATCHA",
-                "price": null,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
+                "group": "frappe",
+                "price": 121,
+                "prices": {
+                    "16oz": 121
+                }
             },
             {
-                "id": "dish-frappes-4",
+                "id": "frappe-chocolate",
                 "name": "CHOCOLATE",
+                "group": "frappe",
                 "price": 119,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
+                "prices": {
+                    "16oz": 119
+                }
             }
         ]
     },
     {
         "id": "smoothies",
         "kicker": "100% NATURAL",
-        "quote": "“Energía pura y natural”",
-        "name": "SMOOTHIES",
-        "layoutTemplate": "editorial-three",
+        "quote": "“Energía pura y natural en cada vaso”",
+        "name": "BEBIDAS",
+        "subtitle": "Smoothies & Jugos",
+        "priceHeaders": [
+            "16oz"
+        ],
+        "layoutTemplate": "columnar-table",
         "dishes": [
             {
                 "id": "smoothie-mango",
                 "name": "MANGO",
-                "description": "A base de agua.",
-                "price": null,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
+                "description": "A base de agua. Acompañado de chamoy y Tajín.",
+                "group": "smoothie",
+                "price": 97,
+                "prices": {
+                    "16oz": 97
+                }
             },
             {
                 "id": "smoothie-platano",
                 "name": "PLÁTANO",
                 "description": "A base de leche.",
-                "price": null,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
+                "group": "smoothie",
+                "price": 111,
+                "prices": {
+                    "16oz": 111
+                }
             },
             {
                 "id": "smoothie-frutos-rojos",
                 "name": "FRUTOS ROJOS",
                 "description": "A base de leche.",
-                "price": null,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
-            }
-        ]
-    },
-    {
-        "id": "jugos",
-        "kicker": "PRENSADOS AL MOMENTO",
-        "quote": "“Frescura pura de la huerta a tu mesa”",
-        "name": "JUGOS",
-        "description": "Nuestros jugos son 100% naturales.",
-        "layoutTemplate": "dense-list",
-        "dishes": [
+                "group": "smoothie",
+                "price": 123,
+                "prices": {
+                    "16oz": 123
+                }
+            },
             {
                 "id": "jugo-naranja",
                 "name": "NARANJA",
+                "description": "Jugo 100% natural recién exprimido.",
+                "group": "jugo",
                 "price": 71,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
+                "prices": {
+                    "16oz": 71
+                }
             },
             {
                 "id": "jugo-verde",
                 "name": "VERDE",
                 "description": "Apio, piña, nopal, espinaca y naranja.",
-                "price": 97,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
+                "group": "jugo",
+                "price": 92,
+                "prices": {
+                    "16oz": 92
+                }
             },
             {
                 "id": "jugo-detox",
                 "name": "DETOX",
                 "description": "Mix de berries con naranja.",
+                "group": "jugo",
                 "price": 108,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
-            },
-            {
-                "id": "jugo-extra",
-                "name": "JUGO CHAMOY & TAJÍN",
-                "description": "Con chamoy y Tajín.",
-                "price": 111,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
-            },
-            {
-                "id": "jugo-extra-123",
-                "name": "JUGO ESPECIAL",
-                "price": 123,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
+                "prices": {
+                    "16oz": 108
+                }
             }
         ]
     },
     {
         "id": "refrescos",
-        "kicker": "BEBIDAS",
+        "kicker": "HIDRATACIÓN & REFRESCOS",
         "quote": "“Acompaña tus alimentos favoritos”",
-        "name": "REFRESCOS",
-        "layoutTemplate": "dense-list",
+        "name": "BEBIDAS",
+        "subtitle": "Refrescos & Agua",
+        "layoutTemplate": "columnar-table",
+        "notes": [
+            "Sabores Agua Zoe Twist: Esencia de frutos rojos, mandarina o sandía hierbabuena."
+        ],
         "dishes": [
             {
-                "id": "dish-refrescos-0",
-                "name": "COCA-COLA",
-                "price": null,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                }
+                "id": "refresco-coca-cola",
+                "name": "COCA COLA",
+                "group": "refresco",
+                "price": 49
             },
             {
-                "id": "dish-refrescos-1",
-                "name": "COCA-COLA ZERO",
-                "price": null,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                }
+                "id": "refresco-coca-cola-zero",
+                "name": "COCA COLA ZERO",
+                "group": "refresco",
+                "price": 49
             },
             {
-                "id": "dish-refrescos-2",
+                "id": "refresco-sprite",
                 "name": "SPRITE",
-                "price": null,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                }
+                "group": "refresco",
+                "price": 49
             },
             {
-                "id": "dish-refrescos-3",
+                "id": "refresco-fanta",
                 "name": "FANTA",
-                "price": null,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                }
+                "group": "refresco",
+                "price": 49
             },
             {
-                "id": "dish-refrescos-4",
+                "id": "refresco-mundet",
                 "name": "MUNDET",
-                "price": null,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                }
+                "group": "refresco",
+                "price": 49
             },
             {
-                "id": "dish-refrescos-5",
+                "id": "refresco-topo-chico",
                 "name": "TOPO CHICO",
-                "price": null,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                }
+                "group": "refresco",
+                "price": 62
             },
             {
-                "id": "dish-refrescos-6",
+                "id": "refresco-agua-fiel-500",
                 "name": "AGUA FIEL 500 ML",
-                "price": null,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                }
-            }
-        ]
-    },
-    {
-        "id": "agua-zoe",
-        "kicker": "HIDRATACIÓN",
-        "quote": "“Equilibrio y pureza en cada gota”",
-        "name": "AGUA ZOE",
-        "layoutTemplate": "diagonal-two",
-        "dishes": [
+                "group": "refresco",
+                "price": 27
+            },
+            {
+                "id": "refresco-agua-fiel-1lt",
+                "name": "AGUA FIEL 1 LT",
+                "group": "refresco",
+                "price": 31
+            },
             {
                 "id": "agua-zoe-500",
                 "name": "AGUA ZOE 500 ML",
-                "price": 47,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
+                "group": "zoe",
+                "price": 47
             },
             {
                 "id": "agua-zoe-twist",
                 "name": "AGUA ZOE TWIST SABORES",
-                "description": "Esencia de frutos rojos, mandarina o sandía con hierbabuena.",
-                "price": 47,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                }
+                "description": "Esencia de frutos rojos, mandarina o sandía hierbabuena.",
+                "group": "zoe",
+                "price": 47
             }
         ]
     }

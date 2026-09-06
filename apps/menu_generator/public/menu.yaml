@@ -150,7 +150,7 @@ menu:
           description: null
           price: 129
           image: /dishes/wafles.png
-    - id: waffles-belgas
+    - id: bowls-de-fruta
       name: DESAYUNOS
       subtitle: BOWLS DE FRUTA
       description: null
@@ -477,7 +477,7 @@ menu:
           price: 30
     - id: bebidas-calientes
       name: BEBIDAS
-      subtitle: Calientes
+      subtitle: Calientes & Frías
       description: null
       price_headers:
         - 12 oz
@@ -551,177 +551,192 @@ menu:
           prices:
             12 oz: 83
             16 oz: 102
-    - id: tes
-      name: TÉS
-      subtitle: null
-      description: null
-      dishes:
-        - id: te-sabores
-          name: TÉ DE SABORES
-          description: Jengibre, jamaica, limón, manzanilla, menta y manzana/anís.
-          price: 92
-        - id: chai
-          name: CHAI
-          description: null
-          price: 111
-        - id: te-negro
-          name: TÉ NEGRO
-          description: null
-          price: 104
-        - id: tizana-frutos
-          name: TIZANA DE FRUTOS
-          description: null
-          price: 104
-        - id: tizana-manzana
-          name: TIZANA DE MANZANA
-          description: null
-          price: 104
-    - id: bebidas-frias
-      name: BEBIDAS
-      subtitle: Frías
-      description: null
-      dishes:
-        - id: dish-bebidas-frias-0
+        - id: capuccino-frio
           name: CAPUCCINO
           description: null
           price: 108
-        - id: dish-bebidas-frias-1
+        - id: chocolate-frio
           name: CHOCOLATE
           description: null
           price: 109
-        - id: dish-bebidas-frias-2
+        - id: latte-frio
           name: LATTE
           description: null
           price: 109
-        - id: dish-bebidas-frias-3
+        - id: moka-frio
           name: MOKA
           description: null
           price: 111
-        - id: dish-bebidas-frias-4
+        - id: matcha-frio
           name: MATCHA
           description: null
           price: 121
-    - id: frappes
-      name: FRAPPÉ
-      subtitle: null
+    - id: tes
+      name: BEBIDAS
+      subtitle: Infusiones & Frappé
       description: null
+      price_headers:
+        - Caliente 12oz
+        - Caliente 16oz
+        - Frío 16oz
       dishes:
-        - id: dish-frappes-0
+        - id: te-sabores
+          name: TÉ DE SABORES
+          description: 'Sabores de té: Jengibre, Jamaica, Limón, Manzanilla, Menta, Manzana/Anís.'
+          price: null
+          prices:
+            Caliente 12oz: 40
+            Caliente 16oz: 56
+            Frío 16oz: 74
+        - id: chai
+          name: CHAI
+          description: null
+          price: null
+          prices:
+            Caliente 12oz: 92
+            Caliente 16oz: 111
+            Frío 16oz: 136
+        - id: te-negro
+          name: TÉ NEGRO
+          description: null
+          price: null
+          prices:
+            Caliente 12oz: 104
+            Caliente 16oz: 111
+            Frío 16oz: 120
+        - id: tizana-frutos
+          name: TIZANA FRUTOS
+          description: null
+          price: null
+          prices:
+            Caliente 12oz: 104
+            Caliente 16oz: 109
+            Frío 16oz: 118
+        - id: tisana-manzana
+          name: TISANA MANZANA
+          description: null
+          price: null
+          prices:
+            Caliente 12oz: 104
+            Caliente 16oz: 109
+            Frío 16oz: 118
+        - id: frappe-cafe
           name: CAFÉ
           description: null
-          price: 108
-        - id: dish-frappes-1
+          price: 80
+          prices:
+            16oz: 80
+        - id: frappe-capuccino
           name: CAPUCCINO
           description: null
-          price: 121
-        - id: dish-frappes-2
+          price: 108
+          prices:
+            16oz: 108
+        - id: frappe-moka
           name: MOKA
           description: null
           price: 121
-        - id: dish-frappes-3
+          prices:
+            16oz: 121
+        - id: frappe-matcha
           name: MATCHA
           description: null
-          price: null
-          review_required: true
-        - id: dish-frappes-4
+          price: 121
+          prices:
+            16oz: 121
+        - id: frappe-chocolate
           name: CHOCOLATE
           description: null
           price: 119
-          review_required: true
+          prices:
+            16oz: 119
     - id: smoothies
-      name: SMOOTHIES
-      subtitle: null
+      name: BEBIDAS
+      subtitle: Smoothies & Jugos
       description: null
+      price_headers:
+        - 16oz
       dishes:
         - id: smoothie-mango
           name: MANGO
-          description: A base de agua.
-          price: null
-          review_required: true
+          description: A base de agua. Acompañado de chamoy y Tajín.
+          price: 97
+          prices:
+            16oz: 97
         - id: smoothie-platano
           name: PLÁTANO
           description: A base de leche.
-          price: null
-          review_required: true
+          price: 111
+          prices:
+            16oz: 111
         - id: smoothie-frutos-rojos
           name: FRUTOS ROJOS
           description: A base de leche.
-          price: null
-          review_required: true
-    - id: jugos
-      name: JUGOS
-      subtitle: null
-      description: Nuestros jugos son 100% naturales.
-      dishes:
+          price: 123
+          prices:
+            16oz: 123
         - id: jugo-naranja
           name: NARANJA
-          description: null
+          description: Jugo 100% natural recién exprimido.
           price: 71
-          review_required: true
+          prices:
+            16oz: 71
         - id: jugo-verde
           name: VERDE
           description: Apio, piña, nopal, espinaca y naranja.
-          price: 97
-          review_required: true
+          price: 92
+          prices:
+            16oz: 92
         - id: jugo-detox
           name: DETOX
           description: Mix de berries con naranja.
           price: 108
-          review_required: true
-        - id: jugo-extra
-          name: JUGO CHAMOY & TAJÍN
-          description: Con chamoy y Tajín.
-          price: 111
-          review_required: true
-        - id: jugo-extra-123
-          name: JUGO ESPECIAL
-          description: null
-          price: 123
-          review_required: true
+          prices:
+            16oz: 108
     - id: refrescos
-      name: REFRESCOS
-      subtitle: null
+      name: BEBIDAS
+      subtitle: Refrescos & Agua
       description: null
+      notes:
+        - 'Sabores Agua Zoe Twist: Esencia de frutos rojos, mandarina o sandía hierbabuena.'
       dishes:
-        - id: dish-refrescos-0
-          name: COCA-COLA
+        - id: refresco-coca-cola
+          name: COCA COLA
           description: null
-          price: null
-        - id: dish-refrescos-1
-          name: COCA-COLA ZERO
+          price: 49
+        - id: refresco-coca-cola-zero
+          name: COCA COLA ZERO
           description: null
-          price: null
-        - id: dish-refrescos-2
+          price: 49
+        - id: refresco-sprite
           name: SPRITE
           description: null
-          price: null
-        - id: dish-refrescos-3
+          price: 49
+        - id: refresco-fanta
           name: FANTA
           description: null
-          price: null
-        - id: dish-refrescos-4
+          price: 49
+        - id: refresco-mundet
           name: MUNDET
           description: null
-          price: null
-        - id: dish-refrescos-5
+          price: 49
+        - id: refresco-topo-chico
           name: TOPO CHICO
           description: null
-          price: null
-        - id: dish-refrescos-6
+          price: 62
+        - id: refresco-agua-fiel-500
           name: AGUA FIEL 500 ML
           description: null
-          price: null
-    - id: agua-zoe
-      name: AGUA ZOE
-      subtitle: null
-      description: null
-      dishes:
+          price: 27
+        - id: refresco-agua-fiel-1lt
+          name: AGUA FIEL 1 LT
+          description: null
+          price: 31
         - id: agua-zoe-500
           name: AGUA ZOE 500 ML
           description: null
           price: 47
-          review_required: true
         - id: agua-zoe-twist
           name: AGUA ZOE TWIST SABORES
-          description: Esencia de frutos rojos, mandarina o sandía con hierbabuena.
+          description: Esencia de frutos rojos, mandarina o sandía hierbabuena.
           price: 47
