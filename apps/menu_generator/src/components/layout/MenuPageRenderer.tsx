@@ -221,16 +221,16 @@ export const MenuPageRenderer: React.FC<MenuPageRendererProps> = ({
         </div>
 
         {/* Right: Minimalist Brand Header (Logo + CAFETERÍA below, transparent, no borders) */}
-        <div className="flex flex-col items-center justify-center shrink-0">
+        <div className="flex flex-col items-center justify-center shrink-0 pl-3">
           {restaurant.logo ? (
             <img
               src={restaurant.logo}
               alt={restaurant.name}
-              className="h-10 sm:h-12 w-auto object-contain drop-shadow-xs"
+              className="h-20 sm:h-24 w-auto object-contain drop-shadow-xs"
             />
           ) : (
             <span
-              className="font-cormorant font-bold text-xl sm:text-2xl uppercase tracking-[0.2em] leading-none"
+              className="font-cormorant font-bold text-3xl sm:text-4xl uppercase tracking-[0.2em] leading-none"
               style={{ color: CHARCOAL }}
             >
               {restaurant.name}
@@ -238,7 +238,7 @@ export const MenuPageRenderer: React.FC<MenuPageRendererProps> = ({
           )}
 
           <span
-            className="text-[8px] sm:text-[9px] font-montserrat uppercase tracking-[0.3em] font-semibold mt-1 leading-none"
+            className="text-[12px] sm:text-[14px] font-montserrat uppercase tracking-[0.32em] font-semibold mt-1.5 leading-none"
             style={{ color: WARM_GOLD }}
           >
             — CAFETERÍA —
