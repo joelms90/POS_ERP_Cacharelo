@@ -215,7 +215,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "OMELETTE DE CHAMPIÑONES Y QUESO",
                 "description": "Acompañado de pan tostado, aguacate y frijoles maneados de la casa.",
                 "price": 178,
-                "image": "/dishes/OMELETTE DE CHAMPIÑONES Y QUESO.jpeg",
+                "image": "/dishes/OMELETTE DE CHAMPIÑONES Y QUESO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -1197,7 +1197,9 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "id": "espresso-sencillo",
                 "name": "ESPRESSO SENCILLO",
                 "description": "Extracción corta de café puro y concentrado.",
-                "price": 40
+                "price": 40,
+                "image": "/dishes/CAFE ESPRESSO.jpeg",
+                "featured": true
             },
             {
                 "id": "espresso-doble",
@@ -1233,7 +1235,9 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "prices": {
                     "12 oz": 80,
                     "16 oz": 99
-                }
+                },
+                "image": "/dishes/CAFE CAPUCHINO.jpeg",
+                "featured": true
             },
             {
                 "id": "chocolate",
@@ -1284,7 +1288,9 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "id": "capuccino-frio",
                 "name": "CAPUCCINO",
                 "price": 108,
-                "group": "frio"
+                "group": "frio",
+                "image": "/dishes/CAFE FRIO CAPUCHINO.jpeg",
+                "featured": true
             },
             {
                 "id": "chocolate-frio",
@@ -1383,7 +1389,9 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "price": 80,
                 "prices": {
                     "16oz": 80
-                }
+                },
+                "image": "/dishes/FRAPPE CAFE.jpeg",
+                "featured": true
             },
             {
                 "id": "frappe-capuccino",
@@ -1442,7 +1450,9 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "price": 97,
                 "prices": {
                     "16oz": 97
-                }
+                },
+                "image": "/dishes/SMOTHIES MANGO.jpeg",
+                "featured": true
             },
             {
                 "id": "smoothie-platano",
@@ -1482,7 +1492,9 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "price": 92,
                 "prices": {
                     "16oz": 92
-                }
+                },
+                "image": "/dishes/JUGO_VERDE.jpeg",
+                "featured": true
             },
             {
                 "id": "jugo-detox",
@@ -1511,7 +1523,9 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "id": "refresco-coca-cola",
                 "name": "COCA COLA",
                 "group": "refresco",
-                "price": 49
+                "price": 49,
+                "image": "/dishes/COCA COLA.jpeg",
+                "featured": true
             },
             {
                 "id": "refresco-coca-cola-zero",
@@ -1559,7 +1573,9 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "id": "agua-zoe-500",
                 "name": "AGUA ZOE 500 ML",
                 "group": "zoe",
-                "price": 47
+                "price": 47,
+                "image": "/dishes/AGUA ZOE.jpeg",
+                "featured": true
             },
             {
                 "id": "agua-zoe-twist",

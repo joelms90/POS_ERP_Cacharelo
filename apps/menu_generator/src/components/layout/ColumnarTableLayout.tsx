@@ -195,12 +195,23 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
           <div key={dish.id} className="group relative">
             {/* Top row: Name + dotted leader + multi-size prices */}
             <div className="flex items-baseline justify-between gap-1.5">
-              <h4
-                className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight shrink-0"
-                style={{ color: CHARCOAL }}
-              >
-                {dish.name || 'Especialidad'}
-              </h4>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {dish.featured && (dish.image || dish.imageProcessed) && (
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden border border-[#C8A265] shadow-xs shrink-0 inline-flex items-center justify-center">
+                    <img
+                      src={dish.imageProcessed || dish.image}
+                      alt={dish.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                <h4
+                  className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight"
+                  style={{ color: CHARCOAL }}
+                >
+                  {dish.name || 'Especialidad'}
+                </h4>
+              </div>
 
               {/* Dotted leader: connects dish name to price columns */}
               <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
@@ -285,12 +296,23 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
           <div key={dish.id} className="group relative">
             {/* Top row: Name + dotted leader + single price */}
             <div className="flex items-baseline justify-between gap-1.5">
-              <h4
-                className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight shrink-0"
-                style={{ color: CHARCOAL }}
-              >
-                {dish.name || 'Especialidad'}
-              </h4>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {dish.featured && (dish.image || dish.imageProcessed) && (
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden border border-[#C8A265] shadow-xs shrink-0 inline-flex items-center justify-center">
+                    <img
+                      src={dish.imageProcessed || dish.image}
+                      alt={dish.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                <h4
+                  className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight"
+                  style={{ color: CHARCOAL }}
+                >
+                  {dish.name || 'Especialidad'}
+                </h4>
+              </div>
 
               {/* Dotted leader */}
               <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
@@ -467,47 +489,89 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
             </div>
           </div>
 
-          {/* Dish rows */}
-          <div className="space-y-2.5">
-            {frappeDishes.map((dish) => {
-              const priceVal = dish.prices?.['16oz'] ?? dish.prices?.['16 oz'] ?? dish.price;
-              return (
-                <div key={dish.id} className="group relative">
-                  <div className="flex items-baseline justify-between gap-1.5">
-                    <h4
-                      className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight shrink-0"
-                      style={{ color: CHARCOAL }}
-                    >
-                      {dish.name}
-                    </h4>
-
-                    {/* Dotted leader */}
-                    <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
-
-                    {/* Price in far right column matching teHeaders alignment */}
-                    <div className="w-16 sm:w-20 text-center flex items-center justify-end shrink-0">
-                      {priceVal !== null && priceVal !== undefined && (
-                        <span
-                          className="text-sm sm:text-base font-cormorant font-bold tracking-wide text-right w-full"
-                          style={{ color: WARM_GOLD }}
+          {/* Dish rows + Featured showcase */}
+          <div className="flex items-center gap-3 sm:gap-5">
+            <div className="flex-1 space-y-2.5">
+              {frappeDishes.map((dish) => {
+                const priceVal = dish.prices?.['16oz'] ?? dish.prices?.['16 oz'] ?? dish.price;
+                return (
+                  <div key={dish.id} className="group relative">
+                    <div className="flex items-baseline justify-between gap-1.5">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {dish.featured && (dish.image || dish.imageProcessed) && (
+                          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden border border-[#C8A265] shadow-xs shrink-0 inline-flex items-center justify-center">
+                            <img
+                              src={dish.imageProcessed || dish.image}
+                              alt={dish.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <h4
+                          className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight"
+                          style={{ color: CHARCOAL }}
                         >
-                          {formatPrice(priceVal)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                          {dish.name}
+                        </h4>
+                      </div>
 
-                  {dish.description && (
-                    <p
-                      className="text-[10px] sm:text-[10.5px] font-montserrat leading-relaxed opacity-85 mt-0.5 pr-28 line-clamp-1"
-                      style={{ color: CHARCOAL }}
-                    >
-                      {dish.description}
-                    </p>
-                  )}
+                      {/* Dotted leader */}
+                      <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
+
+                      {/* Price in far right column matching teHeaders alignment */}
+                      <div className="w-16 sm:w-20 text-center flex items-center justify-end shrink-0">
+                        {priceVal !== null && priceVal !== undefined && (
+                          <span
+                            className="text-sm sm:text-base font-cormorant font-bold tracking-wide text-right w-full"
+                            style={{ color: WARM_GOLD }}
+                          >
+                            {formatPrice(priceVal)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {dish.description && (
+                      <p
+                        className="text-[10px] sm:text-[10.5px] font-montserrat leading-relaxed opacity-85 mt-0.5 pr-28 line-clamp-1"
+                        style={{ color: CHARCOAL }}
+                      >
+                        {dish.description}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Featured Frappe Photo Showcase */}
+            {(() => {
+              const featuredFrappe = frappeDishes.find((d) => d.featured && (d.image || d.imageProcessed));
+              if (!featuredFrappe) return null;
+              return (
+                <div className="shrink-0 flex flex-col items-center justify-center pl-2">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-[#C8A265]/70 shadow-md">
+                    <img
+                      src={featuredFrappe.imageProcessed || featuredFrappe.image}
+                      alt={featuredFrappe.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span
+                    className="text-[8px] font-montserrat uppercase tracking-widest font-semibold mt-1"
+                    style={{ color: WARM_GOLD }}
+                  >
+                    ★ Destacado
+                  </span>
+                  <span
+                    className="text-[9.5px] font-cormorant font-bold uppercase tracking-wider text-center max-w-[90px] truncate"
+                    style={{ color: CHARCOAL }}
+                  >
+                    {featuredFrappe.name}
+                  </span>
                 </div>
               );
-            })}
+            })()}
           </div>
         </div>
       </div>
@@ -545,47 +609,89 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
             </div>
           </div>
 
-          {/* Dish rows */}
-          <div className="space-y-3">
-            {smoothieDishes.map((dish) => {
-              const priceVal = dish.prices?.['16oz'] ?? dish.prices?.['16 oz'] ?? dish.price;
-              return (
-                <div key={dish.id} className="group relative">
-                  <div className="flex items-baseline justify-between gap-1.5">
-                    <h4
-                      className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight shrink-0"
-                      style={{ color: CHARCOAL }}
-                    >
-                      {dish.name}
-                    </h4>
-
-                    {/* Dotted leader */}
-                    <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
-
-                    {/* Price in far right column */}
-                    <div className="w-16 sm:w-20 text-center flex items-center justify-end shrink-0">
-                      {priceVal !== null && priceVal !== undefined && (
-                        <span
-                          className="text-sm sm:text-base font-cormorant font-bold tracking-wide text-right w-full"
-                          style={{ color: WARM_GOLD }}
+          {/* Dish rows + Featured showcase */}
+          <div className="flex items-center gap-3 sm:gap-5">
+            <div className="flex-1 space-y-3">
+              {smoothieDishes.map((dish) => {
+                const priceVal = dish.prices?.['16oz'] ?? dish.prices?.['16 oz'] ?? dish.price;
+                return (
+                  <div key={dish.id} className="group relative">
+                    <div className="flex items-baseline justify-between gap-1.5">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {dish.featured && (dish.image || dish.imageProcessed) && (
+                          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden border border-[#C8A265] shadow-xs shrink-0 inline-flex items-center justify-center">
+                            <img
+                              src={dish.imageProcessed || dish.image}
+                              alt={dish.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <h4
+                          className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight"
+                          style={{ color: CHARCOAL }}
                         >
-                          {formatPrice(priceVal)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                          {dish.name}
+                        </h4>
+                      </div>
 
-                  {dish.description && (
-                    <p
-                      className="text-[10px] sm:text-[10.5px] font-montserrat leading-relaxed opacity-85 mt-0.5 pr-20"
-                      style={{ color: CHARCOAL }}
-                    >
-                      {dish.description}
-                    </p>
-                  )}
+                      {/* Dotted leader */}
+                      <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
+
+                      {/* Price in far right column */}
+                      <div className="w-16 sm:w-20 text-center flex items-center justify-end shrink-0">
+                        {priceVal !== null && priceVal !== undefined && (
+                          <span
+                            className="text-sm sm:text-base font-cormorant font-bold tracking-wide text-right w-full"
+                            style={{ color: WARM_GOLD }}
+                          >
+                            {formatPrice(priceVal)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {dish.description && (
+                      <p
+                        className="text-[10px] sm:text-[10.5px] font-montserrat leading-relaxed opacity-85 mt-0.5 pr-10"
+                        style={{ color: CHARCOAL }}
+                      >
+                        {dish.description}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Featured Smoothie Photo Showcase */}
+            {(() => {
+              const featuredSmoothie = smoothieDishes.find((d) => d.featured && (d.image || d.imageProcessed));
+              if (!featuredSmoothie) return null;
+              return (
+                <div className="shrink-0 flex flex-col items-center justify-center pl-2">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-[#C8A265]/70 shadow-md">
+                    <img
+                      src={featuredSmoothie.imageProcessed || featuredSmoothie.image}
+                      alt={featuredSmoothie.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span
+                    className="text-[8px] font-montserrat uppercase tracking-widest font-semibold mt-1"
+                    style={{ color: WARM_GOLD }}
+                  >
+                    ★ Destacado
+                  </span>
+                  <span
+                    className="text-[9.5px] font-cormorant font-bold uppercase tracking-wider text-center max-w-[90px] truncate"
+                    style={{ color: CHARCOAL }}
+                  >
+                    {featuredSmoothie.name}
+                  </span>
                 </div>
               );
-            })}
+            })()}
           </div>
         </div>
 
@@ -620,47 +726,89 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
             </div>
           </div>
 
-          {/* Dish rows */}
-          <div className="space-y-3">
-            {jugoDishes.map((dish) => {
-              const priceVal = dish.prices?.['16oz'] ?? dish.prices?.['16 oz'] ?? dish.price;
-              return (
-                <div key={dish.id} className="group relative">
-                  <div className="flex items-baseline justify-between gap-1.5">
-                    <h4
-                      className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight shrink-0"
-                      style={{ color: CHARCOAL }}
-                    >
-                      {dish.name}
-                    </h4>
-
-                    {/* Dotted leader */}
-                    <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
-
-                    {/* Price in far right column */}
-                    <div className="w-16 sm:w-20 text-center flex items-center justify-end shrink-0">
-                      {priceVal !== null && priceVal !== undefined && (
-                        <span
-                          className="text-sm sm:text-base font-cormorant font-bold tracking-wide text-right w-full"
-                          style={{ color: WARM_GOLD }}
+          {/* Dish rows + Featured showcase */}
+          <div className="flex items-center gap-3 sm:gap-5">
+            <div className="flex-1 space-y-3">
+              {jugoDishes.map((dish) => {
+                const priceVal = dish.prices?.['16oz'] ?? dish.prices?.['16 oz'] ?? dish.price;
+                return (
+                  <div key={dish.id} className="group relative">
+                    <div className="flex items-baseline justify-between gap-1.5">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {dish.featured && (dish.image || dish.imageProcessed) && (
+                          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden border border-[#C8A265] shadow-xs shrink-0 inline-flex items-center justify-center">
+                            <img
+                              src={dish.imageProcessed || dish.image}
+                              alt={dish.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <h4
+                          className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight"
+                          style={{ color: CHARCOAL }}
                         >
-                          {formatPrice(priceVal)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                          {dish.name}
+                        </h4>
+                      </div>
 
-                  {dish.description && (
-                    <p
-                      className="text-[10px] sm:text-[10.5px] font-montserrat leading-relaxed opacity-85 mt-0.5 pr-20"
-                      style={{ color: CHARCOAL }}
-                    >
-                      {dish.description}
-                    </p>
-                  )}
+                      {/* Dotted leader */}
+                      <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
+
+                      {/* Price in far right column */}
+                      <div className="w-16 sm:w-20 text-center flex items-center justify-end shrink-0">
+                        {priceVal !== null && priceVal !== undefined && (
+                          <span
+                            className="text-sm sm:text-base font-cormorant font-bold tracking-wide text-right w-full"
+                            style={{ color: WARM_GOLD }}
+                          >
+                            {formatPrice(priceVal)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {dish.description && (
+                      <p
+                        className="text-[10px] sm:text-[10.5px] font-montserrat leading-relaxed opacity-85 mt-0.5 pr-10"
+                        style={{ color: CHARCOAL }}
+                      >
+                        {dish.description}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Featured Jugo Photo Showcase */}
+            {(() => {
+              const featuredJugo = jugoDishes.find((d) => d.featured && (d.image || d.imageProcessed));
+              if (!featuredJugo) return null;
+              return (
+                <div className="shrink-0 flex flex-col items-center justify-center pl-2">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-[#C8A265]/70 shadow-md">
+                    <img
+                      src={featuredJugo.imageProcessed || featuredJugo.image}
+                      alt={featuredJugo.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span
+                    className="text-[8px] font-montserrat uppercase tracking-widest font-semibold mt-1"
+                    style={{ color: WARM_GOLD }}
+                  >
+                    ★ Destacado
+                  </span>
+                  <span
+                    className="text-[9.5px] font-cormorant font-bold uppercase tracking-wider text-center max-w-[90px] truncate"
+                    style={{ color: CHARCOAL }}
+                  >
+                    {featuredJugo.name}
+                  </span>
                 </div>
               );
-            })}
+            })()}
           </div>
         </div>
       </div>
@@ -693,12 +841,23 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
             {refrescoDishes.map((dish) => (
               <div key={dish.id} className="group relative">
                 <div className="flex items-baseline justify-between gap-1.5">
-                  <h4
-                    className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight shrink-0"
-                    style={{ color: CHARCOAL }}
-                  >
-                    {dish.name}
-                  </h4>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {dish.featured && (dish.image || dish.imageProcessed) && (
+                      <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden border border-[#C8A265] shadow-xs shrink-0 inline-flex items-center justify-center">
+                        <img
+                          src={dish.imageProcessed || dish.image}
+                          alt={dish.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <h4
+                      className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight"
+                      style={{ color: CHARCOAL }}
+                    >
+                      {dish.name}
+                    </h4>
+                  </div>
 
                   {/* Dotted leader */}
                   <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
@@ -748,42 +907,84 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
             </span>
           </div>
 
-          {/* Regular dishes in balanced 2-column grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 sm:gap-x-10 gap-y-2.5">
-            {zoeDishes.map((dish) => (
-              <div key={dish.id} className="group relative">
-                <div className="flex items-baseline justify-between gap-1.5">
-                  <h4
-                    className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight shrink-0"
-                    style={{ color: CHARCOAL }}
-                  >
-                    {dish.name}
-                  </h4>
+          {/* Dishes + Featured showcase on right */}
+          <div className="flex items-center gap-3 sm:gap-5">
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-x-8 sm:gap-x-10 gap-y-2.5">
+              {zoeDishes.map((dish) => (
+                <div key={dish.id} className="group relative">
+                  <div className="flex items-baseline justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {dish.featured && (dish.image || dish.imageProcessed) && (
+                        <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden border border-[#C8A265] shadow-xs shrink-0 inline-flex items-center justify-center">
+                          <img
+                            src={dish.imageProcessed || dish.image}
+                            alt={dish.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <h4
+                        className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight"
+                        style={{ color: CHARCOAL }}
+                      >
+                        {dish.name}
+                      </h4>
+                    </div>
 
-                  {/* Dotted leader */}
-                  <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
+                    {/* Dotted leader */}
+                    <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
 
-                  {/* Price */}
-                  {dish.price !== null && dish.price !== undefined && (
-                    <span
-                      className="text-sm sm:text-base font-cormorant font-bold tracking-wide shrink-0"
-                      style={{ color: WARM_GOLD }}
+                    {/* Price */}
+                    {dish.price !== null && dish.price !== undefined && (
+                      <span
+                        className="text-sm sm:text-base font-cormorant font-bold tracking-wide shrink-0"
+                        style={{ color: WARM_GOLD }}
+                      >
+                        {formatPrice(dish.price)}
+                      </span>
+                    )}
+                  </div>
+
+                  {dish.description && (
+                    <p
+                      className="text-[10px] sm:text-[10.5px] font-montserrat leading-relaxed opacity-85 mt-0.5 line-clamp-1"
+                      style={{ color: CHARCOAL }}
                     >
-                      {formatPrice(dish.price)}
-                    </span>
+                      {dish.description}
+                    </p>
                   )}
                 </div>
+              ))}
+            </div>
 
-                {dish.description && (
-                  <p
-                    className="text-[10px] sm:text-[10.5px] font-montserrat leading-relaxed opacity-85 mt-0.5 line-clamp-1"
+            {/* Featured Zoe Photo Showcase */}
+            {(() => {
+              const featuredZoe = zoeDishes.find((d) => d.featured && (d.image || d.imageProcessed));
+              if (!featuredZoe) return null;
+              return (
+                <div className="shrink-0 flex flex-col items-center justify-center pl-2">
+                  <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-full overflow-hidden border-2 border-[#C8A265]/70 shadow-md">
+                    <img
+                      src={featuredZoe.imageProcessed || featuredZoe.image}
+                      alt={featuredZoe.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span
+                    className="text-[8px] font-montserrat uppercase tracking-widest font-semibold mt-1"
+                    style={{ color: WARM_GOLD }}
+                  >
+                    ★ Destacado
+                  </span>
+                  <span
+                    className="text-[9.5px] font-cormorant font-bold uppercase tracking-wider text-center max-w-[90px] truncate"
                     style={{ color: CHARCOAL }}
                   >
-                    {dish.description}
-                  </p>
-                )}
-              </div>
-            ))}
+                    {featuredZoe.name}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
 
         </div>
@@ -817,12 +1018,23 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
             {classicDishes.map((dish) => (
               <div key={dish.id} className="group relative">
                 <div className="flex items-baseline justify-between gap-1.5">
-                  <h4
-                    className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight shrink-0"
-                    style={{ color: CHARCOAL }}
-                  >
-                    {dish.name || 'Especialidad'}
-                  </h4>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {dish.featured && (dish.image || dish.imageProcessed) && (
+                      <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden border border-[#C8A265] shadow-xs shrink-0 inline-flex items-center justify-center">
+                        <img
+                          src={dish.imageProcessed || dish.image}
+                          alt={dish.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <h4
+                      className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight"
+                      style={{ color: CHARCOAL }}
+                    >
+                      {dish.name || 'Especialidad'}
+                    </h4>
+                  </div>
 
                   {/* Dotted leader */}
                   <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
