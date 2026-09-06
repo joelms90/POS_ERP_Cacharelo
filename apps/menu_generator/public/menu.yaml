@@ -39,29 +39,31 @@ menu:
           name: CAPRESSE
           description: Rodajas de jitomate y queso mozzarella fresco marinadas con vinagre balsámico y nuestra mezcla italiana.
           price: 177
-          image: /dishes/caprese_plate.png
+          image: /dishes/CAPRESSE.jpeg
         - id: cesar
           name: CESAR
           description: Lechuga aderezada acompañada de croutones, huevo cocido y queso parmesano rallado.
           price: 162
-          image: /dishes/cesar_salad.png
+          image: /dishes/CESAR.jpeg
         - id: cesar-con-pollo
           name: CESAR CON POLLO
           description: >-
             Lechuga aderezada acompañada de croutones, huevo cocido, queso parmesano rallado y pechuga de pollo a la
             italiana.
           price: 189
-          image: /dishes/cesar_pollo.png
+          image: /dishes/CESAR CON POLLO.jpeg
         - id: del-chef
           name: DEL CHEF
           description: >-
             Lechuga con nuestra vinagreta de cítricos acompañada de jamónjj, queso manchego, pechuga de pollo y huevo
             cocido.
           price: 185
+          image: /dishes/DEL CHEF.jpeg
         - id: waldorf
           name: WALDORF
           description: Lechuga aderezada acompañada de manzana, blueberries, nuez pecana, queso mozzarella fresco y apio.
           price: 175
+          image: /dishes/WALDORF.jpeg
     - id: desayunos-huevos-al-gusto
       name: DESAYUNOS
       subtitle: Huevos al gusto
@@ -71,48 +73,51 @@ menu:
           name: REVUELTOS CON JAMÓN
           description: Acompañados de pan tostado, aguacate y frijoles maneados de la casa.
           price: 166
-          image: /dishes/huevos_board.png
+          image: /dishes/REVUELTOS CON JAMON.jpeg
         - id: revueltos-con-tocino
           name: REVUELTOS CON TOCINO
           description: Acompañados de pan tostado, aguacate y frijoles maneados de la casa.
           price: 166
-          image: /dishes/huevos_board.png
+          image: /dishes/REVUELTOS CON TOCINO.jpeg
         - id: revueltos-a-la-mexicana
           name: REVUELTOS A LA MEXICANA
           description: Con cebolla, jitomate y chile picado, acompañado con pan tostado, aguacate y frijoles maneados de la casa.
           price: 166
-          image: /dishes/huevos_board.png
+          image: /dishes/REVUELTOS A LA MEXICANA.jpeg
         - id: huevos-benedictinos
           name: HUEVOS BENEDICTINOS
           description: >-
             Huevos pochés servidos en bagel con dip de queso y jamón, bañados con salsa holandesa, con un toque de
             parmesano y perejil.
           price: 194
-          image: /dishes/huevos_board.png
+          image: /dishes/HUEVOS BENEDICTINOS.jpeg
         - id: huevos-cacharelo
           name: HUEVOS CACHARELO
           description: >-
             Huevos pochés sobre salsa pomodoro con queso mozzarella fresco y un toque picante, bañados en salsa
             holandesa con parmesano y albahaca, acompañados con pan tostado.
           price: 212
-          image: /dishes/huevos_board.png
+          image: /dishes/HUEVOS CAHCARELO.jpeg
         - id: espinacas-y-queso
           name: OMELETTE DE ESPINACAS Y QUESO
           description: Acompañado de pan tostado, aguacate y frijoles maneados de la casa.
           price: 185
+          image: /dishes/OMELETTE DE ESPINACAS Y QUESO.jpeg
         - id: champinones-y-queso
           name: OMELETTE DE CHAMPIÑONES Y QUESO
           description: Acompañado de pan tostado, aguacate y frijoles maneados de la casa.
           price: 178
+          image: /dishes/OMELETTE DE CHAMPIÑONES Y QUESO.jpeg
         - id: claras-espinaca-panela
           name: OMELETTE DE CLARAS CON ESPINACA Y QUESO PANELA
           description: Acompañados de pan tostado, aguacate y frijoles maneados de la casa.
           price: 180
+          image: /dishes/OMELETTE DE CLARAS CON ESPINACA Y QUESO PANELA.jpeg
         - id: omelette-jamon-queso
           name: OMELETTE DE JAMÓN Y QUESO
           description: Acompañado de pan tostado, aguacate y frijoles maneados de la casa.
           price: 178
-          image: /dishes/huevos_board.png
+          image: /dishes/OMELETTE DE JAMON Y QUESO.jpeg
     - id: desayunos-especialidades
       name: DESAYUNOS
       subtitle: Especialidades
@@ -124,12 +129,12 @@ menu:
             Rellenas de pollo, bañadas con salsa verde de la casa y acompañadas de crema, queso panela, cebolla y
             aguacate.
           price: 175
-          image: /dishes/foccacia.png
+          image: /dishes/ENCHILADAS MINERAS.jpeg
         - id: chilaquiles-cacharelo
           name: CHILAQUILES CACHARELO
           description: Verdes con pollo, huevos fritos, crema, queso y cebolla.
           price: 196
-          image: /dishes/huevos_board.png
+          image: /dishes/CHILAQUILES CACHARELO.jpeg
     - id: waffles-belgas
       name: DESAYUNOS
       subtitle: Waffles belgas
@@ -139,37 +144,37 @@ menu:
           name: CON FRESA Y CREMA
           description: null
           price: 141
-          image: /dishes/wafles.png
+          image: /dishes/WAFFLES CON FRESA Y CREMA.jpeg
         - id: waffle-nutella
           name: CON PLÁTANO Y NUTELLA
           description: null
           price: 129
-          image: /dishes/wafles.png
+          image: /dishes/WAFFLES CON PLATANO Y NUTELLA.jpeg
         - id: waffle-frutos-rojos
           name: CON FRUTOS ROJOS
           description: null
           price: 129
-          image: /dishes/wafles.png
+          image: /dishes/WAFFLES CON FRUTOS ROJOS.jpeg
     - id: bowls-de-fruta
       name: DESAYUNOS
       subtitle: BOWLS DE FRUTA
       description: null
       dishes:
-        - id: bowl-yogurt
+        - id: bowl-mixto
           name: MIXTO
           description: Fruta de temporada acompañada de miel de abeja, yogurt y granola.
           price: 135
-          image: /dishes/wafles.png
+          image: /dishes/BOWLS MIXTO.jpeg
         - id: bowl-yogurt
           name: CON YOGURT
           description: Fruta de temporada acompañada de miel de abeja, yogurt y granola.
           price: 148
-          image: /dishes/wafles.png
+          image: /dishes/BOWLS CON YOGURT.jpeg
         - id: bowl-frutos-rojos
           name: DE FRUTOS ROJOS
           description: 'Mix de berries: blueberries, zarzamoras, frambuesas y fresas, acompañadas de queso cottage.'
           price: 178
-          image: /dishes/wafles.png
+          image: /dishes/BOWLS DE FRUTOS ROJOS.jpeg
     - id: croissant
       name: CROISSANT
       subtitle: null
@@ -179,19 +184,19 @@ menu:
           name: DE JAMÓN Y QUESO
           description: Preparado con jitomate horneado a las finas hierbas, lechuga y nuestro aderezo de mayonesa chipotle.
           price: 135
-          image: /dishes/croissant.png
+          image: /dishes/CROISSANT DE JAMON Y QUESO.jpeg
         - id: croissant-huevo-tocino
           name: DE HUEVO CON TOCINO
           description: Preparado con jitomate horneado a las finas hierbas, queso panela y aderezo de mayonesa chipotle.
           price: 147
-          image: /dishes/croissant.png
+          image: /dishes/CROISSANT DE HUEVO CON TOCINO.jpeg
         - id: croissant-italiano
           name: ITALIANO
           description: >-
             Relleno de queso mozzarella fresco, jitomate a las finas hierbas y lechuga con vinagre balsámico y aceite de
             oliva.
           price: 147
-          image: /dishes/croissant.png
+          image: /dishes/CROISSANT ITALIANO.jpeg
           review_required: true
     - id: sandwiches
       name: SANDWICHES
@@ -204,22 +209,22 @@ menu:
             De dos pisos, pan tostado preparado con jamón, queso machego, jitomate horneado, pollo a las finas hierbas,
             huevo frito, tocino y lechuga marinada con vinagre balsámico.
           price: 205
-          image: /dishes/sandwich.png
+          image: /dishes/SANDWICHES CACHARELO CLUB.jpeg
         - id: croque-monsieur
           name: CROQUE MONSIEUR
           description: De dos pisos, pan tostado relleno de jamón y queso manchego gratinado.
           price: 142
-          image: /dishes/sandwich.png
+          image: /dishes/SANDWICHES CROQUE MONSIER.jpeg
         - id: croque-madame
           name: CROQUE MADAME
           description: De dos pisos, pan tostado relleno de jamón y queso manchego gratinado con un huevo frito encima.
           price: 160
-          image: /dishes/sandwich.png
+          image: /dishes/SANDWICHES CROQUE MADAME.jpeg
         - id: montecristo
           name: MONTECRISTO
           description: De dos pisos, capeado, relleno de jamón, queso manchego, pollo y jitomate horneado a las finas hierbas.
           price: 172
-          image: /dishes/sandwich.png
+          image: /dishes/SANDWICHES MONTECRISTO.jpeg
     - id: baguettes
       name: BAGUETTES
       subtitle: null
@@ -231,22 +236,22 @@ menu:
             Acompañada de queso mozzarella fresco, jitomate horneado a las finas hierbas y lechuga marinada con vinagre
             balsámico.
           price: 180
-          image: /dishes/cesar_pollo.png
+          image: /dishes/BAGUETTES POLLO CAJUN.jpeg
         - id: baguette-arrachera
           name: DE ARRACHERA
           description: Con frijoles maneados, cebolla caramelizada, queso manchego, aderezo de mayonesa chipotle y jitomate.
           price: 200
-          image: /dishes/foccacia.png
+          image: /dishes/BAGUETTES DE ARRACHERA.jpeg
         - id: baguette-jamon-queso
           name: DE JAMÓN Y QUESO
           description: Acompañado de jitomate horneado, lechuga marinada con vinagre balsámico y aderezo de mayonesa chipotle.
           price: 160
-          image: /dishes/foccacia.png
+          image: /dishes/BAGUETTES DE JAMON Y QUESO.jpeg
         - id: baguette-tres-quesos
           name: A LOS 3 QUESOS
           description: Con queso mozzarella fresco, queso panela y queso manchego.
           price: 170
-          image: /dishes/foccacia.png
+          image: /dishes/BAGUETTES A LOS TRES QUESOS.jpeg
     - id: bagels
       name: BAGELS
       subtitle: null
@@ -260,19 +265,19 @@ menu:
           name: DE JAMÓN Y QUESO
           description: Acompañado de jitomate a las finas hierbas, lechuga marinada con vinagre balsámico y dip de queso.
           price: 155
-          image: /dishes/bagel.png
+          image: /dishes/BAGELS DE JAMON Y QUESO.jpeg
         - id: bagel-salmon-ahumado
           name: DE SALMÓN AHUMADO
           description: >-
             Con queso mozzarella fresco, jitomate a las finas hierbas, lechuga marinada con vinagre balsámico y dip de
             queso.
           price: 218
-          image: /dishes/bagel.png
+          image: /dishes/BAGELS DE SALMON AHUMADO.jpeg
         - id: bagel-fresa-nutella
           name: DE FRESA CON NUTELLA
           description: Con queso crema.
           price: 145
-          image: /dishes/bagel.png
+          image: /dishes/BAGELS DE FRESA CON NUTELLA.jpeg
     - id: pan-artesanal
       name: PAN ARTESANAL
       subtitle: null
@@ -283,36 +288,33 @@ menu:
           name: CROISSANT
           description: null
           price: 53
-          image: /dishes/croissant.png
+          image: /dishes/CROISSANT.jpeg
         - id: croissant-almendra
           name: CROISSANT DE ALMENDRA
           description: null
           price: 65
-          image: /dishes/croissant.png
         - id: chocolatin
           name: CHOCOLATÍN
           description: null
           price: 65
-          image: /dishes/croissant.png
+          image: /dishes/CHOCOLATIN.jpeg
         - id: rol-canela
           name: ROL DE CANELA
           description: null
           price: 59
+          image: /dishes/ROL DE CANELA.jpeg
         - id: croissant-nutella-queso
           name: CROISSANT RELLENO DE NUTELLA CON QUESO
           description: null
           price: 145
-          image: /dishes/croissant.png
         - id: croissant-frutos-rojos
           name: CROISSANT RELLENO DE FRUTOS ROJOS
           description: null
           price: 85
-          image: /dishes/croissant.png
         - id: croissant-pina
           name: CROISSANT RELLENO DE PIÑA
           description: null
           price: 88
-          image: /dishes/croissant.png
     - id: extras
       name: EXTRAS
       subtitle: null

@@ -51,7 +51,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "CAPRESSE",
                 "description": "Rodajas de jitomate y queso mozzarella fresco marinadas con vinagre balsámico y nuestra mezcla italiana.",
                 "price": 177,
-                "image": "/dishes/caprese_plate.png",
+                "image": "/dishes/CAPRESSE.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -65,7 +65,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "CESAR",
                 "description": "Lechuga aderezada acompañada de croutones, huevo cocido y queso parmesano rallado.",
                 "price": 162,
-                "image": "/dishes/cesar_salad.png",
+                "image": "/dishes/CESAR.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -79,7 +79,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "CESAR CON POLLO",
                 "description": "Lechuga aderezada acompañada de croutones, huevo cocido, queso parmesano rallado y pechuga de pollo a la italiana.",
                 "price": 189,
-                "image": "/dishes/cesar_pollo.png",
+                "image": "/dishes/CESAR CON POLLO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -93,19 +93,21 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "DEL CHEF",
                 "description": "Lechuga con nuestra vinagreta de cítricos acompañada de jamónjj, queso manchego, pechuga de pollo y huevo cocido.",
                 "price": 185,
+                "image": "/dishes/DEL CHEF.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
                     "x": 0,
                     "y": 0,
                     "rotation": 0
-                },
+                }
             },
             {
                 "id": "waldorf",
                 "name": "WALDORF",
                 "description": "Lechuga aderezada acompañada de manzana, blueberries, nuez pecana, queso mozzarella fresco y apio.",
                 "price": 175,
+                "image": "/dishes/WALDORF.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -129,7 +131,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "REVUELTOS CON JAMÓN",
                 "description": "Acompañados de pan tostado, aguacate y frijoles maneados de la casa.",
                 "price": 166,
-                "image": "/dishes/huevos_board.png",
+                "image": "/dishes/REVUELTOS CON JAMON.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -143,7 +145,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "REVUELTOS CON TOCINO",
                 "description": "Acompañados de pan tostado, aguacate y frijoles maneados de la casa.",
                 "price": 166,
-                "image": "/dishes/huevos_board.png",
+                "image": "/dishes/REVUELTOS CON TOCINO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -157,7 +159,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "REVUELTOS A LA MEXICANA",
                 "description": "Con cebolla, jitomate y chile picado, acompañado con pan tostado, aguacate y frijoles maneados de la casa.",
                 "price": 166,
-                "image": "/dishes/huevos_board.png",
+                "image": "/dishes/REVUELTOS A LA MEXICANA.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -171,7 +173,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "HUEVOS BENEDICTINOS",
                 "description": "Huevos pochés servidos en bagel con dip de queso y jamón, bañados con salsa holandesa, con un toque de parmesano y perejil.",
                 "price": 194,
-                "image": "/dishes/huevos_board.png",
+                "image": "/dishes/HUEVOS BENEDICTINOS.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -185,7 +187,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "HUEVOS CACHARELO",
                 "description": "Huevos pochés sobre salsa pomodoro con queso mozzarella fresco y un toque picante, bañados en salsa holandesa con parmesano y albahaca, acompañados con pan tostado.",
                 "price": 212,
-                "image": "/dishes/huevos_board.png",
+                "image": "/dishes/HUEVOS CAHCARELO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -199,6 +201,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "OMELETTE DE ESPINACAS Y QUESO",
                 "description": "Acompañado de pan tostado, aguacate y frijoles maneados de la casa.",
                 "price": 185,
+                "image": "/dishes/OMELETTE DE ESPINACAS Y QUESO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -212,6 +215,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "OMELETTE DE CHAMPIÑONES Y QUESO",
                 "description": "Acompañado de pan tostado, aguacate y frijoles maneados de la casa.",
                 "price": 178,
+                "image": "/dishes/OMELETTE DE CHAMPIÑONES Y QUESO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -225,6 +229,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "OMELETTE DE CLARAS CON ESPINACA Y QUESO PANELA",
                 "description": "Acompañados de pan tostado, aguacate y frijoles maneados de la casa.",
                 "price": 180,
+                "image": "/dishes/OMELETTE DE CLARAS CON ESPINACA Y QUESO PANELA.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -238,7 +243,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "OMELETTE DE JAMÓN Y QUESO",
                 "description": "Acompañado de pan tostado, aguacate y frijoles maneados de la casa.",
                 "price": 178,
-                "image": "/dishes/huevos_board.png",
+                "image": "/dishes/OMELETTE DE JAMON Y QUESO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -262,7 +267,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "MINERAS",
                 "description": "Rellenas de pollo, bañadas con salsa verde de la casa y acompañadas de crema, queso panela, cebolla y aguacate.",
                 "price": 175,
-                "image": "/dishes/foccacia.png",
+                "image": "/dishes/ENCHILADAS MINERAS.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -276,7 +281,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "CHILAQUILES CACHARELO",
                 "description": "Verdes con pollo, huevos fritos, crema, queso y cebolla.",
                 "price": 196,
-                "image": "/dishes/huevos_board.png",
+                "image": "/dishes/CHILAQUILES CACHARELO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -299,7 +304,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "id": "waffle-fresa-crema",
                 "name": "CON FRESA Y CREMA",
                 "price": 141,
-                "image": "/dishes/wafles.png",
+                "image": "/dishes/WAFFLES CON FRESA Y CREMA.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -312,7 +317,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "id": "waffle-nutella",
                 "name": "CON PLÁTANO Y NUTELLA",
                 "price": 129,
-                "image": "/dishes/wafles.png",
+                "image": "/dishes/WAFFLES CON PLATANO Y NUTELLA.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -325,7 +330,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "id": "waffle-frutos-rojos",
                 "name": "CON FRUTOS ROJOS",
                 "price": 129,
-                "image": "/dishes/wafles.png",
+                "image": "/dishes/WAFFLES CON FRUTOS ROJOS.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -345,11 +350,11 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
         "layoutTemplate": "dense-list",
         "dishes": [
             {
-                "id": "bowl-yogurt",
+                "id": "bowl-mixto",
                 "name": "MIXTO",
                 "description": "Fruta de temporada acompañada de miel de abeja, yogurt y granola.",
                 "price": 135,
-                "image": "/dishes/wafles.png",
+                "image": "/dishes/BOWLS MIXTO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -363,7 +368,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "CON YOGURT",
                 "description": "Fruta de temporada acompañada de miel de abeja, yogurt y granola.",
                 "price": 148,
-                "image": "/dishes/wafles.png",
+                "image": "/dishes/BOWLS CON YOGURT.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -377,7 +382,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "DE FRUTOS ROJOS",
                 "description": "Mix de berries: blueberries, zarzamoras, frambuesas y fresas, acompañadas de queso cottage.",
                 "price": 178,
-                "image": "/dishes/wafles.png",
+                "image": "/dishes/BOWLS DE FRUTOS ROJOS.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -400,7 +405,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "DE JAMÓN Y QUESO",
                 "description": "Preparado con jitomate horneado a las finas hierbas, lechuga y nuestro aderezo de mayonesa chipotle.",
                 "price": 135,
-                "image": "/dishes/croissant.png",
+                "image": "/dishes/CROISSANT DE JAMON Y QUESO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -414,7 +419,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "DE HUEVO CON TOCINO",
                 "description": "Preparado con jitomate horneado a las finas hierbas, queso panela y aderezo de mayonesa chipotle.",
                 "price": 147,
-                "image": "/dishes/croissant.png",
+                "image": "/dishes/CROISSANT DE HUEVO CON TOCINO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -428,7 +433,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "ITALIANO",
                 "description": "Relleno de queso mozzarella fresco, jitomate a las finas hierbas y lechuga con vinagre balsámico y aceite de oliva.",
                 "price": 147,
-                "image": "/dishes/croissant.png",
+                "image": "/dishes/CROISSANT ITALIANO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -455,7 +460,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "CACHARELO CLUB",
                 "description": "De dos pisos, pan tostado preparado con jamón, queso machego, jitomate horneado, pollo a las finas hierbas, huevo frito, tocino y lechuga marinada con vinagre balsámico.",
                 "price": 205,
-                "image": "/dishes/sandwich.png",
+                "image": "/dishes/SANDWICHES CACHARELO CLUB.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -469,7 +474,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "CROQUE MONSIEUR",
                 "description": "De dos pisos, pan tostado relleno de jamón y queso manchego gratinado.",
                 "price": 142,
-                "image": "/dishes/sandwich.png",
+                "image": "/dishes/SANDWICHES CROQUE MONSIER.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -483,7 +488,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "CROQUE MADAME",
                 "description": "De dos pisos, pan tostado relleno de jamón y queso manchego gratinado con un huevo frito encima.",
                 "price": 160,
-                "image": "/dishes/sandwich.png",
+                "image": "/dishes/SANDWICHES CROQUE MADAME.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -497,7 +502,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "MONTECRISTO",
                 "description": "De dos pisos, capeado, relleno de jamón, queso manchego, pollo y jitomate horneado a las finas hierbas.",
                 "price": 172,
-                "image": "/dishes/sandwich.png",
+                "image": "/dishes/SANDWICHES MONTECRISTO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -520,7 +525,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "POLLO CAJÚN",
                 "description": "Acompañada de queso mozzarella fresco, jitomate horneado a las finas hierbas y lechuga marinada con vinagre balsámico.",
                 "price": 180,
-                "image": "/dishes/cesar_pollo.png",
+                "image": "/dishes/BAGUETTES POLLO CAJUN.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -534,7 +539,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "DE ARRACHERA",
                 "description": "Con frijoles maneados, cebolla caramelizada, queso manchego, aderezo de mayonesa chipotle y jitomate.",
                 "price": 200,
-                "image": "/dishes/foccacia.png",
+                "image": "/dishes/BAGUETTES DE ARRACHERA.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -548,7 +553,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "DE JAMÓN Y QUESO",
                 "description": "Acompañado de jitomate horneado, lechuga marinada con vinagre balsámico y aderezo de mayonesa chipotle.",
                 "price": 160,
-                "image": "/dishes/foccacia.png",
+                "image": "/dishes/BAGUETTES DE JAMON Y QUESO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -562,7 +567,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "A LOS 3 QUESOS",
                 "description": "Con queso mozzarella fresco, queso panela y queso manchego.",
                 "price": 170,
-                "image": "/dishes/foccacia.png",
+                "image": "/dishes/BAGUETTES A LOS TRES QUESOS.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -587,7 +592,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "DE JAMÓN Y QUESO",
                 "description": "Acompañado de jitomate a las finas hierbas, lechuga marinada con vinagre balsámico y dip de queso.",
                 "price": 155,
-                "image": "/dishes/bagel.png",
+                "image": "/dishes/BAGELS DE JAMON Y QUESO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -601,7 +606,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "DE SALMÓN AHUMADO",
                 "description": "Con queso mozzarella fresco, jitomate a las finas hierbas, lechuga marinada con vinagre balsámico y dip de queso.",
                 "price": 218,
-                "image": "/dishes/bagel.png",
+                "image": "/dishes/BAGELS DE SALMON AHUMADO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -615,7 +620,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "DE FRESA CON NUTELLA",
                 "description": "Con queso crema.",
                 "price": 145,
-                "image": "/dishes/bagel.png",
+                "image": "/dishes/BAGELS DE FRESA CON NUTELLA.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -639,7 +644,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "id": "croissant-natural",
                 "name": "CROISSANT",
                 "price": 53,
-                "image": "/dishes/croissant.png",
+                "image": "/dishes/CROISSANT.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -651,21 +656,13 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "croissant-almendra",
                 "name": "CROISSANT DE ALMENDRA",
-                "price": 65,
-                "image": "/dishes/croissant.png",
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                }
+                "price": 65
             },
             {
                 "id": "chocolatin",
                 "name": "CHOCOLATÍN",
                 "price": 65,
-                "image": "/dishes/croissant.png",
+                "image": "/dishes/CHOCOLATIN.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -678,32 +675,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "id": "rol-canela",
                 "name": "ROL DE CANELA",
                 "price": 59,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-            },
-            {
-                "id": "croissant-nutella-queso",
-                "name": "CROISSANT RELLENO DE NUTELLA CON QUESO",
-                "price": 145,
-                "image": "/dishes/croissant.png",
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-            },
-            {
-                "id": "croissant-frutos-rojos",
-                "name": "CROISSANT RELLENO DE FRUTOS ROJOS",
-                "price": 85,
-                "image": "/dishes/croissant.png",
+                "image": "/dishes/ROL DE CANELA.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -713,17 +685,19 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 }
             },
             {
+                "id": "croissant-nutella-queso",
+                "name": "CROISSANT RELLENO DE NUTELLA CON QUESO",
+                "price": 145
+            },
+            {
+                "id": "croissant-frutos-rojos",
+                "name": "CROISSANT RELLENO DE FRUTOS ROJOS",
+                "price": 85
+            },
+            {
                 "id": "croissant-pina",
                 "name": "CROISSANT RELLENO DE PIÑA",
-                "price": 88,
-                "image": "/dishes/croissant.png",
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
+                "price": 88
             }
         ]
     },
@@ -1644,19 +1618,13 @@ export const HAMBURGUESAS_MENU_PRESET: MenuCatalog = {
           name: "Cacharelo Suprema",
           description: "200g carne Angus, queso cheddar añejo, tocino ahumado, aros de cebolla y salsa BBQ de la casa.",
           price: 189,
-          image: "/dishes/sandwich.png",
-          imageMode: "transparent",
-          imageTransform: { scale: 1, x: 0, y: 0, rotation: 0 },
           featured: true
         },
         {
           id: "burger-suiza",
           name: "Champiñones & Provolone",
           description: "Pechuga a la parrilla o res con salteado de hongos silvestres al vino blanco y queso derretido.",
-          price: 195,
-          image: "/dishes/foccacia.png",
-          imageMode: "transparent",
-          imageTransform: { scale: 1, x: 0, y: 0, rotation: 0 }
+          price: 195
         }
       ]
     }
@@ -1708,19 +1676,13 @@ export const PASTES_MENU_PRESET: MenuCatalog = {
           name: "Paste Tradicional de Papa con Carne",
           description: "Carne de res molida con papa, cebolla finamente picada, perejil y un toque de chile serrano.",
           price: 32,
-          image: "/dishes/croissant.png",
-          imageMode: "transparent",
-          imageTransform: { scale: 1, x: 0, y: 0, rotation: 0 },
           featured: true
         },
         {
           id: "paste-tinga",
           name: "Paste de Tinga Poblana",
           description: "Pechuga de pollo deshebrada en caldillo de jitomate con chipotle y cebolla caramelizada.",
-          price: 32,
-          image: "/dishes/bagel.png",
-          imageMode: "transparent",
-          imageTransform: { scale: 1, x: 0, y: 0, rotation: 0 }
+          price: 32
         }
       ]
     }
