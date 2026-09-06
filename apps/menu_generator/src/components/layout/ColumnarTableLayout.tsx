@@ -99,17 +99,12 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
 
                   return (
                     <div key={idx} className="w-14 sm:w-16 text-center flex items-center justify-center">
-                      {priceVal !== null && priceVal !== undefined ? (
+                      {priceVal !== null && priceVal !== undefined && (
                         <span
                           className="text-sm sm:text-base font-cormorant font-bold tracking-wide w-full text-right"
                           style={{ color: WARM_GOLD }}
                         >
                           {formatPrice(priceVal)}
-                        </span>
-                      ) : (
-                        /* Clean, centered placeholder em-dash strictly contained in its column */
-                        <span className="w-full text-center text-xs font-montserrat font-semibold text-[#C8A265]/40 tracking-widest select-none">
-                          —
                         </span>
                       )}
                     </div>
