@@ -54,7 +54,7 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
                       <DishImageRenderer
                         dish={dish}
                         theme={theme}
-                        size={dishesWithImage.length > 3 ? 'sm' : 'md'}
+                        size={dishesWithoutImage.length > 0 ? 'sm' : (dishesWithImage.length > 3 ? 'sm' : 'md')}
                       />
                     </div>
 
@@ -64,7 +64,7 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
 
                       <div className="flex items-baseline justify-between gap-1.5">
                         <h4
-                          className="text-lg sm:text-xl md:text-2xl font-bold font-cormorant tracking-[0.08em] uppercase leading-tight shrink-0"
+                          className="text-lg sm:text-xl md:text-2xl font-bold font-cormorant tracking-[0.08em] uppercase leading-tight"
                           style={{ color: CHARCOAL }}
                         >
                           {dish.name}
@@ -115,7 +115,7 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
 
                       <div className="flex items-baseline justify-between gap-1.5">
                         <h4
-                          className="text-lg sm:text-xl md:text-2xl font-bold font-cormorant tracking-[0.08em] uppercase leading-tight shrink-0"
+                          className="text-lg sm:text-xl md:text-2xl font-bold font-cormorant tracking-[0.08em] uppercase leading-tight"
                           style={{ color: CHARCOAL }}
                         >
                           {dish.name}
@@ -163,7 +163,7 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
                       <DishImageRenderer
                         dish={dish}
                         theme={theme}
-                        size={dishesWithImage.length > 3 ? 'sm' : 'md'}
+                        size={dishesWithoutImage.length > 0 ? 'sm' : (dishesWithImage.length > 3 ? 'sm' : 'md')}
                       />
                     </div>
                   </>
@@ -191,25 +191,19 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
               </span>
             </div>
 
-            <div
-              className={
-                dishesWithoutImage.length > 1
-                  ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2'
-                  : 'max-w-xl mx-auto'
-              }
-            >
+            <div className="flex flex-col gap-y-2.5 w-full">
               {dishesWithoutImage.map((dish) => (
-                <div key={dish.id} className="group relative">
-                  <div className="flex items-baseline justify-between gap-1.5">
+                <div key={dish.id} className="group relative w-full">
+                  <div className="flex items-baseline justify-between gap-2 w-full">
                     <h4
-                      className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight shrink-0"
+                      className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight"
                       style={{ color: CHARCOAL }}
                     >
                       {dish.name || 'Especialidad'}
                     </h4>
 
                     {/* Dotted leader */}
-                    <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
+                    <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-2 mb-1 min-w-[20px]" />
 
                     {formatPrice(dish.price) && (
                       <span
