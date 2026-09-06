@@ -12,6 +12,7 @@ export interface Dish {
   name: string;
   description?: string | null;
   price?: number | null;
+  prices?: Record<string, number | null>;
   image?: string;
   imageProcessed?: string;
   imageMode?: ImageMode;
@@ -22,7 +23,7 @@ export interface Dish {
   notes?: string;
 }
 
-export type LayoutTemplate = 'auto' | 'hero-one' | 'diagonal-two' | 'editorial-three' | 'editorial-four' | 'dense-list';
+export type LayoutTemplate = 'auto' | 'hero-one' | 'diagonal-two' | 'editorial-three' | 'editorial-four' | 'dense-list' | 'columnar-table';
 
 export interface MenuSection {
   id: string;
@@ -34,6 +35,7 @@ export interface MenuSection {
   notes?: string | string[];
   review_required?: boolean;
   layoutTemplate?: LayoutTemplate;
+  priceHeaders?: string[];
   dishes: Dish[];
 }
 

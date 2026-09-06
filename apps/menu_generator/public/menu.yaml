@@ -322,7 +322,7 @@ menu:
         - id: dish-extras-0
           name: AGUACATE 80 GR
           description: null
-          price: 80
+          price: 40
         - id: dish-extras-1
           name: FRAMBUESA
           description: null
@@ -350,11 +350,11 @@ menu:
         - id: dish-extras-7
           name: LECHE 2 OZ
           description: null
-          price: null
+          price: 20
         - id: dish-extras-8
           name: TOCINO
           description: null
-          price: null
+          price: 40
         - id: dish-extras-9
           name: JUGO DE LIMÓN
           description: null
@@ -362,11 +362,11 @@ menu:
         - id: dish-extras-10
           name: LECHE DE AVENA
           description: null
-          price: null
+          price: 20
         - id: dish-extras-11
           name: HUEVO
           description: null
-          price: null
+          price: 15
         - id: dish-extras-12
           name: YOGURT
           description: null
@@ -374,7 +374,7 @@ menu:
         - id: dish-extras-13
           name: LECHE DE ALMENDRA
           description: null
-          price: null
+          price: 25
         - id: dish-extras-14
           name: FRIJOLES MANEADOS
           description: null
@@ -382,11 +382,11 @@ menu:
         - id: dish-extras-15
           name: JITOMATE A LAS FINAS HIERBAS
           description: null
-          price: null
+          price: 20
         - id: dish-extras-16
           name: GRANOLA
           description: null
-          price: null
+          price: 15
         - id: dish-extras-17
           name: PAN TOSTADO 2 PZ
           description: null
@@ -394,27 +394,27 @@ menu:
         - id: dish-extras-18
           name: DIP DE QUESO
           description: null
-          price: null
+          price: 30
         - id: dish-extras-19
           name: CREMA BATIDA
           description: null
-          price: null
+          price: 20
         - id: dish-extras-20
           name: PAN BAGUETTE
           description: null
-          price: null
+          price: 40
         - id: dish-extras-21
           name: JAMÓN
           description: null
-          price: null
+          price: 30
         - id: dish-extras-22
           name: MERMELADA DE FRUTOS ROJOS
           description: null
-          price: null
+          price: 20
         - id: dish-extras-23
-          name: JARABE
+          name: JARABE VAINILLA
           description: null
-          price: null
+          price: 25
         - id: dish-extras-24
           name: QUESO MANCHEGO
           description: null
@@ -422,7 +422,7 @@ menu:
         - id: dish-extras-25
           name: MERMELADA DE PIÑA
           description: null
-          price: null
+          price: 20
         - id: dish-extras-26
           name: QUESO MOZZARELLA
           description: null
@@ -430,11 +430,11 @@ menu:
         - id: dish-extras-27
           name: JARABE CARAMELO
           description: null
-          price: null
+          price: 25
         - id: dish-extras-28
           name: NUTELLA
           description: null
-          price: null
+          price: 20
         - id: dish-extras-29
           name: MIEL
           description: null
@@ -442,71 +442,127 @@ menu:
         - id: dish-extras-30
           name: JARABE AMARETTO
           description: null
-          price: null
+          price: 25
         - id: dish-extras-31
           name: FRUTOS ROJOS
           description: null
-          price: null
+          price: 45
         - id: dish-extras-32
           name: BLUEBERRIES
           description: null
-          price: null
+          price: 25
         - id: dish-extras-33
           name: CHAMPIÑÓN
           description: null
-          price: null
+          price: 25
         - id: dish-extras-34
           name: ZARZAMORA
           description: null
-          price: null
+          price: 25
+        - id: dish-extras-35
+          name: Espinaca
+          description: null
+          price: 20
+        - id: dish-extras-36
+          name: Pollo
+          description: null
+          price: 30
+        - id: dish-extras-37
+          name: Crema
+          description: null
+          price: 15
+        - id: dish-extras-38
+          name: Queso panela
+          description: null
+          price: 30
     - id: bebidas-calientes
       name: BEBIDAS
       subtitle: Calientes
       description: null
+      price_headers:
+        - 12 oz
+        - 16 oz
       notes:
         - Preparamos su bebida con leche entera o deslactosada sin costo extra.
         - 'Leches vegetales con costo extra: almendra y avena.'
       dishes:
         - id: espresso-sencillo
           name: ESPRESSO SENCILLO
-          description: null
+          description: Extracción corta de café puro y concentrado.
           price: 40
-          review_required: true
+          prices:
+            12 oz: 40
+            16 oz: null
+        - id: espresso-doble
+          name: ESPRESSO DOBLE
+          description: Doble extracción de espresso.
+          price: 62
+          prices:
+            12 oz: 62
+            16 oz: null
+        - id: sencillo-cortado
+          name: SENCILLO CORTADO
+          description: Espresso con un toque de leche vaporizada.
+          price: 56
+          prices:
+            12 oz: 56
+            16 oz: null
         - id: doble-cortado
           name: DOBLE CORTADO
-          description: null
-          price: 69
-          review_required: true
+          description: Doble espresso cortado con leche vaporizada.
+          price: 68
+          prices:
+            12 oz: 68
+            16 oz: null
         - id: americano
           name: AMERICANO
-          description: null
-          price: 99
-          review_required: true
-        - id: capuccino-caliente
-          name: CAPUCCINO
-          description: null
-          price: 92
-          review_required: true
-        - id: chocolate-caliente
-          name: CHOCOLATE
-          description: null
-          price: 100
-          review_required: true
-        - id: latte-caliente
-          name: LATTE
-          description: null
-          price: 101
-          review_required: true
-        - id: moka-caliente
-          name: MOKA
-          description: null
+          description: Extracción de café espresso con agua caliente.
           price: null
-          review_required: true
+          prices:
+            12 oz: 49
+            16 oz: 69
+        - id: capuccino
+          name: CAPUCCINO
+          description: Espresso con leche vaporizada y abundante espuma cremosa.
+          price: null
+          prices:
+            12 oz: 80
+            16 oz: 99
+        - id: chocolate
+          name: CHOCOLATE
+          description: Chocolate artesanal mexicano con leche espumada.
+          price: null
+          prices:
+            12 oz: 71
+            16 oz: 92
+        - id: latte
+          name: LATTE
+          description: Espresso suave con abundante leche cremada aterciopelada.
+          price: null
+          prices:
+            12 oz: 81
+            16 oz: 100
+        - id: moka
+          name: MOKA
+          description: Espresso combinado con chocolate y leche cremada.
+          price: null
+          prices:
+            12 oz: 82
+            16 oz: 101
+        - id: matcha
+          name: MATCHA
+          description: Té verde matcha japonés ceremonial con leche espumada.
+          price: null
+          prices:
+            12 oz: 87
+            16 oz: 109
         - id: flat-white
           name: FLAT WHITE
-          description: null
-          price: 102
-          review_required: true
+          description: Doble carga de espresso con fina microespuma sedosa.
+          price: null
+          prices:
+            12 oz: 83
+            16 oz: 102
     - id: tes
       name: TÉS
       subtitle: null

@@ -1212,155 +1212,115 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
         "quote": "“Buen café, grandes momentos”",
         "name": "BEBIDAS",
         "subtitle": "Calientes",
+        "priceHeaders": ["12 oz", "16 oz"],
+        "layoutTemplate": "columnar-table",
         "notes": [
             "Preparamos su bebida con leche entera o deslactosada sin costo extra.",
             "Leches vegetales con costo extra: almendra y avena."
         ],
-        "layoutTemplate": "dense-list",
         "dishes": [
             {
                 "id": "espresso-sencillo",
                 "name": "ESPRESSO SENCILLO",
+                "description": "Extracción corta de café puro y concentrado.",
                 "price": 40,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
+                "prices": {
+                    "12 oz": 40,
+                    "16 oz": null
+                }
             },
             {
                 "id": "espresso-doble",
                 "name": "ESPRESSO DOBLE",
+                "description": "Doble extracción de espresso.",
                 "price": 62,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
+                "prices": {
+                    "12 oz": 62,
+                    "16 oz": null
+                }
             },
             {
                 "id": "sencillo-cortado",
                 "name": "SENCILLO CORTADO",
+                "description": "Espresso con un toque de leche vaporizada.",
                 "price": 56,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
+                "prices": {
+                    "12 oz": 56,
+                    "16 oz": null
+                }
             },
             {
                 "id": "doble-cortado",
                 "name": "DOBLE CORTADO",
+                "description": "Doble espresso cortado con leche vaporizada.",
                 "price": 68,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
+                "prices": {
+                    "12 oz": 68,
+                    "16 oz": null
+                }
             },
             {
                 "id": "americano",
                 "name": "AMERICANO",
-                "price": 99,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
+                "description": "Extracción de café espresso con agua caliente.",
+                "prices": {
+                    "12 oz": 49,
+                    "16 oz": 69
+                }
             },
             {
-                "id": "capuccino-caliente",
+                "id": "capuccino",
                 "name": "CAPUCCINO",
-                "price": 92,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
+                "description": "Espresso con leche vaporizada y abundante espuma cremosa.",
+                "prices": {
+                    "12 oz": 80,
+                    "16 oz": 99
+                }
             },
             {
-                "id": "chocolate-caliente",
+                "id": "chocolate",
                 "name": "CHOCOLATE",
-                "price": 100,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
+                "description": "Chocolate artesanal mexicano con leche espumada.",
+                "prices": {
+                    "12 oz": 71,
+                    "16 oz": 92
+                }
             },
             {
-                "id": "latte-caliente",
+                "id": "latte",
                 "name": "LATTE",
-                "price": 101,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
+                "description": "Espresso suave con abundante leche cremada aterciopelada.",
+                "prices": {
+                    "12 oz": 81,
+                    "16 oz": 100
+                }
             },
             {
-                "id": "moka-caliente",
+                "id": "moka",
                 "name": "MOKA",
-                "price": null,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
+                "description": "Espresso combinado con chocolate y leche cremada.",
+                "prices": {
+                    "12 oz": 82,
+                    "16 oz": 101
+                }
+            },
+            {
+                "id": "matcha",
+                "name": "MATCHA",
+                "description": "Té verde matcha japonés ceremonial con leche espumada.",
+                "prices": {
+                    "12 oz": 87,
+                    "16 oz": 109
+                }
             },
             {
                 "id": "flat-white",
                 "name": "FLAT WHITE",
-                "price": 102,
-                "imageMode": "transparent",
-                "imageTransform": {
-                    "scale": 1,
-                    "x": 0,
-                    "y": 0,
-                    "rotation": 0
-                },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
+                "description": "Doble carga de espresso con fina microespuma sedosa.",
+                "prices": {
+                    "12 oz": 83,
+                    "16 oz": 102
+                }
             }
         ]
     },

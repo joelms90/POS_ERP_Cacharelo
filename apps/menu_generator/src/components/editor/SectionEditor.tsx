@@ -163,7 +163,8 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({
             onChange={(e) => onChange({ ...section, layoutTemplate: e.target.value as LayoutTemplate })}
             className="w-full px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
           >
-            <option value="auto">✨ Automático (Según número de platillos)</option>
+            <option value="auto">✨ Automático (Según número de platillos o precios)</option>
+            <option value="columnar-table">☕ Tabla Columnar / Bebidas (Variaciones 12 oz / 16 oz)</option>
             <option value="editorial-three">Editorial 3 Platillos (Estilo Cacharelo Escalonado)</option>
             <option value="diagonal-two">Diagonal Alternado (2 Platillos)</option>
             <option value="hero-one">Hero Especialidad (1 Platillo Destacado)</option>

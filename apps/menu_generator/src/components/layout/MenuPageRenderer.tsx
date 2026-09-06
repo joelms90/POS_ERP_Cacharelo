@@ -5,6 +5,7 @@ import { DiagonalTwoLayout } from './DiagonalTwoLayout';
 import { EditorialThreeLayout } from './EditorialThreeLayout';
 import { EditorialFourLayout } from './EditorialFourLayout';
 import { DenseListLayout } from './DenseListLayout';
+import { ColumnarTableLayout } from './ColumnarTableLayout';
 
 interface MenuPageRendererProps {
   section: MenuSection;
@@ -83,6 +84,17 @@ export const MenuPageRenderer: React.FC<MenuPageRendererProps> = ({
     if (section.layoutTemplate && section.layoutTemplate !== 'auto') {
       return section.layoutTemplate;
     }
+    // Auto-detect multi-size or beverage table
+    if (section.priceHeaders && section.priceHeaders.length > 0) {
+      return 'columnar-table';
+    }
+    const hasMultiplePrices = section.dishes.some(
+      (d) => d.prices && Object.keys(d.prices).length > 0
+    );
+    if (hasMultiplePrices) {
+      return 'columnar-table';
+    }
+
     const count = section.dishes.length;
     if (count === 1) return 'hero-one';
     if (count === 2) return 'diagonal-two';
@@ -245,6 +257,7 @@ export const MenuPageRenderer: React.FC<MenuPageRendererProps> = ({
         {layout === 'editorial-three' && <EditorialThreeLayout section={section} theme={theme} />}
         {layout === 'editorial-four' && <EditorialFourLayout section={section} theme={theme} />}
         {layout === 'dense-list' && <DenseListLayout section={section} theme={theme} />}
+        {layout === 'columnar-table' && <ColumnarTableLayout section={section} theme={theme} />}
       </main>
 
       {/* 6. Centered Micro-Footer with Hairline Rules & Page Numbers */}

@@ -43,6 +43,7 @@ export interface RawYamlMenu {
       name?: string;
       subtitle?: string;
       description?: string;
+      price_headers?: string[];
       review_required?: boolean;
       notes?: string | string[];
       dishes?: Array<{
@@ -50,6 +51,7 @@ export interface RawYamlMenu {
         name?: string | null;
         description?: string | null;
         price?: number | null;
+        prices?: Record<string, number | null>;
         image?: string;
         review_required?: boolean;
         notes?: string;
@@ -125,6 +127,7 @@ export function parseMenuYaml(yamlString: string, currentCatalog?: MenuCatalog):
         name: dishName,
         description: d.description ? d.description.trim() : undefined,
         price: d.price ?? null,
+        prices: d.prices || undefined,
         image: resolvedImg,
         imageMode: 'transparent',
         imageTransform: { scale: 1, x: 0, y: 0, rotation: 0 },
@@ -135,17 +138,28 @@ export function parseMenuYaml(yamlString: string, currentCatalog?: MenuCatalog):
     });
 
     let layoutTemplate: MenuSection['layoutTemplate'] = 'auto';
-    if (dishes.length === 1) layoutTemplate = 'hero-one';
-    else if (dishes.length === 2) layoutTemplate = 'diagonal-two';
-    else if (dishes.length === 3) layoutTemplate = 'editorial-three';
-    else if (dishes.length === 4) layoutTemplate = 'editorial-four';
-    else layoutTemplate = 'dense-list';
+    if (cat.price_headers && cat.price_headers.length > 0) {
+      layoutTemplate = 'columnar-table';
+    } else if (dishes.some((d) => d.prices && Object.keys(d.prices).length > 0)) {
+      layoutTemplate = 'columnar-table';
+    } else if (dishes.length === 1) {
+      layoutTemplate = 'hero-one';
+    } else if (dishes.length === 2) {
+      layoutTemplate = 'diagonal-two';
+    } else if (dishes.length === 3) {
+      layoutTemplate = 'editorial-three';
+    } else if (dishes.length === 4) {
+      layoutTemplate = 'editorial-four';
+    } else {
+      layoutTemplate = 'dense-list';
+    }
 
     return {
       id: cat.id || `sec-${idx}`,
       name: cat.name || 'CATEGORÍA',
       subtitle: cat.subtitle || undefined,
       description: cat.description || undefined,
+      priceHeaders: cat.price_headers || undefined,
       notes: cat.notes,
       review_required: cat.review_required,
       layoutTemplate,
@@ -263,6 +277,7 @@ export function exportMenuToYaml(catalog: MenuCatalog): string {
         name: sec.name,
         subtitle: sec.subtitle || null,
         description: sec.description || null,
+        price_headers: sec.priceHeaders || undefined,
         review_required: sec.review_required || undefined,
         notes: sec.notes || undefined,
         dishes: sec.dishes.map((d) => ({
@@ -270,6 +285,7 @@ export function exportMenuToYaml(catalog: MenuCatalog): string {
           name: d.name,
           description: d.description || null,
           price: d.price ?? null,
+          prices: d.prices || undefined,
           image: d.image || undefined,
           review_required: d.review_required || undefined,
           notes: d.notes || undefined

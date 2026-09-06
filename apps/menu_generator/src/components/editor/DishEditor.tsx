@@ -111,7 +111,12 @@ export const DishEditor: React.FC<DishEditorProps> = ({
               {dish.name || 'Platillo sin nombre'}
             </span>
             <span className="text-xs font-mono text-amber-400 font-medium">
-              ${dish.price || 0}
+              {dish.prices
+                ? Object.entries(dish.prices)
+                    .map(([s, p]) => (p !== null && p !== undefined ? `${s}: $${p}` : null))
+                    .filter(Boolean)
+                    .join(' · ') || `$${dish.price || 0}`
+                : `$${dish.price || 0}`}
             </span>
           </div>
         </div>
@@ -135,7 +140,7 @@ export const DishEditor: React.FC<DishEditorProps> = ({
         <div className="p-4 border-t border-zinc-800 space-y-4 bg-zinc-950/40">
           {/* Row 1: Name & Price */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
+            <div className={dish.prices ? 'sm:col-span-3' : 'sm:col-span-2'}>
               <label className="block text-xs font-medium text-zinc-400 mb-1">
                 Nombre del Platillo
               </label>
@@ -147,18 +152,52 @@ export const DishEditor: React.FC<DishEditorProps> = ({
                 className="w-full px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-amber-500 font-cormorant font-bold uppercase tracking-wider"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">
-                Precio ($)
-              </label>
-              <input
-                type="number"
-                value={dish.price || ''}
-                onChange={(e) => onChange({ ...dish, price: parseFloat(e.target.value) || 0 })}
-                placeholder="177"
-                className="w-full px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-amber-500 font-mono font-bold"
-              />
-            </div>
+            {!dish.prices && (
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">
+                  Precio ($)
+                </label>
+                <input
+                  type="number"
+                  value={dish.price || ''}
+                  onChange={(e) => onChange({ ...dish, price: parseFloat(e.target.value) || 0 })}
+                  placeholder="177"
+                  className="w-full px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-amber-500 font-mono font-bold"
+                />
+              </div>
+            )}
+            {dish.prices && (
+              <div className="sm:col-span-3 bg-zinc-900/90 border border-amber-500/20 rounded-lg p-2.5">
+                <span className="text-[11px] font-semibold text-amber-400 block mb-2">
+                  Precios por Tamaño (Variaciones)
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {Object.entries(dish.prices).map(([size, p]) => (
+                    <div key={size}>
+                      <label className="block text-[10px] text-zinc-400 mb-0.5 uppercase font-mono font-semibold">
+                        {size} ($)
+                      </label>
+                      <input
+                        type="number"
+                        value={p ?? ''}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? null : parseFloat(e.target.value) || 0;
+                          onChange({
+                            ...dish,
+                            prices: {
+                              ...dish.prices,
+                              [size]: val
+                            }
+                          });
+                        }}
+                        placeholder="—"
+                        className="w-full px-2.5 py-1 bg-zinc-950 border border-zinc-800 rounded text-xs text-zinc-200 focus:outline-none focus:border-amber-500 font-mono font-bold"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Row 2: Description */}
