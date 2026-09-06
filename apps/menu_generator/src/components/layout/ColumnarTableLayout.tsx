@@ -27,12 +27,12 @@ const SectionPhotoCard: React.FC<SectionPhotoCardProps> = ({
   if (!image) return null;
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl border border-[#C8A265]/40 bg-[#FAF7F2]/60 shadow-sm flex items-center justify-center shrink-0 group ${className}`}
+      className={`relative flex items-center justify-center shrink-0 bg-transparent group ${className}`}
     >
       <img
         src={image}
         alt={title}
-        className={`w-full h-full object-contain p-1 transition-transform duration-500 group-hover:scale-102 ${imageClassName}`}
+        className={`w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 drop-shadow-sm ${imageClassName}`}
       />
     </div>
   );
