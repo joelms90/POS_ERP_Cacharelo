@@ -191,7 +191,7 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({
 
         <div>
           <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-            Frase Decorativa Inclinada (Quote)
+            Frase del Encabezado (Lema / Quote)
           </label>
           <input
             type="text"

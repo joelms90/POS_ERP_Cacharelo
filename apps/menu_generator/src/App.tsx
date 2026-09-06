@@ -79,7 +79,15 @@ export function App() {
   });
 
   // Active page: -1 is Cover, 0+ is Section index, -99 is View All Pages
-  const [activePageIndex, setActivePageIndex] = useState<number>(-1);
+  const [activePageIndex, setActivePageIndex] = useState<number>(() => {
+    try {
+      const p = new URLSearchParams(window.location.search).get('page');
+      if (p !== null) return parseInt(p, 10);
+    } catch {
+      // ignore
+    }
+    return -1;
+  });
   const [sidebarTab, setSidebarTab] = useState<'sections' | 'branding' | 'theme'>('sections');
   const [zoom, setZoom] = useState<number>(0.72);
   const [designerMode, setDesignerMode] = useState<boolean>(false);
