@@ -247,16 +247,16 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
   }
 
   // SCENARIO 2: MULTI-DISH GRID (e.g. DESAYUNOS [8 dishes], EXTRAS)
-  // Shows dishes in a balanced 2-column grid with clean dotted leaders
+  // Shows dishes in a balanced 2-column grid with unclipped titles, visible prices, and full descriptions
   const isLargeList = dishes.length > 6;
 
   return (
-    <div className="w-full flex-1 flex flex-col justify-around py-2 px-2 sm:px-4">
+    <div className="w-full flex-1 flex flex-col justify-around py-2 px-1 sm:px-2">
       <div
         className={`w-full mx-auto ${
           isLargeList
-            ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3'
-            : 'grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4'
+            ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 sm:gap-x-7 gap-y-3.5'
+            : 'grid grid-cols-1 sm:grid-cols-2 gap-x-7 sm:gap-x-8 gap-y-4'
         }`}
       >
         {dishes.map((dish) => {
@@ -265,32 +265,29 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
           return (
             <div
               key={dish.id}
-              className={`group relative ${hasImage ? 'flex items-center gap-3' : ''}`}
+              className={`group relative ${hasImage ? 'flex items-start gap-2.5 sm:gap-3' : ''}`}
             >
               {/* Dish Photo Thumbnail (if dish has an image) */}
               {hasImage && (
-                <div className="shrink-0 flex items-center justify-center">
+                <div className="shrink-0 flex items-center justify-center pt-0.5">
                   <DishImageRenderer dish={dish} theme={theme} size="xs" />
                 </div>
               )}
 
               {/* Dish Typography & Pricing */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-baseline justify-between gap-1.5">
+                <div className="flex items-start justify-between gap-1.5 w-full">
                   <h4
-                    className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight shrink-0"
+                    className="text-[14px] sm:text-[15.5px] font-cormorant font-bold uppercase tracking-[0.05em] leading-[1.15] flex-1 min-w-0"
                     style={{ color: CHARCOAL }}
                   >
                     {dish.name || 'Especialidad'}
                   </h4>
 
-                  {/* Dotted leader */}
-                  <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
-
-                  {/* Price */}
+                  {/* Price - Always visible, right-aligned, shrink-0 */}
                   {formatPrice(dish.price) && (
                     <span
-                      className="text-sm sm:text-base font-cormorant font-bold tracking-wide shrink-0"
+                      className="text-sm sm:text-base font-cormorant font-bold tracking-wide shrink-0 whitespace-nowrap pl-1 leading-none pt-0.5"
                       style={{ color: WARM_GOLD }}
                     >
                       {formatPrice(dish.price)}
@@ -298,10 +295,10 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
                   )}
                 </div>
 
-                {/* Description */}
+                {/* Description - Full text, never cut off with line-clamp */}
                 {dish.description && (
                   <p
-                    className="text-[10.5px] sm:text-[11.5px] font-montserrat leading-relaxed opacity-85 mt-0.5 mb-1 line-clamp-2"
+                    className="text-[10px] sm:text-[10.5px] font-montserrat leading-relaxed opacity-85 mt-1"
                     style={{ color: CHARCOAL }}
                   >
                     {dish.description}
@@ -310,11 +307,11 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
 
                 {/* Tags */}
                 {dish.tags && dish.tags.length > 0 && (
-                  <div className="flex items-center gap-1.5 mb-0.5">
+                  <div className="flex items-center gap-1.5 mt-1">
                     {dish.tags.map((tag, idx) => (
                       <span
                         key={idx}
-                        className="text-[9px] uppercase font-montserrat font-medium tracking-wider italic"
+                        className="text-[8.5px] sm:text-[9px] uppercase font-montserrat font-medium tracking-wider italic"
                         style={{ color: WARM_GOLD }}
                       >
                         · {tag} ·
