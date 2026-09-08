@@ -246,7 +246,168 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
     );
   }
 
-  // SCENARIO 2: MULTI-DISH GRID (e.g. DESAYUNOS [8 dishes], EXTRAS)
+  // SCENARIO 2: CATEGORIZED 2-COLUMN SPLIT (e.g. DESAYUNOS: Huevos on Left, Omelettes on Right)
+  // Eliminates blank space, balances 5 items per column, and adds house accompaniments card & bakery banner
+  const isHuevosAndOmelettes = React.useMemo(() => {
+    const huevos = dishes.filter((d) => !d.name.toLowerCase().includes('omelette'));
+    const omelettes = dishes.filter((d) => d.name.toLowerCase().includes('omelette'));
+    return huevos.length > 0 && omelettes.length > 0 && huevos.length + omelettes.length === dishes.length;
+  }, [dishes]);
+
+  if (isHuevosAndOmelettes) {
+    const huevos = dishes.filter((d) => !d.name.toLowerCase().includes('omelette'));
+    const omelettes = dishes.filter((d) => d.name.toLowerCase().includes('omelette'));
+
+    const renderDishCard = (dish: any) => {
+      const hasImage = Boolean(dish.image || dish.imageProcessed);
+
+      return (
+        <div key={dish.id} className="group relative flex items-start gap-2.5 sm:gap-3 w-full">
+          {hasImage && (
+            <div className="shrink-0 flex items-center justify-center pt-0.5">
+              <DishImageRenderer dish={dish} theme={theme} size="xs" />
+            </div>
+          )}
+
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <div className="flex items-start justify-between gap-1.5 w-full">
+              <h4
+                className="text-[14px] sm:text-[15.5px] font-cormorant font-bold uppercase tracking-[0.05em] leading-[1.15] flex-1 min-w-0"
+                style={{ color: CHARCOAL }}
+              >
+                {dish.name || 'Especialidad'}
+              </h4>
+
+              {formatPrice(dish.price) && (
+                <span
+                  className="text-sm sm:text-base font-cormorant font-bold tracking-wide shrink-0 whitespace-nowrap pl-1 leading-none pt-0.5"
+                  style={{ color: WARM_GOLD }}
+                >
+                  {formatPrice(dish.price)}
+                </span>
+              )}
+            </div>
+
+            {dish.description && (
+              <p
+                className="text-[10px] sm:text-[10.5px] font-montserrat leading-relaxed opacity-85 mt-1"
+                style={{ color: CHARCOAL }}
+              >
+                {dish.description}
+              </p>
+            )}
+
+            {dish.tags && dish.tags.length > 0 && (
+              <div className="flex items-center gap-1.5 mt-1">
+                {dish.tags.map((tag: string, idx: number) => (
+                  <span
+                    key={idx}
+                    className="text-[8.5px] sm:text-[9px] uppercase font-montserrat font-medium tracking-wider italic"
+                    style={{ color: WARM_GOLD }}
+                  >
+                    · {tag} ·
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div className="w-full flex-1 flex flex-col justify-between py-2 px-1 sm:px-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 sm:gap-x-10 gap-y-6 w-full flex-1">
+          {/* Column 1: Huevos */}
+          <div className="flex flex-col justify-between h-full">
+            <div className="pb-1.5 mb-3 border-b border-[#C8A265]/40 flex items-center justify-between">
+              <span
+                className="text-[10px] sm:text-[11px] font-montserrat uppercase tracking-[0.25em] font-semibold"
+                style={{ color: MUTED_BRONZE }}
+              >
+                Huevos al Gusto & Especiales
+              </span>
+              <span
+                className="text-[9px] font-montserrat uppercase tracking-[0.2em] font-medium opacity-65"
+                style={{ color: WARM_GOLD }}
+              >
+                Recetas de la Casa
+              </span>
+            </div>
+
+            <div className="flex flex-col justify-between gap-y-3.5 sm:gap-y-4 flex-1">
+              {huevos.map(renderDishCard)}
+            </div>
+          </div>
+
+          {/* Column 2: Omelettes */}
+          <div className="flex flex-col justify-between h-full">
+            <div className="pb-1.5 mb-3 border-b border-[#C8A265]/40 flex items-center justify-between">
+              <span
+                className="text-[10px] sm:text-[11px] font-montserrat uppercase tracking-[0.25em] font-semibold"
+                style={{ color: MUTED_BRONZE }}
+              >
+                Omelettes Preparados
+              </span>
+              <span
+                className="text-[9px] font-montserrat uppercase tracking-[0.2em] font-medium opacity-65"
+                style={{ color: WARM_GOLD }}
+              >
+                3 Huevos al Momento
+              </span>
+            </div>
+
+            <div className="flex flex-col justify-between gap-y-3.5 sm:gap-y-4 flex-1">
+              {omelettes.map(renderDishCard)}
+
+              {/* 5th slot: Accompaniments Card */}
+              <div className="rounded-xl border border-[#C8A265]/35 bg-[#FAF7F2]/60 p-3 sm:p-3.5 flex flex-col justify-center text-center shadow-xs">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <span className="w-5 h-0 border-t border-[#C8A265]/60" />
+                  <span
+                    className="text-[9px] sm:text-[9.5px] font-montserrat uppercase tracking-[0.25em] font-bold"
+                    style={{ color: WARM_GOLD }}
+                  >
+                    Acompañamientos Incluidos
+                  </span>
+                  <span className="w-5 h-0 border-t border-[#C8A265]/60" />
+                </div>
+                <p
+                  className="text-[10px] sm:text-[10.5px] font-montserrat leading-relaxed opacity-90"
+                  style={{ color: CHARCOAL }}
+                >
+                  Todos nuestros desayunos incluyen <strong className="font-semibold">pan tostado</strong>, <strong className="font-semibold">aguacate fresco</strong> y <strong className="font-semibold">frijoles maneados</strong> de la casa.
+                </p>
+                <span
+                  className="text-[8.5px] sm:text-[9px] font-montserrat tracking-wider uppercase mt-1 italic opacity-75"
+                  style={{ color: MUTED_BRONZE }}
+                >
+                  * Preparación con claras disponible en cualquier platillo
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Bakery / Sides Note Banner */}
+        <div className="mt-4 pt-2.5 border-t border-[#C8A265]/35 flex flex-col sm:flex-row items-center justify-between text-center px-4 py-2 bg-[#FAF7F2]/50 rounded-xl">
+          <div className="flex items-center gap-2">
+            <span className="text-xs">🍞</span>
+            <span className="text-[10px] sm:text-[10.5px] font-montserrat text-[#5C5449] font-medium tracking-wide">
+              Pan artesanal horneado diariamente en nuestra cocina
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-[9px] sm:text-[9.5px] font-montserrat text-[#8C7A65] mt-1 sm:mt-0 tracking-wider uppercase">
+            <span>• Huevos 100% de Granja</span>
+            <span>• Ingredientes Frescos</span>
+            <span>• Hecho al Momento</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // SCENARIO 3: GENERAL MULTI-DISH GRID (e.g. EXTRAS, OTHER DENSE LISTS)
   // Shows dishes in a balanced 2-column grid with unclipped titles, visible prices, and full descriptions
   const isLargeList = dishes.length > 6;
 
