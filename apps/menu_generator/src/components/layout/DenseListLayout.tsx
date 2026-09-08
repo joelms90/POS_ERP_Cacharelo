@@ -246,7 +246,53 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
     );
   }
 
-  // SCENARIO 2: MULTI-DISH GRID (e.g. DESAYUNOS [8-9 dishes], EXTRAS)
+  // SCENARIO 3: HIGH-DENSITY COMPACT LIST (e.g. EXTRAS [20-45 items, text-only])
+  // Fits all items comfortably on a single page with elegant dotted leaders and zero clipping
+  if (dishes.length > 15) {
+    return (
+      <div className="w-full flex-1 flex flex-col justify-around py-3 sm:py-5 px-2 sm:px-4">
+        <div className="w-full mx-auto grid grid-cols-1 sm:grid-cols-2 gap-x-8 sm:gap-x-12 gap-y-2 sm:gap-y-2.5">
+          {dishes.map((dish) => (
+            <div key={dish.id} className="flex items-baseline justify-between gap-1 w-full group py-0.5">
+              <span
+                className="text-[13px] sm:text-[14px] font-cormorant font-bold uppercase tracking-[0.05em] leading-tight shrink-0"
+                style={{ color: CHARCOAL }}
+              >
+                {dish.name || 'Extra'}
+              </span>
+
+              {/* Dotted leader */}
+              <div className="flex-1 border-b border-dotted border-[#C8A265]/40 mx-2 mb-0.5 min-w-[12px]" />
+
+              {formatPrice(dish.price) && (
+                <span
+                  className="text-[12.5px] sm:text-[13.5px] font-cormorant font-bold tracking-wide shrink-0 whitespace-nowrap leading-none"
+                  style={{ color: WARM_GOLD }}
+                >
+                  {formatPrice(dish.price)}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {notesList.length > 0 && (
+          <div className="mt-2.5 pt-2 border-t border-[#C8A265]/40 flex flex-col items-center justify-center text-center px-4 bg-[#FAF7F2]/60 rounded-lg py-1">
+            {notesList.map((note, idx) => (
+              <p
+                key={idx}
+                className="text-[10px] sm:text-[10.5px] font-montserrat font-medium italic tracking-wide text-[#5C5449] opacity-90 leading-tight my-0.5"
+              >
+                * {note}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // SCENARIO 2: MULTI-DISH GRID (e.g. DESAYUNOS [8-9 dishes])
   // Evenly distributes rows across the page height with unclipped titles, visible prices, and full descriptions
   const isLargeList = dishes.length > 6;
 

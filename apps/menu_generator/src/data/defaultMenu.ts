@@ -91,7 +91,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "del-chef",
                 "name": "DEL CHEF",
-                "description": "Lechuga con nuestra vinagreta de cítricos acompañada de jamónjj, queso manchego, pechuga de pollo y huevo cocido.",
+                "description": "Lechuga con nuestra vinagreta de cítricos acompañada de jamón, queso manchego, pechuga de pollo y huevo cocido.",
                 "price": 185,
                 "image": "/dishes/DEL CHEF.jpeg",
                 "imageMode": "transparent",
@@ -441,10 +441,6 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                     "y": 0,
                     "rotation": 0
                 },
-                "review_required": true,
-                "tags": [
-                    "Revisar"
-                ]
             }
         ]
     },
@@ -618,7 +614,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "bagel-fresa-nutella",
                 "name": "DE FRESA CON NUTELLA",
-                "description": "Con queso crema.",
+                "description": "De fresa con Nutella y queso crema.",
                 "price": 145,
                 "image": "/dishes/BAGELS DE FRESA CON NUTELLA.jpeg",
                 "imageMode": "transparent",
