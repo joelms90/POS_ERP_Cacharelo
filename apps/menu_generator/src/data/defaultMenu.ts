@@ -329,7 +329,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "waffle-frutos-rojos",
                 "name": "CON FRUTOS ROJOS",
-                "price": 129,
+                "price": 159,
                 "image": "/dishes/WAFFLES CON FRUTOS ROJOS.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
@@ -418,7 +418,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "id": "croissant-huevo-tocino",
                 "name": "DE HUEVO CON TOCINO",
                 "description": "Preparado con jitomate horneado a las finas hierbas, queso panela y aderezo de mayonesa chipotle.",
-                "price": 147,
+                "price": 135,
                 "image": "/dishes/CROISSANT DE HUEVO CON TOCINO.jpeg",
                 "imageMode": "transparent",
                 "imageTransform": {
@@ -486,7 +486,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "croque-madame",
                 "name": "CROQUE MADAME",
-                "description": "De dos pisos, pan tostado relleno de jamón y queso manchego gratinado con un huevo frito encima.",
+                "description": "De dos pisos, pan tostado relleno de jamón y queso manchego gratinado, coronado con un huevo frito.",
                 "price": 160,
                 "image": "/dishes/SANDWICHES CROQUE MADAME.jpeg",
                 "imageMode": "transparent",
@@ -916,7 +916,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             {
                 "id": "dish-extras-17",
                 "name": "PAN TOSTADO 2 PZ",
-                "price": 20,
+                "price": 15,
                 "imageMode": "transparent",
                 "imageTransform": {
                     "scale": 1,
@@ -1197,7 +1197,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "id": "espresso-sencillo",
                 "name": "ESPRESSO SENCILLO",
                 "description": "Extracción corta de café puro y concentrado.",
-                "price": 40,
+                "price": 49,
                 "image": "/dishes/CAFE ESPRESSO.jpeg",
                 "featured": true
             },
