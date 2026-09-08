@@ -462,19 +462,19 @@ menu:
           description: null
           price: 25
         - id: dish-extras-35
-          name: Espinaca
+          name: ESPINACA
           description: null
           price: 20
         - id: dish-extras-36
-          name: Pollo
+          name: POLLO
           description: null
           price: 30
         - id: dish-extras-37
-          name: Crema
+          name: CREMA
           description: null
           price: 15
         - id: dish-extras-38
-          name: Queso panela
+          name: QUESO PANELA
           description: null
           price: 30
     - id: bebidas-calientes

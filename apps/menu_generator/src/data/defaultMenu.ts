@@ -1127,7 +1127,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             },
             {
                 "id": "dish-extras-35",
-                "name": "Espinaca",
+                "name": "ESPINACA",
                 "price": 20,
                 "imageMode": "transparent",
                 "imageTransform": {
@@ -1139,7 +1139,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             },
             {
                 "id": "dish-extras-36",
-                "name": "Pollo",
+                "name": "POLLO",
                 "price": 30,
                 "imageMode": "transparent",
                 "imageTransform": {
@@ -1151,7 +1151,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             },
             {
                 "id": "dish-extras-37",
-                "name": "Crema",
+                "name": "CREMA",
                 "price": 15,
                 "imageMode": "transparent",
                 "imageTransform": {
@@ -1163,7 +1163,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
             },
             {
                 "id": "dish-extras-38",
-                "name": "Queso panela",
+                "name": "QUESO PANELA",
                 "price": 30,
                 "imageMode": "transparent",
                 "imageTransform": {
