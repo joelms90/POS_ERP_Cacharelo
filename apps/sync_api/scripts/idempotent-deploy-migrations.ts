@@ -324,6 +324,22 @@ async function main() {
     await client.query('CREATE INDEX IF NOT EXISTS "idx_bst_business" ON "branch_stock_thresholds" USING btree ("business_id");');
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS "warehouse_stock_thresholds" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "business_id" uuid NOT NULL REFERENCES "public"."businesses"("id"),
+        "product_id" uuid NOT NULL REFERENCES "public"."products"("id"),
+        "warehouse_id" uuid NOT NULL REFERENCES "public"."warehouses"("id"),
+        "min_stock" numeric(12, 3) DEFAULT '0.000',
+        "max_stock" numeric(12, 3) DEFAULT '0.000',
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_by" uuid REFERENCES "public"."users"("id")
+      );
+    `);
+    await client.query('CREATE UNIQUE INDEX IF NOT EXISTS "unq_wst_product_warehouse" ON "warehouse_stock_thresholds" USING btree ("product_id","warehouse_id");');
+    await client.query('CREATE INDEX IF NOT EXISTS "idx_wst_warehouse" ON "warehouse_stock_thresholds" USING btree ("warehouse_id");');
+    await client.query('CREATE INDEX IF NOT EXISTS "idx_wst_business" ON "warehouse_stock_thresholds" USING btree ("business_id");');
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS "inventory_alerts" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
         "business_id" uuid NOT NULL REFERENCES "public"."businesses"("id"),

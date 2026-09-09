@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { api, Warehouse } from '../services/api';
+import { api, Warehouse, WarehouseStockThreshold, ThresholdSuggestion } from '../services/api';
 import { Heading } from '../components/atoms/Heading';
+import { Button } from '../components/atoms/Button';
 import { Input } from '../components/atoms/Input';
 import { ToastContainer } from '../components/molecules/ToastNotification';
 
@@ -48,10 +49,16 @@ const effectiveType = (s: StockLevel): LocationType => {
 export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ businessId }) => {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [stock, setStock] = useState<StockLevel[]>([]);
+  const [thresholds, setThresholds] = useState<WarehouseStockThreshold[]>([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [draftThresholds, setDraftThresholds] = useState<Record<string, { min: string; max: string }>>({});
+  const [showSuggest, setShowSuggest] = useState(false);
+  const [suggestions, setSuggestions] = useState<ThresholdSuggestion[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [applyingSuggest, setApplyingSuggest] = useState(false);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
@@ -66,12 +73,14 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [warehousesData, stockData] = await Promise.all([
+      const [warehousesData, stockData, thresholdsData] = await Promise.all([
         api.getWarehouses(businessId),
         api.getStockLevels(businessId),
+        api.getWarehouseThresholds(businessId),
       ]);
       setWarehouses(warehousesData);
       setStock(stockData);
+      setThresholds(thresholdsData);
     } catch (err: any) {
       showToast(err.message || 'Error al cargar el inventario por bodega.', 'error');
     } finally {
@@ -127,6 +136,101 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
     return { warehousesCount, factoriesCount, branchesCount };
   }, [warehouses, stock]);
 
+  const thresholdFor = useCallback((productId: string, warehouseId: string) => {
+    return thresholds.find((t) => t.productId === productId && t.warehouseId === warehouseId);
+  }, [thresholds]);
+
+  const draftKey = (productId: string, warehouseId: string) => `${productId}|${warehouseId}`;
+
+  const draftValue = (productId: string, warehouseId: string, field: 'min' | 'max'): string => {
+    const key = draftKey(productId, warehouseId);
+    if (draftThresholds[key]) return draftThresholds[key][field];
+    const t = thresholdFor(productId, warehouseId);
+    if (!t) return '';
+    const val = field === 'min' ? parseFloat(t.minStock) : parseFloat(t.maxStock);
+    return val > 0 ? String(val) : '';
+  };
+
+  const handleDraftChange = (productId: string, warehouseId: string, field: 'min' | 'max', value: string) => {
+    const key = draftKey(productId, warehouseId);
+    setDraftThresholds((prev) => ({
+      ...prev,
+      [key]: { min: prev[key]?.min ?? draftValue(productId, warehouseId, 'min'), max: prev[key]?.max ?? draftValue(productId, warehouseId, 'max'), [field]: value },
+    }));
+  };
+
+  const saveThreshold = async (productId: string, warehouseId: string) => {
+    const key = draftKey(productId, warehouseId);
+    const draft = draftThresholds[key];
+    if (!draft) return;
+    const minStock = draft.min === '' ? 0 : parseFloat(draft.min);
+    const maxStock = draft.max === '' ? 0 : parseFloat(draft.max);
+    if (isNaN(minStock) || isNaN(maxStock)) return;
+    try {
+      await api.upsertWarehouseThreshold({ businessId, productId, warehouseId, minStock, maxStock });
+      setDraftThresholds((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      const [updated] = await Promise.all([api.getWarehouseThresholds(businessId)]);
+      setThresholds(updated);
+      showToast('Mínimo/máximo guardado.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Error al guardar el umbral.', 'error');
+    }
+  };
+
+  const openSuggest = async () => {
+    setSuggestLoading(true);
+    setShowSuggest(true);
+    try {
+      const data = await api.getThresholdSuggestions(businessId, 4);
+      setSuggestions(data);
+    } catch (err: any) {
+      showToast(err.message || 'Error al calcular sugerencias.', 'error');
+    } finally {
+      setSuggestLoading(false);
+    }
+  };
+
+  const applySuggestions = async () => {
+    setApplyingSuggest(true);
+    try {
+      const suggestionByProduct = new Map(suggestions.map((s) => [s.productId, s]));
+      let applied = 0;
+      for (const s of suggestions) {
+        const warehouseIds = new Set(
+          stock
+            .filter((r) => r.productId === s.productId && r.warehouseId != null)
+            .map((r) => r.warehouseId as string),
+        );
+        const targets = selectedWarehouseId
+          ? (warehouseIds.has(selectedWarehouseId) ? [selectedWarehouseId] : [])
+          : Array.from(warehouseIds);
+        for (const wh of targets) {
+          const sug = suggestionByProduct.get(s.productId)!;
+          await api.upsertWarehouseThreshold({
+            businessId,
+            productId: s.productId,
+            warehouseId: wh,
+            minStock: sug.suggestedMin,
+            maxStock: sug.suggestedMax,
+          });
+          applied++;
+        }
+      }
+      const [updated] = await Promise.all([api.getWarehouseThresholds(businessId)]);
+      setThresholds(updated);
+      setShowSuggest(false);
+      showToast(`Se aplicaron ${applied} umbrales sugeridos.`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Error al aplicar sugerencias.', 'error');
+    } finally {
+      setApplyingSuggest(false);
+    }
+  };
+
   const typeBadge = (type: LocationType) => {
     if (type === 'factory') {
       return <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-wider bg-champagne-gold/15 text-champagne-gold">Fábrica</span>;
@@ -153,6 +257,9 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
             Consulta el stock de cada bodega, fábrica de ensamble y sucursal.
           </p>
         </div>
+        <Button variant="secondary" size="sm" onClick={openSuggest} disabled={suggestLoading}>
+          Sugerir min/max (ventas semanales)
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -237,18 +344,22 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
                   <th className="px-6 py-4">Ubicación</th>
                   <th className="px-6 py-4">Tipo</th>
                   <th className="px-6 py-4 text-right">Stock</th>
+                  <th className="px-6 py-4 text-right">Min</th>
+                  <th className="px-6 py-4 text-right">Max</th>
                   <th className="px-6 py-4 text-right">Actualizado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-aged-bronze/20 text-sm">
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-text-secondary italic">
+                    <td colSpan={9} className="px-6 py-12 text-center text-text-secondary italic">
                       No hay existencias registradas para el filtro seleccionado.
                     </td>
                   </tr>
                 ) : (
-                  rows.map((r) => (
+                  rows.map((r) => {
+                    const whId = r.warehouseId;
+                    return (
                     <tr key={r.id} className="hover:bg-charcoal-surface/20 transition-colors">
                       <td className="px-6 py-4 font-medium text-text-primary text-xs">{r.productName}</td>
                       <td className="px-6 py-4 text-text-secondary text-xs font-mono">{r.internalCode || r.sku || '—'}</td>
@@ -258,11 +369,45 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
                       <td className="px-6 py-4 text-right font-mono font-semibold text-champagne-gold text-xs">
                         {parseFloat(r.quantity || '0').toFixed(decimals(r.uom))} <span className="text-text-secondary text-[10px]">{r.uom || ''}</span>
                       </td>
+                      {whId ? (
+                        <>
+                          <td className="px-3 py-4 text-right">
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              value={draftValue(r.productId, whId, 'min')}
+                              onChange={(e) => handleDraftChange(r.productId, whId, 'min', e.target.value)}
+                              onBlur={() => saveThreshold(r.productId, whId)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') saveThreshold(r.productId, whId); }}
+                              className="w-20 bg-charcoal border border-aged-bronze/40 rounded px-2 py-1 text-right text-xs text-text-primary focus:outline-none focus:border-champagne-gold"
+                            />
+                          </td>
+                          <td className="px-3 py-4 text-right">
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              value={draftValue(r.productId, whId, 'max')}
+                              onChange={(e) => handleDraftChange(r.productId, whId, 'max', e.target.value)}
+                              onBlur={() => saveThreshold(r.productId, whId)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') saveThreshold(r.productId, whId); }}
+                              className="w-20 bg-charcoal border border-aged-bronze/40 rounded px-2 py-1 text-right text-xs text-text-primary focus:outline-none focus:border-champagne-gold"
+                            />
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-3 py-4 text-right text-text-secondary/40 text-xs">—</td>
+                          <td className="px-3 py-4 text-right text-text-secondary/40 text-xs">—</td>
+                        </>
+                      )}
                       <td className="px-6 py-4 text-right text-text-secondary text-xs whitespace-nowrap">
                         {r.updatedAt ? new Date(r.updatedAt).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -274,6 +419,74 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
           <span className="font-mono">Bodegas: {locationCounts.warehousesCount} · Fábricas: {locationCounts.factoriesCount} · Sucursales: {locationCounts.branchesCount}</span>
         </div>
       </div>
+
+      {/* Suggestions Modal */}
+      {showSuggest && (
+        <div className="fixed inset-0 bg-obsidian/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in font-sans">
+          <div className="bg-onyx-surface border border-aged-bronze/35 rounded-xl max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-aged-bronze/25 flex items-center justify-between">
+              <div>
+                <Heading level={2} className="!text-champagne-gold !border-none !pb-0 font-light font-sans text-lg">
+                  Sugerir mínimos y máximos
+                </Heading>
+                <p className="text-xs text-text-secondary mt-1">
+                  Basado en el promedio de ventas semanales (últimas 4 semanas). Mínimo = 1 semana, Máximo = 2 semanas.
+                </p>
+              </div>
+              <button onClick={() => setShowSuggest(false)} className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-6">
+              {suggestLoading ? (
+                <div className="py-12 text-center text-text-secondary text-xs">Calculando sugerencias...</div>
+              ) : suggestions.length === 0 ? (
+                <div className="py-12 text-center text-text-secondary/50 text-xs">
+                  No hay ventas registradas en las últimas 4 semanas para sugerir umbrales.
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-charcoal-surface/60 border-b border-aged-bronze/35 text-[11px] font-semibold text-text-secondary uppercase tracking-wider">
+                      <th className="px-4 py-3">Producto</th>
+                      <th className="px-4 py-3 text-right">Prom. semanal</th>
+                      <th className="px-4 py-3 text-right">Min sugerido</th>
+                      <th className="px-4 py-3 text-right">Max sugerido</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-aged-bronze/20">
+                    {suggestions.map((s) => (
+                      <tr key={s.productId} className="hover:bg-charcoal-surface/20">
+                        <td className="px-4 py-3 font-medium text-text-primary">{s.productName}</td>
+                        <td className="px-4 py-3 text-right font-mono text-text-secondary">{s.weeklyAverage}</td>
+                        <td className="px-4 py-3 text-right font-mono text-champagne-gold">{s.suggestedMin}</td>
+                        <td className="px-4 py-3 text-right font-mono text-champagne-gold">{s.suggestedMax}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-aged-bronze/25 flex flex-col gap-2">
+              <p className="text-[11px] text-text-secondary">
+                {selectedWarehouseId
+                  ? `Se aplicará a la bodega seleccionada (${warehouses.find((w) => w.id === selectedWarehouseId)?.name || '—'}).`
+                  : 'Se aplicará a todas las bodegas que manejen cada producto.'}
+              </p>
+              <div className="flex gap-3">
+                <Button onClick={applySuggestions} disabled={applyingSuggest || suggestions.length === 0} className="flex-1">
+                  {applyingSuggest ? 'Aplicando...' : 'Aplicar sugerencias'}
+                </Button>
+                <Button variant="secondary" onClick={() => setShowSuggest(false)} className="flex-1">Cerrar</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

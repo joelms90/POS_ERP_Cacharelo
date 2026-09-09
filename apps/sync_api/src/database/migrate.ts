@@ -224,6 +224,28 @@ export async function runMigrations() {
     );
 
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS warehouse_stock_thresholds (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        business_id uuid NOT NULL REFERENCES businesses(id),
+        product_id uuid NOT NULL REFERENCES products(id),
+        warehouse_id uuid NOT NULL REFERENCES warehouses(id),
+        min_stock numeric(12, 3) DEFAULT '0.000',
+        max_stock numeric(12, 3) DEFAULT '0.000',
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        updated_by uuid REFERENCES users(id)
+      );
+    `);
+    await db.execute(
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS unq_wst_product_warehouse ON warehouse_stock_thresholds(product_id, warehouse_id);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_wst_warehouse ON warehouse_stock_thresholds(warehouse_id);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_wst_business ON warehouse_stock_thresholds(business_id);`,
+    );
+
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS inventory_alerts (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         business_id uuid NOT NULL REFERENCES businesses(id),

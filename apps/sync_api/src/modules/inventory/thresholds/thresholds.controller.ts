@@ -28,6 +28,27 @@ class UpsertThresholdDto {
   maxStock?: number;
 }
 
+class UpsertWarehouseThresholdDto {
+  @IsUUID()
+  businessId: string;
+
+  @IsUUID()
+  productId: string;
+
+  @IsUUID()
+  warehouseId: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  minStock?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  maxStock?: number;
+}
+
 @Controller('inventory/thresholds')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ThresholdsController {
@@ -58,5 +79,39 @@ export class ThresholdsController {
   @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
   async remove(@Param('id') id: string) {
     return this.thresholdsService.remove(id);
+  }
+
+  @Get('warehouses')
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
+  async listWarehouses(@Query('businessId') businessId: string, @Query('warehouseId') warehouseId: string, @Req() req: any) {
+    assertBusinessAccess(req.user, businessId);
+    return this.thresholdsService.listWarehousesByBusiness(businessId, warehouseId);
+  }
+
+  @Post('warehouses')
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
+  async upsertWarehouse(@Body() dto: UpsertWarehouseThresholdDto, @Req() req: any) {
+    assertBusinessAccess(req.user, dto.businessId);
+    return this.thresholdsService.upsertWarehouse({
+      businessId: dto.businessId,
+      productId: dto.productId,
+      warehouseId: dto.warehouseId,
+      minStock: dto.minStock,
+      maxStock: dto.maxStock,
+      updatedBy: req.user?.sub,
+    });
+  }
+
+  @Delete('warehouses/:id')
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
+  async removeWarehouse(@Param('id') id: string) {
+    return this.thresholdsService.removeWarehouse(id);
+  }
+
+  @Get('suggestions')
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
+  async suggestions(@Query('businessId') businessId: string, @Query('weeks') weeks: string, @Req() req: any) {
+    assertBusinessAccess(req.user, businessId);
+    return this.thresholdsService.getSuggestions(businessId, Number(weeks) || 4);
   }
 }

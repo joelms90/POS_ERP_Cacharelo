@@ -300,6 +300,24 @@ export interface BranchStockThreshold {
   branchName?: string;
 }
 
+export interface WarehouseStockThreshold {
+  id: string;
+  productId: string;
+  warehouseId: string;
+  minStock: string;
+  maxStock: string;
+  productName?: string;
+  warehouseName?: string;
+}
+
+export interface ThresholdSuggestion {
+  productId: string;
+  productName: string;
+  weeklyAverage: number;
+  suggestedMin: number;
+  suggestedMax: number;
+}
+
 export interface BranchCatalogEntry {
   id: string;
   branchId: string;
@@ -1544,6 +1562,35 @@ export const api = {
     return apiRequest(`/inventory/thresholds/${id}`, {
       method: 'DELETE',
     });
+  },
+
+  async getWarehouseThresholds(businessId: string, warehouseId?: string): Promise<WarehouseStockThreshold[]> {
+    let url = `/inventory/thresholds/warehouses?businessId=${businessId}`;
+    if (warehouseId) url += `&warehouseId=${warehouseId}`;
+    return apiRequest<WarehouseStockThreshold[]>(url);
+  },
+
+  async upsertWarehouseThreshold(data: {
+    businessId: string;
+    productId: string;
+    warehouseId: string;
+    minStock?: number;
+    maxStock?: number;
+  }): Promise<WarehouseStockThreshold> {
+    return apiRequest<WarehouseStockThreshold>('/inventory/thresholds/warehouses', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteWarehouseThreshold(id: string): Promise<{ success: boolean }> {
+    return apiRequest(`/inventory/thresholds/warehouses/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async getThresholdSuggestions(businessId: string, weeks = 4): Promise<ThresholdSuggestion[]> {
+    return apiRequest<ThresholdSuggestion[]>(`/inventory/thresholds/suggestions?businessId=${businessId}&weeks=${weeks}`);
   },
 
   /**

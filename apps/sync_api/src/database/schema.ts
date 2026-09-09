@@ -922,6 +922,36 @@ export const branchStockThresholds = pgTable(
   }),
 );
 
+export const warehouseStockThresholds = pgTable(
+  'warehouse_stock_thresholds',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    businessId: uuid('business_id')
+      .references(() => businesses.id)
+      .notNull(),
+    productId: uuid('product_id')
+      .references(() => products.id)
+      .notNull(),
+    warehouseId: uuid('warehouse_id')
+      .references(() => warehouses.id)
+      .notNull(),
+    minStock: decimal('min_stock', { precision: 12, scale: 3 }).default('0.000'), // 0 = use global
+    maxStock: decimal('max_stock', { precision: 12, scale: 3 }).default('0.000'), // 0 = use global
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedBy: uuid('updated_by').references(() => users.id),
+  },
+  (table) => ({
+    unqProductWarehouse: uniqueIndex('unq_wst_product_warehouse').on(
+      table.productId,
+      table.warehouseId,
+    ),
+    idxWarehouse: index('idx_wst_warehouse').on(table.warehouseId),
+    idxBusiness: index('idx_wst_business').on(table.businessId),
+  }),
+);
+
 export const inventoryAlerts = pgTable(
   'inventory_alerts',
   {
