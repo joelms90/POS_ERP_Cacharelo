@@ -2,22 +2,24 @@
 
 **Purpose**: Track which development sessions (terminals/developers/assistants) are working on which parts of the monorepo to prevent conflicts.
 
-**Last Updated**: 2026-09-04
+**Last Updated**: 2026-09-18
 
 ---
 
 ## Currently Active Sessions
 
-### Session: Landing cafeteria menu update
-- **Session Name**: `codex-landing-menu-sept-2026`
-- **Branch**: `011-purchase-orders-requisitions` (app-scoped child branch unavailable because this parent branch already exists)
-- **Primary Focus**: Publish the September 2026 cafeteria menu PDF
-- **Apps Touched**: `apps/landing_page/`
-- **Status**: ⛔ Blocked — Firebase CLI credentials expired; re-authentication required before publish
+_None._
 
 ---
 
 ## Completed Sessions
+
+### Session: Landing cafeteria menu update
+- **Session Name**: `codex-landing-menu-sept-2026`
+- **Branch**: `011-purchase-orders-requisitions` (app-scoped child branch unavailable because this parent branch already exists)
+- **Primary Focus**: Published the September 2026 cafeteria menu PDF
+- **Apps Touched**: `apps/landing_page/`
+- **Status**: ✅ Completed
 
 ### Session: Menu Generator / Catalog Studio
 - **Session Name**: `menu-generator-isolated`

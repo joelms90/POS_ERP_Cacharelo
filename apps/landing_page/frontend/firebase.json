@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "fresh-sensor-497515-d3",
     "public": "dist",
     "ignore": [
       "firebase.json",
