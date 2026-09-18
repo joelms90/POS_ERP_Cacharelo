@@ -5,7 +5,7 @@ interface DishImageRendererProps {
   dish: Dish;
   theme: MenuTheme;
   className?: string;
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'hero';
+  size?: 'xs' | 'thumb' | 'sm' | 'md' | 'lg' | 'hero';
 }
 
 export const DishImageRenderer: React.FC<DishImageRendererProps> = ({
@@ -23,6 +23,7 @@ export const DishImageRenderer: React.FC<DishImageRendererProps> = ({
   // Sizing definitions with generous editorial presence
   const sizeClasses = {
     xs: 'w-14 h-14 sm:w-16 sm:h-16',
+    thumb: 'w-20 h-20 sm:w-24 sm:h-24',
     sm: 'w-32 h-32 sm:w-36 sm:h-36',
     md: 'w-44 h-44 sm:w-52 sm:h-52',
     lg: 'w-56 h-56 sm:w-64 sm:h-64',
@@ -74,7 +75,7 @@ export const DishImageRenderer: React.FC<DishImageRendererProps> = ({
             ? 'rounded-full overflow-hidden'
             : mode === 'ellipse'
             ? 'rounded-[45%] overflow-hidden'
-            : size === 'xs'
+            : size === 'xs' || size === 'thumb'
             ? 'rounded-xl overflow-hidden border border-[#C8A265]/25 shadow-xs'
             : 'overflow-visible'
         }`}

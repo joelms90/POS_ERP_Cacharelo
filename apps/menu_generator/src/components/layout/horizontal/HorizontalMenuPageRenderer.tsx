@@ -132,7 +132,7 @@ export const HorizontalMenuPageRenderer: React.FC<HorizontalMenuPageRendererProp
       </header>
 
       {/* 3. Main 16:9 Layout Body */}
-      <main className="relative z-10 w-full flex-1 flex flex-col justify-center overflow-hidden my-1">
+      <main className="relative z-10 w-full flex-1 flex flex-col justify-between overflow-hidden my-2">
         {layoutType === 'columnar' && <ColumnarTableLayout section={section} theme={theme} />}
         {layoutType === 'split' && <HorizontalSplitLayout section={section} theme={theme} />}
         {layoutType === 'grid' && <HorizontalGridLayout section={section} theme={theme} />}
