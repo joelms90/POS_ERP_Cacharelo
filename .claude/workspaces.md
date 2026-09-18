@@ -13,7 +13,7 @@
 - **Branch**: `011-purchase-orders-requisitions` (app-scoped child branch unavailable because this parent branch already exists)
 - **Primary Focus**: Publish the September 2026 cafeteria menu PDF
 - **Apps Touched**: `apps/landing_page/`
-- **Status**: 🔄 In progress
+- **Status**: ⛔ Blocked — Firebase CLI credentials expired; re-authentication required before publish
 
 ---
 
