@@ -4,208 +4,178 @@ import type { Cover, MenuTheme, Restaurant } from '../../../types/menu';
 interface HorizontalCoverPageProps {
   cover: Cover;
   restaurant: Restaurant;
-  theme: MenuTheme;
+  theme?: MenuTheme;
 }
 
 export const HorizontalCoverPage: React.FC<HorizontalCoverPageProps> = ({
   cover,
-  restaurant,
-  theme: _theme
+  restaurant
 }) => {
+  // Warm metallic gold tones matching vertical CoverPage
+  const WARM_GOLD = '#C8A265';
   const METALLIC_GOLD = '#D4AF37';
+  const SCRIPT_GOLD = '#E5C384';
 
-  const overlayOpacity = cover.backgroundOverlayOpacity ?? 0.35;
+  const overlayOpacity = cover.backgroundOverlayOpacity ?? 0.25;
   const blur = cover.backgroundBlur ?? 0;
-  const backgroundImage = cover.backgroundImage || '/backgrounds/cafe-interior-cover.png';
+  const backgroundImage =
+    cover.backgroundImageHorizontal ||
+    (cover.backgroundImage && cover.backgroundImage.includes('Horizontal')
+      ? cover.backgroundImage
+      : '/backgrounds/Cacharelo_Horizontal.jpeg');
   const logoSrc = restaurant.logo || '/branding/cacharelo-cofee-gold-logo.png';
-  const categoriesSubline = cover.footer || 'DESAYUNOS  •  COMIDAS  •  REPOSTERÍA  •  CAFÉ DE ESPECIALIDAD';
-  const tagline = cover.tagline || '"El placer del buen comer y el mejor café"';
+  const categoriesSubline = cover.footer || 'DESAYUNOS  •  COMIDAS  •  CAFÉ  •  MOMENTOS';
+  const tagline = cover.tagline || '"Aquí sabe mejor"';
 
   return (
     <div
-      className="menu-page relative w-full h-full flex flex-col justify-between select-none overflow-hidden"
+      className="menu-page relative w-full h-full flex flex-col items-center justify-between select-none overflow-hidden"
       style={{
-        backgroundColor: '#121110',
-        color: '#FFFFFF'
+        backgroundColor: '#141416',
+        color: '#FAF7F2'
       }}
     >
-      {/* 1. Background Cinematic Image Layer */}
-      {backgroundImage && (
-        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+      {/* 0. Vector Background Base: Guarantees dark tone even if browser background printing is off */}
+      <svg
+        className="absolute inset-0 w-full h-full pointer-events-none z-0"
+        xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="none"
+        viewBox="0 0 100 100"
+      >
+        <rect width="100" height="100" fill="#141416" />
+      </svg>
+
+      {/* 1. Full-Bleed Horizontal Cover Photo Background (Cacharelo_Horizontal.jpeg) */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <img
+          src={backgroundImage}
+          alt="Cafetería Cacharelo Portada Horizontal"
+          className="w-full h-full object-cover transition-transform duration-500"
+          style={{
+            filter: blur > 0 ? `blur(${blur}px)` : undefined,
+            transform: blur > 0 ? 'scale(1.03)' : 'none'
+          }}
+        />
+
+        {/* 2. Vector Readability Gradient Overlay */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none z-1"
+          xmlns="http://www.w3.org/2000/svg"
+          preserveAspectRatio="none"
+          viewBox="0 0 100 100"
+        >
+          <defs>
+            <linearGradient id="coverReadabilityGradHorizontal" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#000000" stopOpacity={Math.min(0.85, 0.40 + overlayOpacity * 0.4)} />
+              <stop offset="22%" stopColor="#000000" stopOpacity={overlayOpacity * 0.45} />
+              <stop offset="48%" stopColor="#000000" stopOpacity={overlayOpacity * 0.15} />
+              <stop offset="72%" stopColor="#000000" stopOpacity={overlayOpacity * 0.3} />
+              <stop offset="100%" stopColor="#000000" stopOpacity={Math.min(0.92, 0.50 + overlayOpacity * 0.45)} />
+            </linearGradient>
+          </defs>
+          <rect width="100" height="100" fill="url(#coverReadabilityGradHorizontal)" />
+        </svg>
+      </div>
+
+      {/* 3. Decorative Framing: Minimal, thin, single-line gold inset border matching vertical portada */}
+      <div
+        className="absolute inset-6 pointer-events-none z-10"
+        style={{
+          border: `1px solid ${METALLIC_GOLD}`,
+          opacity: 0.85,
+          boxShadow: 'inset 0 0 15px rgba(0,0,0,0.2)'
+        }}
+      />
+
+      {/* 4. Top Block: Single Crisp Gold Vector Logo -> — CAFETERÍA — -> BUEN CAFÉ, GRANDES MOMENTOS */}
+      <div className="relative z-20 w-full flex flex-col items-center text-center pt-8 px-8">
+        {logoSrc ? (
           <img
-            src={backgroundImage}
-            alt="Horizontal Cover Background"
-            className="w-full h-full object-cover"
-            style={{
-              filter: blur > 0 ? `blur(${blur}px)` : undefined,
-              transform: 'scale(1.02)'
-            }}
+            src={logoSrc}
+            alt={restaurant.name || 'Cacharelo'}
+            className="h-20 sm:h-24 w-auto object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] mb-2 transition-transform hover:scale-105"
           />
-          {/* Panoramic dark gradient for readability on left side */}
+        ) : (
           <div
-            className="absolute inset-0"
-            style={{
-              background: 'linear-gradient(90deg, rgba(14,13,12,0.92) 0%, rgba(14,13,12,0.78) 48%, rgba(14,13,12,0.55) 100%)'
-            }}
-          />
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundColor: '#000000',
-              opacity: overlayOpacity
-            }}
-          />
-        </div>
-      )}
-
-      {/* 2. Inset Double Gold Geometric Frame */}
-      <div
-        className="absolute inset-5 pointer-events-none z-10"
-        style={{ border: `1px solid ${METALLIC_GOLD}40` }}
-      />
-      <div
-        className="absolute inset-7 pointer-events-none z-10"
-        style={{ border: `1px solid ${METALLIC_GOLD}20` }}
-      />
-
-      {/* Corner Ornaments */}
-      <div className="absolute top-8 left-8 z-10 w-6 h-6 border-t-2 border-l-2 border-[#C8A265]" />
-      <div className="absolute top-8 right-8 z-10 w-6 h-6 border-t-2 border-r-2 border-[#C8A265]" />
-      <div className="absolute bottom-8 left-8 z-10 w-6 h-6 border-b-2 border-l-2 border-[#C8A265]" />
-      <div className="absolute bottom-8 right-8 z-10 w-6 h-6 border-b-2 border-r-2 border-[#C8A265]" />
-
-      {/* 3. Main 16:9 Panoramic Body: Split 45% / 55% */}
-      <div className="relative z-10 flex-1 grid grid-cols-12 gap-8 px-14 pt-12 pb-6 items-center">
-        
-        {/* Left 45% (Cols 1-5): Editorial Brand Presentation */}
-        <div className="col-span-6 flex flex-col justify-center text-left space-y-4 pl-4">
-          {/* Logo & Category */}
-          <div className="flex items-center gap-4">
-            <img
-              src={logoSrc}
-              alt={restaurant.name}
-              className="h-16 w-auto object-contain drop-shadow-md"
-            />
-            <div className="flex flex-col">
-              <span
-                className="text-[11px] font-montserrat uppercase tracking-[0.35em] font-bold"
-                style={{ color: METALLIC_GOLD }}
-              >
-                — CAFETERÍA & RESTAURANTE —
-              </span>
-              <span className="text-xs font-montserrat uppercase tracking-[0.2em] text-zinc-300">
-                {restaurant.slogan || cover.slogan || 'Sabor tradicional & café de autor'}
-              </span>
-            </div>
+            className="w-16 h-16 rounded-full border-2 flex items-center justify-center mb-2 font-cinzel font-bold text-2xl drop-shadow-md"
+            style={{ borderColor: METALLIC_GOLD, color: METALLIC_GOLD }}
+          >
+            {restaurant.name?.charAt(0) || 'C'}
           </div>
+        )}
 
-          {/* Hairline Divider */}
-          <div className="h-[1px] w-36 bg-gradient-to-r from-[#C8A265] to-transparent" />
-
-          {/* Main Title */}
-          <div>
-            <h1 className="text-5xl font-cormorant font-bold tracking-[0.14em] uppercase text-zinc-100 leading-none">
-              {cover.title || 'CARTA DE MENÚ'}
-            </h1>
-            {cover.subtitle ? (
-              <p className="text-base font-baskerville italic text-[#C8A265] mt-2">
-                {cover.subtitle}
-              </p>
-            ) : (
-              <p className="text-sm font-baskerville italic text-zinc-400 mt-2">
-                Selección de especialidades preparadas al momento con insumos locales
-              </p>
-            )}
-          </div>
-
-          {/* Script Tagline */}
-          <div className="pt-2">
-            <p className="font-script text-3xl sm:text-4xl text-[#E5C384]">
-              {tagline}
-            </p>
-          </div>
-
-          {/* Quality Badges */}
-          <div className="pt-3 flex items-center gap-6 text-[11px] font-montserrat uppercase tracking-widest text-zinc-300">
-            <div className="flex items-center gap-2">
-              <span className="text-[#C8A265]">✦</span>
-              <span>Insumos Frescos</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[#C8A265]">✦</span>
-              <span>Hecho en Casa</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[#C8A265]">✦</span>
-              <span>Café Gourmet</span>
-            </div>
-          </div>
+        {/* — CAFETERÍA — (spaced uppercase sans-serif in warm metallic gold) */}
+        <div
+          className="font-montserrat text-xs sm:text-sm font-semibold uppercase tracking-[0.45em] drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)] my-0.5"
+          style={{
+            color: METALLIC_GOLD,
+            textShadow: '0 1px 4px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.6)'
+          }}
+        >
+          — C A F E T E R Í A —
         </div>
 
-        {/* Right 55% (Cols 7-12): Cinematic Visual Focal Point */}
-        <div className="col-span-6 flex items-center justify-center relative pr-4">
-          {/* Subtle Ambient Radial Glow */}
-          <div
-            className="absolute w-96 h-96 rounded-full pointer-events-none"
-            style={{
-              background: 'radial-gradient(circle, rgba(200,162,101,0.22) 0%, rgba(0,0,0,0) 70%)'
-            }}
-          />
-
-          {/* Luxury Plate / Dish Showcase */}
-          <div className="relative flex items-center justify-center">
-            {/* Outer Circular Ring */}
-            <div
-              className="w-[340px] h-[340px] rounded-full flex items-center justify-center p-3 shadow-2xl"
-              style={{
-                border: `2px solid ${METALLIC_GOLD}60`,
-                background: 'radial-gradient(circle, rgba(26,24,22,0.85) 0%, rgba(14,13,12,0.95) 100%)'
-              }}
-            >
-              <div
-                className="w-full h-full rounded-full overflow-hidden flex items-center justify-center border border-[#C8A265]/40"
-              >
-                <img
-                  src="/dishes/BAGUETTES A LOS TRES QUESOS.jpeg"
-                  alt="Platillo Portada"
-                  className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700"
-                  onError={(e) => {
-                    // Fallback to logo or clean icon if dish image not present
-                    const target = e.currentTarget;
-                    target.src = logoSrc;
-                    target.className = 'h-36 w-auto object-contain opacity-80';
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Floating Luxury Stamp / Ribbon */}
-            <div
-              className="absolute -bottom-2 -left-4 px-4 py-2 bg-gradient-to-r from-[#C8A265] to-[#B58E4E] text-zinc-950 font-montserrat font-bold text-[10px] tracking-[0.2em] uppercase rounded-full shadow-xl border border-white/20 flex items-center gap-1.5"
-            >
-              <span>★</span>
-              <span>ESPECIALIDAD DE LA CASA</span>
-            </div>
-          </div>
+        {/* BUEN CAFÉ, GRANDES MOMENTOS (spaced uppercase sans-serif) */}
+        <div
+          className="font-montserrat text-[11px] sm:text-xs font-semibold uppercase tracking-[0.3em] drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)] mt-0.5 opacity-95"
+          style={{
+            color: WARM_GOLD,
+            textShadow: '0 1px 4px rgba(0,0,0,0.9)'
+          }}
+        >
+          {restaurant.slogan || cover.slogan || 'BUEN CAFÉ, GRANDES MOMENTOS'}
         </div>
       </div>
 
-      {/* 4. Panoramic Bottom Footer Bar */}
-      <footer className="relative z-10 w-full px-12 pb-5 pt-2 flex items-center justify-between text-[11px] font-montserrat uppercase tracking-[0.2em]">
-        <div className="flex items-center gap-2 text-[#C8A265]">
-          <span className="font-cormorant font-bold text-sm tracking-wider text-zinc-100">
-            {restaurant.name}
-          </span>
-          <span className="opacity-60">•</span>
-          <span className="opacity-90">{categoriesSubline}</span>
-        </div>
+      {/* 5. Center Focal Hero Area: Clean and unobstructed so the 16:9 cafe photo is celebrated */}
+      <div className="relative z-10 flex-1 w-full flex items-center justify-center pointer-events-none">
+        {cover.title && cover.title.trim() !== '' && cover.title.trim().toUpperCase() !== 'MENÚ' && (
+          <div className="text-center px-6 py-2">
+            <h1
+              className="text-3xl sm:text-4xl font-cormorant font-bold uppercase tracking-[0.2em] drop-shadow-xl"
+              style={{ color: METALLIC_GOLD }}
+            >
+              {cover.title}
+            </h1>
+            {cover.subtitle && (
+              <p
+                className="text-sm sm:text-base font-baskerville italic mt-1 drop-shadow-md"
+                style={{ color: SCRIPT_GOLD }}
+              >
+                {cover.subtitle}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
 
-        <div className="flex items-center gap-4 text-zinc-400 text-[10px]">
-          <span>{restaurant.contact || 'Servicio en Mesa & Para Llevar'}</span>
-          <span className="text-[#C8A265]">•</span>
-          <span className="text-[#E5C384] font-medium">16:9 Widescreen</span>
-        </div>
-      </footer>
+      {/* 6. Bottom Block:
+             - Categories subline: DESAYUNOS • COMIDAS • CAFÉ • MOMENTOS (spaced uppercase sans-serif in warm gold)
+             - Script Tagline beneath categories: "Aquí sabe mejor" in elegant handwritten/calligraphy font
+      */}
+      <div className="relative z-20 w-full flex flex-col items-center text-center pb-8 px-8">
+        {/* Categories subline */}
+        <p
+          className="font-montserrat text-xs sm:text-sm font-semibold uppercase tracking-[0.32em] mb-1.5 drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]"
+          style={{
+            color: METALLIC_GOLD,
+            textShadow: '0 2px 6px rgba(0,0,0,0.95), 0 0 12px rgba(0,0,0,0.6)'
+          }}
+        >
+          {categoriesSubline}
+        </p>
+
+        {/* Script Tagline in elegant calligraphy cursive */}
+        <p
+          className="font-script text-3xl sm:text-4xl font-normal drop-shadow-[0_3px_8px_rgba(0,0,0,0.95)] tracking-wide"
+          style={{
+            color: SCRIPT_GOLD,
+            textShadow: '0 2px 8px rgba(0,0,0,0.95), 0 0 15px rgba(212,175,55,0.3)'
+          }}
+        >
+          {tagline.startsWith('"') || tagline.startsWith('“') ? tagline : `"${tagline}"`}
+        </p>
+      </div>
     </div>
   );
 };

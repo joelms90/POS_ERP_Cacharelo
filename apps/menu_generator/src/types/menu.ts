@@ -56,6 +56,7 @@ export interface Cover {
   footer?: string;
   tagline?: string;
   backgroundImage?: string;
+  backgroundImageHorizontal?: string;
   backgroundOverlayOpacity?: number;
   backgroundBlur?: number;
   cardMode?: 'floating-card' | 'full-bleed' | 'framed';

@@ -81,6 +81,12 @@ export function App() {
               tagline: 'Aquí sabe mejor'
             };
           }
+          if (!parsed.cover?.backgroundImageHorizontal) {
+            parsed.cover = {
+              ...parsed.cover,
+              backgroundImageHorizontal: '/backgrounds/Cacharelo_Horizontal.jpeg'
+            };
+          }
           return parsed;
         }
       }

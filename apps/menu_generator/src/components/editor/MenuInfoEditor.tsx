@@ -19,6 +19,7 @@ const BRAND_LOGOS = [
 
 const CURATED_BACKGROUNDS = [
   { label: 'Café & Mármol Artesanal (Oficial)', path: '/backgrounds/cafe-interior-cover.png' },
+  { label: 'Cacharelo Panorámica 16:9 (Horizontal)', path: '/backgrounds/Cacharelo_Horizontal.jpeg' },
   { label: 'Plato de Madera (Referencia)', path: '/backgrounds/cacharelo-cover-ref.jpg' },
   { label: 'Lino Cálido Texturizado', path: '/backgrounds/warm-linen.jpg' },
   { label: 'Pizarra Oscura Slate', path: '/backgrounds/dark-slate.jpg' },

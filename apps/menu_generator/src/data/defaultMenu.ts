@@ -19,6 +19,7 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
     footer: "DESAYUNOS  •  COMIDAS  •  CAFÉ  •  MOMENTOS",
     tagline: "Aquí sabe mejor",
     backgroundImage: "/backgrounds/cafe-interior-cover.png",
+    backgroundImageHorizontal: "/backgrounds/Cacharelo_Horizontal.jpeg",
     cardMode: "full-bleed",
     backgroundOverlayOpacity: 0.25,
     style: "minimal-gold"
