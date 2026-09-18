@@ -240,7 +240,11 @@ export function App() {
   };
 
   // Direct High-Resolution Digital PDF Generator (Carta & A4)
-  const handleExportPDF = async (targetSize?: 'letter' | 'a4', singleOnly = false) => {
+  const handleExportPDF = async (
+    targetSize?: 'letter' | 'a4',
+    singleOnly = false,
+    pageFilter: 'all' | 'odd' | 'even' = 'all'
+  ) => {
     if (isGeneratingPdf) return;
     try {
       setIsGeneratingPdf(true);
@@ -250,15 +254,21 @@ export function App() {
         ? (activePageIndex === -99 ? 0 : activePageIndex)
         : undefined;
 
-      const pageDesc = targetIndex !== undefined
-        ? (targetIndex === -1 ? 'Portada' : `Página ${targetIndex + 1}: ${catalog.sections[targetIndex]?.name || ''}`)
-        : `Menú Completo (${catalog.sections.length + (catalog.cover.enabled ? 1 : 0)} páginas)`;
+      let pageDesc = `Menú Completo (${catalog.sections.length + (catalog.cover.enabled ? 1 : 0)} páginas)`;
+      if (targetIndex !== undefined) {
+        pageDesc = targetIndex === -1 ? 'Portada' : `Página ${targetIndex + 1}: ${catalog.sections[targetIndex]?.name || ''}`;
+      } else if (pageFilter === 'odd') {
+        pageDesc = 'Tablet 1 — Páginas Impares (1, 3, 5...)';
+      } else if (pageFilter === 'even') {
+        pageDesc = 'Tablet 2 — Páginas Pares (2, 4, 6...)';
+      }
 
       showToast(`Generando PDF Digital ${sizeLabel} — ${pageDesc}...`, 'info');
 
       const res = await generateDigitalPdf({
         catalog,
         singlePageIndex: targetIndex,
+        pageFilter,
         targetFormat: chosenSize,
         onProgress: (_cur, _tot, message) => {
           showToast(message, 'info');
@@ -276,6 +286,60 @@ export function App() {
     } catch (err: any) {
       console.error('Failed to generate digital PDF', err);
       showToast(`Error al generar PDF: ${err?.message || err}`, 'error');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  // Dual-Tablet PDF Generator: Exports both Odd and Even in one seamless click
+  const handleExportDualTabletPDF = async (targetSize?: 'letter' | 'a4') => {
+    if (isGeneratingPdf) return;
+    try {
+      setIsGeneratingPdf(true);
+      const chosenSize = targetSize || catalog.theme.pageSize || 'letter';
+      const sizeLabel = chosenSize === 'a4' ? 'A4' : 'Carta';
+
+      // 1. Tablet 1: Odd pages (1, 3, 5...)
+      showToast(`[1/2] Generando PDF Tablet 1 (Páginas Impares) — ${sizeLabel}...`, 'info');
+      const res1 = await generateDigitalPdf({
+        catalog,
+        pageFilter: 'odd',
+        targetFormat: chosenSize,
+        onProgress: (cur, tot, message) => {
+          showToast(`[Tablet 1: ${cur}/${tot}] ${message}`, 'info');
+        }
+      });
+
+      try {
+        window.open(res1.blobUrl, '_blank');
+      } catch (e) {
+        console.warn('Could not auto-open digital PDF tab for tablet 1', e);
+      }
+
+      // Small pause to allow browser download thread to settle
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      // 2. Tablet 2: Even pages (2, 4, 6...)
+      showToast(`[2/2] Generando PDF Tablet 2 (Páginas Pares) — ${sizeLabel}...`, 'info');
+      const res2 = await generateDigitalPdf({
+        catalog,
+        pageFilter: 'even',
+        targetFormat: chosenSize,
+        onProgress: (cur, tot, message) => {
+          showToast(`[Tablet 2: ${cur}/${tot}] ${message}`, 'info');
+        }
+      });
+
+      try {
+        window.open(res2.blobUrl, '_blank');
+      } catch (e) {
+        console.warn('Could not auto-open digital PDF tab for tablet 2', e);
+      }
+
+      showToast(`¡Pack 2 Tablets descargado con éxito! (${res1.filename} & ${res2.filename})`, 'success');
+    } catch (err: any) {
+      console.error('Failed to generate dual tablet PDFs', err);
+      showToast(`Error al generar PDFs de Tablets: ${err?.message || err}`, 'error');
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -365,6 +429,7 @@ export function App() {
         onLoadPreset={handleLoadPreset}
         onResetToDefaultCode={handleResetToDefaultCode}
         onExportPDF={handleExportPDF}
+        onExportDualTabletPDF={handleExportDualTabletPDF}
         onExportPNG={handleExportPNG}
         onSaveJSON={handleSaveJSON}
         onLoadJSON={handleLoadJSON}

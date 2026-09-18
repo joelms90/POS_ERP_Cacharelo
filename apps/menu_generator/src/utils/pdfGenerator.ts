@@ -5,6 +5,7 @@ import type { MenuCatalog } from '../types/menu';
 export interface GeneratePdfOptions {
   catalog: MenuCatalog;
   singlePageIndex?: number; // -1 for cover, 0+ for section, undefined for ALL pages
+  pageFilter?: 'all' | 'odd' | 'even';
   targetFormat?: 'letter' | 'a4'; // Override catalog.theme.pageSize
   onProgress?: (current: number, total: number, message: string) => void;
 }
@@ -22,6 +23,7 @@ export interface PdfResult {
 export async function generateDigitalPdf({
   catalog,
   singlePageIndex,
+  pageFilter = 'all',
   targetFormat,
   onProgress
 }: GeneratePdfOptions): Promise<PdfResult> {
@@ -65,44 +67,62 @@ export async function generateDigitalPdf({
     elementId: string;
     fallbackId?: string;
     label: string;
+    docPageNumber: number; // 1-based page number in document sequence
   }
 
-  const targets: PageExportTarget[] = [];
+  const allTargets: PageExportTarget[] = [];
+
+  if (cover.enabled) {
+    allTargets.push({
+      elementId: 'export-page-cover',
+      fallbackId: 'menu-page-cover',
+      label: 'Portada (Pág. 1)',
+      docPageNumber: 1
+    });
+  }
+  sections.forEach((sec, idx) => {
+    const pageNum = cover.enabled ? idx + 2 : idx + 1;
+    allTargets.push({
+      elementId: `export-page-${idx}`,
+      fallbackId: `menu-page-${idx}`,
+      label: `${sec.name} (Pág. ${pageNum})`,
+      docPageNumber: pageNum
+    });
+  });
+
+  let targets: PageExportTarget[] = [];
 
   if (singlePageIndex !== undefined) {
     if (singlePageIndex === -1 && cover.enabled) {
       targets.push({
         elementId: 'export-page-cover',
         fallbackId: 'menu-page-cover',
-        label: 'Portada'
+        label: 'Portada (Pág. 1)',
+        docPageNumber: 1
       });
     } else if (singlePageIndex >= 0 && sections[singlePageIndex]) {
+      const pageNum = cover.enabled ? singlePageIndex + 2 : singlePageIndex + 1;
       targets.push({
         elementId: `export-page-${singlePageIndex}`,
         fallbackId: `menu-page-${singlePageIndex}`,
-        label: sections[singlePageIndex].name
+        label: `${sections[singlePageIndex].name} (Pág. ${pageNum})`,
+        docPageNumber: pageNum
       });
     }
   } else {
-    // Export All Pages
-    if (cover.enabled) {
-      targets.push({
-        elementId: 'export-page-cover',
-        fallbackId: 'menu-page-cover',
-        label: 'Portada'
-      });
+    // Filter by odd / even / all
+    if (pageFilter === 'odd') {
+      targets = allTargets.filter(t => t.docPageNumber % 2 !== 0);
+    } else if (pageFilter === 'even') {
+      targets = allTargets.filter(t => t.docPageNumber % 2 === 0);
+    } else {
+      targets = allTargets;
     }
-    sections.forEach((sec, idx) => {
-      targets.push({
-        elementId: `export-page-${idx}`,
-        fallbackId: `menu-page-${idx}`,
-        label: sec.name
-      });
-    });
   }
 
   if (targets.length === 0) {
-    throw new Error('No hay páginas disponibles para exportar');
+    const filterDesc = pageFilter === 'odd' ? 'impares' : pageFilter === 'even' ? 'pares' : '';
+    throw new Error(`No hay páginas ${filterDesc} disponibles para exportar`);
   }
 
   // Iterate and capture each page
@@ -131,7 +151,7 @@ export async function generateDigitalPdf({
       quality: 0.98,
       width: widthPx,
       height: heightPx,
-      backgroundColor: target.label === 'Portada' ? '#141416' : theme.pageBackground,
+      backgroundColor: target.label.includes('Portada') ? '#141416' : theme.pageBackground,
       skipFonts: false
     });
 
@@ -147,9 +167,15 @@ export async function generateDigitalPdf({
   onProgress?.(targets.length, targets.length, 'Compilando archivo PDF digital...');
 
   const cleanRestaurantName = restaurant.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-  const scopeName = singlePageIndex !== undefined
-    ? (singlePageIndex === -1 ? 'portada' : `pag-${singlePageIndex + 1}`)
-    : 'completo';
+  let scopeName = 'completo';
+  if (singlePageIndex !== undefined) {
+    scopeName = singlePageIndex === -1 ? 'portada' : `pag-${singlePageIndex + 1}`;
+  } else if (pageFilter === 'odd') {
+    scopeName = 'tablet1-impares';
+  } else if (pageFilter === 'even') {
+    scopeName = 'tablet2-pares';
+  }
+
   const filename = `${cleanRestaurantName}-menu-${scopeName}-${formatName.toLowerCase()}.pdf`;
 
   // Download PDF file directly
