@@ -1,12 +1,15 @@
 import React from 'react';
-import type { MenuCatalog } from '../../types/menu';
+import type { MenuCatalog, MenuOrientation } from '../../types/menu';
 import { MenuPageRenderer } from '../layout/MenuPageRenderer';
 import { CoverPage } from '../layout/CoverPage';
+import { HorizontalCoverPage } from '../layout/horizontal/HorizontalCoverPage';
+import { HorizontalMenuPageRenderer } from '../layout/horizontal/HorizontalMenuPageRenderer';
 
 interface PagePreviewContainerProps {
   catalog: MenuCatalog;
   activePageIndex: number; // -1 for cover, 0+ for section, -99 for all
   zoom: number;
+  orientation?: MenuOrientation;
   containerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -14,18 +17,28 @@ export const PagePreviewContainer: React.FC<PagePreviewContainerProps> = ({
   catalog,
   activePageIndex,
   zoom,
+  orientation = 'vertical',
   containerRef
 }) => {
   const { cover, sections, theme, restaurant } = catalog;
 
-  // Aspect ratio dimensions for Letter (8.5in x 11in) and A4 (210mm x 297mm)
+  // Aspect ratio dimensions
+  const isHorizontal = orientation === 'horizontal';
   const isA4 = theme.pageSize === 'a4';
-  const widthPx = isA4 ? 794 : 816; // 8.5in * 96
-  const heightPx = isA4 ? 1123 : 1056; // 11in * 96
+
+  // Vertical: Letter (816x1056) or A4 (794x1123). Horizontal: 16:9 widescreen (1280x720)
+  const widthPx = isHorizontal ? 1280 : (isA4 ? 794 : 816);
+  const heightPx = isHorizontal ? 720 : (isA4 ? 1123 : 1056);
 
   const renderSinglePage = (pageIndex: number) => {
     if (pageIndex === -1 && cover.enabled) {
-      return (
+      return isHorizontal ? (
+        <HorizontalCoverPage
+          cover={cover}
+          restaurant={restaurant}
+          theme={theme}
+        />
+      ) : (
         <CoverPage
           cover={cover}
           restaurant={restaurant}
@@ -37,7 +50,15 @@ export const PagePreviewContainer: React.FC<PagePreviewContainerProps> = ({
     const section = sections[pageIndex];
     if (!section) return null;
 
-    return (
+    return isHorizontal ? (
+      <HorizontalMenuPageRenderer
+        section={section}
+        theme={theme}
+        restaurant={restaurant}
+        pageNumber={cover.enabled ? pageIndex + 2 : pageIndex + 1}
+        totalPages={cover.enabled ? sections.length + 1 : sections.length}
+      />
+    ) : (
       <MenuPageRenderer
         section={section}
         theme={theme}
@@ -82,7 +103,11 @@ export const PagePreviewContainer: React.FC<PagePreviewContainerProps> = ({
                   minHeight: `${heightPx}px`
                 }}
               >
-                <CoverPage cover={cover} restaurant={restaurant} theme={theme} />
+                {isHorizontal ? (
+                  <HorizontalCoverPage cover={cover} restaurant={restaurant} theme={theme} />
+                ) : (
+                  <CoverPage cover={cover} restaurant={restaurant} theme={theme} />
+                )}
               </div>
             )}
 
@@ -98,13 +123,23 @@ export const PagePreviewContainer: React.FC<PagePreviewContainerProps> = ({
                   minHeight: `${heightPx}px`
                 }}
               >
-                <MenuPageRenderer
-                  section={section}
-                  theme={theme}
-                  restaurant={restaurant}
-                  pageNumber={cover.enabled ? idx + 2 : idx + 1}
-                  totalPages={cover.enabled ? sections.length + 1 : sections.length}
-                />
+                {isHorizontal ? (
+                  <HorizontalMenuPageRenderer
+                    section={section}
+                    theme={theme}
+                    restaurant={restaurant}
+                    pageNumber={cover.enabled ? idx + 2 : idx + 1}
+                    totalPages={cover.enabled ? sections.length + 1 : sections.length}
+                  />
+                ) : (
+                  <MenuPageRenderer
+                    section={section}
+                    theme={theme}
+                    restaurant={restaurant}
+                    pageNumber={cover.enabled ? idx + 2 : idx + 1}
+                    totalPages={cover.enabled ? sections.length + 1 : sections.length}
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -145,7 +180,11 @@ export const PagePreviewContainer: React.FC<PagePreviewContainerProps> = ({
               minHeight: `${heightPx}px`
             }}
           >
-            <CoverPage cover={cover} restaurant={restaurant} theme={theme} />
+            {isHorizontal ? (
+              <HorizontalCoverPage cover={cover} restaurant={restaurant} theme={theme} />
+            ) : (
+              <CoverPage cover={cover} restaurant={restaurant} theme={theme} />
+            )}
           </div>
         )}
 
@@ -161,13 +200,23 @@ export const PagePreviewContainer: React.FC<PagePreviewContainerProps> = ({
               minHeight: `${heightPx}px`
             }}
           >
-            <MenuPageRenderer
-              section={section}
-              theme={theme}
-              restaurant={restaurant}
-              pageNumber={cover.enabled ? idx + 2 : idx + 1}
-              totalPages={cover.enabled ? sections.length + 1 : sections.length}
-            />
+            {isHorizontal ? (
+              <HorizontalMenuPageRenderer
+                section={section}
+                theme={theme}
+                restaurant={restaurant}
+                pageNumber={cover.enabled ? idx + 2 : idx + 1}
+                totalPages={cover.enabled ? sections.length + 1 : sections.length}
+              />
+            ) : (
+              <MenuPageRenderer
+                section={section}
+                theme={theme}
+                restaurant={restaurant}
+                pageNumber={cover.enabled ? idx + 2 : idx + 1}
+                totalPages={cover.enabled ? sections.length + 1 : sections.length}
+              />
+            )}
           </div>
         ))}
       </div>

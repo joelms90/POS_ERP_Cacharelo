@@ -15,9 +15,10 @@ import {
   ChevronDown,
   Loader2,
   RotateCcw,
-  Tablet
+  Tablet,
+  Monitor
 } from 'lucide-react';
-import type { MenuCatalog } from '../../types/menu';
+import type { MenuCatalog, MenuOrientation } from '../../types/menu';
 
 interface EditorHeaderProps {
   catalog: MenuCatalog;
@@ -26,8 +27,8 @@ interface EditorHeaderProps {
   onAddSection: () => void;
   onLoadPreset: (presetKey: string) => void;
   onResetToDefaultCode?: () => void;
-  onExportPDF: (format?: 'letter' | 'a4', singleOnly?: boolean, pageFilter?: 'all' | 'odd' | 'even') => void;
-  onExportDualTabletPDF?: (format?: 'letter' | 'a4') => void;
+  onExportPDF: (format?: 'letter' | 'a4' | '16:9', singleOnly?: boolean, pageFilter?: 'all' | 'odd' | 'even') => void;
+  onExportDualTabletPDF?: (format?: 'letter' | 'a4' | '16:9') => void;
   onExportPNG: () => void;
   onSaveJSON: () => void;
   onLoadJSON: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -37,6 +38,8 @@ interface EditorHeaderProps {
   designerMode: boolean;
   onToggleDesignerMode: () => void;
   isGeneratingPdf?: boolean;
+  orientation?: MenuOrientation;
+  onOrientationChange?: (orientation: MenuOrientation) => void;
 }
 
 export const EditorHeader: React.FC<EditorHeaderProps> = ({
@@ -56,7 +59,9 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
   onZoomChange,
   designerMode,
   onToggleDesignerMode,
-  isGeneratingPdf = false
+  isGeneratingPdf = false,
+  orientation = 'vertical',
+  onOrientationChange
 }) => {
   const [isPdfMenuOpen, setIsPdfMenuOpen] = useState(false);
   const pdfMenuRef = useRef<HTMLDivElement | null>(null);
@@ -124,8 +129,38 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
           </div>
         </div>
 
-        {/* Center: Mode Switch (Auto vs Designer) & Zoom */}
+        {/* Center: Orientation Switcher, Mode Switch & Zoom */}
         <div className="flex items-center gap-3">
+          {/* Orientation Switcher: Vertical vs Horizontal 16:9 */}
+          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-lg p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => onOrientationChange?.('vertical')}
+              title="Modo Vertical (Carta / A4)"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all font-medium ${
+                orientation === 'vertical'
+                  ? 'bg-amber-600 text-white shadow-sm font-semibold'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Vertical</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onOrientationChange?.('horizontal')}
+              title="Modo Horizontal 16:9 (Tablets / TV / Pantalla)"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all font-medium ${
+                orientation === 'horizontal'
+                  ? 'bg-amber-600 text-white shadow-sm font-semibold'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <Monitor className="w-3.5 h-3.5" />
+              <span>Horizontal 16:9</span>
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={onToggleDesignerMode}
@@ -136,7 +171,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
             }`}
           >
             {designerMode ? <Sliders className="w-3.5 h-3.5 text-amber-400" /> : <Sparkles className="w-3.5 h-3.5 text-zinc-400" />}
-            {designerMode ? 'Modo Diseñador (Activo)' : 'Modo Automático'}
+            {designerMode ? 'Diseñador' : 'Automático'}
           </button>
 
           {/* Zoom controls */}
@@ -220,8 +255,12 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
               <button
                 type="button"
                 disabled={isGeneratingPdf}
-                onClick={() => onExportPDF(catalog.theme.pageSize, false)}
-                title={`Descargar Menú Completo Digital en formato ${catalog.theme.pageSize === 'a4' ? 'A4 (21.0 × 29.7 cm)' : 'Carta (21.6 × 27.9 cm)'}`}
+                onClick={() => onExportPDF(orientation === 'horizontal' ? '16:9' : catalog.theme.pageSize, false)}
+                title={
+                  orientation === 'horizontal'
+                    ? 'Descargar Menú Completo en formato Pantalla 16:9 (29.7 × 16.7 cm)'
+                    : `Descargar Menú Completo Digital en formato ${catalog.theme.pageSize === 'a4' ? 'A4 (21.0 × 29.7 cm)' : 'Carta (21.6 × 27.9 cm)'}`
+                }
                 className="flex items-center gap-1.5 px-3.5 py-1.5 text-white text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isGeneratingPdf ? (
@@ -231,8 +270,14 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
                   </>
                 ) : (
                   <>
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>Descargar PDF Digital</span>
+                    {orientation === 'horizontal' ? (
+                      <Monitor className="w-3.5 h-3.5" />
+                    ) : (
+                      <FileText className="w-3.5 h-3.5" />
+                    )}
+                    <span>
+                      {orientation === 'horizontal' ? 'Descargar PDF 16:9' : 'Descargar PDF Digital'}
+                    </span>
                   </>
                 )}
               </button>
@@ -242,7 +287,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
                 disabled={isGeneratingPdf}
                 onClick={() => setIsPdfMenuOpen(!isPdfMenuOpen)}
                 className="p-1.5 text-white/80 hover:text-white hover:bg-black/15 border-l border-white/20 disabled:opacity-60 transition-colors"
-                title="Opciones de formato (Carta / A4)"
+                title={orientation === 'horizontal' ? 'Opciones de exportación 16:9' : 'Opciones de formato (Carta / A4)'}
               >
                 <ChevronDown className="w-3.5 h-3.5" />
               </button>
@@ -252,160 +297,286 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
             {isPdfMenuOpen && (
               <div className="absolute right-0 mt-2 w-80 bg-zinc-900 border border-zinc-750 rounded-xl shadow-2xl p-2 z-50 text-xs animate-fade-in space-y-1.5">
                 <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 border-b border-zinc-800">
-                  Descarga Digital Directa (Sin Imprimir)
+                  {orientation === 'horizontal'
+                    ? 'Descarga Digital 16:9 (Tablets / TV)'
+                    : 'Descarga Digital Directa (Sin Imprimir)'}
                 </div>
 
-                {/* Complete Menu */}
-                <div className="space-y-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPdfMenuOpen(false);
-                      onExportPDF('letter', false, 'all');
-                    }}
-                    className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-zinc-800 text-zinc-200 transition-colors flex flex-col"
-                  >
-                    <span className="font-semibold flex items-center gap-1.5">
-                      📄 Menú Completo — Carta
-                      {catalog.theme.pageSize === 'letter' && (
-                        <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded font-mono">
-                          Activo
+                {orientation === 'horizontal' ? (
+                  /* HORIZONTAL 16:9 EXPORT OPTIONS */
+                  <>
+                    <div className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPdfMenuOpen(false);
+                          onExportPDF('16:9', false, 'all');
+                        }}
+                        className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-zinc-800 text-zinc-200 transition-colors flex flex-col"
+                      >
+                        <span className="font-semibold flex items-center gap-1.5">
+                          🖥️ Menú Completo — Pantalla 16:9
+                          <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded font-mono">
+                            Activo
+                          </span>
                         </span>
-                      )}
-                    </span>
-                    <span className="text-[10px] text-zinc-400">
-                      21.6 × 27.9 cm (Carta / 8.5 × 11 in)
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPdfMenuOpen(false);
-                      onExportPDF('a4', false, 'all');
-                    }}
-                    className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-zinc-800 text-zinc-200 transition-colors flex flex-col"
-                  >
-                    <span className="font-semibold flex items-center gap-1.5">
-                      📄 Menú Completo — A4
-                      {catalog.theme.pageSize === 'a4' && (
-                        <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded font-mono">
-                          Activo
+                        <span className="text-[10px] text-zinc-400">
+                          29.7 × 16.7 cm (Widescreen Tablets / TV / Cartelería)
                         </span>
+                      </button>
+                    </div>
+
+                    {/* 2 Tablets Section (Odd / Even 16:9) */}
+                    <div className="pt-1.5 border-t border-zinc-800 space-y-1">
+                      <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-400 bg-amber-500/10 rounded-lg flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Tablet className="w-3 h-3 text-amber-400" />
+                          Modo 2 Tablets 16:9
+                        </span>
+                        <span className="text-[9px] font-mono text-amber-300/80 uppercase font-normal">
+                          16:9 Widescreen
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPdfMenuOpen(false);
+                          onExportPDF('16:9', false, 'odd');
+                        }}
+                        className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-amber-600/20 hover:text-amber-300 text-zinc-200 transition-colors flex flex-col"
+                      >
+                        <span className="font-medium flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Tablet className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            Tablet 1: Páginas Impares
+                          </span>
+                          <span className="text-[9px] bg-zinc-800 text-amber-300 px-1.5 py-0.5 rounded font-mono">
+                            1, 3, 5...
+                          </span>
+                        </span>
+                        <span className="text-[10px] text-zinc-400 pl-5">
+                          Portada y páginas impares horizontales
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPdfMenuOpen(false);
+                          onExportPDF('16:9', false, 'even');
+                        }}
+                        className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-amber-600/20 hover:text-amber-300 text-zinc-200 transition-colors flex flex-col"
+                      >
+                        <span className="font-medium flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Tablet className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            Tablet 2: Páginas Pares
+                          </span>
+                          <span className="text-[9px] bg-zinc-800 text-amber-300 px-1.5 py-0.5 rounded font-mono">
+                            2, 4, 6...
+                          </span>
+                        </span>
+                        <span className="text-[10px] text-zinc-400 pl-5">
+                          Páginas pares horizontales
+                        </span>
+                      </button>
+
+                      {onExportDualTabletPDF && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsPdfMenuOpen(false);
+                            onExportDualTabletPDF('16:9');
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 transition-colors flex flex-col border border-amber-500/40 mt-1"
+                        >
+                          <span className="font-semibold flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            Descargar Ambos (Tablet 1 + 2 en 16:9)
+                          </span>
+                          <span className="text-[10px] text-amber-200/80 pl-5">
+                            Genera y descarga ambos PDFs apaisados en un solo clic
+                          </span>
+                        </button>
                       )}
-                    </span>
-                    <span className="text-[10px] text-zinc-400">
-                      21.0 × 29.7 cm (A4 Internacional)
-                    </span>
-                  </button>
-                </div>
+                    </div>
 
-                {/* 2 Tablets Section (Odd / Even) */}
-                <div className="pt-1.5 border-t border-zinc-800 space-y-1">
-                  <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-400 bg-amber-500/10 rounded-lg flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <Tablet className="w-3 h-3 text-amber-400" />
-                      Modo 2 Tablets (Doble Pantalla)
-                    </span>
-                    <span className="text-[9px] font-mono text-amber-300/80 uppercase font-normal">
-                      {catalog.theme.pageSize === 'a4' ? 'A4' : 'Carta'}
-                    </span>
-                  </div>
+                    {/* Single Page Section 16:9 */}
+                    <div className="pt-1.5 border-t border-zinc-800 space-y-1">
+                      <div className="px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">
+                        Página Actual Individual
+                      </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPdfMenuOpen(false);
-                      onExportPDF(catalog.theme.pageSize, false, 'odd');
-                    }}
-                    className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-amber-600/20 hover:text-amber-300 text-zinc-200 transition-colors flex flex-col"
-                  >
-                    <span className="font-medium flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <Tablet className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                        Tablet 1: Páginas Impares
-                      </span>
-                      <span className="text-[9px] bg-zinc-800 text-amber-300 px-1.5 py-0.5 rounded font-mono">
-                        1, 3, 5...
-                      </span>
-                    </span>
-                    <span className="text-[10px] text-zinc-400 pl-5">
-                      {catalog.cover.enabled ? 'Portada y páginas izquierdas' : 'Páginas impares (izquierda)'}
-                    </span>
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPdfMenuOpen(false);
+                          onExportPDF('16:9', true);
+                        }}
+                        className="w-full text-left px-3 py-1 rounded-lg hover:bg-zinc-800 text-zinc-300 transition-colors flex items-center justify-between"
+                      >
+                        <span>📑 Solo Página Actual</span>
+                        <span className="text-[9px] font-mono text-zinc-500">16:9 Widescreen</span>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  /* VERTICAL CARTA / A4 EXPORT OPTIONS */
+                  <>
+                    {/* Complete Menu */}
+                    <div className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPdfMenuOpen(false);
+                          onExportPDF('letter', false, 'all');
+                        }}
+                        className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-zinc-800 text-zinc-200 transition-colors flex flex-col"
+                      >
+                        <span className="font-semibold flex items-center gap-1.5">
+                          📄 Menú Completo — Carta
+                          {catalog.theme.pageSize === 'letter' && (
+                            <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded font-mono">
+                              Activo
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-[10px] text-zinc-400">
+                          21.6 × 27.9 cm (Carta / 8.5 × 11 in)
+                        </span>
+                      </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPdfMenuOpen(false);
-                      onExportPDF(catalog.theme.pageSize, false, 'even');
-                    }}
-                    className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-amber-600/20 hover:text-amber-300 text-zinc-200 transition-colors flex flex-col"
-                  >
-                    <span className="font-medium flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <Tablet className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                        Tablet 2: Páginas Pares
-                      </span>
-                      <span className="text-[9px] bg-zinc-800 text-amber-300 px-1.5 py-0.5 rounded font-mono">
-                        2, 4, 6...
-                      </span>
-                    </span>
-                    <span className="text-[10px] text-zinc-400 pl-5">
-                      Páginas pares (derecha)
-                    </span>
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPdfMenuOpen(false);
+                          onExportPDF('a4', false, 'all');
+                        }}
+                        className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-zinc-800 text-zinc-200 transition-colors flex flex-col"
+                      >
+                        <span className="font-semibold flex items-center gap-1.5">
+                          📄 Menú Completo — A4
+                          {catalog.theme.pageSize === 'a4' && (
+                            <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded font-mono">
+                              Activo
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-[10px] text-zinc-400">
+                          21.0 × 29.7 cm (A4 Internacional)
+                        </span>
+                      </button>
+                    </div>
 
-                  {onExportDualTabletPDF && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsPdfMenuOpen(false);
-                        onExportDualTabletPDF(catalog.theme.pageSize);
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 transition-colors flex flex-col border border-amber-500/40 mt-1"
-                    >
-                      <span className="font-semibold flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                        Descargar Ambos (Tablet 1 + 2)
-                      </span>
-                      <span className="text-[10px] text-amber-200/80 pl-5">
-                        Genera y descarga los 2 PDFs en un solo clic
-                      </span>
-                    </button>
-                  )}
-                </div>
+                    {/* 2 Tablets Section (Odd / Even) */}
+                    <div className="pt-1.5 border-t border-zinc-800 space-y-1">
+                      <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-400 bg-amber-500/10 rounded-lg flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Tablet className="w-3 h-3 text-amber-400" />
+                          Modo 2 Tablets (Doble Pantalla)
+                        </span>
+                        <span className="text-[9px] font-mono text-amber-300/80 uppercase font-normal">
+                          {catalog.theme.pageSize === 'a4' ? 'A4' : 'Carta'}
+                        </span>
+                      </div>
 
-                {/* Single Page Section */}
-                <div className="pt-1.5 border-t border-zinc-800 space-y-1">
-                  <div className="px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">
-                    Página Actual Individual
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPdfMenuOpen(false);
+                          onExportPDF(catalog.theme.pageSize, false, 'odd');
+                        }}
+                        className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-amber-600/20 hover:text-amber-300 text-zinc-200 transition-colors flex flex-col"
+                      >
+                        <span className="font-medium flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Tablet className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            Tablet 1: Páginas Impares
+                          </span>
+                          <span className="text-[9px] bg-zinc-800 text-amber-300 px-1.5 py-0.5 rounded font-mono">
+                            1, 3, 5...
+                          </span>
+                        </span>
+                        <span className="text-[10px] text-zinc-400 pl-5">
+                          {catalog.cover.enabled ? 'Portada y páginas izquierdas' : 'Páginas impares (izquierda)'}
+                        </span>
+                      </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPdfMenuOpen(false);
-                      onExportPDF('letter', true);
-                    }}
-                    className="w-full text-left px-3 py-1 rounded-lg hover:bg-zinc-800 text-zinc-300 transition-colors flex items-center justify-between"
-                  >
-                    <span>📑 Solo Página Actual</span>
-                    <span className="text-[9px] font-mono text-zinc-500">Carta</span>
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPdfMenuOpen(false);
+                          onExportPDF(catalog.theme.pageSize, false, 'even');
+                        }}
+                        className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-amber-600/20 hover:text-amber-300 text-zinc-200 transition-colors flex flex-col"
+                      >
+                        <span className="font-medium flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Tablet className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            Tablet 2: Páginas Pares
+                          </span>
+                          <span className="text-[9px] bg-zinc-800 text-amber-300 px-1.5 py-0.5 rounded font-mono">
+                            2, 4, 6...
+                          </span>
+                        </span>
+                        <span className="text-[10px] text-zinc-400 pl-5">
+                          Páginas pares (derecha)
+                        </span>
+                      </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPdfMenuOpen(false);
-                      onExportPDF('a4', true);
-                    }}
-                    className="w-full text-left px-3 py-1 rounded-lg hover:bg-zinc-800 text-zinc-300 transition-colors flex items-center justify-between"
-                  >
-                    <span>📑 Solo Página Actual</span>
-                    <span className="text-[9px] font-mono text-zinc-500">A4</span>
-                  </button>
-                </div>
+                      {onExportDualTabletPDF && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsPdfMenuOpen(false);
+                            onExportDualTabletPDF(catalog.theme.pageSize);
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 transition-colors flex flex-col border border-amber-500/40 mt-1"
+                        >
+                          <span className="font-semibold flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            Descargar Ambos (Tablet 1 + 2)
+                          </span>
+                          <span className="text-[10px] text-amber-200/80 pl-5">
+                            Genera y descarga los 2 PDFs en un solo clic
+                          </span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Single Page Section */}
+                    <div className="pt-1.5 border-t border-zinc-800 space-y-1">
+                      <div className="px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-500">
+                        Página Actual Individual
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPdfMenuOpen(false);
+                          onExportPDF('letter', true);
+                        }}
+                        className="w-full text-left px-3 py-1 rounded-lg hover:bg-zinc-800 text-zinc-300 transition-colors flex items-center justify-between"
+                      >
+                        <span>📑 Solo Página Actual</span>
+                        <span className="text-[9px] font-mono text-zinc-500">Carta</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPdfMenuOpen(false);
+                          onExportPDF('a4', true);
+                        }}
+                        className="w-full text-left px-3 py-1 rounded-lg hover:bg-zinc-800 text-zinc-300 transition-colors flex items-center justify-between"
+                      >
+                        <span>📑 Solo Página Actual</span>
+                        <span className="text-[9px] font-mono text-zinc-500">A4</span>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

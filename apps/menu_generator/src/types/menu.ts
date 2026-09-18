@@ -77,6 +77,8 @@ export interface MenuTheme {
   showPageNumbers: boolean;
 }
 
+export type MenuOrientation = 'vertical' | 'horizontal';
+
 export interface MenuCatalog {
   version: string;
   id: string;

@@ -7,7 +7,7 @@ import {
   CheckCircle,
   AlertCircle
 } from 'lucide-react';
-import type { MenuCatalog, MenuSection } from './types/menu';
+import type { MenuCatalog, MenuSection, MenuOrientation } from './types/menu';
 import {
   CACHARELO_MENU_PRESET,
   MENU_PRESETS
@@ -35,6 +35,22 @@ function getCatalogHash(data: any): string {
 
 export function App() {
   const currentPresetHash = getCatalogHash(CACHARELO_MENU_PRESET);
+
+  // Orientation state: 'vertical' (default) vs 'horizontal' (16:9 widescreen)
+  const [orientation, setOrientation] = useState<MenuOrientation>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname.toLowerCase();
+        const params = new URLSearchParams(window.location.search);
+        if (path.includes('horizontal') || params.get('orientation') === 'horizontal') {
+          return 'horizontal';
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return 'vertical';
+  });
 
   // Load initial catalog from localStorage or default preset
   const [catalog, setCatalog] = useState<MenuCatalog>(() => {
@@ -89,13 +105,45 @@ export function App() {
     return -1;
   });
   const [sidebarTab, setSidebarTab] = useState<'sections' | 'branding' | 'theme'>('sections');
-  const [zoom, setZoom] = useState<number>(0.72);
+  const [zoom, setZoom] = useState<number>(() => (orientation === 'horizontal' ? 0.65 : 0.72));
   const [designerMode, setDesignerMode] = useState<boolean>(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
   const [isYamlModalOpen, setIsYamlModalOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   const previewRef = useRef<HTMLDivElement | null>(null);
+
+  // Keep orientation in sync with browser URL & history
+  const handleOrientationChange = (newOrientation: MenuOrientation) => {
+    setOrientation(newOrientation);
+    try {
+      if (typeof window !== 'undefined') {
+        const targetPath = newOrientation === 'horizontal' ? '/horizontal' : '/';
+        window.history.pushState({ orientation: newOrientation }, '', targetPath);
+      }
+    } catch {
+      // ignore
+    }
+    showToast(`Modo ${newOrientation === 'horizontal' ? 'Horizontal 16:9' : 'Vertical (Carta/A4)'} activado`, 'info');
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      try {
+        const path = window.location.pathname.toLowerCase();
+        const params = new URLSearchParams(window.location.search);
+        if (path.includes('horizontal') || params.get('orientation') === 'horizontal') {
+          setOrientation('horizontal');
+        } else {
+          setOrientation('vertical');
+        }
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Auto-save to localStorage
   useEffect(() => {
@@ -239,17 +287,21 @@ export function App() {
     }
   };
 
-  // Direct High-Resolution Digital PDF Generator (Carta & A4)
+  // Direct High-Resolution Digital PDF Generator (Carta, A4 & 16:9)
   const handleExportPDF = async (
-    targetSize?: 'letter' | 'a4',
+    targetSize?: 'letter' | 'a4' | '16:9',
     singleOnly = false,
     pageFilter: 'all' | 'odd' | 'even' = 'all'
   ) => {
     if (isGeneratingPdf) return;
     try {
       setIsGeneratingPdf(true);
-      const chosenSize = targetSize || catalog.theme.pageSize || 'letter';
-      const sizeLabel = chosenSize === 'a4' ? 'A4 (21.0 × 29.7 cm)' : 'Carta (21.6 × 27.9 cm)';
+      const isHorizontalMode = orientation === 'horizontal' || targetSize === '16:9';
+      const chosenSize = targetSize || (isHorizontalMode ? '16:9' : (catalog.theme.pageSize || 'letter'));
+      const sizeLabel = chosenSize === '16:9'
+        ? 'Pantalla 16:9 (29.7 × 16.7 cm)'
+        : (chosenSize === 'a4' ? 'A4 (21.0 × 29.7 cm)' : 'Carta (21.6 × 27.9 cm)');
+
       const targetIndex = singleOnly
         ? (activePageIndex === -99 ? 0 : activePageIndex)
         : undefined;
@@ -258,9 +310,9 @@ export function App() {
       if (targetIndex !== undefined) {
         pageDesc = targetIndex === -1 ? 'Portada' : `Página ${targetIndex + 1}: ${catalog.sections[targetIndex]?.name || ''}`;
       } else if (pageFilter === 'odd') {
-        pageDesc = 'Tablet 1 — Páginas Impares (1, 3, 5...)';
+        pageDesc = isHorizontalMode ? 'Tablet 1 — Páginas Impares 16:9 (1, 3, 5...)' : 'Tablet 1 — Páginas Impares (1, 3, 5...)';
       } else if (pageFilter === 'even') {
-        pageDesc = 'Tablet 2 — Páginas Pares (2, 4, 6...)';
+        pageDesc = isHorizontalMode ? 'Tablet 2 — Páginas Pares 16:9 (2, 4, 6...)' : 'Tablet 2 — Páginas Pares (2, 4, 6...)';
       }
 
       showToast(`Generando PDF Digital ${sizeLabel} — ${pageDesc}...`, 'info');
@@ -270,6 +322,7 @@ export function App() {
         singlePageIndex: targetIndex,
         pageFilter,
         targetFormat: chosenSize,
+        orientation: isHorizontalMode ? 'horizontal' : 'vertical',
         onProgress: (_cur, _tot, message) => {
           showToast(message, 'info');
         }
@@ -292,12 +345,13 @@ export function App() {
   };
 
   // Dual-Tablet PDF Generator: Exports both Odd and Even in one seamless click
-  const handleExportDualTabletPDF = async (targetSize?: 'letter' | 'a4') => {
+  const handleExportDualTabletPDF = async (targetSize?: 'letter' | 'a4' | '16:9') => {
     if (isGeneratingPdf) return;
     try {
       setIsGeneratingPdf(true);
-      const chosenSize = targetSize || catalog.theme.pageSize || 'letter';
-      const sizeLabel = chosenSize === 'a4' ? 'A4' : 'Carta';
+      const isHorizontalMode = orientation === 'horizontal' || targetSize === '16:9';
+      const chosenSize = targetSize || (isHorizontalMode ? '16:9' : (catalog.theme.pageSize || 'letter'));
+      const sizeLabel = chosenSize === '16:9' ? '16:9 Widescreen' : (chosenSize === 'a4' ? 'A4' : 'Carta');
 
       // 1. Tablet 1: Odd pages (1, 3, 5...)
       showToast(`[1/2] Generando PDF Tablet 1 (Páginas Impares) — ${sizeLabel}...`, 'info');
@@ -305,6 +359,7 @@ export function App() {
         catalog,
         pageFilter: 'odd',
         targetFormat: chosenSize,
+        orientation: isHorizontalMode ? 'horizontal' : 'vertical',
         onProgress: (cur, tot, message) => {
           showToast(`[Tablet 1: ${cur}/${tot}] ${message}`, 'info');
         }
@@ -325,6 +380,7 @@ export function App() {
         catalog,
         pageFilter: 'even',
         targetFormat: chosenSize,
+        orientation: isHorizontalMode ? 'horizontal' : 'vertical',
         onProgress: (cur, tot, message) => {
           showToast(`[Tablet 2: ${cur}/${tot}] ${message}`, 'info');
         }
@@ -442,6 +498,8 @@ export function App() {
           showToast(designerMode ? 'Modo Automático activado' : 'Modo Diseñador activado');
         }}
         isGeneratingPdf={isGeneratingPdf}
+        orientation={orientation}
+        onOrientationChange={handleOrientationChange}
       />
 
       {/* Main Workspace (Split: Editor Sidebar + Page Preview) */}
@@ -578,6 +636,7 @@ export function App() {
             catalog={catalog}
             activePageIndex={activePageIndex}
             zoom={zoom}
+            orientation={orientation}
             containerRef={previewRef}
           />
         </main>

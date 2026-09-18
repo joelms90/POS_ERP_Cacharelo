@@ -6,7 +6,8 @@ export interface GeneratePdfOptions {
   catalog: MenuCatalog;
   singlePageIndex?: number; // -1 for cover, 0+ for section, undefined for ALL pages
   pageFilter?: 'all' | 'odd' | 'even';
-  targetFormat?: 'letter' | 'a4'; // Override catalog.theme.pageSize
+  targetFormat?: 'letter' | 'a4' | '16:9'; // Override catalog.theme.pageSize
+  orientation?: 'vertical' | 'horizontal';
   onProgress?: (current: number, total: number, message: string) => void;
 }
 
@@ -18,27 +19,31 @@ export interface PdfResult {
 /**
  * Direct High-Resolution Digital PDF Generator
  * Eliminates browser print dialog (window.print), capturing pages at native 2x retina
- * resolution and embedding into a digital PDF with exact physical dimensions (Carta / A4).
+ * resolution and embedding into a digital PDF with exact physical dimensions (Carta / A4 / 16:9).
  */
 export async function generateDigitalPdf({
   catalog,
   singlePageIndex,
   pageFilter = 'all',
   targetFormat,
+  orientation = 'vertical',
   onProgress
 }: GeneratePdfOptions): Promise<PdfResult> {
   const { theme, cover, sections, restaurant } = catalog;
+  const isHorizontal = orientation === 'horizontal' || targetFormat === '16:9';
   const activePageSize = targetFormat || theme.pageSize || 'letter';
-  const isA4 = activePageSize === 'a4';
+  const isA4 = !isHorizontal && activePageSize === 'a4';
 
-  // Exact physical millimeter dimensions
-  // Carta / Letter: 21.6 × 27.9 cm (215.9 mm × 279.4 mm / 8.5 × 11 in)
-  // A4: 21.0 × 29.7 cm (210.0 mm × 297.0 mm)
-  const widthMm = isA4 ? 210.0 : 215.9;
-  const heightMm = isA4 ? 297.0 : 279.4;
-  const widthPx = isA4 ? 794 : 816;
-  const heightPx = isA4 ? 1123 : 1056;
-  const formatName = isA4 ? 'A4' : 'Carta';
+  // Physical millimeter dimensions:
+  // 16:9 Widescreen: 297.0 mm × 167.06 mm (Landscape)
+  // Carta / Letter: 215.9 mm × 279.4 mm (Portrait)
+  // A4: 210.0 mm × 297.0 mm (Portrait)
+  const widthMm = isHorizontal ? 297.0 : (isA4 ? 210.0 : 215.9);
+  const heightMm = isHorizontal ? 167.06 : (isA4 ? 297.0 : 279.4);
+  const widthPx = isHorizontal ? 1280 : (isA4 ? 794 : 816);
+  const heightPx = isHorizontal ? 720 : (isA4 ? 1123 : 1056);
+  const formatName = isHorizontal ? '16-9' : (isA4 ? 'A4' : 'Carta');
+  const orientationDoc: 'portrait' | 'landscape' = isHorizontal ? 'landscape' : 'portrait';
 
   onProgress?.(0, 1, 'Verificando tipografías y recursos gráficos...');
 
@@ -56,7 +61,7 @@ export async function generateDigitalPdf({
 
   // Initialize jsPDF with exact custom millimeter dimensions
   const pdf = new jsPDF({
-    orientation: 'portrait',
+    orientation: orientationDoc,
     unit: 'mm',
     format: [widthMm, heightMm],
     compress: true
@@ -157,7 +162,7 @@ export async function generateDigitalPdf({
 
     // If not the first page, add a new page
     if (i > 0) {
-      pdf.addPage([widthMm, heightMm], 'portrait');
+      pdf.addPage([widthMm, heightMm], orientationDoc);
     }
 
     // Embed full-bleed image with 0 margin
@@ -167,13 +172,13 @@ export async function generateDigitalPdf({
   onProgress?.(targets.length, targets.length, 'Compilando archivo PDF digital...');
 
   const cleanRestaurantName = restaurant.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-  let scopeName = 'completo';
+  let scopeName = isHorizontal ? 'horizontal' : 'completo';
   if (singlePageIndex !== undefined) {
     scopeName = singlePageIndex === -1 ? 'portada' : `pag-${singlePageIndex + 1}`;
   } else if (pageFilter === 'odd') {
-    scopeName = 'tablet1-impares';
+    scopeName = isHorizontal ? 'horizontal-tablet1-impares' : 'tablet1-impares';
   } else if (pageFilter === 'even') {
-    scopeName = 'tablet2-pares';
+    scopeName = isHorizontal ? 'horizontal-tablet2-pares' : 'tablet2-pares';
   }
 
   const filename = `${cleanRestaurantName}-menu-${scopeName}-${formatName.toLowerCase()}.pdf`;
