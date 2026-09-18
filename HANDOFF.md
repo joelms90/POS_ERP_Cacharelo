@@ -1,13 +1,15 @@
 # 🤝 Session Handoff Document
 
 - **Project Name**: POS-ERP Monorepo (`joelms90/POS_ERP_Cacharelo`)
-- **Date & Time**: 2026-08-29 (session close)
+- **Date & Time**: 2026-09-18 (landing menu publish)
 - **Branch**: `011-purchase-orders-requisitions`
-- **Last Agent**: OpenCode (deepseek-v4-pro)
+- **Last Agent**: Codex
 
 ---
 
 ## 1. Executive Summary
+
+The September 2026 cafeteria menu was published at `https://www.cacharelo.com/menus/menu-cafeteria.pdf`. The landing Firebase configuration now explicitly targets the primary `fresh-sensor-497515-d3` Hosting site; the custom-domain PDF download was checksum-verified after deployment.
 
 This session revamped the **inventory system** from a mutable-counter model into an **immutable, ledger-driven model** and unified the operational UI (Órdenes de Compra, Requisiciones, Traspasos, Recepción, Panel de Inventario, Catálogo por Sucursal). Highlights:
 
@@ -58,6 +60,7 @@ This session revamped the **inventory system** from a mutable-counter model into
 | Backend (`apps/sync_api`) | ✅ Builds | `npm run build` green; new tables/columns migrated locally |
 | Admin (`apps/business_control_tauri`) | ✅ Builds | `npm run build` green; e2e navigation + feature specs pass |
 | POS (`apps/pos_flutter`) | ⚠️ Not rebuilt | branchId change needs `flutter analyze` + rebuild |
+| Landing menu (`apps/landing_page`) | ✅ Published | September 2026 PDF live at `/menus/menu-cafeteria.pdf` |
 | Migrations (prod) | ⚠️ Not applied | see `docs/pre-deployment-checklist.md` |
 | Data backfills (prod) | ⚠️ Not applied | `backfill-stock-ledger.ts` + `reconcile-product-item-type.ts` |
 
