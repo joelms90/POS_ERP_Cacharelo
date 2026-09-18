@@ -8,7 +8,12 @@
 
 ## Currently Active Sessions
 
-_None._
+### Session: Landing cafeteria menu update
+- **Session Name**: `codex-landing-menu-sept-2026`
+- **Branch**: `011-purchase-orders-requisitions` (app-scoped child branch unavailable because this parent branch already exists)
+- **Primary Focus**: Publish the September 2026 cafeteria menu PDF
+- **Apps Touched**: `apps/landing_page/`
+- **Status**: 🔄 In progress
 
 ---
 
