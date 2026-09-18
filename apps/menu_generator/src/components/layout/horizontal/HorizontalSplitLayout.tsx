@@ -96,66 +96,86 @@ export const HorizontalSplitLayout: React.FC<HorizontalSplitLayoutProps> = ({ se
       <div className="w-[62%] h-full grid grid-cols-2 gap-6 items-center">
         {/* Sub-column 1 */}
         <div className="space-y-3.5 flex flex-col justify-center">
-          {col1Dishes.map((dish) => (
-            <div key={dish.id} className="group flex flex-col">
-              <div className="flex items-baseline justify-between gap-1">
-                <h4
-                  className="text-base font-bold font-cormorant tracking-[0.06em] uppercase leading-tight"
-                  style={{ color: CHARCOAL }}
-                >
-                  {dish.name}
-                </h4>
-                <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[8px]" />
-                {formatPrice(dish.price) && (
-                  <span
-                    className="text-sm font-bold font-cormorant tracking-wide shrink-0 text-[#C8A265]"
-                  >
-                    {formatPrice(dish.price)}
-                  </span>
+          {col1Dishes.map((dish) => {
+            const hasImg = Boolean(dish.image || dish.imageProcessed);
+            return (
+              <div key={dish.id} className="group flex items-start gap-2.5">
+                {hasImg && (
+                  <div className="shrink-0 flex items-center justify-center pt-0.5">
+                    <DishImageRenderer dish={dish} theme={theme} size="xs" />
+                  </div>
                 )}
+                <div className="flex-1 min-w-0 flex flex-col">
+                  <div className="flex items-baseline justify-between gap-1">
+                    <h4
+                      className="text-base font-bold font-cormorant tracking-[0.06em] uppercase leading-tight truncate"
+                      style={{ color: CHARCOAL }}
+                    >
+                      {dish.name}
+                    </h4>
+                    <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[8px]" />
+                    {formatPrice(dish.price) && (
+                      <span
+                        className="text-sm font-bold font-cormorant tracking-wide shrink-0 text-[#C8A265]"
+                      >
+                        {formatPrice(dish.price)}
+                      </span>
+                    )}
+                  </div>
+                  {dish.description && (
+                    <p
+                      className="text-[11px] font-montserrat leading-snug opacity-80 mt-0.5 line-clamp-2"
+                      style={{ color: MUTED_BRONZE }}
+                    >
+                      {dish.description}
+                    </p>
+                  )}
+                </div>
               </div>
-              {dish.description && (
-                <p
-                  className="text-[11px] font-montserrat leading-snug opacity-80 mt-0.5 line-clamp-2"
-                  style={{ color: MUTED_BRONZE }}
-                >
-                  {dish.description}
-                </p>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Sub-column 2 */}
         <div className="space-y-3.5 flex flex-col justify-center">
-          {col2Dishes.map((dish) => (
-            <div key={dish.id} className="group flex flex-col">
-              <div className="flex items-baseline justify-between gap-1">
-                <h4
-                  className="text-base font-bold font-cormorant tracking-[0.06em] uppercase leading-tight"
-                  style={{ color: CHARCOAL }}
-                >
-                  {dish.name}
-                </h4>
-                <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[8px]" />
-                {formatPrice(dish.price) && (
-                  <span
-                    className="text-sm font-bold font-cormorant tracking-wide shrink-0 text-[#C8A265]"
-                  >
-                    {formatPrice(dish.price)}
-                  </span>
+          {col2Dishes.map((dish) => {
+            const hasImg = Boolean(dish.image || dish.imageProcessed);
+            return (
+              <div key={dish.id} className="group flex items-start gap-2.5">
+                {hasImg && (
+                  <div className="shrink-0 flex items-center justify-center pt-0.5">
+                    <DishImageRenderer dish={dish} theme={theme} size="xs" />
+                  </div>
                 )}
+                <div className="flex-1 min-w-0 flex flex-col">
+                  <div className="flex items-baseline justify-between gap-1">
+                    <h4
+                      className="text-base font-bold font-cormorant tracking-[0.06em] uppercase leading-tight truncate"
+                      style={{ color: CHARCOAL }}
+                    >
+                      {dish.name}
+                    </h4>
+                    <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[8px]" />
+                    {formatPrice(dish.price) && (
+                      <span
+                        className="text-sm font-bold font-cormorant tracking-wide shrink-0 text-[#C8A265]"
+                      >
+                        {formatPrice(dish.price)}
+                      </span>
+                    )}
+                  </div>
+                  {dish.description && (
+                    <p
+                      className="text-[11px] font-montserrat leading-snug opacity-80 mt-0.5 line-clamp-2"
+                      style={{ color: MUTED_BRONZE }}
+                    >
+                      {dish.description}
+                    </p>
+                  )}
+                </div>
               </div>
-              {dish.description && (
-                <p
-                  className="text-[11px] font-montserrat leading-snug opacity-80 mt-0.5 line-clamp-2"
-                  style={{ color: MUTED_BRONZE }}
-                >
-                  {dish.description}
-                </p>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

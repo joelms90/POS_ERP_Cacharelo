@@ -3,6 +3,7 @@ import type { MenuSection, MenuTheme, Restaurant } from '../../../types/menu';
 import { HorizontalSplitLayout } from './HorizontalSplitLayout';
 import { HorizontalGridLayout } from './HorizontalGridLayout';
 import { HorizontalDenseLayout } from './HorizontalDenseLayout';
+import { ColumnarTableLayout } from '../ColumnarTableLayout';
 
 interface HorizontalMenuPageRendererProps {
   section: MenuSection;
@@ -21,22 +22,36 @@ export const HorizontalMenuPageRenderer: React.FC<HorizontalMenuPageRendererProp
   const WARM_GOLD = '#C8A265';
   const CHARCOAL = '#2D2926';
 
-  // Determine which layout best fits the section in 16:9 widescreen
   const dishes = section.dishes;
   const dishesWithImage = dishes.filter((d) => Boolean(d.image || d.imageProcessed));
+  const hasMultiplePrices = dishes.some((d) => d.prices && Object.keys(d.prices).length > 0);
 
-  let layoutType: 'split' | 'grid' | 'dense' = 'split';
+  // 1. Check for multi-size or columnar table beverage section
+  const isColumnar =
+    section.layoutTemplate === 'columnar-table' ||
+    Boolean(section.priceHeaders && section.priceHeaders.length > 0) ||
+    hasMultiplePrices;
 
-  if (section.layoutTemplate === 'dense-list' || dishes.length > 12) {
-    layoutType = 'dense';
+  let layoutType: 'columnar' | 'split' | 'grid' | 'dense' = 'grid';
+
+  if (isColumnar) {
+    layoutType = 'columnar';
+  } else if (section.layoutTemplate === 'hero-one') {
+    layoutType = 'split';
   } else if (
     section.layoutTemplate === 'editorial-three' ||
     section.layoutTemplate === 'editorial-four' ||
+    section.layoutTemplate === 'diagonal-two' ||
+    (dishes.length <= 6 && dishesWithImage.length >= 1) ||
     (dishesWithImage.length >= 3 && dishes.length <= 8)
   ) {
+    // Photo-rich sections (like ENSALADAS [5 photos], BAGUETTES [4 photos], WAFFLES [3 photos])
     layoutType = 'grid';
+  } else if (section.layoutTemplate === 'dense-list' || dishes.length > 8) {
+    // Dense lists (like DESAYUNOS [9 items with thumbnails], EXTRAS [text-only])
+    layoutType = 'dense';
   } else {
-    layoutType = 'split';
+    layoutType = dishesWithImage.length > 0 ? 'grid' : 'dense';
   }
 
   return (
@@ -118,6 +133,7 @@ export const HorizontalMenuPageRenderer: React.FC<HorizontalMenuPageRendererProp
 
       {/* 3. Main 16:9 Layout Body */}
       <main className="relative z-10 w-full flex-1 flex flex-col justify-center overflow-hidden my-1">
+        {layoutType === 'columnar' && <ColumnarTableLayout section={section} theme={theme} />}
         {layoutType === 'split' && <HorizontalSplitLayout section={section} theme={theme} />}
         {layoutType === 'grid' && <HorizontalGridLayout section={section} theme={theme} />}
         {layoutType === 'dense' && <HorizontalDenseLayout section={section} theme={theme} />}
