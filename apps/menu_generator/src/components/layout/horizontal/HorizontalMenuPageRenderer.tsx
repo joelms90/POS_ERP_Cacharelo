@@ -3,6 +3,7 @@ import type { MenuSection, MenuTheme, Restaurant } from '../../../types/menu';
 import { HorizontalSplitLayout } from './HorizontalSplitLayout';
 import { HorizontalGridLayout } from './HorizontalGridLayout';
 import { HorizontalDenseLayout } from './HorizontalDenseLayout';
+import { HorizontalMixedFlowLayout } from './HorizontalMixedFlowLayout';
 import { ColumnarTableLayout } from '../ColumnarTableLayout';
 
 interface HorizontalMenuPageRendererProps {
@@ -24,6 +25,7 @@ export const HorizontalMenuPageRenderer: React.FC<HorizontalMenuPageRendererProp
 
   const dishes = section.dishes;
   const dishesWithImage = dishes.filter((d) => Boolean(d.image || d.imageProcessed));
+  const dishesWithoutImage = dishes.filter((d) => !d.image && !d.imageProcessed);
   const hasMultiplePrices = dishes.some((d) => d.prices && Object.keys(d.prices).length > 0);
 
   // 1. Check for multi-size or columnar table beverage section
@@ -32,10 +34,19 @@ export const HorizontalMenuPageRenderer: React.FC<HorizontalMenuPageRendererProp
     Boolean(section.priceHeaders && section.priceHeaders.length > 0) ||
     hasMultiplePrices;
 
-  let layoutType: 'columnar' | 'split' | 'grid' | 'dense' = 'grid';
+  // 2. Check for mixed flow (dishes with photo + text-only varieties, like PAN ARTESANAL)
+  const isMixedFlow =
+    dishesWithImage.length >= 1 &&
+    dishesWithoutImage.length >= 1 &&
+    dishes.length <= 10;
+
+  let layoutType: 'columnar' | 'split' | 'grid' | 'dense' | 'mixed' = 'grid';
 
   if (isColumnar) {
     layoutType = 'columnar';
+  } else if (isMixedFlow) {
+    // Specialized layout for PAN ARTESANAL and mixed photo/text sections
+    layoutType = 'mixed';
   } else if (section.layoutTemplate === 'hero-one') {
     layoutType = 'split';
   } else if (
@@ -134,6 +145,7 @@ export const HorizontalMenuPageRenderer: React.FC<HorizontalMenuPageRendererProp
       {/* 3. Main 16:9 Layout Body */}
       <main className="relative z-10 w-full flex-1 flex flex-col justify-between overflow-hidden my-2">
         {layoutType === 'columnar' && <ColumnarTableLayout section={section} theme={theme} />}
+        {layoutType === 'mixed' && <HorizontalMixedFlowLayout section={section} theme={theme} />}
         {layoutType === 'split' && <HorizontalSplitLayout section={section} theme={theme} />}
         {layoutType === 'grid' && <HorizontalGridLayout section={section} theme={theme} />}
         {layoutType === 'dense' && <HorizontalDenseLayout section={section} theme={theme} />}
