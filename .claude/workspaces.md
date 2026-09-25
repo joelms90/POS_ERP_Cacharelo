@@ -8,7 +8,12 @@
 
 ## Currently Active Sessions
 
-_None._
+### Session: Role and permission unification
+- **Session Name**: `013-unify-roles`
+- **Branch**: `013-unify-roles`
+- **Primary Focus**: Align operational roles, authorization rules, and inventory workflow permissions across the API, dashboard, and Flutter POS.
+- **Apps Touched**: `apps/sync_api/`, `apps/business_control_tauri/`, `apps/pos_flutter/`
+- **Status**: 🔄 In progress
 
 ---
 
