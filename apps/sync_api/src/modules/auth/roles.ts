@@ -10,6 +10,7 @@ export const INVENTORY_ADMIN_ROLE: AdminRole = 'inventory_admin';
 export const SUPPORT_TECH_ROLE: AdminRole = 'support_tech';
 
 export const BRANCH_OPERATOR_ROLE: PosRole = 'branch_operator';
+export const CASHIER_ROLE: PosRole = 'cashier';
 export const WAREHOUSE_PURCHASING_OPERATOR_ROLE: PosRole = 'warehouse_purchasing_operator';
 // Compatibility aliases accepted while existing terminal users are migrated.
 export const ENCARGADO_ROLE: PosRole = 'encargado';

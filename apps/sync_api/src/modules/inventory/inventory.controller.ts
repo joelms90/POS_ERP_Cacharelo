@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Body, Query, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Param, UseGuards, Req } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { CreateReceiptDto } from './dto/create-receipt.dto';
 import { CreateProductionRunDto } from './dto/create-production-run.dto';
 import { CompleteProductionRunDto } from './dto/complete-production-run.dto';
 import { CreateTransferDto } from './dto/create-transfer.dto';
+import { ReceiveTransferDto } from './dto/receive-transfer.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -79,8 +80,8 @@ export class InventoryController {
 
   @Post('transfers/:id/receive')
   @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE, BRANCH_OPERATOR_ROLE)
-  async receiveTransfer(@Param('id') id: string) {
-    return this.inventoryService.receiveTransfer(id);
+  async receiveTransfer(@Param('id') id: string, @Body() receipt: ReceiveTransferDto, @Req() req: any) {
+    return this.inventoryService.receiveTransfer(id, receipt, req.user);
   }
 
   @Post('transfers/:id/ship')

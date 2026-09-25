@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { OrdersRepository } from './repositories/orders.repository';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { AddOrderItemsDto } from './dto/add-order-items.dto';
@@ -195,13 +195,19 @@ export class OrdersService {
     return result;
   }
 
-  async cancelOrder(orderId: string) {
+  async cancelOrder(orderId: string, reason: string, actor: any) {
     const order = await this.findOne(orderId);
-    if (order.state === 'closed' || order.state === 'cancelled') {
+    if (!reason?.trim()) throw new BadRequestException('Debes indicar el motivo de la cancelación.');
+    if (order.state === 'closed' || order.state === 'cancelled' || order.payments.length > 0) {
       throw new ConflictException(`Cannot cancel an order in state: ${order.state}`);
     }
-    
-    const result = await this.ordersRepository.updateOrderAndTableState(orderId, 'cancelled', 'free');
+    const roles = Array.isArray(actor.roles) ? actor.roles : [actor.role];
+    const isManagement = roles.some((role: string) => ['owner', 'inventory_admin', 'support_tech'].includes(role));
+    if (!isManagement && (!actor.branchId || actor.branchId !== order.branchId)) {
+      throw new ForbiddenException('Solo puedes cancelar órdenes de tu sucursal.');
+    }
+
+    const result = await this.ordersRepository.cancelOrderWithAudit(orderId, reason.trim(), actor.sub);
 
     // Broadcast cancellation and table release (free)
     if (result.branchId) {
@@ -215,6 +221,13 @@ export class OrdersService {
     }
 
     return result;
+  }
+
+  async getDailyPaymentSummary(actor: any, requestedDate?: string) {
+    if (!actor.branchId) throw new ForbiddenException('El operador no tiene una sucursal asignada.');
+    const date = requestedDate || new Date().toISOString().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new BadRequestException('La fecha debe tener formato AAAA-MM-DD.');
+    return this.ordersRepository.getDailyPaymentSummary(actor.branchId, date);
   }
 
   private async _logChanges(branchId: string, entries: Array<{ entity: string; entityId: string; payload: any }>) {

@@ -9,6 +9,8 @@ describe('RequisitionsService', () => {
 
   const mockRequisitionsRepository = {
     create: jest.fn(),
+    createForBranch: jest.fn(),
+    findByRequester: jest.fn(),
     findByBranch: jest.fn(),
     findPendingForBusiness: jest.fn(),
     findById: jest.fn(),
@@ -51,6 +53,29 @@ describe('RequisitionsService', () => {
       const result = await service.create(dto);
       expect(result).toEqual(created);
       expect(repository.create).toHaveBeenCalledWith(dto);
+    });
+  });
+
+  describe('branch operator scope', () => {
+    const actor = { sub: 'user-1', businessId: 'bus-1', branchId: 'branch-1' };
+
+    it('derives the requester and branch instead of accepting them from the POS', async () => {
+      const dto = { notes: 'Faltan insumos', items: [{ productId: 'prod-1', quantityRequested: 2 }] } as any;
+      mockRequisitionsRepository.createForBranch.mockResolvedValue({ id: 'req-1' });
+
+      await service.createForOperator(dto, actor);
+
+      expect(repository.createForBranch).toHaveBeenCalledWith({
+        businessId: 'bus-1', fromBranchId: 'branch-1', createdBy: 'user-1',
+        notes: 'Faltan insumos', items: dto.items,
+      });
+    });
+
+    it('returns only the current operator requisitions and applies the optional status filter', async () => {
+      mockRequisitionsRepository.findByRequester.mockResolvedValue([{ id: 'req-1', createdBy: 'user-1' }]);
+
+      await expect(service.findMine(actor, 'pending')).resolves.toEqual([{ id: 'req-1', createdBy: 'user-1' }]);
+      expect(repository.findByRequester).toHaveBeenCalledWith('bus-1', 'branch-1', 'user-1', 'pending');
     });
   });
 

@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
-import { eq, and, inArray, count } from 'drizzle-orm';
+import { eq, and, inArray, count, asc } from 'drizzle-orm';
 
 @Injectable()
 export class RequisitionsRepository {
@@ -62,6 +62,21 @@ export class RequisitionsRepository {
       .where(eq(schema.branchRequisitions.businessId, businessId))
       .orderBy(schema.branchRequisitions.createdAt);
 
+    return this.attachItemCounts(requisitions);
+  }
+
+  async findByRequester(businessId: string, branchId: string, createdBy: string, status?: string) {
+    const conditions = [
+      eq(schema.branchRequisitions.businessId, businessId),
+      eq(schema.branchRequisitions.fromBranchId, branchId),
+      eq(schema.branchRequisitions.createdBy, createdBy),
+    ];
+    if (status) conditions.push(eq(schema.branchRequisitions.status, status));
+    const requisitions = await this.db
+      .select()
+      .from(schema.branchRequisitions)
+      .where(and(...conditions))
+      .orderBy(asc(schema.branchRequisitions.createdAt));
     return this.attachItemCounts(requisitions);
   }
 
@@ -187,6 +202,24 @@ export class RequisitionsRepository {
         })),
       };
     });
+  }
+
+  async createForBranch(data: {
+    id?: string;
+    businessId: string;
+    fromBranchId: string;
+    createdBy: string;
+    notes?: string;
+    items: Array<{ productId: string; quantityRequested: number }>;
+  }) {
+    const [warehouse] = await this.db
+      .select({ id: schema.warehouses.id })
+      .from(schema.warehouses)
+      .where(eq(schema.warehouses.businessId, data.businessId))
+      .orderBy(asc(schema.warehouses.createdAt))
+      .limit(1);
+    if (!warehouse) throw new Error('No hay una bodega configurada para este negocio.');
+    return this.create({ ...data, toWarehouseId: warehouse.id });
   }
 
   async updateStatus(

@@ -4,6 +4,7 @@ import { LedgerService } from './ledger.service';
 import { CreateReceiptDto } from './dto/create-receipt.dto';
 import { CreateProductionRunDto } from './dto/create-production-run.dto';
 import { CompleteProductionRunDto } from './dto/complete-production-run.dto';
+import { ReceiveTransferDto } from './dto/receive-transfer.dto';
 import * as schema from '../../database/schema';
 import { eq, and, gte, lte, sql, desc, inArray } from 'drizzle-orm';
 
@@ -612,7 +613,7 @@ export class InventoryService {
     });
   }
 
-  async receiveTransfer(transferId: string) {
+  async receiveTransfer(transferId: string, receipt: ReceiveTransferDto, actor: any) {
     const db = this.inventoryRepository.getDb();
 
     return db.transaction(async (tx) => {
@@ -632,6 +633,14 @@ export class InventoryService {
         );
       }
 
+      const actorRoles = Array.isArray(actor.roles) ? actor.roles : [actor.role];
+      const isManagement = actorRoles.some((role: string) =>
+        ['owner', 'inventory_admin', 'support_tech', 'warehouse_purchasing_operator'].includes(role),
+      );
+      if (!isManagement && (!actor.branchId || transfer.toBranchId !== actor.branchId)) {
+        throw new BadRequestException('Solo la sucursal destino puede recibir este traspaso.');
+      }
+
       const transitWh = await this.getOrCreateTransitWarehouse(tx, transfer.businessId);
 
       const items = await tx
@@ -639,7 +648,20 @@ export class InventoryService {
         .from(schema.stockTransferItems)
         .where(eq(schema.stockTransferItems.transferId, transferId));
 
+      const receivedByProduct = new Map(receipt.items.map((item) => [item.productId, item.quantityReceived]));
+      if (receivedByProduct.size !== items.length || items.some((item) => !receivedByProduct.has(item.productId))) {
+        throw new BadRequestException('Debes confirmar la cantidad recibida de cada producto del traspaso.');
+      }
+      const hasDiscrepancy = items.some((item) => receivedByProduct.get(item.productId)! !== parseFloat(item.quantity));
+      if (hasDiscrepancy && !receipt.note?.trim()) {
+        throw new BadRequestException('Registra una nota para aceptar una recepción con diferencias.');
+      }
+
       for (const item of items) {
+        const quantityReceived = receivedByProduct.get(item.productId)!;
+        if (quantityReceived > parseFloat(item.quantity)) {
+          throw new BadRequestException('La cantidad recibida no puede ser mayor a la cantidad enviada.');
+        }
         await this.ledgerService.applyMovement(tx, {
           businessId: transfer.businessId,
           productId: item.productId,
@@ -655,24 +677,50 @@ export class InventoryService {
         await this.ledgerService.applyMovement(tx, {
           businessId: transfer.businessId,
           productId: item.productId,
-          quantityDelta: parseFloat(item.quantity),
+          quantityDelta: quantityReceived,
           eventType: 'transfer_in',
           warehouseId: transfer.toWarehouseId || null,
           branchId: transfer.toBranchId || null,
           unitCost: item.unitCost,
           referenceType: 'transfer',
           referenceId: transferId,
-          notes: 'Traspaso recibido',
+          notes: `Traspaso recibido por ${actor.name || actor.sub}${receipt.note ? `: ${receipt.note.trim()}` : ''}`,
         });
+
+        // Remove any shortage from the transit location so it cannot be received twice.
+        const shortage = parseFloat(item.quantity) - quantityReceived;
+        if (shortage > 0) {
+          await this.ledgerService.applyMovement(tx, {
+            businessId: transfer.businessId,
+            productId: item.productId,
+            quantityDelta: -shortage,
+            eventType: 'transfer_shortage',
+            warehouseId: transitWh.id,
+            unitCost: item.unitCost,
+            referenceType: 'transfer',
+            referenceId: transferId,
+            notes: `Diferencia aceptada por ${actor.name || actor.sub}: ${receipt.note!.trim()}`,
+          });
+        }
+
+        await tx.update(schema.stockTransferItems)
+          .set({ quantityReceived: quantityReceived.toFixed(3) })
+          .where(eq(schema.stockTransferItems.id, item.id));
       }
 
       const [updated] = await tx
         .update(schema.stockTransfers)
-        .set({ status: 'received', transferredAt: new Date() })
+        .set({
+          status: 'received',
+          transferredAt: new Date(),
+          receivedAt: new Date(),
+          receivedBy: actor.sub,
+          receiptNote: receipt.note?.trim() || null,
+        })
         .where(eq(schema.stockTransfers.id, transferId))
         .returning();
 
-      return { success: true, transferId, status: updated.status };
+      return { success: true, transferId, status: updated.status, hasDiscrepancy };
     });
   }
 

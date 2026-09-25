@@ -307,6 +307,9 @@ export const orders = pgTable('orders', {
   updatedAt: timestamp('updated_at', { withTimezone: true })
     .defaultNow()
     .notNull(),
+  cancellationReason: text('cancellation_reason'),
+  cancelledBy: uuid('cancelled_by').references(() => users.id),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   version: integer('version').default(1).notNull(),
 });
@@ -605,6 +608,9 @@ export const stockTransfers = pgTable('stock_transfers', {
     .notNull(),
   status: varchar('status', { length: 20 }).default('completed').notNull(),
   notes: text('notes'),
+  receivedBy: uuid('received_by').references(() => users.id),
+  receivedAt: timestamp('received_at', { withTimezone: true }),
+  receiptNote: text('receipt_note'),
 });
 
 export const stockTransferItems = pgTable('stock_transfer_items', {
@@ -616,6 +622,7 @@ export const stockTransferItems = pgTable('stock_transfer_items', {
     .references(() => products.id)
     .notNull(),
   quantity: decimal('quantity', { precision: 12, scale: 3 }).notNull(),
+  quantityReceived: decimal('quantity_received', { precision: 12, scale: 3 }),
   unitCost: decimal('unit_cost', { precision: 10, scale: 2 })
     .default('0.00')
     .notNull(),

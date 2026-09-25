@@ -334,6 +334,53 @@ export class OrdersRepository {
     });
   }
 
+  async cancelOrderWithAudit(orderId: string, reason: string, cancelledBy: string) {
+    return this.db.transaction(async (tx) => {
+      const [updatedOrder] = await tx
+        .update(schema.orders)
+        .set({
+          state: 'cancelled',
+          cancellationReason: reason,
+          cancelledBy,
+          cancelledAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.orders.id, orderId))
+        .returning();
+      await tx.update(schema.branchTables)
+        .set({ state: 'free', updatedAt: new Date() })
+        .where(eq(schema.branchTables.id, updatedOrder.tableId));
+      return updatedOrder;
+    });
+  }
+
+  async getDailyPaymentSummary(branchId: string, date: string) {
+    const rows = await this.db
+      .select({
+        method: schema.payments.paymentMethod,
+        amount: schema.payments.amount,
+      })
+      .from(schema.payments)
+      .innerJoin(schema.orders, eq(schema.payments.orderId, schema.orders.id))
+      .where(and(
+        eq(schema.orders.branchId, branchId),
+        sql`${schema.payments.createdAt} >= ${date}::date`,
+        sql`${schema.payments.createdAt} < (${date}::date + interval '1 day')`,
+        sql`${schema.orders.state} <> 'cancelled'`,
+      ));
+    const byMethod: Record<string, number> = {};
+    for (const row of rows) byMethod[row.method] = (byMethod[row.method] || 0) + Number(row.amount);
+    const cash = byMethod.cash || 0;
+    const card = byMethod.card || 0;
+    return {
+      date,
+      branchId,
+      transactionCount: rows.length,
+      totals: { cash, card, other: Object.entries(byMethod).filter(([method]) => method !== 'cash' && method !== 'card').reduce((sum, [, amount]) => sum + amount, 0), total: rows.reduce((sum, row) => sum + Number(row.amount), 0) },
+      byMethod,
+    };
+  }
+
   async createPayment(
     orderId: string,
     paymentData: {

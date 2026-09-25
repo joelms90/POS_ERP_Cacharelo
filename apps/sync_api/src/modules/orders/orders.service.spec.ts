@@ -3,6 +3,7 @@ import { OrdersService } from './orders.service';
 import { OrdersRepository } from './repositories/orders.repository';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { SyncGateway } from '../sync/sync.gateway';
+import { DRIZZLE_CONNECTION } from '../../database/database.module';
 
 describe('OrdersService', () => {
   let service: OrdersService;
@@ -16,6 +17,8 @@ describe('OrdersService', () => {
     findExistingOrderItemClientUuids: jest.fn(),
     updateOrderAndTableState: jest.fn(),
     createPayment: jest.fn(),
+    cancelOrderWithAudit: jest.fn(),
+    getDailyPaymentSummary: jest.fn(),
   };
 
   const mockSyncGateway = {
@@ -33,6 +36,10 @@ describe('OrdersService', () => {
         {
           provide: SyncGateway,
           useValue: mockSyncGateway,
+        },
+        {
+          provide: DRIZZLE_CONNECTION,
+          useValue: { insert: jest.fn() },
         },
       ],
     }).compile();
@@ -342,6 +349,31 @@ describe('OrdersService', () => {
           paymentMethod: 'cash',
         }),
       ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('audited cancellation and daily report', () => {
+    const operator = { sub: 'operator-1', branchId: 'branch-1', roles: ['branch_operator'] };
+
+    it('records the actor and reason and refuses orders with a payment', async () => {
+      mockOrdersRepository.findById.mockResolvedValue({
+        id: 'order-1', branchId: 'branch-1', tableId: 'table-1', state: 'open', payments: [],
+      });
+      mockOrdersRepository.cancelOrderWithAudit.mockResolvedValue({ id: 'order-1', state: 'cancelled' });
+
+      await service.cancelOrder('order-1', 'Cliente se retiró', operator);
+      expect(repository.cancelOrderWithAudit).toHaveBeenCalledWith('order-1', 'Cliente se retiró', 'operator-1');
+
+      mockOrdersRepository.findById.mockResolvedValue({
+        id: 'order-1', branchId: 'branch-1', tableId: 'table-1', state: 'billing', payments: [{ id: 'payment-1' }],
+      });
+      await expect(service.cancelOrder('order-1', 'No procede', operator)).rejects.toThrow(ConflictException);
+    });
+
+    it('obtains daily payment totals only for the actor branch', async () => {
+      mockOrdersRepository.getDailyPaymentSummary.mockResolvedValue({ branchId: 'branch-1', totals: { cash: 20, card: 10 } });
+      await service.getDailyPaymentSummary(operator, '2026-09-24');
+      expect(repository.getDailyPaymentSummary).toHaveBeenCalledWith('branch-1', '2026-09-24');
     });
   });
 });

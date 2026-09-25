@@ -111,6 +111,7 @@ export class AuthService {
       role: roles[0],
       roles,
       businessId: primaryBusinessId,
+      branchId: user.branchId || null,
       businessAccess: normalizedAccess,
     };
 
@@ -150,6 +151,7 @@ export class AuthService {
         role: roles[0],
         roles,
         businessId: primaryBusinessId,
+        branchId: user.branchId || null,
         businessAccess: normalizedAccess,
       },
     };

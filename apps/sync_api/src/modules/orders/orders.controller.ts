@@ -1,9 +1,14 @@
-import { Controller, Get, Post, Body, Param, Query, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { AddOrderItemsDto } from './dto/add-order-items.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { AdminGuard } from '../auth/guards/admin.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { BRANCH_OPERATOR_ROLE, CASHIER_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE } from '../auth/roles';
+import { CancelOrderDto } from './dto/cancel-order.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -26,6 +31,14 @@ export class OrdersController {
   @UseGuards(AdminGuard)
   async findActiveByBusiness(@Query('businessId') businessId: string) {
     return this.ordersService.findActiveByBusiness(businessId);
+  }
+
+  @Get('reports/daily-summary')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(BRANCH_OPERATOR_ROLE, CASHIER_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
+  async dailySummary(@Query('date') date: string | undefined, @Req() req: any) {
+    return this.ordersService.getDailyPaymentSummary(req.user, date);
   }
 
   @Get(':id')
@@ -54,7 +67,10 @@ export class OrdersController {
 
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
-  async cancel(@Param('id') id: string) {
-    return this.ordersService.cancelOrder(id);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(BRANCH_OPERATOR_ROLE, CASHIER_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
+  async cancel(@Param('id') id: string, @Body() dto: CancelOrderDto, @Req() req: any) {
+    return this.ordersService.cancelOrder(id, dto.reason, req.user);
   }
+
 }

@@ -84,6 +84,21 @@ async function main() {
     `);
     console.log('Table branch_requisition_items ensured.');
 
+    // Audit fields for branch inventory receipts and POS order cancellations.
+    await client.query(`
+      ALTER TABLE "stock_transfers"
+        ADD COLUMN IF NOT EXISTS "received_by" uuid REFERENCES "users"("id"),
+        ADD COLUMN IF NOT EXISTS "received_at" timestamp with time zone,
+        ADD COLUMN IF NOT EXISTS "receipt_note" text;
+      ALTER TABLE "stock_transfer_items"
+        ADD COLUMN IF NOT EXISTS "quantity_received" numeric(12, 3);
+      ALTER TABLE "orders"
+        ADD COLUMN IF NOT EXISTS "cancellation_reason" text,
+        ADD COLUMN IF NOT EXISTS "cancelled_by" uuid REFERENCES "users"("id"),
+        ADD COLUMN IF NOT EXISTS "cancelled_at" timestamp with time zone;
+    `);
+    console.log('Transfer receipt and order cancellation audit fields ensured.');
+
     // 5. Constraints
     console.log('Adding constraints...');
     const addConstraintSafe = async (table: string, constraint: string, sqlQuery: string) => {
