@@ -86,6 +86,7 @@ describe('AuthService', () => {
         role: 'admin',
         roles: ['admin'],
         businessId: 'bus-1',
+        branchId: null,
         businessAccess: [{ businessId: 'bus-1', role: 'admin' }],
       });
     });

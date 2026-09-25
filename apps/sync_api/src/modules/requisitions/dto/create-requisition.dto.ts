@@ -16,6 +16,16 @@ export class CreateRequisitionDto {
   @IsOptional()
   id?: string;
 
+  // Accepted temporarily for offline clients built before the branch-operator
+  // workflow. The server ignores both fields and derives scope from the JWT.
+  @IsUUID()
+  @IsOptional()
+  businessId?: string;
+
+  @IsUUID()
+  @IsOptional()
+  fromBranchId?: string;
+
   @IsString()
   @IsOptional()
   notes?: string;

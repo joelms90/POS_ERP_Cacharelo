@@ -51,7 +51,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid login PIN');
     }
 
-    return this.generateAuthTokens(matchedUser, deviceId);
+    // A shared operator (branchId null on the user record) works in the
+    // configured terminal branch. The request is already restricted to users
+    // assigned to that branch or intentionally shared across branches.
+    return this.generateAuthTokens(matchedUser, deviceId, branchId);
   }
 
   async refresh(refreshTokenDto: RefreshTokenDto) {
@@ -92,7 +95,11 @@ export class AuthService {
     return { success: true, message: 'Logged out successfully' };
   }
 
-  private async generateAuthTokens(user: any, deviceId: string) {
+  private async generateAuthTokens(
+    user: any,
+    deviceId: string,
+    terminalBranchId?: string,
+  ) {
     const roles = this.normalizeRoles(user.roles, user.role);
     const businessAccess = await this.usersRepository.findAdminAccessForUser(user.id);
     const normalizedAccess = businessAccess.length > 0
@@ -111,7 +118,7 @@ export class AuthService {
       role: roles[0],
       roles,
       businessId: primaryBusinessId,
-      branchId: user.branchId || null,
+      branchId: user.branchId || terminalBranchId || null,
       businessAccess: normalizedAccess,
     };
 
@@ -151,7 +158,7 @@ export class AuthService {
         role: roles[0],
         roles,
         businessId: primaryBusinessId,
-        branchId: user.branchId || null,
+        branchId: user.branchId || terminalBranchId || null,
         businessAccess: normalizedAccess,
       },
     };

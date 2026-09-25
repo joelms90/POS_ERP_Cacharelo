@@ -5164,8 +5164,6 @@ class AppState extends ChangeNotifier {
       try {
         final payload = {
           'id': req.id,
-          'businessId': terminalBusinessId ?? req.fromBranchId,
-          'fromBranchId': req.fromBranchId,
           'notes': req.notes,
           'items': req.items
               .map((i) => {
