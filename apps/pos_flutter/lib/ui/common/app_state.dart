@@ -706,12 +706,17 @@ class AppState extends ChangeNotifier {
         terminalBranchName = config['branchName'];
         terminalApiUrl = config['apiUrl'];
 
-        // Auto-migrate old Cloud Run API URLs to the secure VM API subdomain
+        final bool usesLocalDevelopmentApi =
+            configuredDefaultApiUrl.contains('localhost') ||
+            configuredDefaultApiUrl.contains('127.0.0.1') ||
+            configuredDefaultApiUrl.contains('10.0.2.2');
+        final bool hasObsoleteApiUrl =
+            terminalApiUrl?.contains('umqpitkpoa-uc.a.run.app') ?? false;
+
+        // A local development launch must not keep a previously saved production
+        // endpoint. Production builds retain the saved terminal endpoint.
         if (terminalApiUrl != null &&
-            (terminalApiUrl!.contains('umqpitkpoa-uc.a.run.app') ||
-                terminalApiUrl!.contains('localhost') ||
-                terminalApiUrl!.contains('127.0.0.1') ||
-                terminalApiUrl!.contains('10.0.2.2'))) {
+            (hasObsoleteApiUrl || usesLocalDevelopmentApi)) {
           terminalApiUrl = configuredDefaultApiUrl;
           await _secureStorageService.saveTerminalConfig(
             businessId: terminalBusinessId ?? '',
