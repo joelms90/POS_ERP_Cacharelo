@@ -5,7 +5,7 @@ import { UpdateRequisitionStatusDto } from './dto/update-requisition-status.dto'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { ENCARGADO_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE } from '../auth/roles';
+import { BRANCH_OPERATOR_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE } from '../auth/roles';
 import { assertBusinessAccess } from '../auth/business-access';
 
 @Controller('requisitions')
@@ -14,14 +14,14 @@ export class RequisitionsController {
   constructor(private readonly requisitionsService: RequisitionsService) {}
 
   @Post()
-  @Roles(ENCARGADO_ROLE)
+  @Roles(BRANCH_OPERATOR_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE)
   async create(@Body() createRequisitionDto: CreateRequisitionDto, @Req() req: any) {
     assertBusinessAccess(req.user, createRequisitionDto.businessId);
-    return this.requisitionsService.create(createRequisitionDto);
+    return this.requisitionsService.create({ ...createRequisitionDto, createdBy: req.user.sub });
   }
 
   @Get('branch/:branchId')
-  @Roles(ENCARGADO_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
+  @Roles(BRANCH_OPERATOR_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
   async findByBranch(
     @Param('branchId') branchId: string,
     @Query('businessId') businessId: string,
@@ -50,12 +50,13 @@ export class RequisitionsController {
   async updateStatus(
     @Param('id') id: string,
     @Body() updateStatusDto: UpdateRequisitionStatusDto,
+    @Req() req: any,
   ) {
-    return this.requisitionsService.updateStatus(id, updateStatusDto);
+    return this.requisitionsService.updateStatus(id, updateStatusDto, req.user.sub, req.user.roles || [req.user.role]);
   }
 
   @Get(':id')
-  @Roles(ENCARGADO_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
+  @Roles(BRANCH_OPERATOR_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
   async findOne(@Param('id') id: string, @Req() req: any) {
     const requisition = await this.requisitionsService.findOne(id);
     if (requisition) {

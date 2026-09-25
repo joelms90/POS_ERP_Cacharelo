@@ -31,10 +31,17 @@ export class RequisitionsService {
     return requisition;
   }
 
-  async updateStatus(id: string, updateStatusDto: UpdateRequisitionStatusDto) {
+  async updateStatus(id: string, updateStatusDto: UpdateRequisitionStatusDto, actorId: string, actorRoles: string[]) {
     const requisition = await this.requisitionsRepository.findById(id);
     if (!requisition) {
       throw new NotFoundException(`Requisition with ID ${id} not found`);
+    }
+
+    if (requisition.createdBy === actorId && !actorRoles.includes('owner')) {
+      throw new BadRequestException('No puedes aprobar, rechazar o completar tu propia requisición.');
+    }
+    if (requisition.createdBy === actorId && actorRoles.includes('owner') && !updateStatusDto.notes?.trim()) {
+      throw new BadRequestException('El propietario debe registrar un motivo para autorizar su propia requisición.');
     }
 
     // Validate status transitions

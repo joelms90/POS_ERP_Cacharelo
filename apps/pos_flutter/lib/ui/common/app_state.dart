@@ -19,7 +19,7 @@ enum TableState { free, occupied, billing, cleaning }
 
 enum TableShape { circle, square }
 
-enum UserRole { waiter, cashier, kitchen, encargado, responsable, none }
+enum UserRole { waiter, cashier, kitchen, branchOperator, warehousePurchasingOperator, none }
 
 const double ivaRate = 0.16;
 const double ivaFactor = 1 + ivaRate;
@@ -435,10 +435,12 @@ class PrintStation {
     switch ((role ?? '').toLowerCase()) {
       case 'cashier':
         return UserRole.cashier;
+      case 'branch_operator':
       case 'encargado':
-        return UserRole.encargado;
       case 'responsable':
-        return UserRole.responsable;
+        return UserRole.branchOperator;
+      case 'warehouse_purchasing_operator':
+        return UserRole.warehousePurchasingOperator;
       case 'waiter':
         return UserRole.waiter;
       case 'kitchen':
@@ -2192,10 +2194,12 @@ class AppState extends ChangeNotifier {
         return UserRole.cashier;
       case 'kitchen':
         return UserRole.kitchen;
+      case 'branch_operator':
       case 'encargado':
-        return UserRole.encargado;
       case 'responsable':
-        return UserRole.responsable;
+        return UserRole.branchOperator;
+      case 'warehouse_purchasing_operator':
+        return UserRole.warehousePurchasingOperator;
       default:
         return UserRole.none;
     }
@@ -5337,10 +5341,10 @@ class AppState extends ChangeNotifier {
             ? 'cashier'
             : currentUserRole == UserRole.kitchen
                 ? 'kitchen'
-                : currentUserRole == UserRole.encargado
-                    ? 'encargado'
-                    : currentUserRole == UserRole.responsable
-                        ? 'responsable'
+                : currentUserRole == UserRole.branchOperator
+                    ? 'branch_operator'
+                    : currentUserRole == UserRole.warehousePurchasingOperator
+                        ? 'warehouse_purchasing_operator'
                         : 'none';
 
     if (token == null || branchId == null || roleStr == 'none') {

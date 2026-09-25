@@ -1,11 +1,17 @@
-import { Controller, Get, Post, Body, Query, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Param, UseGuards } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { CreateReceiptDto } from './dto/create-receipt.dto';
 import { CreateProductionRunDto } from './dto/create-production-run.dto';
 import { CompleteProductionRunDto } from './dto/complete-production-run.dto';
 import { CreateTransferDto } from './dto/create-transfer.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE, BRANCH_OPERATOR_ROLE } from '../auth/roles';
 
 @Controller('inventory')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE)
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
@@ -72,6 +78,7 @@ export class InventoryController {
   }
 
   @Post('transfers/:id/receive')
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE, BRANCH_OPERATOR_ROLE)
   async receiveTransfer(@Param('id') id: string) {
     return this.inventoryService.receiveTransfer(id);
   }

@@ -5,8 +5,8 @@ export interface Employee {
   name: string;
   email?: string;
   pin: string;
-  role: 'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'encargado' | 'empleado' | 'owner' | 'inventory_admin' | 'support_tech';
-  roles?: Array<'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'encargado' | 'empleado' | 'owner' | 'inventory_admin' | 'support_tech'>;
+  role: 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable' | 'owner' | 'inventory_admin' | 'support_tech';
+  roles?: Array<'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable' | 'owner' | 'inventory_admin' | 'support_tech'>;
 }
 
 export interface AdminUser {
@@ -26,7 +26,7 @@ export interface AuthUser {
   branchId?: string;
   name: string;
   email?: string;
-  role: 'owner' | 'inventory_admin' | 'support_tech' | 'admin' | 'waiter' | 'cashier' | 'kitchen' | 'vendedor' | 'encargado' | 'empleado';
+  role: 'owner' | 'inventory_admin' | 'support_tech' | 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable';
   businessAccess?: Array<{ businessId: string; role: 'owner' | 'inventory_admin' | 'support_tech' }>;
 }
 

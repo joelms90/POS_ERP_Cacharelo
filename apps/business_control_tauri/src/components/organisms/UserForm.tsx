@@ -4,7 +4,7 @@ import { Button } from '../atoms/Button';
 import { Input } from '../atoms/Input';
 import { FormField } from '../molecules/FormField';
 
-type PosEmployeeRole = 'waiter' | 'cashier' | 'kitchen' | 'admin' | 'vendedor' | 'encargado' | 'empleado';
+type PosEmployeeRole = 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator';
 
 interface UserFormProps {
   onSuccess: (newUser: Employee) => void;
@@ -19,18 +19,17 @@ const roleOptions: Array<[PosEmployeeRole, string]> = [
   ['waiter', 'Mesero'],
   ['cashier', 'Cajero'],
   ['kitchen', 'Cocina'],
-  ['admin', 'Admin POS'],
-  ['vendedor', 'Vendedor'],
-  ['encargado', 'Encargado'],
-  ['empleado', 'Empleado'],
+  ['branch_operator', 'Operador Integral de Sucursal'],
+  ['warehouse_purchasing_operator', 'Operador de Almacén y Compras'],
 ];
 
 const getPosRoles = (user?: Employee | null): PosEmployeeRole[] => {
   const source = user?.roles?.length ? user.roles : user?.role ? [user.role] : [];
-  const posRoleValues: PosEmployeeRole[] = ['waiter', 'cashier', 'kitchen', 'admin', 'vendedor', 'encargado', 'empleado'];
+  const legacyAliases: Record<string, PosEmployeeRole> = { encargado: 'branch_operator', responsable: 'branch_operator' };
+  const posRoleValues: PosEmployeeRole[] = ['waiter', 'cashier', 'kitchen', 'branch_operator', 'warehouse_purchasing_operator'];
   const roles = source.filter((role): role is PosEmployeeRole =>
-    posRoleValues.includes(role as PosEmployeeRole),
-  );
+    posRoleValues.includes((legacyAliases[role] || role) as PosEmployeeRole),
+  ).map((role) => legacyAliases[role] || role) as PosEmployeeRole[];
   return roles.length > 0 ? roles : ['waiter'];
 };
 

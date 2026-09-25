@@ -1,14 +1,14 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
-import { AdminRole } from '../roles';
+import { UserRole, normalizeOperationalRole } from '../roles';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.getAllAndOverride<AdminRole[]>(ROLES_KEY, [
+    const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
@@ -18,11 +18,11 @@ export class RolesGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const roles = Array.isArray(request.user?.roles)
+    const roles = (Array.isArray(request.user?.roles)
       ? request.user.roles
       : request.user?.role
         ? [request.user.role]
-        : [];
+        : []).map((role: string) => normalizeOperationalRole(role));
 
     if (roles.includes('owner')) {
       return true;

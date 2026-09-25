@@ -465,13 +465,13 @@ class _LoginScreenState extends State<LoginScreen> {
       case UserRole.kitchen:
         nextScreen = KitchenDashboardScreen(state: widget.state);
         break;
-      case UserRole.encargado:
+      case UserRole.branchOperator:
         nextScreen = EncargadoDashboardScreen(
             state: widget.state, showFullFeatures: false);
         break;
-      case UserRole.responsable:
+      case UserRole.warehousePurchasingOperator:
         nextScreen = EncargadoDashboardScreen(
-            state: widget.state, showFullFeatures: true);
+            state: widget.state, showFullFeatures: false);
         break;
       default:
         return;
@@ -562,10 +562,10 @@ class _LoginScreenState extends State<LoginScreen> {
         return 'Cajero';
       case UserRole.kitchen:
         return 'Cocina';
-      case UserRole.encargado:
-        return 'Encargado';
-      case UserRole.responsable:
-        return 'Responsable';
+      case UserRole.branchOperator:
+        return 'Operador Integral de Sucursal';
+      case UserRole.warehousePurchasingOperator:
+        return 'Operador de Almacén y Compras';
       case UserRole.none:
         return 'Sin rol';
     }
