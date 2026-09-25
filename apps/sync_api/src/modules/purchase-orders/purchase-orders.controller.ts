@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Req } from '@nestjs/common';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
@@ -44,7 +44,8 @@ export class PurchaseOrdersController {
   }
 
   @Post(':id/receive')
-  async receiveOrder(@Param('id') id: string, @Body() receiptData: any) {
-    return this.purchaseOrdersService.receiveOrder(id, receiptData);
+  async receiveOrder(@Param('id') id: string, @Body() receiptData: any, @Req() req: any) {
+    const actor = req.user?.name || req.user?.sub || 'operador';
+    return this.purchaseOrdersService.receiveOrder(id, receiptData, actor);
   }
 }

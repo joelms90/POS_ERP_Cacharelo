@@ -58,6 +58,7 @@ export class PurchaseOrdersService {
       items: Array<{ productId: string; quantityReceived: number; unitCostActual: number }>;
       notes?: string;
     },
+    receivedBy = 'operador',
   ) {
     const purchaseOrder = await this.purchaseOrdersRepository.findById(id);
     if (!purchaseOrder) {
@@ -66,6 +67,26 @@ export class PurchaseOrdersService {
     if (purchaseOrder.status !== 'sent' && purchaseOrder.status !== 'partially_received') {
       throw new BadRequestException(`Cannot receive purchase order with status: ${purchaseOrder.status}`);
     }
-    return this.inventoryService.processPurchaseOrderReception(id, receiptData.items, receiptData.notes);
+    if (!receiptData.items?.length) {
+      throw new BadRequestException('La recepción debe incluir al menos un producto.');
+    }
+
+    const orderWithItems = await this.purchaseOrdersRepository.findByIdWithItems(id);
+    const expectedByProduct = new Map(
+      orderWithItems?.items.map((item) => [item.productId, item]) ?? [],
+    );
+    const hasMismatch = receiptData.items.some((item) => {
+      const expected = expectedByProduct.get(item.productId);
+      if (!expected) return true;
+      return Number(expected.quantityOrdered) !== item.quantityReceived ||
+        Number(expected.unitCostEstimated) !== item.unitCostActual;
+    });
+    if (hasMismatch && !receiptData.notes?.trim()) {
+      throw new BadRequestException(
+        'Debes registrar una nota cuando la cantidad o el costo recibido difiere de la orden de compra.',
+      );
+    }
+    const auditedNotes = `${receiptData.notes?.trim() || 'Recepción sin discrepancias'}\nRecibido por: ${receivedBy}`;
+    return this.inventoryService.processPurchaseOrderReception(id, receiptData.items, auditedNotes);
   }
 }
