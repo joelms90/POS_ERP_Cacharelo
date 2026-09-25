@@ -708,7 +708,10 @@ class AppState extends ChangeNotifier {
 
         // Auto-migrate old Cloud Run API URLs to the secure VM API subdomain
         if (terminalApiUrl != null &&
-            terminalApiUrl!.contains('umqpitkpoa-uc.a.run.app')) {
+            (terminalApiUrl!.contains('umqpitkpoa-uc.a.run.app') ||
+                terminalApiUrl!.contains('localhost') ||
+                terminalApiUrl!.contains('127.0.0.1') ||
+                terminalApiUrl!.contains('10.0.2.2'))) {
           terminalApiUrl = configuredDefaultApiUrl;
           await _secureStorageService.saveTerminalConfig(
             businessId: terminalBusinessId ?? '',
