@@ -433,7 +433,8 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        String? localProductId = widget.state.cachedIngredients.first['id'];
+        String? localProductId;
+        var query = '';
         final qtyController = TextEditingController(text: '1.0');
 
         return StatefulBuilder(
@@ -449,52 +450,92 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
                 style:
                     TextStyle(color: EmpireColors.champagneGold, fontSize: 16),
               ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    dropdownColor: EmpireColors.onyxSurface,
-                    value: localProductId,
-                    decoration: const InputDecoration(
-                      labelText: 'Seleccione Insumo',
-                      labelStyle: TextStyle(
-                          color: EmpireColors.textSecondary, fontSize: 13),
-                      enabledBorder: UnderlineInputBorder(
-                        borderSide: BorderSide(color: EmpireColors.agedBronze),
+              content: SizedBox(
+                width: 440,
+                height: 380,
+                child: Column(
+                  children: [
+                    TextField(
+                      autofocus: true,
+                      style: const TextStyle(color: EmpireColors.textPrimary),
+                      onChanged: (value) => setDialogState(
+                        () => query = value.trim().toLowerCase(),
+                      ),
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search,
+                            color: EmpireColors.champagneGold),
+                        hintText: 'Buscar por nombre, SKU o código',
+                        hintStyle: TextStyle(color: EmpireColors.textSecondary),
                       ),
                     ),
-                    style: const TextStyle(color: EmpireColors.textPrimary),
-                    items: widget.state.cachedIngredients.map((item) {
-                      return DropdownMenuItem<String>(
-                        value: item['id'],
-                        child: Text(
-                          item['name'],
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setDialogState(() {
-                        localProductId = val;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: qtyController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    style: const TextStyle(color: EmpireColors.textPrimary),
-                    decoration: const InputDecoration(
-                      labelText: 'Cantidad Solicitada',
-                      labelStyle: TextStyle(
-                          color: EmpireColors.textSecondary, fontSize: 13),
-                      enabledBorder: UnderlineInputBorder(
-                        borderSide: BorderSide(color: EmpireColors.agedBronze),
-                      ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: Builder(builder: (context) {
+                        final products =
+                            widget.state.cachedIngredients.where((item) {
+                          final searchable = [
+                            item['name'],
+                            item['sku'],
+                            item['internalCode'],
+                            item['code'],
+                          ]
+                              .map((value) =>
+                                  value?.toString().toLowerCase() ?? '')
+                              .join(' ');
+                          return query.isEmpty || searchable.contains(query);
+                        }).toList();
+                        if (products.isEmpty) {
+                          return const Center(
+                              child: Text('No se encontraron insumos',
+                                  style: TextStyle(
+                                      color: EmpireColors.textSecondary)));
+                        }
+                        return ListView.separated(
+                          itemCount: products.length,
+                          separatorBuilder: (_, __) => const Divider(
+                              color: EmpireColors.charcoalSurface, height: 1),
+                          itemBuilder: (context, index) {
+                            final item = products[index];
+                            final selected = item['id'] == localProductId;
+                            final code = item['sku'] ??
+                                item['internalCode'] ??
+                                item['code'];
+                            return ListTile(
+                              dense: true,
+                              selected: selected,
+                              selectedTileColor: EmpireColors.champagneGold
+                                  .withValues(alpha: 0.12),
+                              title: Text(
+                                  item['name']?.toString() ?? 'Sin nombre',
+                                  style: const TextStyle(
+                                      color: EmpireColors.textPrimary)),
+                              subtitle: code == null
+                                  ? null
+                                  : Text(code.toString(),
+                                      style: const TextStyle(
+                                          color: EmpireColors.textSecondary,
+                                          fontSize: 12)),
+                              trailing: selected
+                                  ? const Icon(Icons.check_circle,
+                                      color: EmpireColors.champagneGold)
+                                  : null,
+                              onTap: () => setDialogState(() =>
+                                  localProductId = item['id']?.toString()),
+                            );
+                          },
+                        );
+                      }),
                     ),
-                  ),
-                ],
+                    TextField(
+                      controller: qtyController,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(color: EmpireColors.textPrimary),
+                      decoration: const InputDecoration(
+                          labelText: 'Cantidad solicitada'),
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(
@@ -505,6 +546,12 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
                 TextButton(
                   onPressed: () {
                     final qty = double.tryParse(qtyController.text) ?? 0.0;
+                    if (localProductId == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Seleccione un insumo')),
+                      );
+                      return;
+                    }
                     if (qty <= 0.0) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
