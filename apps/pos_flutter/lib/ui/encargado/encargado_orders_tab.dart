@@ -58,35 +58,57 @@ class _EncargadoOrdersTabState extends State<EncargadoOrdersTab> {
   }
 
   Future<void> _handleCancelOrder(TableModel table) async {
+    final reasonController = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: EmpireColors.onyxSurface,
-        title: const Text('Cancelar Orden', style: TextStyle(color: EmpireColors.textGold)),
-        content: Text(
-          '¿Cancelar ${table.label}?',
-          style: const TextStyle(color: EmpireColors.textPrimary),
+        title: const Text('Cancelar Orden',
+            style: TextStyle(color: EmpireColors.textGold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('¿Cancelar ${table.label}? Esta acción quedará auditada.',
+                style: const TextStyle(color: EmpireColors.textPrimary)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              autofocus: true,
+              maxLines: 2,
+              style: const TextStyle(color: EmpireColors.textPrimary),
+              decoration:
+                  const InputDecoration(labelText: 'Motivo de cancelación'),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('No', style: TextStyle(color: EmpireColors.textSecondary)),
+            child: const Text('No',
+                style: TextStyle(color: EmpireColors.textSecondary)),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sí, Cancelar', style: TextStyle(color: EmpireColors.errorRed)),
+            onPressed: () =>
+                Navigator.pop(context, reasonController.text.trim().isNotEmpty),
+            child: const Text('Sí, Cancelar',
+                style: TextStyle(color: EmpireColors.errorRed)),
           ),
         ],
       ),
     );
 
     if (confirmed == true) {
-      table.state = TableState.free;
-      table.items = [];
-      table.guests = 0;
-      table.partialPayments = [];
-      widget.state.notifyListeners();
-      if (mounted) setState(() {});
+      final cancelled = await widget.state
+          .cancelActiveOrder(table.id, reason: reasonController.text);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(cancelled
+            ? 'Orden cancelada y auditada.'
+            : 'No se pudo cancelar la orden.'),
+        backgroundColor:
+            cancelled ? EmpireColors.successGreen : EmpireColors.errorRed,
+      ));
+      if (cancelled) setState(() {});
     }
   }
 
@@ -101,16 +123,21 @@ class _EncargadoOrdersTabState extends State<EncargadoOrdersTab> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.receipt_long, color: EmpireColors.textSecondary, size: 48),
+                  const Icon(Icons.receipt_long,
+                      color: EmpireColors.textSecondary, size: 48),
                   const SizedBox(height: 16),
                   const Text(
                     'No hay órdenes activas',
-                    style: TextStyle(color: EmpireColors.textSecondary, fontSize: 16),
+                    style: TextStyle(
+                        color: EmpireColors.textSecondary, fontSize: 16),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Usa la pestaña POS para crear nuevas órdenes',
-                    style: TextStyle(color: EmpireColors.textSecondary.withValues(alpha: 0.7), fontSize: 13),
+                    style: TextStyle(
+                        color:
+                            EmpireColors.textSecondary.withValues(alpha: 0.7),
+                        fontSize: 13),
                   ),
                 ],
               ),
@@ -135,7 +162,9 @@ class _EncargadoOrdersTabState extends State<EncargadoOrdersTab> {
         color: EmpireColors.onyxSurface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isBilling ? EmpireColors.champagneGold : EmpireColors.agedBronzeDark,
+          color: isBilling
+              ? EmpireColors.champagneGold
+              : EmpireColors.agedBronzeDark,
           width: isBilling ? 1.5 : 1,
         ),
       ),
@@ -148,9 +177,11 @@ class _EncargadoOrdersTabState extends State<EncargadoOrdersTab> {
               color: isBilling
                   ? EmpireColors.champagneGold.withValues(alpha: 0.1)
                   : EmpireColors.charcoalSurface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(9)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(9)),
               border: const Border(
-                bottom: BorderSide(color: EmpireColors.agedBronzeDark, width: 1),
+                bottom:
+                    BorderSide(color: EmpireColors.agedBronzeDark, width: 1),
               ),
             ),
             child: Row(
@@ -160,16 +191,22 @@ class _EncargadoOrdersTabState extends State<EncargadoOrdersTab> {
                   height: 40,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: isBilling ? EmpireColors.champagneGold : EmpireColors.obsidian,
+                    color: isBilling
+                        ? EmpireColors.champagneGold
+                        : EmpireColors.obsidian,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: isBilling ? EmpireColors.champagneGold : EmpireColors.agedBronzeDark,
+                      color: isBilling
+                          ? EmpireColors.champagneGold
+                          : EmpireColors.agedBronzeDark,
                     ),
                   ),
                   child: Text(
                     table.label.replaceAll('Llevar #', '#'),
                     style: TextStyle(
-                      color: isBilling ? EmpireColors.obsidian : EmpireColors.champagneGold,
+                      color: isBilling
+                          ? EmpireColors.obsidian
+                          : EmpireColors.champagneGold,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
@@ -200,20 +237,25 @@ class _EncargadoOrdersTabState extends State<EncargadoOrdersTab> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: isBilling
                         ? EmpireColors.champagneGold.withValues(alpha: 0.2)
                         : EmpireColors.charcoalSurface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isBilling ? EmpireColors.champagneGold : EmpireColors.agedBronzeDark,
+                      color: isBilling
+                          ? EmpireColors.champagneGold
+                          : EmpireColors.agedBronzeDark,
                     ),
                   ),
                   child: Text(
                     isBilling ? 'POR COBRAR' : 'EN PREPARACIÓN',
                     style: TextStyle(
-                      color: isBilling ? EmpireColors.champagneGold : EmpireColors.textSecondary,
+                      color: isBilling
+                          ? EmpireColors.champagneGold
+                          : EmpireColors.textSecondary,
                       fontWeight: FontWeight.bold,
                       fontSize: 10,
                     ),
@@ -245,14 +287,18 @@ class _EncargadoOrdersTabState extends State<EncargadoOrdersTab> {
                           Expanded(
                             child: Text(
                               item.item.name,
-                              style: const TextStyle(color: EmpireColors.textPrimary, fontSize: 12),
+                              style: const TextStyle(
+                                  color: EmpireColors.textPrimary,
+                                  fontSize: 12),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           Text(
                             '\$${item.totalPrice.toStringAsFixed(2)}',
-                            style: const TextStyle(color: EmpireColors.textSecondary, fontSize: 11),
+                            style: const TextStyle(
+                                color: EmpireColors.textSecondary,
+                                fontSize: 11),
                           ),
                         ],
                       ),
@@ -260,7 +306,10 @@ class _EncargadoOrdersTabState extends State<EncargadoOrdersTab> {
                   if (table.items.length > 5)
                     Text(
                       '... y ${table.items.length - 5} más',
-                      style: const TextStyle(color: EmpireColors.textSecondary, fontSize: 11, fontStyle: FontStyle.italic),
+                      style: const TextStyle(
+                          color: EmpireColors.textSecondary,
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic),
                     ),
                 ],
               ),
@@ -281,7 +330,8 @@ class _EncargadoOrdersTabState extends State<EncargadoOrdersTab> {
                   label: const Text('Cancelar', style: TextStyle(fontSize: 11)),
                   style: TextButton.styleFrom(
                     foregroundColor: EmpireColors.errorRed,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -296,7 +346,8 @@ class _EncargadoOrdersTabState extends State<EncargadoOrdersTab> {
                     label: const Text('Listo', style: TextStyle(fontSize: 11)),
                     style: TextButton.styleFrom(
                       foregroundColor: EmpireColors.successGreen,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                     ),
                   ),
                 const SizedBox(width: 4),
@@ -307,7 +358,8 @@ class _EncargadoOrdersTabState extends State<EncargadoOrdersTab> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: EmpireColors.champagneGold,
                     foregroundColor: EmpireColors.obsidian,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   ),
                 ),
               ],
@@ -378,11 +430,13 @@ class _EncargadoOrderPaymentScreenState
 
     setState(() => _processing = true);
 
-    final cashReceived =
-        _paymentMethod == 'Efectivo' ? double.tryParse(_cashController.text) : null;
+    final cashReceived = _paymentMethod == 'Efectivo'
+        ? double.tryParse(_cashController.text)
+        : null;
     final cashChange = cashReceived != null ? cashReceived - _total : null;
-    final refCode =
-        _paymentMethod == 'Tarjeta' ? _cardRefController.text.trim() : 'Efectivo';
+    final refCode = _paymentMethod == 'Tarjeta'
+        ? _cardRefController.text.trim()
+        : 'Efectivo';
 
     widget.state.checkoutTable(
       widget.table.id,
@@ -458,8 +512,10 @@ class _EncargadoOrderPaymentScreenState
                       ],
                     ),
                     selected: _paymentMethod == 'Efectivo',
-                    onSelected: (_) => setState(() => _paymentMethod = 'Efectivo'),
-                    selectedColor: EmpireColors.champagneGold.withValues(alpha: 0.3),
+                    onSelected: (_) =>
+                        setState(() => _paymentMethod = 'Efectivo'),
+                    selectedColor:
+                        EmpireColors.champagneGold.withValues(alpha: 0.3),
                     backgroundColor: EmpireColors.charcoalSurface,
                   ),
                 ),
@@ -475,8 +531,10 @@ class _EncargadoOrderPaymentScreenState
                       ],
                     ),
                     selected: _paymentMethod == 'Tarjeta',
-                    onSelected: (_) => setState(() => _paymentMethod = 'Tarjeta'),
-                    selectedColor: EmpireColors.champagneGold.withValues(alpha: 0.3),
+                    onSelected: (_) =>
+                        setState(() => _paymentMethod = 'Tarjeta'),
+                    selectedColor:
+                        EmpireColors.champagneGold.withValues(alpha: 0.3),
                     backgroundColor: EmpireColors.charcoalSurface,
                   ),
                 ),
@@ -495,20 +553,25 @@ class _EncargadoOrderPaymentScreenState
                   return Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color: EmpireColors.successGreen.withValues(alpha: 0.12),
+                        color:
+                            EmpireColors.successGreen.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: EmpireColors.successGreen.withValues(alpha: 0.3)),
+                        border: Border.all(
+                            color: EmpireColors.successGreen
+                                .withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Cambio:', style: TextStyle(
-                            color: EmpireColors.successGreen,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          )),
+                          const Text('Cambio:',
+                              style: TextStyle(
+                                color: EmpireColors.successGreen,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              )),
                           Text(
                             '\$${change.toStringAsFixed(2)}',
                             style: const TextStyle(
@@ -534,10 +597,12 @@ class _EncargadoOrderPaymentScreenState
                         onPressed: () => _addCashReceived(amount.toDouble()),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: EmpireColors.champagneGold,
-                          side: const BorderSide(color: EmpireColors.agedBronzeDark),
+                          side: const BorderSide(
+                              color: EmpireColors.agedBronzeDark),
                           padding: const EdgeInsets.symmetric(vertical: 10),
                         ),
-                        child: Text('+\$$amount', style: const TextStyle(fontSize: 12)),
+                        child: Text('+\$$amount',
+                            style: const TextStyle(fontSize: 12)),
                       ),
                     ),
                   );
@@ -561,7 +626,8 @@ class _EncargadoOrderPaymentScreenState
                       )
                     : const Text(
                         'COBRAR',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16),
                       ),
               ),
             ),
@@ -679,7 +745,8 @@ class _EncargadoOrderPaymentScreenState
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: EmpireColors.champagneGold, width: 2),
+          borderSide:
+              const BorderSide(color: EmpireColors.champagneGold, width: 2),
         ),
       ),
     );
@@ -690,7 +757,8 @@ class _EncargadoOrderPaymentScreenState
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label,
-            style: const TextStyle(color: EmpireColors.textSecondary, fontSize: 13)),
+            style: const TextStyle(
+                color: EmpireColors.textSecondary, fontSize: 13)),
         Text(value,
             style: const TextStyle(
                 color: EmpireColors.textGold,

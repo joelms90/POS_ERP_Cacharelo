@@ -64,13 +64,15 @@ export class InventoryController {
   }
 
   @Get('transfers')
-  async getTransfers(@Query('businessId') businessId: string) {
-    return this.inventoryService.getTransfers(businessId);
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE, BRANCH_OPERATOR_ROLE)
+  async getTransfers(@Query('businessId') businessId: string, @Req() req: any) {
+    return this.inventoryService.getTransfers(businessId, req.user);
   }
 
   @Get('transfers/:id')
-  async getTransfer(@Param('id') id: string) {
-    return this.inventoryService.getTransfer(id);
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE, BRANCH_OPERATOR_ROLE)
+  async getTransfer(@Param('id') id: string, @Req() req: any) {
+    return this.inventoryService.getTransfer(id, req.user);
   }
 
   @Post('transfers')

@@ -8,6 +8,7 @@ import '../widgets/app_version_badge.dart';
 import '../requisitions/create_requisition.dart';
 import 'encargado_pos_tab.dart';
 import 'encargado_orders_tab.dart';
+import 'operator_operations_tabs.dart';
 
 class EncargadoDashboardScreen extends StatefulWidget {
   final AppState state;
@@ -62,12 +63,15 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
         content: Row(
           children: [
             SizedBox(
-              width: 16, height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2, color: EmpireColors.obsidian),
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: EmpireColors.obsidian),
             ),
             SizedBox(width: 12),
             Text('Sincronizando datos con el servidor...',
-              style: TextStyle(color: EmpireColors.obsidian, fontWeight: FontWeight.bold)),
+                style: TextStyle(
+                    color: EmpireColors.obsidian, fontWeight: FontWeight.bold)),
           ],
         ),
         backgroundColor: EmpireColors.champagneGold,
@@ -85,9 +89,11 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
             success
                 ? 'Sincronización completa con éxito.'
                 : 'Sincronización incompleta. Revise su conexión de red.',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold),
           ),
-          backgroundColor: success ? EmpireColors.successGreen : EmpireColors.errorRed,
+          backgroundColor:
+              success ? EmpireColors.successGreen : EmpireColors.errorRed,
           duration: const Duration(seconds: 2),
         ),
       );
@@ -117,18 +123,24 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
                     Expanded(
                       child: IndexedStack(
                         index: _selectedIndex,
-                        children: [
-                          EncargadoPosTab(
-                            state: widget.state,
-                            showPrepararButton: widget.showFullFeatures,
-                          ),
-                          if (widget.showFullFeatures)
-                            EncargadoOrdersTab(state: widget.state)
-                          else
-                            RequisitionsScreen(state: widget.state),
-                          if (widget.showFullFeatures)
-                            RequisitionsScreen(state: widget.state),
-                        ],
+                        children: widget.showFullFeatures
+                            ? [
+                                EncargadoPosTab(
+                                  state: widget.state,
+                                  showPrepararButton: true,
+                                ),
+                                EncargadoOrdersTab(state: widget.state),
+                                RequisitionsScreen(state: widget.state),
+                              ]
+                            : [
+                                EncargadoPosTab(
+                                    state: widget.state,
+                                    showPrepararButton: false),
+                                EncargadoOrdersTab(state: widget.state),
+                                RequisitionsScreen(state: widget.state),
+                                InventoryReceiptsTab(state: widget.state),
+                                DailySalesTab(state: widget.state),
+                              ],
                       ),
                     ),
                     _buildBottomNav(),
@@ -137,17 +149,22 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
               ),
               if (_isPrinterQueueOpen)
                 Positioned(
-                  top: 0, bottom: 0, right: 0,
+                  top: 0,
+                  bottom: 0,
+                  right: 0,
                   child: Material(
                     elevation: 16,
                     color: Colors.transparent,
                     child: Container(
                       decoration: const BoxDecoration(
-                        boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 20)],
+                        boxShadow: [
+                          BoxShadow(color: Colors.black54, blurRadius: 20)
+                        ],
                       ),
                       child: PrinterMonitorPanel(
                         state: widget.state,
-                        onClose: () => setState(() => _isPrinterQueueOpen = false),
+                        onClose: () =>
+                            setState(() => _isPrinterQueueOpen = false),
                       ),
                     ),
                   ),
@@ -177,7 +194,8 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.storefront, color: EmpireColors.champagneGold, size: 20),
+              const Icon(Icons.storefront,
+                  color: EmpireColors.champagneGold, size: 20),
               const SizedBox(width: 8),
               Text(
                 'MOSTRADOR',
@@ -190,7 +208,8 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
               ),
               const SizedBox(width: 12),
               Container(
-                height: 20, width: 1.5,
+                height: 20,
+                width: 1.5,
                 color: EmpireColors.agedBronzeDark,
               ),
               const SizedBox(width: 12),
@@ -210,17 +229,22 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
             children: [
               Icon(
                 widget.state.isOnline ? Icons.wifi : Icons.wifi_off,
-                color: widget.state.isOnline ? EmpireColors.successGreen : EmpireColors.warningOrange,
+                color: widget.state.isOnline
+                    ? EmpireColors.successGreen
+                    : EmpireColors.warningOrange,
                 size: 20,
               ),
               if (!widget.state.isOnline) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: EmpireColors.warningOrange.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: EmpireColors.warningOrange.withValues(alpha: 0.4)),
+                    border: Border.all(
+                        color:
+                            EmpireColors.warningOrange.withValues(alpha: 0.4)),
                   ),
                   child: Text(
                     '${widget.state.pendingSyncCount}',
@@ -239,14 +263,18 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
                   IconButton(
                     icon: Icon(
                       Icons.print,
-                      color: hasFailedPrinters ? EmpireColors.errorRed : EmpireColors.champagneGold,
+                      color: hasFailedPrinters
+                          ? EmpireColors.errorRed
+                          : EmpireColors.champagneGold,
                     ),
                     tooltip: 'Monitor de Impresoras',
-                    onPressed: () => setState(() => _isPrinterQueueOpen = !_isPrinterQueueOpen),
+                    onPressed: () => setState(
+                        () => _isPrinterQueueOpen = !_isPrinterQueueOpen),
                   ),
                   if (hasFailedPrinters)
                     Positioned(
-                      top: 4, right: 4,
+                      top: 4,
+                      right: 4,
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: const BoxDecoration(
@@ -256,7 +284,9 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
                         child: Text(
                           '${widget.state.printJobs.where((j) => j.status == 'failed').length}',
                           style: const TextStyle(
-                            color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
@@ -265,7 +295,8 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
               ),
               const SizedBox(width: 12),
               PopupMenuButton<String>(
-                icon: const Icon(Icons.settings, color: EmpireColors.champagneGold),
+                icon: const Icon(Icons.settings,
+                    color: EmpireColors.champagneGold),
                 color: EmpireColors.onyxSurface,
                 surfaceTintColor: Colors.transparent,
                 offset: const Offset(0, 40),
@@ -275,7 +306,8 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
                   } else if (value == 'printer') {
                     showDialog(
                       context: context,
-                      builder: (context) => PrinterSettingsDialog(state: widget.state),
+                      builder: (context) =>
+                          PrinterSettingsDialog(state: widget.state),
                     );
                   } else if (value == 'sync') {
                     _triggerSync(context);
@@ -285,27 +317,36 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
                   const PopupMenuItem<String>(
                     value: 'sync',
                     child: Row(children: [
-                      Icon(Icons.sync, color: EmpireColors.champagneGold, size: 18),
+                      Icon(Icons.sync,
+                          color: EmpireColors.champagneGold, size: 18),
                       SizedBox(width: 8),
-                      Text('Sincronizar Datos', style: TextStyle(color: EmpireColors.textPrimary, fontSize: 13)),
+                      Text('Sincronizar Datos',
+                          style: TextStyle(
+                              color: EmpireColors.textPrimary, fontSize: 13)),
                     ]),
                   ),
                   const PopupMenuDivider(height: 1),
                   const PopupMenuItem<String>(
                     value: 'printer',
                     child: Row(children: [
-                      Icon(Icons.print, color: EmpireColors.champagneGold, size: 18),
+                      Icon(Icons.print,
+                          color: EmpireColors.champagneGold, size: 18),
                       SizedBox(width: 8),
-                      Text('Configurar Impresora', style: TextStyle(color: EmpireColors.textPrimary, fontSize: 13)),
+                      Text('Configurar Impresora',
+                          style: TextStyle(
+                              color: EmpireColors.textPrimary, fontSize: 13)),
                     ]),
                   ),
                   const PopupMenuDivider(height: 1),
                   const PopupMenuItem<String>(
                     value: 'logout',
                     child: Row(children: [
-                      Icon(Icons.logout, color: EmpireColors.errorRed, size: 18),
+                      Icon(Icons.logout,
+                          color: EmpireColors.errorRed, size: 18),
                       SizedBox(width: 8),
-                      Text('Cerrar Sesión', style: TextStyle(color: EmpireColors.textPrimary, fontSize: 13)),
+                      Text('Cerrar Sesión',
+                          style: TextStyle(
+                              color: EmpireColors.textPrimary, fontSize: 13)),
                     ]),
                   ),
                 ],
@@ -321,30 +362,42 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
     return Container(
       decoration: const BoxDecoration(
         color: EmpireColors.onyxSurface,
-        border: Border(top: BorderSide(color: EmpireColors.agedBronzeDark, width: 1)),
+        border: Border(
+            top: BorderSide(color: EmpireColors.agedBronzeDark, width: 1)),
       ),
       child: SafeArea(
         top: false,
         child: Row(
           children: [
             _buildNavItem(0, Icons.point_of_sale, 'POS'),
-            if (widget.showFullFeatures)
-              _buildNavItem(1, Icons.receipt_long, 'Órdenes', badge: _activeOrdersCount),
-            _buildNavItem(widget.showFullFeatures ? 2 : 1, Icons.inventory_2_outlined, 'Requisiciones'),
+            if (widget.showFullFeatures) ...[
+              _buildNavItem(1, Icons.receipt_long, 'Órdenes',
+                  badge: _activeOrdersCount),
+              _buildNavItem(2, Icons.inventory_2_outlined, 'Requisiciones'),
+            ] else ...[
+              _buildNavItem(1, Icons.receipt_long, 'Órdenes',
+                  badge: _activeOrdersCount),
+              _buildNavItem(2, Icons.inventory_2_outlined, 'Requisiciones'),
+              _buildNavItem(3, Icons.local_shipping_outlined, 'Recibir'),
+              _buildNavItem(4, Icons.today_outlined, 'Resumen'),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label, {int badge = 0}) {
+  Widget _buildNavItem(int index, IconData icon, String label,
+      {int badge = 0}) {
     final isSelected = _selectedIndex == index;
     return Expanded(
       child: InkWell(
         onTap: () => setState(() => _selectedIndex = index),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
-          color: isSelected ? EmpireColors.champagneGold.withValues(alpha: 0.1) : Colors.transparent,
+          color: isSelected
+              ? EmpireColors.champagneGold.withValues(alpha: 0.1)
+              : Colors.transparent,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -352,21 +405,28 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
                 children: [
                   Icon(
                     icon,
-                    color: isSelected ? EmpireColors.champagneGold : EmpireColors.textSecondary,
+                    color: isSelected
+                        ? EmpireColors.champagneGold
+                        : EmpireColors.textSecondary,
                     size: 22,
                   ),
                   if (badge > 0)
                     Positioned(
-                      top: -4, right: -10,
+                      top: -4,
+                      right: -10,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
                         decoration: BoxDecoration(
                           color: EmpireColors.errorRed,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           '$badge',
-                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -376,7 +436,9 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? EmpireColors.champagneGold : EmpireColors.textSecondary,
+                  color: isSelected
+                      ? EmpireColors.champagneGold
+                      : EmpireColors.textSecondary,
                   fontSize: 11,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),

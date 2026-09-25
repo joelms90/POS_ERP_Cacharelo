@@ -57,6 +57,12 @@ An Owner assigns standardized role bundles, and every app shows only actions aut
 - Offline branch operators may create requisitions; those remain pending until synchronized and cannot be approved locally.
 - A transfer cannot be received twice. A partial reception leaves the remaining quantity traceable.
 - A user whose legacy role has no unified mapping is denied operational access until an Owner assigns a supported role.
+- A branch operator's requisition is a draft until sent. The operator may add, change quantities, remove items, or discard that draft without a stock movement or approval record.
+- The system derives the fulfilment origin for a branch requisition; a branch operator never selects a warehouse or other inventory source.
+- A branch operator sees only requisitions that they created, with a status filter. This restriction is enforced by the server, not only by the app.
+- On delivery, the operator confirms the quantity actually received for every line. A difference from the dispatched amount requires a note; only confirmed quantity becomes branch stock.
+- A branch operator may review today's cash and card totals only for their assigned branch.
+- An uncollected order may be cancelled only with a non-empty reason, actor, timestamp, and outcome retained. Paid or closed orders cannot be cancelled through this flow.
 
 ## Requirements
 
@@ -68,6 +74,11 @@ An Owner assigns standardized role bundles, and every app shows only actions aut
 - **FR-006**: The system MUST require and retain discrepancy notes for nonmatching supplier or transfer receptions.
 - **FR-007**: The system MUST retain actor, timestamp, role, action, reason/note, and outcome for privileged inventory and purchasing actions.
 - **FR-008**: The system MUST map legacy `encargado` and `responsable` users to `branch_operator` without removing their access unexpectedly.
+- **FR-009**: The system MUST let a branch operator create, edit, remove, and discard requisition draft lines before submission without selecting an inventory source.
+- **FR-010**: The system MUST return requisition history only for the authenticated branch operator and support filtering it by status.
+- **FR-011**: The system MUST let a branch operator verify each inbound transfer line and retain the recipient, accepted quantity, and discrepancy note.
+- **FR-012**: The system MUST show the authenticated operator today's branch-scoped cash, card, and total sales.
+- **FR-013**: The system MUST require an auditable reason for an authorized cancellation and preserve the local order if the cancellation is rejected by the server.
 
 ## Key Entities
 

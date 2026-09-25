@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InventoryRepository } from './repositories/inventory.repository';
 import { LedgerService } from './ledger.service';
 import { CreateReceiptDto } from './dto/create-receipt.dto';
@@ -427,13 +427,22 @@ export class InventoryService {
     };
   }
 
-  async getTransfers(businessId: string) {
+  async getTransfers(businessId: string, actor?: any) {
     const db = this.inventoryRepository.getDb();
-    
+    const actorRoles = Array.isArray(actor?.roles) ? actor.roles : [actor?.role];
+    const isManagement = actorRoles.some((role: string) =>
+      ['owner', 'inventory_admin', 'support_tech', 'warehouse_purchasing_operator'].includes(role),
+    );
+    if (!isManagement && (!actor?.branchId || actor.businessId !== businessId)) {
+      throw new ForbiddenException('Solo puedes consultar entregas de tu sucursal.');
+    }
+    const transferConditions = [eq(schema.stockTransfers.businessId, businessId)];
+    if (!isManagement) transferConditions.push(eq(schema.stockTransfers.toBranchId, actor.branchId));
+
     const transfers = await db
       .select()
       .from(schema.stockTransfers)
-      .where(eq(schema.stockTransfers.businessId, businessId))
+      .where(and(...transferConditions))
       .orderBy(desc(schema.stockTransfers.transferredAt));
 
     const warehouses = await db
@@ -472,7 +481,7 @@ export class InventoryService {
     }));
   }
 
-  async getTransfer(transferId: string) {
+  async getTransfer(transferId: string, actor?: any) {
     const db = this.inventoryRepository.getDb();
 
     const [transfer] = await db
@@ -483,6 +492,14 @@ export class InventoryService {
 
     if (!transfer) {
       throw new NotFoundException(`Traspaso con ID ${transferId} no encontrado`);
+    }
+    const actorRoles = Array.isArray(actor?.roles) ? actor.roles : [actor?.role];
+    const isManagement = actorRoles.some((role: string) =>
+      ['owner', 'inventory_admin', 'support_tech', 'warehouse_purchasing_operator'].includes(role),
+    );
+    if (!isManagement &&
+        (!actor?.branchId || transfer.toBranchId !== actor.branchId || transfer.businessId !== actor.businessId)) {
+      throw new ForbiddenException('Solo puedes consultar entregas de tu sucursal.');
     }
 
     const items = await db

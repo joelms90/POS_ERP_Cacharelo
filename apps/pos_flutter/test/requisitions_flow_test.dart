@@ -187,9 +187,10 @@ void main() {
 
       // Verify page titles and sections
       expect(find.text('Nueva Requisición'), findsOneWidget);
-      expect(find.text('Bodega Destino'), findsOneWidget);
+      expect(find.text('Bodega Destino'), findsNothing);
       expect(find.text('Insumos Solicitados'), findsOneWidget);
       expect(find.text('Notas / Comentarios'), findsOneWidget);
+      expect(find.text('Cancelar creación'), findsOneWidget);
       expect(find.text('Enviar Requisición'), findsOneWidget);
     });
   });

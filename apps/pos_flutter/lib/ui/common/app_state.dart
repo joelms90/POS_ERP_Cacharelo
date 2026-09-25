@@ -19,7 +19,14 @@ enum TableState { free, occupied, billing, cleaning }
 
 enum TableShape { circle, square }
 
-enum UserRole { waiter, cashier, kitchen, branchOperator, warehousePurchasingOperator, none }
+enum UserRole {
+  waiter,
+  cashier,
+  kitchen,
+  branchOperator,
+  warehousePurchasingOperator,
+  none
+}
 
 const double ivaRate = 0.16;
 const double ivaFactor = 1 + ivaRate;
@@ -708,8 +715,8 @@ class AppState extends ChangeNotifier {
 
         final bool usesLocalDevelopmentApi =
             configuredDefaultApiUrl.contains('localhost') ||
-            configuredDefaultApiUrl.contains('127.0.0.1') ||
-            configuredDefaultApiUrl.contains('10.0.2.2');
+                configuredDefaultApiUrl.contains('127.0.0.1') ||
+                configuredDefaultApiUrl.contains('10.0.2.2');
         final bool hasObsoleteApiUrl =
             terminalApiUrl?.contains('umqpitkpoa-uc.a.run.app') ?? false;
 
@@ -2457,7 +2464,10 @@ class AppState extends ChangeNotifier {
     String? targetStationId,
   }) async {
     if (cartItems.isEmpty) {
-      await cancelActiveOrder(tableId);
+      await cancelActiveOrder(
+        tableId,
+        reason: 'Orden sin artículos antes de enviarse',
+      );
       return true;
     }
 
@@ -2646,9 +2656,9 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> cancelActiveOrder(int tableId) async {
+  Future<bool> cancelActiveOrder(int tableId, {required String reason}) async {
     final index = tables.indexWhere((t) => t.id == tableId);
-    if (index == -1) return;
+    if (index == -1 || reason.trim().isEmpty) return false;
 
     final table = tables[index];
     final tableRemoteId = _remoteIdForTable(table);
@@ -2656,27 +2666,44 @@ class AppState extends ChangeNotifier {
         ? null
         : _activeOrderIdsByTableRemoteId[tableRemoteId];
 
-    // Clear local state
-    table.items = [];
-    table.guests = 0;
-    table.state = TableState.free;
-
-    if (tableRemoteId != null) {
-      _activeOrderIdsByTableRemoteId.remove(tableRemoteId);
-    }
-
-    notifyListeners();
-
     if (orderId != null) {
       try {
         final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
-        await http
-            .post(Uri.parse('$baseUrl/orders/$orderId/cancel'))
+        final token =
+            currentJwtToken ?? await _secureStorageService.getJwtToken();
+        final response = await http
+            .post(
+              Uri.parse('$baseUrl/orders/$orderId/cancel'),
+              headers: {
+                'Content-Type': 'application/json',
+                if (token != null && token.isNotEmpty)
+                  'Authorization': 'Bearer $token',
+              },
+              body: jsonEncode({'reason': reason.trim()}),
+            )
             .timeout(const Duration(seconds: 8));
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          debugPrint(
+              'Cloud order cancel failed: ${response.statusCode} ${response.body}');
+          return false;
+        }
       } catch (e) {
         debugPrint('Cloud order cancel failed: $e');
+        return false;
       }
     }
+
+    // A local order has no remote record yet; a remote order is only cleared
+    // after the server accepted its audited cancellation.
+    table.items = [];
+    table.guests = 0;
+    table.partialPayments = [];
+    table.state = TableState.free;
+    if (tableRemoteId != null) {
+      _activeOrderIdsByTableRemoteId.remove(tableRemoteId);
+    }
+    notifyListeners();
+    return true;
   }
 
   // Mark Table as ready for billing
@@ -4974,6 +5001,132 @@ class AppState extends ChangeNotifier {
     return saleSync && orderSync && reqSync;
   }
 
+  Future<Map<String, String>> _operatorHeaders() async {
+    final token = currentJwtToken ?? await _secureStorageService.getJwtToken();
+    return {
+      'Content-Type': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  /// Authoritative requisition history. The API derives the user and branch
+  /// from the session, so this client never decides whose requests are shown.
+  Future<List<Map<String, dynamic>>> fetchMyRequisitions(
+      {String? status}) async {
+    if (!isTerminalConfigured) return const [];
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final query = status == null || status == 'all'
+          ? ''
+          : '?status=${Uri.encodeQueryComponent(status)}';
+      final response = await http
+          .get(Uri.parse('$baseUrl/requisitions/mine$query'),
+              headers: await _operatorHeaders())
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) {
+        debugPrint(
+            'Unable to load requisitions: ${response.statusCode} ${response.body}');
+        return const [];
+      }
+      final body = jsonDecode(response.body);
+      if (body is! List) return const [];
+      return body
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+    } catch (error) {
+      debugPrint('Unable to load requisitions: $error');
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchInboundTransfers() async {
+    if (!isTerminalConfigured ||
+        terminalBusinessId == null ||
+        terminalBranchId == null) {
+      return const [];
+    }
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .get(
+            Uri.parse(
+                '$baseUrl/inventory/transfers?businessId=${Uri.encodeQueryComponent(terminalBusinessId!)}'),
+            headers: await _operatorHeaders(),
+          )
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return const [];
+      final body = jsonDecode(response.body);
+      if (body is! List) return const [];
+      return body
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .where((item) =>
+              item['toBranchId'] == terminalBranchId &&
+              item['status'] == 'in_transit')
+          .toList();
+    } catch (error) {
+      debugPrint('Unable to load inbound transfers: $error');
+      return const [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchTransfer(String transferId) async {
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .get(Uri.parse('$baseUrl/inventory/transfers/$transferId'),
+              headers: await _operatorHeaders())
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return null;
+      return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+    } catch (error) {
+      debugPrint('Unable to load transfer: $error');
+      return null;
+    }
+  }
+
+  Future<bool> receiveTransfer({
+    required String transferId,
+    required List<Map<String, dynamic>> items,
+    String? note,
+  }) async {
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/inventory/transfers/$transferId/receive'),
+            headers: await _operatorHeaders(),
+            body: jsonEncode({
+              'items': items,
+              if (note?.trim().isNotEmpty ?? false) 'note': note!.trim()
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode >= 200 && response.statusCode < 300) return true;
+      debugPrint(
+          'Unable to receive transfer: ${response.statusCode} ${response.body}');
+      return false;
+    } catch (error) {
+      debugPrint('Unable to receive transfer: $error');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchTodaySalesSummary() async {
+    if (!isTerminalConfigured) return null;
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .get(Uri.parse('$baseUrl/orders/reports/daily-summary'),
+              headers: await _operatorHeaders())
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return null;
+      return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+    } catch (error) {
+      debugPrint('Unable to load daily sales summary: $error');
+      return null;
+    }
+  }
+
   Future<bool> syncPendingRequisitions() async {
     if (!isTerminalConfigured) return false;
 
@@ -5013,8 +5166,6 @@ class AppState extends ChangeNotifier {
           'id': req.id,
           'businessId': terminalBusinessId ?? req.fromBranchId,
           'fromBranchId': req.fromBranchId,
-          'toWarehouseId': req.toWarehouseId,
-          'createdBy': currentUserId ?? 'operator-pos',
           'notes': req.notes,
           'items': req.items
               .map((i) => {
