@@ -1,102 +1,93 @@
-# 🤝 Session Handoff Document
+# Session Handoff
 
-- **Project Name**: POS-ERP Monorepo (`joelms90/POS_ERP_Cacharelo`)
-- **Date & Time**: 2026-09-18 (landing menu publish)
-- **Branch**: `011-purchase-orders-requisitions`
-- **Last Agent**: Codex
+**Date:** 2026-09-25
+**Branch:** `013-unify-roles`
+**Scope:** role unification, branch-operator workflows, and local POS/API troubleshooting.
 
----
+## Current local environment
 
-## 1. Executive Summary
+| Component | Address | State |
+|---|---|---|
+| Nest API | `http://localhost:3001/api` | Running against local `pos_dev` database |
+| Flutter POS web | `http://localhost:8081` | Running locally |
+| Local database | `pos_dev` | Receipt/cancellation audit migration applied locally |
 
-The September 2026 cafeteria menu was published at `https://www.cacharelo.com/menus/menu-cafeteria.pdf`. The landing Firebase configuration now explicitly targets the primary `fresh-sensor-497515-d3` Hosting site; the custom-domain PDF download was checksum-verified after deployment.
+The Flutter client must use the local API in development. Do not point this local workflow at the production Cloud Run URL.
 
-This session revamped the **inventory system** from a mutable-counter model into an **immutable, ledger-driven model** and unified the operational UI (Órdenes de Compra, Requisiciones, Traspasos, Recepción, Panel de Inventario, Catálogo por Sucursal). Highlights:
+## Completed work
 
-1. **Ledger as source of truth** — added `stock_ledger` (+ `item_type`/`production_strategy`/`uom` on `products`) and a `LedgerService` that is the single write choke point. Every stock write now appends a ledger row and updates `stock_levels` as a read model.
-2. **Intelligent inventory control** — `branch_stock_thresholds`, `inventory_alerts` (global vs branch), `business_inventory_settings`, and an idempotent alert engine. The "Panel de Inventario" distinguishes *Compra sugerida* (global low → OC), *Requisición sugerida* (branch low + transferable stock → transfer), and *Producción sugerida* (finished good → Ensamble).
-3. **Per-sucursal stock** — POS sales now deduct the **selling branch's** stock (not the warehouse); warehouse holds bulk until transferred.
-4. **Per-sucursal catalog** — `branch_products` table + "Catálogo por Sucursal" page (per-product sellable toggle, min/max thresholds, copy catalog, live branch stock).
-5. **Unified UX** — OC, Requisiciones, Traspasos and Recepción now share a list + toggleable side-form pattern; Traspasos got a full lifecycle (Pendiente → En Tránsito → Recibido) with ship/receive actions and a "Falta / Generar OC / Producir / Ajustar a disponible" resolution flow.
+### Roles and permissions
 
----
+- Established canonical operational roles: `owner`, `branch_operator`, `warehouse_purchasing_operator`, `waiter`, `cashier`, and `kitchen`.
+- Legacy `encargado` and `responsable` roles normalize to `branch_operator`.
+- Added branch-scoped authorization for operator requisitions, inbound transfer receipts, daily sales reporting, and audited order cancellations.
 
-## 2. Key Changes & File Map
+### Branch operator POS workflow
 
-### A. Backend (`apps/sync_api`)
+- Requisitions no longer require choosing an origin warehouse.
+- Product selection is a searchable catalog by name, SKU, or internal code.
+- Draft lines can be edited or deleted; discard is confirmed before leaving the draft.
+- Requisitions screen shows only the logged-in operator's requisitions and supports status filtering.
+- Added `Recibir` for inbound transfers and `Resumen` for daily cash/card sales.
+- Receipt supports actual received quantities and a discrepancy note.
+- Order cancellation requires a reason and is audited server-side.
+- Offline reconciliation now fetches `/requisitions/mine`, so it does not merge other operators' requisitions into the current user’s list.
 
-- `src/database/schema.ts` — added `stockLedger`, `branchStockThresholds`, `inventoryAlerts` (nullable `branchId`), `businessInventorySettings`, `branchProducts`; `products` gains `itemType`/`productionStrategy`/`uom`; `recipes.wastePercent`; `warehouses.locationType`.
-- `src/database/migrate.ts` + `scripts/idempotent-deploy-migrations.ts` — idempotent DDL for all of the above (kept in sync for prod).
-- `src/modules/inventory/ledger.service.ts` — `LedgerService.applyMovement` (append ledger + update read model in one tx).
-- `src/modules/inventory/inventory.service.ts` — receipt/production/transfer/adjust/PO-reception now route through the ledger; `shipTransfer` (with `adjustToAvailable`), `receiveTransfer`, `getTransfer` (items + origin availability), `getTransfers` (itemCount).
-- `src/modules/inventory/alerts/alerts.service.ts` — alert engine (global vs branch), `generatePurchaseOrders` (bulk, grouped by provider), `generatePurchaseOrdersByProducts`, `runAutoPoEngine` (fixed "1 OC for 1 product" bug).
-- `src/modules/inventory/thresholds/thresholds.service.ts` — per-branch min/max.
-- `src/modules/recipes/` — `wastePercent` + BOM validation (parent = finished_good/wip, component ≠ service, no self-ref).
-- `src/modules/orders/repositories/orders.repository.ts` — sale deduction targets the **branch**, not the warehouse.
-- `src/modules/catalog/branch-catalog.service.ts` + `controller` — per-branch catalog (list/upsert/delete/copy); `products.service` accepts `branchId` to override `isSellable`.
-- `scripts/backfill-stock-ledger.ts`, `scripts/reconcile-product-item-type.ts` — one-time backfills (idempotent, dry-run + `--apply`).
+### Backend compatibility and reliability
 
-### B. Admin Dashboard (`apps/business_control_tauri`)
+- Tablet login binds a shared user to the terminal's requested branch in the issued JWT. Users must log out and log in again to obtain the new branch-scoped token.
+- Requisition creation derives business, branch, and actor from the JWT. Legacy `businessId` and `fromBranchId` request fields are tolerated for compatibility but ignored.
+- Fixed the local database schema gap that caused 500 responses from active-orders and sync-pull endpoints.
+- Added receipt/cancellation audit fields through an idempotent local migration:
+  - `stock_transfers`: `received_by`, `received_at`, `receipt_note`
+  - `stock_transfer_items`: `quantity_received`
+  - `orders`: `cancellation_reason`, `cancelled_by`, `cancelled_at`
 
-- `src/pages/InventoryDashboardPage.tsx` — Panel de Inventario (summary cards, alerts with type-aware actions, multi-select bulk OC, "Producir" → production modal).
-- `src/pages/BranchCatalogPage.tsx` — Catálogo por Sucursal (sellable toggle, min/max inputs, copy catalog, branch stock).
-- `src/pages/ProductionOrderModal.tsx` — Ensamble modal with inline recipe builder + "Generar OC de faltantes".
-- `src/pages/PurchaseOrdersPage.tsx`, `RequisitionsPage.tsx`, `TransfersPage.tsx`, `ReceiptsPage.tsx` — unified list + side-form layout; Traspasos full lifecycle + reports modal.
-- `src/components/molecules/ToastNotification.tsx` — z-index `z-[100]` so toasts show above modals.
-- `src/services/api.ts` — error handling prefers NestJS `message` over `error`; new endpoints; `getProducts` accepts `branchId`.
-- `src/App.tsx` — persists selected business in localStorage.
-- `e2e/` — `product-create`, `purchase-order-inventory-flow`, `panel-inventory-bulk-oc`, `panel-inventory-oc-alert-resolution`, `branch-out-of-stock-requisition`, `branch-catalog` specs.
+## Current data check
 
-### C. POS (`apps/pos_flutter`)
+For branch `f99da201-e7ef-4ea6-9616-0bc7d5b4a9b7`:
 
-- `lib/ui/common/app_state.dart` — `fetchMenuDynamic` passes `terminalBranchId` so each terminal shows its own menu.
+- Three requisitions created by the operator exist in the local database and are `approved`.
+- Transfer `0928f30c-afac-478e-92e3-1e09850fc78b` is `in_transit` to that branch.
+- It should appear in the POS **Recibir** tab after a fresh login and refresh. It is correct for the receiving branch operator to see and receive transfers in this state.
 
----
+## Validation performed
 
-## 3. Current Status
+- Backend build passed: `npm run build` in `apps/sync_api`.
+- Focused backend tests passed: orders + requisitions (25 tests), and auth + requisitions (15 tests).
+- Flutter focused requisition flow passed: 4 tests.
+- `flutter analyze lib/ui/common/app_state.dart` had no errors; only pre-existing informational lint notices.
+- Local endpoint smoke checks returned 200 for active orders and sync pull after the migration.
 
-| Component | Status | Notes |
-| :--- | :--- | :--- |
-| Backend (`apps/sync_api`) | ✅ Builds | `npm run build` green; new tables/columns migrated locally |
-| Admin (`apps/business_control_tauri`) | ✅ Builds | `npm run build` green; e2e navigation + feature specs pass |
-| POS (`apps/pos_flutter`) | ⚠️ Not rebuilt | branchId change needs `flutter analyze` + rebuild |
-| Landing menu (`apps/landing_page`) | ✅ Published | September 2026 PDF live at `/menus/menu-cafeteria.pdf` |
-| Migrations (prod) | ⚠️ Not applied | see `docs/pre-deployment-checklist.md` |
-| Data backfills (prod) | ⚠️ Not applied | `backfill-stock-ledger.ts` + `reconcile-product-item-type.ts` |
+## Important operational notes
 
----
+1. The JWT previously used by the browser had no branch assignment. It cannot use operator-scoped endpoints. Log out, then perform tablet login again using the local API.
+2. Do not send `businessId` or `fromBranchId` from new POS requisition payloads; authorization scope comes from the token.
+3. A transfer shown as `in_transit` is the expected input for **Recibir**. Confirm it with received quantities, adding a note for discrepancies.
+4. The local audit migration has not been deployed to production. Follow `docs/pre-deployment-checklist.md` and coordinate a database migration before any production backend deployment.
 
-## 4. Next Steps (for the next agent)
+## Relevant commits
 
-1. **Pre-deploy**: follow `docs/pre-deployment-checklist.md` — run `make backend-migrate`, then the two backfill scripts, then deploy backend + admin + POS.
-2. **POS verify/rebuild**: `cd apps/pos_flutter && flutter analyze`, bump version, `make flutter-portal-deploy`.
-3. **Verify per-sucursal model**: correct legacy warehouse stock (adjust), stock branches via Traspasos, set per-branch thresholds.
-4. **Reconciled flag review**: `reconcile-product-item-type.ts` reclassified 3 products (`Empanada Queso`, `Empanada Jamon`, `Coca Cola`) as `raw_material`; confirm if they should be `finished_good`.
-5. **Optional follow-ups**:
-   - Surface `skipped` product **names** (not just count) in "Generar OC de faltantes".
-   - Convert remaining `alert()` error handlers (Assembly, Providers) to toast with `err.message`.
-   - Add stock availability check to the "Nuevo Traspaso" form (before submit).
+Root repository:
 
----
+- `74a9e94` `feat(api): secure branch operator workflows`
+- `5d9fd15` `feat(pos): add branch operator daily workflows`
+- `48f5833` `fix(auth): bind tablet sessions to terminal branch`
+- `58d78a9` `feat(pos): search requisition products`
 
-## 5. Helpful Commands
+`apps/pos_flutter` is a nested repository. Its latest related commit is:
 
-```bash
-# Backend
-cd apps/sync_api && npm run build && npm test
+- `349caa1` `fix(pos): merge only operator requisitions`
 
-# Admin
-cd apps/business_control_tauri && pnpm build && npx playwright test
+Do not flatten or reset the nested repository during follow-up work.
 
-# POS
-cd apps/pos_flutter && flutter analyze
+## Working-tree caution
 
-# Migrations / backfills (prod)
-make backend-migrate
-cd apps/sync_api && npx tsx scripts/backfill-stock-ledger.ts --apply
-cd apps/sync_api && npx tsx scripts/reconcile-product-item-type.ts --apply
-```
+There are existing unrelated changes in the root workspace and in the nested Flutter repository. Preserve them. Do not reset, checkout, or broadly stage files while preparing follow-up commits.
 
----
+## Recommended next steps
 
-*Handoff document updated successfully.*
+1. In the browser, log out and log in again, then open **Recibir** and pull to refresh. Confirm that the in-transit transfer appears.
+2. Receive the transfer with actual quantities and an optional discrepancy note; verify its status becomes received and inventory movement is recorded.
+3. If a requisition still appears only locally, capture the network request and response after the fresh login. The server record should be visible through `/api/requisitions/mine` with the authenticated branch-scoped token.
+4. Before deployment, run the full relevant backend/POS checks and coordinate the production migration per the deployment checklist.
