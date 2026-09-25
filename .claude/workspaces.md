@@ -14,6 +14,14 @@ _None._
 
 ## Completed Sessions
 
+### Session: Multi-Warehouse Setup & Inventory Excel Import
+- **Session Name**: `multi-warehouse-inventory-import`
+- **Branch**: `011-purchase-orders-requisitions`
+- **Primary Focus**: Support UOMs (pieza, gramos, kilos, paquete), multi-warehouse architecture (Almacén General & Almacén Cafetería), internal transfers, and Excel inventory import.
+- **Apps Touched**: `apps/sync_api/`, `apps/business_control_tauri/`
+- **Status**: ✅ Completed
+
+
 ### Session: Landing cafeteria menu update
 - **Session Name**: `codex-landing-menu-sept-2026`
 - **Branch**: `011-purchase-orders-requisitions` (app-scoped child branch unavailable because this parent branch already exists)

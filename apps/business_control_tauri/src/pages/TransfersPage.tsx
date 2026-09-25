@@ -17,6 +17,7 @@ interface TransferLineItem {
   productId: string;
   productName: string;
   quantity: number;
+  uom?: string;
 }
 
 interface TransferRow {
@@ -33,8 +34,20 @@ interface TransferRow {
   notes?: string | null;
   transferredAt?: string | null;
   itemCount?: number;
-  items?: Array<{ productId: string; productName: string; quantity: string; unitCost?: string; totalCost?: string; availableQty?: number; itemType?: string; providerId?: string | null }>;
+  items?: Array<{ productId: string; productName: string; quantity: string; unitCost?: string; totalCost?: string; availableQty?: number; itemType?: string; providerId?: string | null; uom?: string }>;
 }
+
+const UOM_LABELS: Record<string, string> = {
+  piece: 'pza',
+  pack: 'paq',
+  kg: 'kg',
+  g: 'g',
+  l: 'l',
+  ml: 'ml',
+};
+
+const BULK_UOMS = ['kg', 'g', 'l', 'ml'];
+const decimals = (uom?: string) => (uom && BULK_UOMS.includes(uom) ? 3 : 0);
 
 export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
   const [transfers, setTransfers] = useState<TransferRow[]>([]);
@@ -141,6 +154,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
     }
     const prod = products.find((p) => p.id === selectedProductId);
     const productName = prod ? prod.name : 'Producto';
+    const uom = prod?.uom || 'piece';
 
     const existing = itemsList.find((it) => it.productId === selectedProductId);
     if (existing) {
@@ -149,7 +163,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
       );
       setItemsList(newItems);
     } else {
-      setItemsList((prev) => [...prev, { productId: selectedProductId, productName, quantity: qty }]);
+      setItemsList((prev) => [...prev, { productId: selectedProductId, productName, quantity: qty, uom }]);
     }
     setItemQuantity('1');
   };
@@ -568,7 +582,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                     options={products.map((p) => ({
                       id: p.id,
                       label: p.name,
-                      sublabel: p.sku ? `SKU: ${p.sku}` : undefined,
+                      sublabel: `${UOM_LABELS[p.uom || 'piece'] || p.uom || 'pza'}${p.sku ? ` · SKU: ${p.sku}` : ''}`,
                     }))}
                     value={selectedProductId}
                     onChange={setSelectedProductId}
@@ -607,7 +621,9 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                       <div key={idx} className="flex justify-between items-center text-xs bg-charcoal/40 border border-aged-bronze/10 rounded px-2.5 py-2">
                         <span className="font-semibold text-text-primary">{item.productName}</span>
                         <div className="flex items-center gap-3">
-                          <span className="font-mono text-champagne-gold font-semibold">{item.quantity}</span>
+                          <span className="font-mono text-champagne-gold font-semibold">
+                            {item.quantity} <span className="text-[10px] text-text-secondary font-normal font-sans">{UOM_LABELS[item.uom || 'piece'] || item.uom || ''}</span>
+                          </span>
                           <button type="button" onClick={() => removeItem(idx)} className="text-error-red/80 hover:text-error-red transition-colors p-1">
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -671,12 +687,16 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                         return (
                           <tr key={idx}>
                             <td className="px-4 py-3 font-medium text-text-primary">{item.productName}</td>
-                            <td className="px-4 py-3 text-right font-mono text-champagne-gold">{qty}</td>
-                            <td className={`px-4 py-3 text-right font-mono ${short ? 'text-error-red' : 'text-text-secondary'}`}>{avail}</td>
+                            <td className="px-4 py-3 text-right font-mono text-champagne-gold">
+                              {qty} <span className="text-[10px] text-text-secondary font-normal font-sans">{UOM_LABELS[item.uom || 'piece'] || item.uom || ''}</span>
+                            </td>
+                            <td className={`px-4 py-3 text-right font-mono ${short ? 'text-error-red' : 'text-text-secondary'}`}>
+                              {avail} <span className="text-[10px] font-normal font-sans opacity-75">{UOM_LABELS[item.uom || 'piece'] || item.uom || ''}</span>
+                            </td>
                             <td className="px-4 py-3 text-center">
                               {short ? (
                                 <div className="flex flex-col items-center gap-1">
-                                  <Badge variant="error">Falta {qty - avail}</Badge>
+                                  <Badge variant="error">Falta {(qty - avail).toFixed(decimals(item.uom))} {UOM_LABELS[item.uom || 'piece'] || ''}</Badge>
                                   {item.itemType !== 'raw_material' && (
                                     <button
                                       type="button"

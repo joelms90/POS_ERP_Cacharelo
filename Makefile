@@ -171,6 +171,18 @@ db-clean:
 	cd apps/sync_api && pnpm run db:clean
 	@echo "✅ Database cleaned successfully!"
 
+db-import-excel:
+	@echo "Loading inventory from Excel files into Almacén General & Almacén Cafetería..."
+	cd apps/sync_api && npx tsx scripts/import-excel-inventories.ts
+
+db-import-finance:
+	@echo "Loading updated finance inventory & sales Kardex from ~/Downloads/new cacharelo files..."
+	cd apps/sync_api && npx tsx scripts/import-finance-data.ts
+
+db-import-menu:
+	@echo "Importing preset menu dishes from apps/menu_generator into cafeteria catalog..."
+	cd apps/sync_api && npx tsx scripts/import-menu-products.ts
+
 db-clean-prod:
 	@echo "🚨 DANGER: This will delete all PRODUCTION transactional data!"
 	@echo "Target: Cloud SQL Database (pos-db-instance)"
@@ -424,15 +436,19 @@ db-tickets-hoy-prod:
 		exit $$EXIT_CODE
 
 # Run & Development Targets
+BACKEND_PORT ?= 3000
+ADMIN_PORT ?= 1420
+FLUTTER_WEB_PORT ?= 8081
+
 dev-backend: dev-backend-local
 
 dev-backend-local:
 	@echo "======================================================================="
-	@echo "🚀 Starting NestJS Backend on localhost:3000 (LOCAL Postgres: port 5432)"
+	@echo "🚀 Starting NestJS Backend on localhost:$(BACKEND_PORT) (LOCAL Postgres: port 5432)"
 	@echo "   GCP integrations disabled (Firestore/GCS not required locally)"
 	@echo "======================================================================="
 	@cd apps/sync_api && \
-		PORT=3000 \
+		PORT=$(BACKEND_PORT) \
 		NODE_ENV=development \
 		ENABLE_GCP_INTEGRATIONS=false \
 		DATABASE_URL="postgres://pos_user:pos_password@localhost:5432/pos_dev" \
@@ -649,10 +665,10 @@ admin-dev-prod:
 
 admin-dev-local:
 	@echo "======================================================================="
-	@echo "🚀 Starting Admin Dashboard connected to LOCAL API (localhost:3000)"
-	@echo "   Frontend: http://localhost:1420 -> Backend: http://localhost:3000/api"
+	@echo "🚀 Starting Admin Dashboard connected to LOCAL API (localhost:$(BACKEND_PORT))"
+	@echo "   Frontend: http://localhost:$(ADMIN_PORT) -> Backend: http://localhost:$(BACKEND_PORT)/api"
 	@echo "======================================================================="
-	cd apps/business_control_tauri && pnpm dev:local
+	cd apps/business_control_tauri && PORT=$(ADMIN_PORT) VITE_API_URL=http://localhost:$(BACKEND_PORT)/api pnpm vite --port $(ADMIN_PORT)
 
 admin-test-e2e:
 	@echo "Running Playwright E2E tests for Admin Dashboard..."
@@ -763,8 +779,8 @@ flutter-web-dev-prod:
 	cd apps/pos_flutter && flutter run -d chrome --dart-define=API_URL=https://pos-sync-api-232144991863.us-central1.run.app/api
 
 flutter-web-dev-local:
-	@echo "Starting Flutter POS in Chrome connected to LOCAL backend (http://localhost:3000/api)..."
-	cd apps/pos_flutter && flutter run -d chrome --dart-define=API_URL=http://localhost:3000/api
+	@echo "Starting Flutter POS in Chrome connected to LOCAL backend (http://localhost:$(BACKEND_PORT)/api)..."
+	cd apps/pos_flutter && flutter run -d chrome --web-port=$(FLUTTER_WEB_PORT) --dart-define=API_URL=http://localhost:$(BACKEND_PORT)/api
 
 flutter-web-serve:
 	@echo "Serving built web app locally on http://localhost:8000"

@@ -103,6 +103,7 @@ export class RequisitionsRepository {
   }
 
   async create(data: {
+    id?: string;
     businessId: string;
     fromBranchId: string;
     toWarehouseId: string;
@@ -114,10 +115,36 @@ export class RequisitionsRepository {
     }>;
   }) {
     return await this.db.transaction(async (tx) => {
+      if (data.id) {
+        const existing = await tx
+          .select()
+          .from(schema.branchRequisitions)
+          .where(eq(schema.branchRequisitions.id, data.id));
+        if (existing[0]) {
+          const items = await tx
+            .select({
+              requisitionItem: schema.branchRequisitionItems,
+              productName: schema.products.name,
+            })
+            .from(schema.branchRequisitionItems)
+            .leftJoin(schema.products, eq(schema.branchRequisitionItems.productId, schema.products.id))
+            .where(eq(schema.branchRequisitionItems.requisitionId, data.id));
+
+          return {
+            ...existing[0],
+            items: items.map((i) => ({
+              ...i.requisitionItem,
+              productName: i.productName,
+            })),
+          };
+        }
+      }
+
       // Create requisition
       const [requisition] = await tx
         .insert(schema.branchRequisitions)
         .values({
+          id: data.id,
           businessId: data.businessId,
           fromBranchId: data.fromBranchId,
           toWarehouseId: data.toWarehouseId,

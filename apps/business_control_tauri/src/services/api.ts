@@ -599,6 +599,16 @@ export const api = {
   },
 
   /**
+   * Update a category
+   */
+  async updateCategory(id: string, categoryUpdates: Partial<Omit<Category, 'id' | 'businessId'>>): Promise<Category> {
+    return apiRequest<Category>(`/categories/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(categoryUpdates),
+    });
+  },
+
+  /**
    * Delete a category
    */
   async deleteCategory(id: string): Promise<{ success: boolean; message: string }> {
@@ -849,7 +859,7 @@ export const api = {
   async updateBranchTable(
     branchId: string,
     tableId: string,
-    updates: { label?: string; capacity?: number; room?: string; x?: number; y?: number; shape?: string },
+    updates: { label?: string; capacity?: number; room?: string; x?: number; y?: number; shape?: string; state?: string },
   ): Promise<any> {
     return apiRequest<any>(`/branches/${branchId}/tables/${tableId}`, {
       method: 'PATCH',

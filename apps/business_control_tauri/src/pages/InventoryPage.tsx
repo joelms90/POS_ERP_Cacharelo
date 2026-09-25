@@ -21,6 +21,15 @@ const PRODUCTION_STRATEGY_LABELS: Record<string, string> = {
 
 const BULK_UOMS = ['kg', 'g', 'l', 'ml'];
 const productDecimals = (uom?: string) => (uom && BULK_UOMS.includes(uom) ? 3 : 0);
+const UOM_LABELS: Record<string, string> = {
+  piece: 'pza',
+  pack: 'paq',
+  kg: 'kg',
+  g: 'g',
+  l: 'l',
+  ml: 'ml',
+};
+const isSupplyItem = (product: Product) => product.itemType === 'raw_material' || product.isIngredient === true;
 
 interface InventoryPageProps {
   businessId: string;
@@ -36,6 +45,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
+  const [providerFilter, setProviderFilter] = useState<'all' | 'missing'>('all');
   
   // Toast notifications state
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
@@ -43,6 +53,11 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
   // Edit/Create Product State
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [isSavingProduct, setIsSavingProduct] = useState<boolean>(false);
+  const [productAwaitingProvider, setProductAwaitingProvider] = useState<Product | null>(null);
+  const [providerSearch, setProviderSearch] = useState('');
+  const [selectedProviderId, setSelectedProviderId] = useState('');
+  const [newProviderName, setNewProviderName] = useState('');
+  const [isAssigningProvider, setIsAssigningProvider] = useState(false);
   // Import History states
   const [activeSubTab, setActiveSubTab] = useState<'products' | 'deprecated' | 'bulk'>('products');
   const [importHistory, setImportHistory] = useState<any[]>([]);
@@ -204,7 +219,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
         service: { isIngredient: false, isSellable: true },
       };
       const flags = itemTypeFlags[itemType] || { isIngredient: false, isSellable: true };
-      const saleType = uom === 'piece' ? 'pieza' : 'granel';
+      const saleType = (uom === 'piece' || uom === 'pack') ? 'pieza' : 'granel';
 
       const payload = {
         categoryId: editingProduct.categoryId,
@@ -275,6 +290,46 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
       showToast(`Producto "${updated.name}" ${newActiveState ? 'activado' : 'inactivado'} con éxito.`, 'success');
     } catch (error: any) {
       showToast(error.message || 'No se pudo cambiar el estado del producto.', 'error');
+    }
+  };
+
+  const openProviderAssignment = (product: Product) => {
+    setProductAwaitingProvider(product);
+    setSelectedProviderId(product.providerId || '');
+    setProviderSearch('');
+    setNewProviderName('');
+  };
+
+  const handleProviderAssignment = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!productAwaitingProvider) return;
+
+    const providerName = newProviderName.trim();
+    if (!selectedProviderId && !providerName) {
+      showToast('Seleccione o registre un proveedor para continuar.', 'warning');
+      return;
+    }
+
+    setIsAssigningProvider(true);
+    try {
+      let providerId = selectedProviderId;
+      let providerLabel = providers.find((provider) => provider.id === providerId)?.name;
+
+      if (!providerId) {
+        const createdProvider = await api.addProvider({ name: providerName }, businessId);
+        setProviders((current) => [...current, createdProvider]);
+        providerId = createdProvider.id;
+        providerLabel = createdProvider.name;
+      }
+
+      const updatedProduct = await api.updateProduct(productAwaitingProvider.id, { providerId });
+      setProducts((current) => current.map((product) => product.id === updatedProduct.id ? updatedProduct : product));
+      showToast(`${providerLabel || 'Proveedor'} asignado a "${updatedProduct.name}".`, 'success');
+      setProductAwaitingProvider(null);
+    } catch (error: any) {
+      showToast(error.message || 'No se pudo asignar el proveedor.', 'error');
+    } finally {
+      setIsAssigningProvider(false);
     }
   };
 
@@ -446,7 +501,12 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
     }
   };
 
-  // Filter products based on search, category and status
+  const productsWithoutProvider = products.filter((product) => isSupplyItem(product) && !product.providerId && product.isActive !== false);
+  const matchingProviders = providers.filter((provider) =>
+    provider.name.toLocaleLowerCase().includes(providerSearch.trim().toLocaleLowerCase())
+  );
+
+  // Filter products based on search, category, provider and status
   const filteredProducts = products.filter((p) => {
     const matchesSearch = 
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -459,8 +519,10 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
     const matchesTab = activeSubTab === 'deprecated'
       ? p.isActive === false
       : p.isActive !== false;
+
+    const matchesProvider = providerFilter === 'all' || (isSupplyItem(p) && !p.providerId);
     
-    return matchesSearch && matchesCategory && matchesTab;
+    return matchesSearch && matchesCategory && matchesTab && matchesProvider;
   });
 
   return (
@@ -834,6 +896,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                           data-testid="product-uom"
                         >
                           <option value="piece">Pieza (unidad)</option>
+                          <option value="pack">Paquete (paq)</option>
                           <option value="kg">Kilogramo (kg)</option>
                           <option value="g">Gramo (g)</option>
                           <option value="l">Litro (l)</option>
@@ -1119,6 +1182,22 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setProviderFilter((current) => current === 'missing' ? 'all' : 'missing')}
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded border text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                        providerFilter === 'missing'
+                          ? 'bg-warning-yellow/15 border-warning-yellow/60 text-warning-yellow'
+                          : productsWithoutProvider.length > 0
+                            ? 'border-warning-yellow/35 text-warning-yellow hover:border-warning-yellow/70'
+                            : 'border-aged-bronze/40 text-text-secondary hover:border-aged-bronze'
+                      }`}
+                      title="Mostrar insumos pendientes de proveedor"
+                      data-testid="missing-provider-filter"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                      {productsWithoutProvider.length} sin proveedor
+                    </button>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-text-secondary whitespace-nowrap">Filtrar Categoría:</span>
                       <select
@@ -1156,6 +1235,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                           <th className="px-6 py-4">Producto</th>
                           <th className="px-6 py-4">Categoría</th>
                           <th className="px-6 py-4">Códigos SKU / EAN</th>
+                          <th className="px-6 py-4">Proveedor</th>
                           <th className="px-6 py-4 text-right">Existencia</th>
                           <th className="px-6 py-4 text-right">Costo</th>
                           <th className="px-6 py-4 text-right">Precio</th>
@@ -1166,7 +1246,7 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                       <tbody className="divide-y divide-aged-bronze/20 text-sm">
                         {filteredProducts.length === 0 ? (
                           <tr>
-                            <td colSpan={8} className="px-6 py-12 text-center text-text-secondary italic">
+                            <td colSpan={9} className="px-6 py-12 text-center text-text-secondary italic">
                               {categories.length === 0 
                                 ? 'Registre una categoría a la izquierda antes de agregar productos.'
                                 : 'No se encontraron artículos en el inventario que coincidan con la búsqueda.'}
@@ -1211,17 +1291,31 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
                                     {p.sku && <span>SKU: {p.sku}</span>}
                                     {p.barcode && <span>EAN: {p.barcode}</span>}
                                     {p.internalCode && <span>Int: {p.internalCode}</span>}
-                                    {p.providerId && (
-                                      <span className="text-[10px] text-champagne-gold/75 mt-0.5 font-sans">
-                                        Prov: {providers.find(prov => prov.id === p.providerId)?.name || 'Cargando...'}
-                                      </span>
-                                    )}
-                                    {!p.sku && !p.barcode && !p.internalCode && !p.providerId && <span className="text-[10px] italic">-</span>}
+                                    {!p.sku && !p.barcode && !p.internalCode && <span className="text-[10px] italic">-</span>}
                                   </div>
+                                </td>
+                                <td className="px-6 py-4 text-xs">
+                                  {p.providerId ? (
+                                    <span className="text-champagne-gold/85 font-medium">
+                                      {providers.find((provider) => provider.id === p.providerId)?.name || 'Proveedor no disponible'}
+                                    </span>
+                                  ) : isSupplyItem(p) ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => openProviderAssignment(p)}
+                                      className="inline-flex items-center gap-1.5 rounded border border-warning-yellow/35 px-2 py-1 text-[10px] font-semibold text-warning-yellow hover:border-warning-yellow hover:bg-warning-yellow/10 transition-colors"
+                                      title={`Asignar proveedor a ${p.name}`}
+                                      data-testid={`assign-provider-${p.id}`}
+                                    >
+                                      <span className="text-sm leading-none">+</span> Asignar proveedor
+                                    </button>
+                                  ) : (
+                                    <span className="text-text-secondary/60">—</span>
+                                  )}
                                 </td>
                                 <td className="px-6 py-4 text-right font-mono text-xs">
                                   <span className={isLowStock ? 'text-error-red font-bold animate-pulse' : 'text-text-primary font-medium'}>
-                                    {displayStock}
+                                    {displayStock} <span className="text-[10px] text-text-secondary font-normal font-sans">{UOM_LABELS[p.uom || 'piece'] || p.uom || ''}</span>
                                   </span>
                                   {isLowStock && (
                                     <span className="text-[9px] text-error-red block font-sans font-normal">
@@ -1341,6 +1435,103 @@ export const InventoryPage: React.FC<InventoryPageProps> = ({ businessId }) => {
 
       {/* Toast Notifications Queue */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
+
+      {/* Quick supplier assignment */}
+      {productAwaitingProvider && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-obsidian/85 p-4 backdrop-blur-sm animate-fade-in font-sans">
+          <form
+            onSubmit={handleProviderAssignment}
+            className="w-full max-w-lg overflow-hidden rounded-xl border border-aged-bronze/35 bg-onyx-surface shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-aged-bronze/25 p-5">
+              <div>
+                <Heading level={2} className="!border-none !pb-0 !text-lg font-light text-champagne-gold">
+                  Asignar proveedor
+                </Heading>
+                <p className="mt-1 text-xs text-text-secondary">
+                  Insumo: <span className="font-semibold text-text-primary">{productAwaitingProvider.name}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProductAwaitingProvider(null)}
+                disabled={isAssigningProvider}
+                className="rounded p-1 text-text-secondary transition-colors hover:text-text-primary disabled:opacity-50"
+                aria-label="Cerrar"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-4 p-5">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-text-secondary">Buscar proveedor registrado</label>
+                <Input
+                  type="search"
+                  value={providerSearch}
+                  onChange={(event) => setProviderSearch(event.target.value)}
+                  placeholder="Escriba el nombre del proveedor..."
+                  disabled={isAssigningProvider}
+                  data-testid="provider-search"
+                />
+              </div>
+
+              <div className="max-h-40 overflow-y-auto rounded border border-aged-bronze/30 bg-charcoal-surface/40">
+                {matchingProviders.length > 0 ? matchingProviders.map((provider) => (
+                  <label
+                    key={provider.id}
+                    className="flex cursor-pointer items-center gap-3 border-b border-aged-bronze/15 px-3 py-2.5 text-sm last:border-b-0 hover:bg-charcoal-surface"
+                  >
+                    <input
+                      type="radio"
+                      name="provider"
+                      value={provider.id}
+                      checked={selectedProviderId === provider.id}
+                      onChange={() => {
+                        setSelectedProviderId(provider.id);
+                        setNewProviderName('');
+                      }}
+                      disabled={isAssigningProvider}
+                      className="accent-champagne-gold"
+                    />
+                    <span className="text-text-primary">{provider.name}</span>
+                    {provider.contactName && <span className="text-xs text-text-secondary">{provider.contactName}</span>}
+                  </label>
+                )) : (
+                  <p className="px-3 py-3 text-xs italic text-text-secondary">No se encontraron proveedores registrados.</p>
+                )}
+              </div>
+
+              <div className="border-t border-aged-bronze/20 pt-4">
+                <label className="mb-1.5 block text-xs font-medium text-text-secondary">O registrar un proveedor nuevo</label>
+                <Input
+                  type="text"
+                  value={newProviderName}
+                  onChange={(event) => {
+                    setNewProviderName(event.target.value);
+                    if (event.target.value.trim()) setSelectedProviderId('');
+                  }}
+                  placeholder="Nombre del nuevo proveedor"
+                  disabled={isAssigningProvider}
+                  data-testid="new-provider-name"
+                />
+                <p className="mt-1.5 text-[11px] text-text-secondary">Se registrará y se asignará como proveedor principal de este insumo.</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-aged-bronze/25 p-5">
+              <Button type="button" variant="secondary" onClick={() => setProductAwaitingProvider(null)} disabled={isAssigningProvider}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isAssigningProvider} data-testid="save-provider-assignment">
+                {isAssigningProvider ? 'Guardando...' : newProviderName.trim() ? 'Registrar y asignar' : 'Asignar proveedor'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Selected Import Details Modal */}
       {selectedImportDetails && (

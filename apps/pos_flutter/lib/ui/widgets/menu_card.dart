@@ -38,27 +38,7 @@ class MenuCard extends StatelessWidget {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
-                  child: item.imagePath.isNotEmpty
-                      ? Image.memory(
-                          base64Decode(item.imagePath.split(',').last),
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Center(
-                              child: Icon(
-                                _getCategoryIcon(item.category),
-                                color: EmpireColors.champagneGold,
-                                size: 24,
-                              ),
-                            );
-                          },
-                        )
-                      : Center(
-                          child: Icon(
-                            _getCategoryIcon(item.category),
-                            color: EmpireColors.champagneGold,
-                            size: 24,
-                          ),
-                        ),
+                  child: _buildImage(item),
                 ),
               ),
               const SizedBox(width: 10),
@@ -114,6 +94,50 @@ class MenuCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildImage(MenuItem item) {
+    final path = item.imagePath.trim();
+    if (path.isEmpty) {
+      return _buildFallbackIcon(item);
+    }
+
+    // 1. Data URI or raw Base64 string
+    if (path.startsWith('data:image') || (!path.startsWith('/') && !path.startsWith('http') && !path.contains(' '))) {
+      try {
+        final base64Str = path.contains(',') ? path.split(',').last : path;
+        final bytes = base64Decode(base64Str);
+        return Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildFallbackIcon(item),
+        );
+      } catch (_) {
+        return _buildFallbackIcon(item);
+      }
+    }
+
+    // 2. Relative web path (/dishes/...) or Network URL
+    try {
+      final encodedUrl = Uri.encodeFull(path);
+      return Image.network(
+        encodedUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _buildFallbackIcon(item),
+      );
+    } catch (_) {
+      return _buildFallbackIcon(item);
+    }
+  }
+
+  Widget _buildFallbackIcon(MenuItem item) {
+    return Center(
+      child: Icon(
+        _getCategoryIcon(item.category),
+        color: EmpireColors.champagneGold,
+        size: 24,
       ),
     );
   }

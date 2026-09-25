@@ -13,6 +13,10 @@ export class RequisitionItemDto {
 
 export class CreateRequisitionDto {
   @IsUUID()
+  @IsOptional()
+  id?: string;
+
+  @IsUUID()
   @IsNotEmpty()
   businessId: string;
 

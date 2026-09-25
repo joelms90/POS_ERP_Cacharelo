@@ -7,6 +7,7 @@ class LocalBranchRequisition {
   final DateTime createdAt;
   final String syncState; // 'pending', 'synced', 'failed'
   final List<LocalBranchRequisitionItem> items;
+  final int itemCount;
 
   LocalBranchRequisition({
     required this.id,
@@ -17,7 +18,8 @@ class LocalBranchRequisition {
     required this.createdAt,
     required this.syncState,
     required this.items,
-  });
+    int? itemCount,
+  }) : itemCount = itemCount ?? items.length;
 
   Map<String, dynamic> toMap() {
     return {
@@ -29,10 +31,20 @@ class LocalBranchRequisition {
       'createdAt': createdAt.toIso8601String(),
       'syncState': syncState,
       'items': items.map((i) => i.toMap()).toList(),
+      'itemCount': itemCount,
     };
   }
 
   factory LocalBranchRequisition.fromMap(Map<String, dynamic> map) {
+    final rawItems = map['items'];
+    final items = rawItems is List
+        ? rawItems
+            .map((i) => LocalBranchRequisitionItem.fromMap(
+                  Map<String, dynamic>.from(i as Map),
+                ))
+            .toList()
+        : <LocalBranchRequisitionItem>[];
+
     return LocalBranchRequisition(
       id: map['id'],
       fromBranchId: map['fromBranchId'],
@@ -41,9 +53,8 @@ class LocalBranchRequisition {
       notes: map['notes'],
       createdAt: DateTime.parse(map['createdAt']),
       syncState: map['syncState'],
-      items: (map['items'] as List)
-          .map((i) => LocalBranchRequisitionItem.fromMap(i))
-          .toList(),
+      items: items,
+      itemCount: (map['itemCount'] as num?)?.toInt() ?? items.length,
     );
   }
 }

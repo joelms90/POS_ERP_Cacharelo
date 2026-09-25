@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
+const defaultPort = process.env.PORT ? parseInt(process.env.PORT, 10) : 1420;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
@@ -15,14 +16,14 @@ export default defineConfig(async () => ({
   clearScreen: false,
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
-    port: 1420,
+    port: defaultPort,
     strictPort: true,
     host: host || false,
     hmr: host
       ? {
           protocol: "ws",
           host,
-          port: 1421,
+          port: defaultPort + 1,
         }
       : undefined,
     watch: {

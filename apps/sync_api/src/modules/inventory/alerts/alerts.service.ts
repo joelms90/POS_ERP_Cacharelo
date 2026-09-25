@@ -17,11 +17,32 @@ export class AlertsService {
   // Alert engine
   // ---------------------------------------------------------------------------
 
+  private inFlightEngine = new Map<
+    string,
+    Promise<{ processed: number; created: number; updated: number; resolved: number }>
+  >();
+
   /**
    * Run the full low-stock/out-of-stock detection engine for a business.
    * Idempotent: safe to run multiple times; only creates/updates/resolves alerts.
+   * Concurrent calls for the same business share the in-flight execution promise.
    */
   async runAlertEngine(businessId: string) {
+    const existing = this.inFlightEngine.get(businessId);
+    if (existing) {
+      return await existing;
+    }
+
+    const runPromise = this.executeAlertEngine(businessId);
+    this.inFlightEngine.set(businessId, runPromise);
+    try {
+      return await runPromise;
+    } finally {
+      this.inFlightEngine.delete(businessId);
+    }
+  }
+
+  private async executeAlertEngine(businessId: string) {
     const products = await this.db
       .select({
         id: schema.products.id,
@@ -145,11 +166,41 @@ export class AlertsService {
           .where(eq(schema.inventoryAlerts.id, existing.id));
         updated++;
       } else {
-        await this.db.insert(schema.inventoryAlerts).values({
-          ...input,
-          status: 'active',
-        });
-        created++;
+        try {
+          await this.db.insert(schema.inventoryAlerts).values({
+            ...input,
+            status: 'active',
+          });
+          created++;
+        } catch (err: any) {
+          const pgCode = err?.code || err?.cause?.code;
+          if (pgCode === '23505') {
+            // Concurrent execution already inserted the active alert. Fall back to update.
+            const condition = input.branchId
+              ? and(
+                  eq(schema.inventoryAlerts.productId, input.productId),
+                  eq(schema.inventoryAlerts.branchId, input.branchId),
+                  sql`${schema.inventoryAlerts.status} IN ('active', 'acknowledged')`,
+                )
+              : and(
+                  eq(schema.inventoryAlerts.productId, input.productId),
+                  isNull(schema.inventoryAlerts.branchId),
+                  sql`${schema.inventoryAlerts.status} IN ('active', 'acknowledged')`,
+                );
+
+            await this.db
+              .update(schema.inventoryAlerts)
+              .set({
+                alertType: input.alertType,
+                threshold: input.threshold,
+                currentQty: input.currentQty,
+              })
+              .where(condition);
+            updated++;
+          } else {
+            throw err;
+          }
+        }
       }
     };
 

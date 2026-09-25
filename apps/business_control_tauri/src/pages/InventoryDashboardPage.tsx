@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { api, InventoryAlert, InventoryAlertSummary, Branch } from '../services/api';
+import { api, InventoryAlert, InventoryAlertSummary, Branch, Provider } from '../services/api';
 import { Heading } from '../components/atoms/Heading';
 import { Button } from '../components/atoms/Button';
+import { Input } from '../components/atoms/Input';
 import { ToastContainer } from '../components/molecules/ToastNotification';
 import { ProductionOrderModal } from './ProductionOrderModal';
 
@@ -25,6 +26,12 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [productionProduct, setProductionProduct] = useState<InventoryAlert | null>(null);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [alertAwaitingProvider, setAlertAwaitingProvider] = useState<InventoryAlert | null>(null);
+  const [providerSearch, setProviderSearch] = useState('');
+  const [selectedProviderId, setSelectedProviderId] = useState('');
+  const [newProviderName, setNewProviderName] = useState('');
+  const [isAssigningProvider, setIsAssigningProvider] = useState(false);
 
   const showToast = useCallback((message: string, type: Toast['type'] = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -36,16 +43,19 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
   }, []);
 
   const fetchData = useCallback(async (branch?: string) => {
+    if (!businessId) return;
     setLoading(true);
     setError(null);
     try {
-      const [summaryData, branchesData] = await Promise.all([
+      const [summaryData, branchesData, providersData] = await Promise.all([
         api.getInventoryAlertSummary(businessId, branch || undefined),
         api.getBranches(businessId),
+        api.getProviders(businessId).catch(() => [] as Provider[]),
       ]);
       setSummary(summaryData.summary);
       setAlerts(summaryData.alerts);
       setBranches(branchesData);
+      setProviders(providersData);
     } catch (e: any) {
       setError(e?.message || 'No se pudo cargar el panel de inventario.');
     } finally {
@@ -118,6 +128,46 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
     }
   };
 
+  const openProviderAssignment = (alert: InventoryAlert) => {
+    setAlertAwaitingProvider(alert);
+    setProviderSearch('');
+    setSelectedProviderId('');
+    setNewProviderName('');
+  };
+
+  const handleProviderAssignment = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!alertAwaitingProvider) return;
+
+    const providerName = newProviderName.trim();
+    if (!selectedProviderId && !providerName) {
+      showToast('Seleccione o registre un proveedor para continuar.', 'warning');
+      return;
+    }
+
+    setIsAssigningProvider(true);
+    try {
+      let providerId = selectedProviderId;
+      let providerLabel = providers.find((provider) => provider.id === providerId)?.name;
+
+      if (!providerId) {
+        const createdProvider = await api.addProvider({ name: providerName }, businessId);
+        setProviders((current) => [...current, createdProvider]);
+        providerId = createdProvider.id;
+        providerLabel = createdProvider.name;
+      }
+
+      await api.updateProduct(alertAwaitingProvider.productId, { providerId });
+      showToast(`${providerLabel || 'Proveedor'} asignado a "${alertAwaitingProvider.productName}".`);
+      setAlertAwaitingProvider(null);
+      await fetchData(branchFilter);
+    } catch (e: any) {
+      showToast(e?.message || 'No se pudo asignar el proveedor.', 'error');
+    } finally {
+      setIsAssigningProvider(false);
+    }
+  };
+
   const handleBulkGenerateOc = async () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) {
@@ -166,6 +216,9 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
   };
 
   const visibleAlerts = alerts.filter((a) => (hideResolved ? a.status !== 'resolved' : true));
+  const matchingProviders = providers.filter((provider) =>
+    provider.name.toLocaleLowerCase().includes(providerSearch.trim().toLocaleLowerCase())
+  );
 
   const SummaryCard: React.FC<{ label: string; value: number; tone: 'red' | 'amber' | 'green' | 'gold' }> = ({ label, value, tone }) => {
     const tones = {
@@ -333,9 +386,14 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
                     Generar OC
                   </Button>
                 ) : isRawMaterial ? (
-                  <span className="text-[10px] text-text-secondary italic px-2 py-1 rounded bg-charcoal-surface/40 border border-aged-bronze/20">
-                    Sin proveedor registrado
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => openProviderAssignment(alert)}
+                    className="inline-flex items-center gap-1.5 rounded border border-warning-yellow/35 px-2.5 py-1.5 text-[10px] font-semibold text-warning-yellow transition-colors hover:border-warning-yellow hover:bg-warning-yellow/10"
+                    data-testid={`alert-assign-provider-${alert.id}`}
+                  >
+                    <span className="text-sm leading-none">+</span> Asignar proveedor
+                  </button>
                 ) : (
                   <Button variant="secondary" size="sm" data-testid={`alert-produce-${alert.id}`} onClick={() => setProductionProduct(alert)}>
                     Producir
@@ -349,6 +407,102 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
       </div>
 
       <ToastContainer toasts={toasts} onClose={removeToast} />
+
+      {alertAwaitingProvider && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-obsidian/85 p-4 backdrop-blur-sm animate-fade-in font-sans">
+          <form
+            onSubmit={handleProviderAssignment}
+            className="w-full max-w-lg overflow-hidden rounded-xl border border-aged-bronze/35 bg-onyx-surface shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-aged-bronze/25 p-5">
+              <div>
+                <Heading level={2} className="!border-none !pb-0 !text-lg font-light text-champagne-gold">
+                  Asignar proveedor
+                </Heading>
+                <p className="mt-1 text-xs text-text-secondary">
+                  Insumo: <span className="font-semibold text-text-primary">{alertAwaitingProvider.productName}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAlertAwaitingProvider(null)}
+                disabled={isAssigningProvider}
+                className="rounded p-1 text-text-secondary transition-colors hover:text-text-primary disabled:opacity-50"
+                aria-label="Cerrar"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-4 p-5">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-text-secondary">Buscar proveedor registrado</label>
+                <Input
+                  type="search"
+                  value={providerSearch}
+                  onChange={(event) => setProviderSearch(event.target.value)}
+                  placeholder="Escriba el nombre del proveedor..."
+                  disabled={isAssigningProvider}
+                  data-testid="alert-provider-search"
+                />
+              </div>
+
+              <div className="max-h-40 overflow-y-auto rounded border border-aged-bronze/30 bg-charcoal-surface/40">
+                {matchingProviders.length > 0 ? matchingProviders.map((provider) => (
+                  <label
+                    key={provider.id}
+                    className="flex cursor-pointer items-center gap-3 border-b border-aged-bronze/15 px-3 py-2.5 text-sm last:border-b-0 hover:bg-charcoal-surface"
+                  >
+                    <input
+                      type="radio"
+                      name="alert-provider"
+                      value={provider.id}
+                      checked={selectedProviderId === provider.id}
+                      onChange={() => {
+                        setSelectedProviderId(provider.id);
+                        setNewProviderName('');
+                      }}
+                      disabled={isAssigningProvider}
+                      className="accent-champagne-gold"
+                    />
+                    <span className="text-text-primary">{provider.name}</span>
+                    {provider.contactName && <span className="text-xs text-text-secondary">{provider.contactName}</span>}
+                  </label>
+                )) : (
+                  <p className="px-3 py-3 text-xs italic text-text-secondary">No se encontraron proveedores registrados.</p>
+                )}
+              </div>
+
+              <div className="border-t border-aged-bronze/20 pt-4">
+                <label className="mb-1.5 block text-xs font-medium text-text-secondary">O registrar un proveedor nuevo</label>
+                <Input
+                  type="text"
+                  value={newProviderName}
+                  onChange={(event) => {
+                    setNewProviderName(event.target.value);
+                    if (event.target.value.trim()) setSelectedProviderId('');
+                  }}
+                  placeholder="Nombre del nuevo proveedor"
+                  disabled={isAssigningProvider}
+                  data-testid="alert-new-provider-name"
+                />
+                <p className="mt-1.5 text-[11px] text-text-secondary">Se registrará y se asignará como proveedor principal de este insumo.</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-aged-bronze/25 p-5">
+              <Button type="button" variant="secondary" onClick={() => setAlertAwaitingProvider(null)} disabled={isAssigningProvider}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isAssigningProvider} data-testid="alert-save-provider-assignment">
+                {isAssigningProvider ? 'Guardando...' : newProviderName.trim() ? 'Registrar y asignar' : 'Asignar proveedor'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {productionProduct && (
         <ProductionOrderModal

@@ -707,8 +707,7 @@ class AppState extends ChangeNotifier {
         // Auto-migrate old Cloud Run API URLs to the secure VM API subdomain
         if (terminalApiUrl != null &&
             terminalApiUrl!.contains('umqpitkpoa-uc.a.run.app')) {
-          terminalApiUrl =
-              configuredDefaultApiUrl;
+          terminalApiUrl = configuredDefaultApiUrl;
           await _secureStorageService.saveTerminalConfig(
             businessId: terminalBusinessId ?? '',
             branchId: terminalBranchId ?? '',
@@ -778,21 +777,67 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> deconfigureTerminal() async {
+    await resetLocalBranchData();
+  }
+
+  Future<void> resetLocalBranchData() async {
+    _stopPrintStationLifecycle();
+    disconnectWebSocket();
+
     terminalBusinessId = null;
     terminalBranchId = null;
     terminalBusinessName = null;
     terminalBranchName = null;
     terminalApiUrl = null;
     isTerminalConfigured = false;
+    currentUserRole = UserRole.none;
+    availableUserRoles = const [];
+    currentUserId = null;
+    currentUserName = "";
+    currentJwtToken = null;
+    selectedTable = null;
+    tables.clear();
+    kitchenOrders.clear();
+    readyPickupOrders.clear();
+    printJobs.clear();
+    recentClosedSales.clear();
+    readyNotifications.clear();
+    roomConfigs.clear();
+    cachedIngredients.clear();
+    cachedWarehouses.clear();
+    _pendingSaleSyncJobs.clear();
+    _pendingOrderSyncJobs.clear();
+    _activeOrderIdsByTableRemoteId.clear();
+    _locallyClosedPaidOrderIdsByTableRemoteId.clear();
+    _pendingKitchenStatusUpdates.clear();
+    _alertedReadyPickupIds.clear();
+    _remotePrintJobsInFlight.clear();
+    pendingSyncCount = 0;
+    isShiftOpen = false;
+    cashDrawerAmount = 0.0;
+    initialFloat = 0.0;
+    activeShiftId = null;
+    lastSyncError = null;
+    ticketFiscalConfig = TicketFiscalConfig.defaults();
+    connectedPrinterMac = null;
+    connectedPrinterName = null;
+    printerPaperWidth = '58mm';
+    onlinePrintStations.clear();
+    lastSelectedPrintStationId = null;
+    receiveRemotePrintJobs = false;
+    lastPrintStationPublishAttemptAt = null;
+    lastPrintStationPublishSucceeded = null;
+    lastPrintStationPublishMessage = null;
+    localStationId = null;
 
-    await _secureStorageService.clearTerminalConfig();
+    await _secureStorageService.clearLocalBranchData();
+    localStationId = await _secureStorageService.getOrCreateLocalStationId();
     notifyListeners();
   }
 
   Future<bool> configureTerminalWithCode(String branchId) async {
     try {
-      String baseUrl =
-          configuredDefaultApiUrl;
+      String baseUrl = configuredDefaultApiUrl;
 
       http.Response response = await http
           .get(Uri.parse('$baseUrl/branches/$branchId'))
@@ -824,8 +869,7 @@ class AppState extends ChangeNotifier {
     if (!isTerminalConfigured) return false;
 
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final String? businessId = terminalBusinessId;
       final String? branchId = terminalBranchId;
       if (businessId == null || branchId == null) return false;
@@ -862,8 +906,7 @@ class AppState extends ChangeNotifier {
       return false;
     }
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final String? bId = terminalBusinessId;
       if (bId == null || bId.isEmpty) {
         debugPrint('SyncOperators skipped: missing terminal businessId.');
@@ -1207,8 +1250,7 @@ class AppState extends ChangeNotifier {
     }
 
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final String brId = terminalBranchId!;
 
       // Fetch branch configs dynamically (room configs, zoom, images)
@@ -1404,8 +1446,7 @@ class AppState extends ChangeNotifier {
   Future<void> fetchMenuDynamic() async {
     if (!isTerminalConfigured) return;
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final bool isLocalConfig = baseUrl.contains('localhost') ||
           baseUrl.contains('10.0.2.2') ||
           baseUrl.contains('127.0.0.1');
@@ -1494,8 +1535,7 @@ class AppState extends ChangeNotifier {
   Future<bool> syncWarehouses() async {
     if (!isTerminalConfigured) return false;
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final String? bId = terminalBusinessId;
       if (bId == null || bId.isEmpty) {
         debugPrint('syncWarehouses skipped: missing terminal businessId.');
@@ -1528,8 +1568,7 @@ class AppState extends ChangeNotifier {
     if (!isTerminalConfigured || terminalBranchId == null) return false;
 
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
           .get(Uri.parse('$baseUrl/orders/active?branchId=$terminalBranchId'))
           .timeout(const Duration(seconds: 10));
@@ -1632,8 +1671,7 @@ class AppState extends ChangeNotifier {
     if (!isTerminalConfigured || terminalBranchId == null) return false;
 
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
           .get(Uri.parse('$baseUrl/kitchen/active?branchId=$terminalBranchId'))
           .timeout(const Duration(seconds: 10));
@@ -1718,8 +1756,7 @@ class AppState extends ChangeNotifier {
     if (!isTerminalConfigured || terminalBranchId == null) return false;
 
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
 
       // Get last sync checkpoint timestamp
       final lastSyncedAt = await _getLastSyncCheckpoint();
@@ -2023,8 +2060,7 @@ class AppState extends ChangeNotifier {
       }
 
       http.Response response;
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       try {
         response = await http
             .post(
@@ -2209,8 +2245,7 @@ class AppState extends ChangeNotifier {
       return;
     }
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
           .get(Uri.parse(
               '$baseUrl/cash-shifts/active?branchId=$terminalBranchId&cashierId=$currentUserId'))
@@ -2241,8 +2276,7 @@ class AppState extends ChangeNotifier {
       return false;
     }
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
           .post(
             Uri.parse('$baseUrl/cash-shifts'),
@@ -2275,8 +2309,7 @@ class AppState extends ChangeNotifier {
       {String reason = 'Ingreso de caja'}) async {
     if (activeShiftId == null) return false;
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
           .post(
             Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
@@ -2312,8 +2345,7 @@ class AppState extends ChangeNotifier {
       {String reason = 'Retiro de caja'}) async {
     if (activeShiftId == null) return false;
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
           .post(
             Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
@@ -2352,8 +2384,7 @@ class AppState extends ChangeNotifier {
   }) async {
     if (activeShiftId == null) return null;
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
           .post(
             Uri.parse('$baseUrl/cash-shifts/$activeShiftId/close'),
@@ -2388,8 +2419,7 @@ class AppState extends ChangeNotifier {
 
   Future<Map<String, dynamic>?> getCashShiftAuditReport(String shiftId) async {
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
           .get(Uri.parse('$baseUrl/reports/cash-shifts/$shiftId/audit'))
           .timeout(const Duration(seconds: 8));
@@ -2627,8 +2657,7 @@ class AppState extends ChangeNotifier {
 
     if (orderId != null) {
       try {
-        final String baseUrl = terminalApiUrl ??
-            configuredDefaultApiUrl;
+        final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
         await http
             .post(Uri.parse('$baseUrl/orders/$orderId/cancel'))
             .timeout(const Duration(seconds: 8));
@@ -2776,8 +2805,7 @@ class AppState extends ChangeNotifier {
     }
 
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
 
       var orderId = _activeOrderIdsByTableRemoteId[tableRemoteId!];
       if (orderId == null) {
@@ -2870,8 +2898,7 @@ class AppState extends ChangeNotifier {
     if (orderId == null) return;
 
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       await http
           .post(Uri.parse('$baseUrl/orders/$orderId/billing'))
           .timeout(const Duration(seconds: 10));
@@ -3428,8 +3455,7 @@ class AppState extends ChangeNotifier {
     bool forceCloseLocalOnSuccess = false,
   }) async {
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
           .post(
             Uri.parse('$baseUrl/orders/$orderId/payments'),
@@ -3527,8 +3553,7 @@ class AppState extends ChangeNotifier {
 
     final state = table.zone == 'Para Llevar' ? 'free' : 'cleaning';
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
           .patch(
             Uri.parse(
@@ -3573,8 +3598,7 @@ class AppState extends ChangeNotifier {
     }
 
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final String brId = terminalBranchId!;
 
       // Calculate next index
@@ -3662,8 +3686,7 @@ class AppState extends ChangeNotifier {
         isTerminalConfigured &&
         terminalBranchId != null) {
       try {
-        final String baseUrl = terminalApiUrl ??
-            configuredDefaultApiUrl;
+        final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
         final response = await http
             .patch(
               Uri.parse(
@@ -3728,8 +3751,7 @@ class AppState extends ChangeNotifier {
   ) async {
     if (!isTerminalConfigured) return false;
     try {
-      final String baseUrl = terminalApiUrl ??
-          configuredDefaultApiUrl;
+      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
           .patch(
             Uri.parse('$baseUrl/kitchen/tickets/$ticketId/status'),
@@ -3900,9 +3922,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  String get _printStationBaseUrl =>
-      terminalApiUrl ??
-      configuredDefaultApiUrl;
+  String get _printStationBaseUrl => terminalApiUrl ?? configuredDefaultApiUrl;
 
   String? get branchCashierPrintQueueId {
     final branchId = terminalBranchId;
@@ -4909,8 +4929,7 @@ class AppState extends ChangeNotifier {
       return false; // Leave in queue until socket ack arrives
     }
 
-    final baseUrl = terminalApiUrl ??
-        configuredDefaultApiUrl;
+    final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
     try {
       final response = await http
           .post(
@@ -4949,8 +4968,7 @@ class AppState extends ChangeNotifier {
     final rawList = await _secureStorageService.getPendingRequisitions();
     if (rawList.isEmpty) return true;
 
-    final String baseUrl = terminalApiUrl ??
-        configuredDefaultApiUrl;
+    final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
     final token = currentJwtToken ?? await _secureStorageService.getJwtToken();
 
     final headers = <String, String>{
@@ -5003,15 +5021,18 @@ class AppState extends ChangeNotifier {
             .timeout(const Duration(seconds: 8));
 
         if (response.statusCode >= 200 && response.statusCode < 300) {
+          final responseData =
+              jsonDecode(response.body) as Map<String, dynamic>;
           final updatedReq = LocalBranchRequisition(
             id: req.id,
             fromBranchId: req.fromBranchId,
             toWarehouseId: req.toWarehouseId,
-            status: req.status,
+            status: responseData['status']?.toString() ?? req.status,
             notes: req.notes,
             createdAt: req.createdAt,
             syncState: 'synced',
             items: req.items,
+            itemCount: req.itemCount,
           );
           remainingList.add(updatedReq.toMap());
         } else {
@@ -5027,6 +5048,7 @@ class AppState extends ChangeNotifier {
             createdAt: req.createdAt,
             syncState: 'failed',
             items: req.items,
+            itemCount: req.itemCount,
           );
           remainingList.add(failedReq.toMap());
         }
@@ -5042,14 +5064,100 @@ class AppState extends ChangeNotifier {
           createdAt: req.createdAt,
           syncState: 'failed',
           items: req.items,
+          itemCount: req.itemCount,
         );
         remainingList.add(failedReq.toMap());
       }
     }
 
-    await _secureStorageService.savePendingRequisitions(remainingList);
+    final mergedList = await _mergeRemoteBranchRequisitions(
+      localRequisitions: remainingList,
+      baseUrl: baseUrl,
+      headers: headers,
+    );
+
+    await _secureStorageService.savePendingRequisitions(mergedList);
     notifyListeners();
     return allSynced;
+  }
+
+  Future<List<Map<String, dynamic>>> _mergeRemoteBranchRequisitions({
+    required List<Map<String, dynamic>> localRequisitions,
+    required String baseUrl,
+    required Map<String, String> headers,
+  }) async {
+    final branchId = terminalBranchId;
+    final businessId = terminalBusinessId;
+    if (branchId == null || branchId.isEmpty) {
+      return localRequisitions;
+    }
+
+    final uri = Uri.parse('$baseUrl/requisitions/branch/$branchId').replace(
+      queryParameters: businessId != null && businessId.isNotEmpty
+          ? {'businessId': businessId}
+          : null,
+    );
+
+    try {
+      final response = await http
+          .get(uri, headers: headers)
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint(
+            'Failed to fetch branch requisitions: ${response.statusCode} ${response.body}');
+        return localRequisitions;
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! List) return localRequisitions;
+
+      final localById = <String, Map<String, dynamic>>{};
+      for (final map in localRequisitions) {
+        final id = map['id']?.toString();
+        if (id != null && id.isNotEmpty) {
+          localById[id] = map;
+        }
+      }
+
+      for (final item in decoded.whereType<Map>()) {
+        final remote = Map<String, dynamic>.from(item);
+        final id = remote['id']?.toString();
+        if (id == null || id.isEmpty) continue;
+
+        final local = localById[id];
+        final localItems = local?['items'] is List ? local!['items'] : const [];
+        final itemCount =
+            (remote['itemCount'] as num?)?.toInt() ?? localItems.length;
+
+        localById[id] = {
+          'id': id,
+          'fromBranchId': remote['fromBranchId']?.toString() ??
+              local?['fromBranchId']?.toString() ??
+              branchId,
+          'toWarehouseId': remote['toWarehouseId']?.toString() ??
+              local?['toWarehouseId']?.toString() ??
+              '',
+          'status': remote['status']?.toString() ??
+              local?['status']?.toString() ??
+              'pending',
+          'notes': remote['notes']?.toString() == 'null'
+              ? null
+              : remote['notes'] ?? local?['notes'],
+          'createdAt': remote['createdAt']?.toString() ??
+              local?['createdAt']?.toString() ??
+              DateTime.now().toIso8601String(),
+          'syncState': 'synced',
+          'items': localItems,
+          'itemCount': itemCount,
+        };
+      }
+
+      return localById.values.toList();
+    } catch (e) {
+      debugPrint('Error fetching branch requisitions: $e');
+      return localRequisitions;
+    }
   }
 
   String _normalizePaymentMethod(String paymentMethod) {
@@ -5220,8 +5328,7 @@ class AppState extends ChangeNotifier {
   void _initWebSocket() {
     _socketService?.dispose();
 
-    final String baseUrl = terminalApiUrl ??
-        configuredDefaultApiUrl;
+    final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
     final token = currentJwtToken;
     final branchId = terminalBranchId;
     final roleStr = currentUserRole == UserRole.waiter

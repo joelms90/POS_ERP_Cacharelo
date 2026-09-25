@@ -1,4 +1,9 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Firestore, QueryDocumentSnapshot } from '@google-cloud/firestore';
 
 export interface Inquiry {
@@ -15,15 +20,21 @@ export interface Inquiry {
 
 @Injectable()
 export class InquiriesService {
-  private readonly db: Firestore;
+  private readonly db?: Firestore;
 
   constructor() {
-    this.db = new Firestore({
-      projectId: 'fresh-sensor-497515-d3',
-    });
+    if (this.gcpIntegrationsEnabled()) {
+      this.db = new Firestore({
+        projectId: 'fresh-sensor-497515-d3',
+      });
+    }
   }
 
   async findAll(status?: string): Promise<Inquiry[]> {
+    if (!this.db) {
+      return [];
+    }
+
     try {
       let query: any = this.db.collection('contact_inquiries');
 
@@ -63,11 +74,19 @@ export class InquiriesService {
       return inquiries;
     } catch (error) {
       console.error('Error fetching inquiries from Firestore:', error);
-      throw new InternalServerErrorException('No se pudieron obtener las consultas del servidor.');
+      throw new InternalServerErrorException(
+        'No se pudieron obtener las consultas del servidor.',
+      );
     }
   }
 
   async updateStatus(id: string, status: string): Promise<Inquiry> {
+    if (!this.db) {
+      throw new ServiceUnavailableException(
+        'Firestore inquiries are disabled for local development. Set ENABLE_GCP_INTEGRATIONS=true to enable them.',
+      );
+    }
+
     try {
       const docRef = this.db.collection('contact_inquiries').doc(id);
       const doc = await docRef.get();
@@ -108,7 +127,15 @@ export class InquiriesService {
         throw error;
       }
       console.error('Error updating inquiry status in Firestore:', error);
-      throw new InternalServerErrorException('No se pudo actualizar el estado de la consulta.');
+      throw new InternalServerErrorException(
+        'No se pudo actualizar el estado de la consulta.',
+      );
     }
+  }
+
+  private gcpIntegrationsEnabled() {
+    if (process.env.ENABLE_GCP_INTEGRATIONS === 'true') return true;
+    if (process.env.ENABLE_GCP_INTEGRATIONS === 'false') return false;
+    return process.env.NODE_ENV === 'production';
   }
 }

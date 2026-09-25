@@ -26,6 +26,7 @@
     "db:clean-all-sales": "ts-node src/database/clean-all-sales-history.ts",
     "db:query-tickets-hoy": "ts-node src/database/query-tickets-hoy.ts",
     "db:pull-prod": "./scripts/sync-db-from-prod.sh",
+    "db:import-excel": "tsx scripts/import-excel-inventories.ts",
     "migrate": "tsx scripts/run-migrations.ts"
   },
   "dependencies": {

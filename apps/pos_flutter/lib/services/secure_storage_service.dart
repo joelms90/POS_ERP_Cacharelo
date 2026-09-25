@@ -519,6 +519,25 @@ class SecureStorageService {
     await _delete('terminal_api_url');
   }
 
+  Future<void> clearLocalBranchData() async {
+    await clearTerminalConfig();
+    await clearCachedCredentials();
+    await clearJwtToken();
+    await clearSavedPrinter();
+    await _delete(_pendingSaleSyncJobsKey);
+    await _delete(_pendingOrderSyncJobsKey);
+    await _delete(_readyPickupOrdersKey);
+    await _delete(_ticketFiscalConfigKey);
+    await _delete(_pendingRequisitionsKey);
+    await _delete(_cachedIngredientsKey);
+    await _delete(_cachedWarehousesKey);
+    await _delete(_localStationIdKey);
+    await _delete(_lastPrintStationIdKey);
+    await _delete(_receiveRemotePrintJobsKey);
+    await _delete('recent_closed_sales_list');
+    await _delete('last_table_sync_checkpoint');
+  }
+
   Future<void> saveTicketFiscalConfig(Map<String, dynamic> config) async {
     await _write(_ticketFiscalConfigKey, jsonEncode(config));
   }

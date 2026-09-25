@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ProductsRepository } from './repositories/products.repository';
 import { CategoriesRepository } from './repositories/categories.repository';
 import { ProvidersRepository } from '../providers/repositories/providers.repository';
@@ -10,7 +15,10 @@ import { eq, and, isNull, desc } from 'drizzle-orm';
 import { read, utils } from 'xlsx';
 import { Storage } from '@google-cloud/storage';
 
-const ITEM_TYPE_FLAGS: Record<string, { isIngredient: boolean; isSellable: boolean }> = {
+const ITEM_TYPE_FLAGS: Record<
+  string,
+  { isIngredient: boolean; isSellable: boolean }
+> = {
   raw_material: { isIngredient: true, isSellable: false },
   wip: { isIngredient: false, isSellable: false },
   finished_good: { isIngredient: false, isSellable: true },
@@ -20,22 +28,39 @@ const ITEM_TYPE_FLAGS: Record<string, { isIngredient: boolean; isSellable: boole
 function normalizeItemType(value: string | undefined): string | undefined {
   const s = (value || '').trim().toLowerCase();
   const map: Record<string, string> = {
-    raw_material: 'raw_material', 'materia prima': 'raw_material', materia: 'raw_material',
-    insumo: 'raw_material', ingrediente: 'raw_material', 'raw material': 'raw_material',
-    wip: 'wip', 'producto en proceso': 'wip', 'en proceso': 'wip', 'producto en proceso (wip)': 'wip',
-    finished_good: 'finished_good', 'producto terminado': 'finished_good', terminado: 'finished_good',
+    raw_material: 'raw_material',
+    'materia prima': 'raw_material',
+    materia: 'raw_material',
+    insumo: 'raw_material',
+    ingrediente: 'raw_material',
+    'raw material': 'raw_material',
+    wip: 'wip',
+    'producto en proceso': 'wip',
+    'en proceso': 'wip',
+    'producto en proceso (wip)': 'wip',
+    finished_good: 'finished_good',
+    'producto terminado': 'finished_good',
+    terminado: 'finished_good',
     'finished good': 'finished_good',
-    service: 'service', servicio: 'service',
+    service: 'service',
+    servicio: 'service',
   };
   return s ? map[s] : undefined;
 }
 
-function normalizeProductionStrategy(value: string | undefined): string | undefined {
+function normalizeProductionStrategy(
+  value: string | undefined,
+): string | undefined {
   const s = (value || '').trim().toLowerCase();
   const map: Record<string, string> = {
-    none: 'none', ninguna: 'none', 'sin lógica automática': 'none', 'sin logica automatica': 'none',
+    none: 'none',
+    ninguna: 'none',
+    'sin lógica automática': 'none',
+    'sin logica automatica': 'none',
     backflush: 'backflush',
-    work_order: 'work_order', 'orden de trabajo': 'work_order', orden: 'work_order',
+    work_order: 'work_order',
+    'orden de trabajo': 'work_order',
+    orden: 'work_order',
     'orden de trabajo (producción por lotes)': 'work_order',
   };
   return s ? map[s] : undefined;
@@ -44,11 +69,48 @@ function normalizeProductionStrategy(value: string | undefined): string | undefi
 function normalizeUom(value: string | undefined): string | undefined {
   const s = (value || '').trim().toLowerCase();
   const map: Record<string, string> = {
-    piece: 'piece', pieza: 'piece', unidad: 'piece', pz: 'piece', 'pieza (unidad)': 'piece',
-    kg: 'kg', kilogramo: 'kg', kilos: 'kg', 'kilogramo (kg)': 'kg',
-    g: 'g', gramo: 'g', gramos: 'g', gr: 'g', 'gramo (g)': 'g',
-    l: 'l', litro: 'l', litros: 'l', lt: 'l', 'litro (l)': 'l',
-    ml: 'ml', mililitro: 'ml', mililitros: 'ml', 'mililitro (ml)': 'ml',
+    piece: 'piece',
+    pieza: 'piece',
+    piezas: 'piece',
+    unidad: 'piece',
+    unidades: 'piece',
+    pz: 'piece',
+    pzs: 'piece',
+    pza: 'piece',
+    pzas: 'piece',
+    'pieza (unidad)': 'piece',
+    kg: 'kg',
+    kilogramo: 'kg',
+    kilogramos: 'kg',
+    kilo: 'kg',
+    kilos: 'kg',
+    'kilogramo (kg)': 'kg',
+    g: 'g',
+    gramo: 'g',
+    gramos: 'g',
+    gr: 'g',
+    grs: 'g',
+    'gramo (g)': 'g',
+    pack: 'pack',
+    paquete: 'pack',
+    paquetes: 'pack',
+    paq: 'pack',
+    paqs: 'pack',
+    pq: 'pack',
+    pqt: 'pack',
+    pqte: 'pack',
+    'paquete (paq)': 'pack',
+    'paquete (pack)': 'pack',
+    l: 'l',
+    litro: 'l',
+    litros: 'l',
+    lt: 'l',
+    lts: 'l',
+    'litro (l)': 'l',
+    ml: 'ml',
+    mililitro: 'ml',
+    mililitros: 'ml',
+    'mililitro (ml)': 'ml',
   };
   return s ? map[s] : undefined;
 }
@@ -57,12 +119,14 @@ function resolveItemFlags(
   itemType: string | undefined,
   fallback: { isIngredient: boolean; isSellable: boolean },
 ): { isIngredient: boolean; isSellable: boolean } {
-  return itemType && ITEM_TYPE_FLAGS[itemType] ? ITEM_TYPE_FLAGS[itemType] : fallback;
+  return itemType && ITEM_TYPE_FLAGS[itemType]
+    ? ITEM_TYPE_FLAGS[itemType]
+    : fallback;
 }
 
 function resolveSaleType(uom: string | undefined, fallback: string): string {
   if (!uom) return fallback;
-  return uom === 'piece' ? 'pieza' : 'granel';
+  return uom === 'piece' || uom === 'pack' ? 'pieza' : 'granel';
 }
 
 @Injectable()
@@ -75,7 +139,10 @@ export class ProductsService {
   ) {}
 
   async findAll(businessId?: string, categoryId?: string, branchId?: string) {
-    const products = await this.productsRepository.findAll(businessId, categoryId);
+    const products = await this.productsRepository.findAll(
+      businessId,
+      categoryId,
+    );
 
     if (branchId && products.length > 0) {
       // Override isSellable using the per-branch catalog (branch_products)
@@ -110,15 +177,23 @@ export class ProductsService {
   }
 
   async create(createProductDto: CreateProductDto) {
-    const category = await this.categoriesRepository.findById(createProductDto.categoryId);
+    const category = await this.categoriesRepository.findById(
+      createProductDto.categoryId,
+    );
     if (!category) {
-      throw new NotFoundException(`Category with ID ${createProductDto.categoryId} not found`);
+      throw new NotFoundException(
+        `Category with ID ${createProductDto.categoryId} not found`,
+      );
     }
 
     if (createProductDto.providerId) {
-      const provider = await this.providersRepository.findById(createProductDto.providerId);
+      const provider = await this.providersRepository.findById(
+        createProductDto.providerId,
+      );
       if (!provider) {
-        throw new NotFoundException(`Provider with ID ${createProductDto.providerId} not found`);
+        throw new NotFoundException(
+          `Provider with ID ${createProductDto.providerId} not found`,
+        );
       }
     }
 
@@ -150,16 +225,24 @@ export class ProductsService {
     }
 
     if (updateProductDto.categoryId) {
-      const category = await this.categoriesRepository.findById(updateProductDto.categoryId);
+      const category = await this.categoriesRepository.findById(
+        updateProductDto.categoryId,
+      );
       if (!category) {
-        throw new NotFoundException(`Category with ID ${updateProductDto.categoryId} not found`);
+        throw new NotFoundException(
+          `Category with ID ${updateProductDto.categoryId} not found`,
+        );
       }
     }
 
     if (updateProductDto.providerId) {
-      const provider = await this.providersRepository.findById(updateProductDto.providerId);
+      const provider = await this.providersRepository.findById(
+        updateProductDto.providerId,
+      );
       if (!provider) {
-        throw new NotFoundException(`Provider with ID ${updateProductDto.providerId} not found`);
+        throw new NotFoundException(
+          `Provider with ID ${updateProductDto.providerId} not found`,
+        );
       }
     }
 
@@ -177,12 +260,12 @@ export class ProductsService {
 
   async validateImport(businessId: string, rows: any[]) {
     const db = this.productsRepository.getDb();
-    
+
     const dbCategories = await db
       .select()
       .from(schema.categories)
       .where(eq(schema.categories.businessId, businessId));
-      
+
     const dbProviders = await db
       .select()
       .from(schema.providers)
@@ -191,10 +274,13 @@ export class ProductsService {
     return rows.map((row, idx) => {
       const name = row['Nombre del Producto']?.toString().trim() || '';
       const catName = row['Categoría']?.toString().trim() || '';
-      
+
       const cleanNumber = (val: any): string => {
         if (val === undefined || val === null) return '0.00';
-        const cleaned = val.toString().trim().replace(/[$\s,]/g, '');
+        const cleaned = val
+          .toString()
+          .trim()
+          .replace(/[$\s,]/g, '');
         const parsed = parseFloat(cleaned);
         return isNaN(parsed) ? '0.00' : parsed.toString();
       };
@@ -204,9 +290,15 @@ export class ProductsService {
       const priceWholesale = cleanNumber(row['Precio Mayoreo']);
       const minStock = cleanNumber(row['Inv Mínimo']);
       const maxStock = cleanNumber(row['Inv Máximo']);
-      const saleType = (row['Tipo de Venta']?.toString().trim() || 'pieza').toLowerCase() === 'granel' ? 'granel' : 'pieza';
+      const saleType =
+        (row['Tipo de Venta']?.toString().trim() || 'pieza').toLowerCase() ===
+        'granel'
+          ? 'granel'
+          : 'pieza';
       const itemType = normalizeItemType(row['Tipo de Artículo']?.toString());
-      const productionStrategy = normalizeProductionStrategy(row['Estrategia de Producción']?.toString());
+      const productionStrategy = normalizeProductionStrategy(
+        row['Estrategia de Producción']?.toString(),
+      );
       const uom = normalizeUom(row['Unidad de Medida']?.toString());
       const sku = row['SKU']?.toString().trim() || '';
       const barcode = row['Código Barras']?.toString().trim() || '';
@@ -220,13 +312,18 @@ export class ProductsService {
       if (!name) errors.push('Falta el nombre del producto.');
       if (!catName) errors.push('Falta la categoría.');
 
-      const catExists = dbCategories.some(c => c && c.name && c.name.toLowerCase() === catName.toLowerCase());
+      const catExists = dbCategories.some(
+        (c) => c && c.name && c.name.toLowerCase() === catName.toLowerCase(),
+      );
       if (catName && !catExists) {
         warnings.push(`Creará nueva categoría: "${catName}"`);
       }
 
       if (providerName) {
-        const provExists = dbProviders.some(p => p && p.name && p.name.toLowerCase() === providerName.toLowerCase());
+        const provExists = dbProviders.some(
+          (p) =>
+            p && p.name && p.name.toLowerCase() === providerName.toLowerCase(),
+        );
         if (!provExists) {
           warnings.push(`Creará nuevo proveedor: "${providerName}"`);
         }
@@ -259,7 +356,7 @@ export class ProductsService {
 
   async bulkImport(businessId: string, rows: any[]) {
     const db = this.productsRepository.getDb();
-    
+
     return db.transaction(async (tx) => {
       let successCount = 0;
       let errorCount = 0;
@@ -268,12 +365,12 @@ export class ProductsService {
         .select()
         .from(schema.categories)
         .where(eq(schema.categories.businessId, businessId));
-        
+
       const providers = await tx
         .select()
         .from(schema.providers)
         .where(eq(schema.providers.businessId, businessId));
-        
+
       const warehouses = await tx
         .select()
         .from(schema.warehouses)
@@ -284,7 +381,9 @@ export class ProductsService {
 
         try {
           // 1. Resolve Category
-          let category = categories.find(c => c.name.toLowerCase() === row.catName.toLowerCase());
+          let category = categories.find(
+            (c) => c.name.toLowerCase() === row.catName.toLowerCase(),
+          );
           if (!category) {
             const [createdCat] = await tx
               .insert(schema.categories)
@@ -301,7 +400,9 @@ export class ProductsService {
           // 2. Resolve Provider
           let providerId: string | null = null;
           if (row.providerName) {
-            const provider = providers.find(p => p.name.toLowerCase() === row.providerName.toLowerCase());
+            const provider = providers.find(
+              (p) => p.name.toLowerCase() === row.providerName.toLowerCase(),
+            );
             if (provider) {
               providerId = provider.id;
             } else {
@@ -338,7 +439,8 @@ export class ProductsService {
               minStock: row.minStock || '0.000',
               maxStock: row.maxStock || '0.000',
               saleType: resolveSaleType(row.uom, row.saleType || 'pieza'),
-              itemType: row.itemType || (providerId ? 'raw_material' : 'finished_good'),
+              itemType:
+                row.itemType || (providerId ? 'raw_material' : 'finished_good'),
               productionStrategy: row.productionStrategy || 'none',
               uom: row.uom || 'piece',
               isSellable: flags.isSellable,
@@ -390,7 +492,7 @@ export class ProductsService {
     }
 
     const db = this.productsRepository.getDb();
-    
+
     // 1. Create a bulk import record
     const [importRecord] = await db
       .insert(schema.bulkImports)
@@ -405,15 +507,21 @@ export class ProductsService {
       .returning();
 
     // 2. Process file synchronously (awaiting) to prevent Cloud Run CPU throttling
-    await this.processBulkImportBackground(businessId, importRecord.id, file.buffer);
+    await this.processBulkImportBackground(
+      businessId,
+      importRecord.id,
+      file.buffer,
+    );
 
     // 3. Return the completed/failed import record
     return this.getBulkImportDetails(importRecord.id);
   }
 
   async getBulkUploadUrl(businessId: string, filename: string) {
+    this.assertGcpIntegrationsEnabled();
+
     const db = this.productsRepository.getDb();
-    
+
     // 1. Create a bulk import record
     const [importRecord] = await db
       .insert(schema.bulkImports)
@@ -445,9 +553,12 @@ export class ProductsService {
         },
       });
     } catch (e) {
-      console.warn(`Failed to set GCS lifecycle metadata on bucket ${bucketName}:`, e);
+      console.warn(
+        `Failed to set GCS lifecycle metadata on bucket ${bucketName}:`,
+        e,
+      );
     }
-    
+
     const [url] = await storage
       .bucket(bucketName)
       .file(gcsFileName)
@@ -455,7 +566,8 @@ export class ProductsService {
         version: 'v4',
         action: 'write',
         expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        contentType:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
 
     return {
@@ -465,10 +577,16 @@ export class ProductsService {
     };
   }
 
-  async processBulkImportGcs(businessId: string, importId: string, gcsFileName: string) {
+  async processBulkImportGcs(
+    businessId: string,
+    importId: string,
+    gcsFileName: string,
+  ) {
+    this.assertGcpIntegrationsEnabled();
+
     const storage = new Storage();
     const bucketName = 'bulk-uploads-fresh-sensor-497515-d3';
-    
+
     // 1. Download file from GCS
     const [fileBuffer] = await storage
       .bucket(bucketName)
@@ -504,47 +622,73 @@ export class ProductsService {
       .select()
       .from(schema.bulkImports)
       .where(eq(schema.bulkImports.id, id));
-      
+
     if (results.length === 0) {
-      throw new NotFoundException(`Importación masiva con ID ${id} no encontrada`);
+      throw new NotFoundException(
+        `Importación masiva con ID ${id} no encontrada`,
+      );
     }
     return results[0];
   }
 
-  async processBulkImportBackground(businessId: string, importId: string, buffer: Buffer) {
+  private assertGcpIntegrationsEnabled() {
+    if (process.env.ENABLE_GCP_INTEGRATIONS === 'true') return;
+    if (
+      process.env.ENABLE_GCP_INTEGRATIONS !== 'false' &&
+      process.env.NODE_ENV === 'production'
+    ) {
+      return;
+    }
+
+    throw new ServiceUnavailableException(
+      'GCS bulk upload is disabled for local development. Use direct bulk import or set ENABLE_GCP_INTEGRATIONS=true.',
+    );
+  }
+
+  async processBulkImportBackground(
+    businessId: string,
+    importId: string,
+    buffer: Buffer,
+  ) {
     const db = this.productsRepository.getDb();
 
     // Helper to find a value by key case-insensitively and diacritic-insensitively
     const normalizeKey = (str: string): string => {
       return str
         .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // remove accents
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // remove accents
         .replace(/\s+/g, ''); // remove spaces
     };
 
-    const getRowValue = (rowObj: Record<string, any>, targetKey: string): string => {
+    const getRowValue = (
+      rowObj: Record<string, any>,
+      targetKey: string,
+    ): string => {
       const keys = Object.keys(rowObj);
       const normTarget = normalizeKey(targetKey);
-      
+
       // 1. Exact normalized match
-      let foundKey = keys.find(k => normalizeKey(k) === normTarget);
-      
+      let foundKey = keys.find((k) => normalizeKey(k) === normTarget);
+
       // 2. Fuzzy prefix match fallback
       if (!foundKey) {
-        foundKey = keys.find(k => {
+        foundKey = keys.find((k) => {
           const normK = normalizeKey(k);
           return normK.startsWith(normTarget) || normTarget.startsWith(normK);
         });
       }
-      
+
       return foundKey ? rowObj[foundKey]?.toString().trim() || '' : '';
     };
 
     // Helper to clean numeric values
     const cleanNumber = (val: any): string => {
       if (val === undefined || val === null) return '0.00';
-      const cleaned = val.toString().trim().replace(/[$\s,]/g, '');
+      const cleaned = val
+        .toString()
+        .trim()
+        .replace(/[$\s,]/g, '');
       const parsed = parseFloat(cleaned);
       return isNaN(parsed) ? '0.00' : parsed.toString();
     };
@@ -560,10 +704,12 @@ export class ProductsService {
       if (!buffer || buffer.length < 100) {
         await db
           .update(schema.bulkImports)
-          .set({ 
-            status: 'failed', 
-            errorDetails: [{ error: 'El archivo subido está vacío, dañado o es inválido.' }],
-            updatedAt: new Date() 
+          .set({
+            status: 'failed',
+            errorDetails: [
+              { error: 'El archivo subido está vacío, dañado o es inválido.' },
+            ],
+            updatedAt: new Date(),
           })
           .where(eq(schema.bulkImports.id, importId));
         return;
@@ -574,15 +720,19 @@ export class ProductsService {
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
       recalculateSheetRange(worksheet);
-      const rows = utils.sheet_to_json<Record<string, any>>(worksheet, { defval: '' });
+      const rows = utils.sheet_to_json<Record<string, any>>(worksheet, {
+        defval: '',
+      });
 
       if (rows.length === 0) {
         await db
           .update(schema.bulkImports)
-          .set({ 
-            status: 'failed', 
-            errorDetails: [{ error: 'El archivo está vacío o no contiene filas de datos.' }],
-            updatedAt: new Date() 
+          .set({
+            status: 'failed',
+            errorDetails: [
+              { error: 'El archivo está vacío o no contiene filas de datos.' },
+            ],
+            updatedAt: new Date(),
           })
           .where(eq(schema.bulkImports.id, importId));
         return;
@@ -593,12 +743,12 @@ export class ProductsService {
         .select()
         .from(schema.categories)
         .where(eq(schema.categories.businessId, businessId));
-        
+
       const providers = await db
         .select()
         .from(schema.providers)
         .where(eq(schema.providers.businessId, businessId));
-        
+
       const warehouses = await db
         .select()
         .from(schema.warehouses)
@@ -609,20 +759,29 @@ export class ProductsService {
       const errorDetails: any[] = [];
 
       // 1. Initial Validation and Row Extraction
-      const validRows: { row: Record<string, any>; rowNumber: number; parsed: any }[] = [];
-      
+      const validRows: {
+        row: Record<string, any>;
+        rowNumber: number;
+        parsed: any;
+      }[] = [];
+
       for (let idx = 0; idx < rows.length; idx++) {
         const row = rows[idx];
         const rowNumber = idx + 2; // header is row 1
 
         // Extract product ID if present (for UPSERT)
         const productId = getRowValue(row, 'ID');
-        const name = getRowValue(row, 'Nombre del Producto') || getRowValue(row, 'Nombre');
-        const catName = getRowValue(row, 'Categoría') || getRowValue(row, 'Categoria');
-        
+        const name =
+          getRowValue(row, 'Nombre del Producto') || getRowValue(row, 'Nombre');
+        const catName =
+          getRowValue(row, 'Categoría') || getRowValue(row, 'Categoria');
+
         if (!name) {
           errorCount++;
-          errorDetails.push({ rowNumber, error: 'Falta el nombre del producto.' });
+          errorDetails.push({
+            rowNumber,
+            error: 'Falta el nombre del producto.',
+          });
           continue;
         }
         if (!catName) {
@@ -630,25 +789,72 @@ export class ProductsService {
           errorDetails.push({ rowNumber, error: 'Falta la categoría.' });
           continue;
         }
-        
+
         const cost = cleanNumber(getRowValue(row, 'Costo'));
-        const price = cleanNumber(getRowValue(row, 'Precio Venta') || getRowValue(row, 'Precio'));
-        const priceWholesale = cleanNumber(getRowValue(row, 'Precio Mayoreo') || getRowValue(row, 'Mayoreo'));
-        const minStock = cleanNumber(getRowValue(row, 'Inv Mínimo') || getRowValue(row, 'Minimo') || getRowValue(row, 'Stock Minimo'));
-        const maxStock = cleanNumber(getRowValue(row, 'Inv Máximo') || getRowValue(row, 'Maximo') || getRowValue(row, 'Stock Maximo'));
-        const saleType = (getRowValue(row, 'Tipo de Venta') || 'pieza').toLowerCase() === 'granel' ? 'granel' : 'pieza';
-        const itemType = normalizeItemType(getRowValue(row, 'Tipo de Artículo') || getRowValue(row, 'Tipo de Articulo'));
-        const productionStrategy = normalizeProductionStrategy(getRowValue(row, 'Estrategia de Producción') || getRowValue(row, 'Estrategia de Produccion'));
-        const uom = normalizeUom(getRowValue(row, 'Unidad de Medida') || getRowValue(row, 'Unidad Medida'));
+        const price = cleanNumber(
+          getRowValue(row, 'Precio Venta') || getRowValue(row, 'Precio'),
+        );
+        const priceWholesale = cleanNumber(
+          getRowValue(row, 'Precio Mayoreo') || getRowValue(row, 'Mayoreo'),
+        );
+        const minStock = cleanNumber(
+          getRowValue(row, 'Inv Mínimo') ||
+            getRowValue(row, 'Minimo') ||
+            getRowValue(row, 'Stock Minimo'),
+        );
+        const maxStock = cleanNumber(
+          getRowValue(row, 'Inv Máximo') ||
+            getRowValue(row, 'Maximo') ||
+            getRowValue(row, 'Stock Maximo'),
+        );
+        const saleType =
+          (getRowValue(row, 'Tipo de Venta') || 'pieza').toLowerCase() ===
+          'granel'
+            ? 'granel'
+            : 'pieza';
+        const itemType = normalizeItemType(
+          getRowValue(row, 'Tipo de Artículo') ||
+            getRowValue(row, 'Tipo de Articulo'),
+        );
+        const productionStrategy = normalizeProductionStrategy(
+          getRowValue(row, 'Estrategia de Producción') ||
+            getRowValue(row, 'Estrategia de Produccion'),
+        );
+        const uom = normalizeUom(
+          getRowValue(row, 'Unidad de Medida') ||
+            getRowValue(row, 'Unidad Medida'),
+        );
         const sku = getRowValue(row, 'SKU');
-        const barcode = getRowValue(row, 'Código Barras') || getRowValue(row, 'Codigo Barras') || getRowValue(row, 'Codigo de Barras') || getRowValue(row, 'Barcode');
-        const internalCode = getRowValue(row, 'Código Interno') || getRowValue(row, 'Codigo Interno') || getRowValue(row, 'Codigo');
-        const existence = parseFloat(cleanNumber(getRowValue(row, 'Existencia') || getRowValue(row, 'Existencias') || getRowValue(row, 'Cantidad') || getRowValue(row, 'Stock')));
-        const providerName = getRowValue(row, 'Proveedor') || getRowValue(row, 'Proveedores');
-        const paraVentaValue = getRowValue(row, 'Para Venta') || getRowValue(row, 'Venta') || getRowValue(row, 'Es Venta');
-        const paraVentaStr = paraVentaValue ? paraVentaValue.toString().toLowerCase().trim() : '';
-        const paraVenta = ['si', 's', 'yes', 'y', 'true', '1'].includes(paraVentaStr);
-        
+        const barcode =
+          getRowValue(row, 'Código Barras') ||
+          getRowValue(row, 'Codigo Barras') ||
+          getRowValue(row, 'Codigo de Barras') ||
+          getRowValue(row, 'Barcode');
+        const internalCode =
+          getRowValue(row, 'Código Interno') ||
+          getRowValue(row, 'Codigo Interno') ||
+          getRowValue(row, 'Codigo');
+        const existence = parseFloat(
+          cleanNumber(
+            getRowValue(row, 'Existencia') ||
+              getRowValue(row, 'Existencias') ||
+              getRowValue(row, 'Cantidad') ||
+              getRowValue(row, 'Stock'),
+          ),
+        );
+        const providerName =
+          getRowValue(row, 'Proveedor') || getRowValue(row, 'Proveedores');
+        const paraVentaValue =
+          getRowValue(row, 'Para Venta') ||
+          getRowValue(row, 'Venta') ||
+          getRowValue(row, 'Es Venta');
+        const paraVentaStr = paraVentaValue
+          ? paraVentaValue.toString().toLowerCase().trim()
+          : '';
+        const paraVenta = ['si', 's', 'yes', 'y', 'true', '1'].includes(
+          paraVentaStr,
+        );
+
         validRows.push({
           row,
           rowNumber,
@@ -671,7 +877,7 @@ export class ProductsService {
             existence,
             providerName,
             paraVenta,
-          }
+          },
         });
       }
 
@@ -679,17 +885,27 @@ export class ProductsService {
       if (validRows.length > 0) {
         await db.transaction(async (tx) => {
           // A. Insert missing categories in bulk
-          const uniqueCatNames = Array.from(new Set(validRows.map(vr => vr.parsed.catName)));
+          const uniqueCatNames = Array.from(
+            new Set(validRows.map((vr) => vr.parsed.catName)),
+          );
           const newCatsToInsert = uniqueCatNames
-            .filter(name => !categories.some(c => c.name.toLowerCase() === name.toLowerCase()))
-            .map(name => ({
+            .filter(
+              (name) =>
+                !categories.some(
+                  (c) => c.name.toLowerCase() === name.toLowerCase(),
+                ),
+            )
+            .map((name) => ({
               name,
               description: 'Creada por importación masiva',
               businessId,
             }));
-            
+
           if (newCatsToInsert.length > 0) {
-            const insertedCats = await tx.insert(schema.categories).values(newCatsToInsert).returning();
+            const insertedCats = await tx
+              .insert(schema.categories)
+              .values(newCatsToInsert)
+              .returning();
             categories.push(...insertedCats);
           }
 
@@ -697,19 +913,30 @@ export class ProductsService {
           const uniqueProvNames = Array.from(
             new Set(
               validRows
-                .map(vr => vr.parsed.providerName)
-                .filter((name): name is string => typeof name === 'string' && name.trim().length > 0)
-            )
+                .map((vr) => vr.parsed.providerName)
+                .filter(
+                  (name): name is string =>
+                    typeof name === 'string' && name.trim().length > 0,
+                ),
+            ),
           );
           const newProvsToInsert = uniqueProvNames
-            .filter(name => !providers.some(p => p.name.toLowerCase() === name.toLowerCase()))
-            .map(name => ({
+            .filter(
+              (name) =>
+                !providers.some(
+                  (p) => p.name.toLowerCase() === name.toLowerCase(),
+                ),
+            )
+            .map((name) => ({
               name,
               businessId,
             }));
-            
+
           if (newProvsToInsert.length > 0) {
-            const insertedProvs = await tx.insert(schema.providers).values(newProvsToInsert).returning();
+            const insertedProvs = await tx
+              .insert(schema.providers)
+              .values(newProvsToInsert)
+              .returning();
             providers.push(...insertedProvs);
           }
 
@@ -719,8 +946,15 @@ export class ProductsService {
 
           for (const vr of validRows) {
             const p = vr.parsed;
-            const category = categories.find(c => c.name.toLowerCase() === p.catName.toLowerCase())!;
-            const provider = p.providerName ? providers.find(prov => prov.name.toLowerCase() === p.providerName.toLowerCase()) : null;
+            const category = categories.find(
+              (c) => c.name.toLowerCase() === p.catName.toLowerCase(),
+            )!;
+            const provider = p.providerName
+              ? providers.find(
+                  (prov) =>
+                    prov.name.toLowerCase() === p.providerName.toLowerCase(),
+                )
+              : null;
             const providerId = provider ? provider.id : null;
 
             const flags = resolveItemFlags(p.itemType, {
@@ -741,7 +975,8 @@ export class ProductsService {
               minStock: p.minStock,
               maxStock: p.maxStock,
               saleType: resolveSaleType(p.uom, p.saleType),
-              itemType: p.itemType || (p.paraVenta ? 'finished_good' : 'raw_material'),
+              itemType:
+                p.itemType || (p.paraVenta ? 'finished_good' : 'raw_material'),
               productionStrategy: p.productionStrategy || 'none',
               uom: p.uom || 'piece',
               isSellable: flags.isSellable,
@@ -758,11 +993,13 @@ export class ProductsService {
               existingProduct = await tx
                 .select()
                 .from(schema.products)
-                .where(and(
-                  eq(schema.products.id, p.productId),
-                  eq(schema.products.businessId, businessId),
-                  isNull(schema.products.deletedAt)
-                ))
+                .where(
+                  and(
+                    eq(schema.products.id, p.productId),
+                    eq(schema.products.businessId, businessId),
+                    isNull(schema.products.deletedAt),
+                  ),
+                )
                 .limit(1);
             }
 
@@ -772,11 +1009,13 @@ export class ProductsService {
                 existingProduct = await tx
                   .select()
                   .from(schema.products)
-                  .where(and(
-                    eq(schema.products.businessId, businessId),
-                    eq(schema.products.internalCode, p.internalCode),
-                    isNull(schema.products.deletedAt)
-                  ))
+                  .where(
+                    and(
+                      eq(schema.products.businessId, businessId),
+                      eq(schema.products.internalCode, p.internalCode),
+                      isNull(schema.products.deletedAt),
+                    ),
+                  )
                   .limit(1);
               }
             }
@@ -787,11 +1026,13 @@ export class ProductsService {
                 existingProduct = await tx
                   .select()
                   .from(schema.products)
-                  .where(and(
-                    eq(schema.products.businessId, businessId),
-                    eq(schema.products.sku, p.sku),
-                    isNull(schema.products.deletedAt)
-                  ))
+                  .where(
+                    and(
+                      eq(schema.products.businessId, businessId),
+                      eq(schema.products.sku, p.sku),
+                      isNull(schema.products.deletedAt),
+                    ),
+                  )
                   .limit(1);
               }
             }
@@ -801,11 +1042,13 @@ export class ProductsService {
               existingProduct = await tx
                 .select()
                 .from(schema.products)
-                .where(and(
-                  eq(schema.products.businessId, businessId),
-                  eq(schema.products.name, p.name),
-                  isNull(schema.products.deletedAt)
-                ))
+                .where(
+                  and(
+                    eq(schema.products.businessId, businessId),
+                    eq(schema.products.name, p.name),
+                    isNull(schema.products.deletedAt),
+                  ),
+                )
                 .limit(1);
             }
 
@@ -832,7 +1075,7 @@ export class ProductsService {
 
           // D. Upsert stock levels for products with existence > 0
           let targetWh = warehouses[0];
-          if (validRows.some(vr => vr.parsed.existence > 0)) {
+          if (validRows.some((vr) => vr.parsed.existence > 0)) {
             if (!targetWh) {
               const [createdWh] = await tx
                 .insert(schema.warehouses)
@@ -888,7 +1131,6 @@ export class ProductsService {
           updatedAt: new Date(),
         })
         .where(eq(schema.bulkImports.id, importId));
-
     } catch (err: any) {
       console.error('Error processing bulk import background task:', err);
       try {
@@ -896,7 +1138,9 @@ export class ProductsService {
           .update(schema.bulkImports)
           .set({
             status: 'failed',
-            errorDetails: [{ error: 'Error interno de procesamiento: ' + err.message }],
+            errorDetails: [
+              { error: 'Error interno de procesamiento: ' + err.message },
+            ],
             updatedAt: new Date(),
           })
           .where(eq(schema.bulkImports.id, importId));
@@ -932,16 +1176,16 @@ function recalculateSheetRange(sheet: any) {
 
   for (const key in sheet) {
     if (key.startsWith('!')) continue;
-    
+
     const match = key.match(/^([A-Z]+)([0-9]+)$/);
     if (!match) continue;
-    
+
     const colStr = match[1];
     const rowStr = match[2];
-    
+
     const col = colLetterToIndex(colStr);
     const row = parseInt(rowStr, 10);
-    
+
     if (col < minCol) minCol = col;
     if (col > maxCol) maxCol = col;
     if (row < minRow) minRow = row;

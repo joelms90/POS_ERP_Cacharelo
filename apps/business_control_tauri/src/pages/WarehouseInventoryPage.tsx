@@ -35,6 +35,14 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
 
 const BULK_UOMS = ['kg', 'g', 'l', 'ml'];
 const decimals = (uom?: string) => (uom && BULK_UOMS.includes(uom) ? 3 : 0);
+const UOM_LABELS: Record<string, string> = {
+  piece: 'pza',
+  pack: 'paq',
+  kg: 'kg',
+  g: 'g',
+  l: 'l',
+  ml: 'ml',
+};
 
 type LocationType = 'warehouse' | 'factory' | 'branch' | 'transit';
 type TypeFilter = 'all' | 'warehouse' | 'factory' | 'branch';
@@ -367,7 +375,7 @@ export const WarehouseInventoryPage: React.FC<WarehouseInventoryPageProps> = ({ 
                       <td className="px-6 py-4 text-text-primary text-xs">{r.warehouseName || r.branchName || '—'}</td>
                       <td className="px-6 py-4 text-xs">{typeBadge(effectiveType(r))}</td>
                       <td className="px-6 py-4 text-right font-mono font-semibold text-champagne-gold text-xs">
-                        {parseFloat(r.quantity || '0').toFixed(decimals(r.uom))} <span className="text-text-secondary text-[10px]">{r.uom || ''}</span>
+                        {parseFloat(r.quantity || '0').toFixed(decimals(r.uom))} <span className="text-text-secondary text-[10px]">{UOM_LABELS[r.uom || ''] || r.uom || ''}</span>
                       </td>
                       {whId ? (
                         <>

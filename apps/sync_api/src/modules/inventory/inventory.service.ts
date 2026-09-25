@@ -494,6 +494,7 @@ export class InventoryService {
         productName: schema.products.name,
         itemType: schema.products.itemType,
         providerId: schema.products.providerId,
+        uom: schema.products.uom,
       })
       .from(schema.stockTransferItems)
       .innerJoin(schema.products, eq(schema.stockTransferItems.productId, schema.products.id))

@@ -25,6 +25,7 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
 
 const UOM_LABELS: Record<string, string> = {
   piece: 'pza',
+  pack: 'paq',
   kg: 'kg',
   g: 'g',
   l: 'l',

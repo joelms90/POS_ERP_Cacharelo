@@ -40,15 +40,18 @@ class _RequisitionsScreenState extends State<RequisitionsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadRequisitions();
+    _syncAndLoadRequisitions();
   }
 
   Future<void> _loadRequisitions() async {
     setState(() => _loading = true);
     try {
-      final rawList = await widget.state.secureStorageService.getPendingRequisitions();
+      final rawList =
+          await widget.state.secureStorageService.getPendingRequisitions();
       setState(() {
-        _requisitions = rawList.map((m) => LocalBranchRequisition.fromMap(m)).toList()
+        _requisitions = rawList
+            .map((m) => LocalBranchRequisition.fromMap(m))
+            .toList()
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       });
     } catch (e) {
@@ -56,6 +59,11 @@ class _RequisitionsScreenState extends State<RequisitionsScreen> {
     } finally {
       setState(() => _loading = false);
     }
+  }
+
+  Future<void> _syncAndLoadRequisitions() async {
+    await widget.state.syncPendingRequisitions();
+    await _loadRequisitions();
   }
 
   void _navigateToCreate() async {
@@ -66,7 +74,7 @@ class _RequisitionsScreenState extends State<RequisitionsScreen> {
       ),
     );
     if (result == true) {
-      _loadRequisitions();
+      await _syncAndLoadRequisitions();
     }
   }
 
@@ -77,7 +85,11 @@ class _RequisitionsScreenState extends State<RequisitionsScreen> {
       case 'rejected':
         return EmpireColors.errorRed;
       case 'standby':
+      case 'pending':
+      case 'pending_approval':
         return EmpireColors.warningOrange;
+      case 'completed':
+        return EmpireColors.champagneGold;
       default:
         return EmpireColors.textSecondary;
     }
@@ -89,8 +101,11 @@ class _RequisitionsScreenState extends State<RequisitionsScreen> {
         return 'Aprobada';
       case 'rejected':
         return 'Rechazada';
+      case 'completed':
+        return 'Completada';
       case 'standby':
         return 'En Espera';
+      case 'pending':
       case 'pending_approval':
       default:
         return 'Pendiente';
@@ -103,7 +118,8 @@ class _RequisitionsScreenState extends State<RequisitionsScreen> {
       backgroundColor: EmpireColors.obsidian,
       body: _loading
           ? const Center(
-              child: CircularProgressIndicator(color: EmpireColors.champagneGold),
+              child:
+                  CircularProgressIndicator(color: EmpireColors.champagneGold),
             )
           : _requisitions.isEmpty
               ? Center(
@@ -139,7 +155,7 @@ class _RequisitionsScreenState extends State<RequisitionsScreen> {
                     final req = _requisitions[index];
                     final dateStr =
                         '${req.createdAt.day}/${req.createdAt.month}/${req.createdAt.year} ${req.createdAt.hour.toString().padLeft(2, '0')}:${req.createdAt.minute.toString().padLeft(2, '0')}';
-                    
+
                     return Card(
                       color: EmpireColors.onyxSurface,
                       shape: RoundedRectangleBorder(
@@ -172,10 +188,12 @@ class _RequisitionsScreenState extends State<RequisitionsScreen> {
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: _getStatusColor(req.status).withOpacity(0.15),
+                                    color: _getStatusColor(req.status)
+                                        .withOpacity(0.15),
                                     borderRadius: BorderRadius.circular(4),
                                     border: Border.all(
-                                      color: _getStatusColor(req.status).withOpacity(0.4),
+                                      color: _getStatusColor(req.status)
+                                          .withOpacity(0.4),
                                     ),
                                   ),
                                   child: Text(
@@ -215,7 +233,7 @@ class _RequisitionsScreenState extends State<RequisitionsScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  '${req.items.length} Insumos solicitados',
+                                  '${req.itemCount} Insumos solicitados',
                                   style: const TextStyle(
                                     color: EmpireColors.textSecondary,
                                     fontSize: 12,
@@ -274,7 +292,8 @@ class CreateRequisitionScreen extends StatefulWidget {
   const CreateRequisitionScreen({super.key, required this.state});
 
   @override
-  State<CreateRequisitionScreen> createState() => _CreateRequisitionScreenState();
+  State<CreateRequisitionScreen> createState() =>
+      _CreateRequisitionScreenState();
 }
 
 class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
@@ -294,7 +313,8 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
     if (widget.state.cachedIngredients.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No hay insumos/ingredientes disponibles. Por favor, sincronice.'),
+          content: Text(
+              'No hay insumos/ingredientes disponibles. Por favor, sincronice.'),
         ),
       );
       return;
@@ -316,7 +336,8 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
               ),
               title: const Text(
                 'Agregar Insumo',
-                style: TextStyle(color: EmpireColors.champagneGold, fontSize: 16),
+                style:
+                    TextStyle(color: EmpireColors.champagneGold, fontSize: 16),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -326,7 +347,8 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
                     value: localProductId,
                     decoration: const InputDecoration(
                       labelText: 'Seleccione Insumo',
-                      labelStyle: TextStyle(color: EmpireColors.textSecondary, fontSize: 13),
+                      labelStyle: TextStyle(
+                          color: EmpireColors.textSecondary, fontSize: 13),
                       enabledBorder: UnderlineInputBorder(
                         borderSide: BorderSide(color: EmpireColors.agedBronze),
                       ),
@@ -350,11 +372,13 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: qtyController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     style: const TextStyle(color: EmpireColors.textPrimary),
                     decoration: const InputDecoration(
                       labelText: 'Cantidad Solicitada',
-                      labelStyle: TextStyle(color: EmpireColors.textSecondary, fontSize: 13),
+                      labelStyle: TextStyle(
+                          color: EmpireColors.textSecondary, fontSize: 13),
                       enabledBorder: UnderlineInputBorder(
                         borderSide: BorderSide(color: EmpireColors.agedBronze),
                       ),
@@ -365,24 +389,30 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+                  child: const Text('Cancelar',
+                      style: TextStyle(color: Colors.grey)),
                 ),
                 TextButton(
                   onPressed: () {
                     final qty = double.tryParse(qtyController.text) ?? 0.0;
                     if (qty <= 0.0) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Ingrese una cantidad válida mayor a 0')),
+                        const SnackBar(
+                            content:
+                                Text('Ingrese una cantidad válida mayor a 0')),
                       );
                       return;
                     }
-                    final prod = widget.state.cachedIngredients.firstWhere((p) => p['id'] == localProductId);
-                    
+                    final prod = widget.state.cachedIngredients
+                        .firstWhere((p) => p['id'] == localProductId);
+
                     // Check if already added
-                    final alreadyIndex = _selectedItems.indexWhere((i) => i['productId'] == localProductId);
+                    final alreadyIndex = _selectedItems
+                        .indexWhere((i) => i['productId'] == localProductId);
                     setState(() {
                       if (alreadyIndex != -1) {
-                        _selectedItems[alreadyIndex]['quantityRequested'] += qty;
+                        _selectedItems[alreadyIndex]['quantityRequested'] +=
+                            qty;
                       } else {
                         _selectedItems.add({
                           'productId': localProductId,
@@ -393,7 +423,8 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
                     });
                     Navigator.pop(context);
                   },
-                  child: const Text('Agregar', style: TextStyle(color: EmpireColors.champagneGold)),
+                  child: const Text('Agregar',
+                      style: TextStyle(color: EmpireColors.champagneGold)),
                 ),
               ],
             );
@@ -406,7 +437,8 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
   void _saveRequisition() async {
     if (widget.state.terminalBranchId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('La terminal no tiene una sucursal configurada')),
+        const SnackBar(
+            content: Text('La terminal no tiene una sucursal configurada')),
       );
       return;
     }
@@ -418,7 +450,8 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
     }
     if (_selectedItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Agregue al menos un insumo a la requisición')),
+        const SnackBar(
+            content: Text('Agregue al menos un insumo a la requisición')),
       );
       return;
     }
@@ -445,12 +478,14 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
     );
 
     try {
-      final existingRaw = await widget.state.secureStorageService.getPendingRequisitions();
+      final existingRaw =
+          await widget.state.secureStorageService.getPendingRequisitions();
       final updatedList = List<Map<String, dynamic>>.from(existingRaw);
       updatedList.add(requisition.toMap());
 
-      await widget.state.secureStorageService.savePendingRequisitions(updatedList);
-      
+      await widget.state.secureStorageService
+          .savePendingRequisitions(updatedList);
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Requisición guardada localmente')),
       );
@@ -468,7 +503,8 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
       backgroundColor: EmpireColors.obsidian,
       appBar: AppBar(
         backgroundColor: EmpireColors.champagneGold,
-        title: const Text('Nueva Requisición', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Nueva Requisición',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         foregroundColor: EmpireColors.obsidian,
       ),
       body: SingleChildScrollView(
@@ -491,7 +527,8 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
               decoration: BoxDecoration(
                 color: EmpireColors.onyxSurface,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: EmpireColors.agedBronze.withOpacity(0.5)),
+                border:
+                    Border.all(color: EmpireColors.agedBronze.withOpacity(0.5)),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
@@ -499,7 +536,8 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
                   value: _selectedWarehouseId,
                   isExpanded: true,
                   style: const TextStyle(color: EmpireColors.textPrimary),
-                  hint: const Text('Seleccionar bodega...', style: TextStyle(color: Colors.grey)),
+                  hint: const Text('Seleccionar bodega...',
+                      style: TextStyle(color: Colors.grey)),
                   items: widget.state.cachedWarehouses.map((wh) {
                     return DropdownMenuItem<String>(
                       value: wh['id'],
@@ -530,10 +568,12 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
                 ),
                 TextButton.icon(
                   onPressed: _showAddProductDialog,
-                  icon: const Icon(Icons.add, color: EmpireColors.champagneGold, size: 18),
+                  icon: const Icon(Icons.add,
+                      color: EmpireColors.champagneGold, size: 18),
                   label: const Text(
                     'Agregar',
-                    style: TextStyle(color: EmpireColors.champagneGold, fontSize: 13),
+                    style: TextStyle(
+                        color: EmpireColors.champagneGold, fontSize: 13),
                   ),
                 ),
               ],
@@ -565,14 +605,15 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: _selectedItems.length,
-                      separatorBuilder: (context, index) =>
-                          const Divider(color: EmpireColors.charcoalSurface, height: 1),
+                      separatorBuilder: (context, index) => const Divider(
+                          color: EmpireColors.charcoalSurface, height: 1),
                       itemBuilder: (context, index) {
                         final item = _selectedItems[index];
                         return ListTile(
                           title: Text(
                             item['name'],
-                            style: const TextStyle(color: EmpireColors.textPrimary, fontSize: 13),
+                            style: const TextStyle(
+                                color: EmpireColors.textPrimary, fontSize: 13),
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -587,7 +628,8 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
                               ),
                               const SizedBox(width: 12),
                               IconButton(
-                                icon: const Icon(Icons.delete_outline, color: EmpireColors.errorRed),
+                                icon: const Icon(Icons.delete_outline,
+                                    color: EmpireColors.errorRed),
                                 onPressed: () {
                                   setState(() {
                                     _selectedItems.removeAt(index);
@@ -615,19 +657,23 @@ class _CreateRequisitionScreenState extends State<CreateRequisitionScreen> {
             TextField(
               controller: _notesController,
               maxLines: 3,
-              style: const TextStyle(color: EmpireColors.textPrimary, fontSize: 13),
+              style: const TextStyle(
+                  color: EmpireColors.textPrimary, fontSize: 13),
               decoration: InputDecoration(
                 filled: true,
                 fillColor: EmpireColors.onyxSurface,
-                hintText: 'Ingrese observaciones adicionales sobre este pedido...',
+                hintText:
+                    'Ingrese observaciones adicionales sobre este pedido...',
                 hintStyle: const TextStyle(color: Colors.grey, fontSize: 12),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: EmpireColors.agedBronze.withOpacity(0.5)),
+                  borderSide: BorderSide(
+                      color: EmpireColors.agedBronze.withOpacity(0.5)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: EmpireColors.champagneGold),
+                  borderSide:
+                      const BorderSide(color: EmpireColors.champagneGold),
                 ),
               ),
             ),
