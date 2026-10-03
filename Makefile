@@ -859,8 +859,8 @@ flutter-web-dev-prod:
 	cd apps/pos_flutter && flutter run -d chrome --dart-define=API_URL=https://pos-sync-api-232144991863.us-central1.run.app/api
 
 flutter-web-dev-local:
-	@echo "Starting Flutter POS in Chrome connected to LOCAL backend (http://localhost:$(BACKEND_PORT)/api)..."
-	cd apps/pos_flutter && flutter run -d chrome --web-port=$(FLUTTER_WEB_PORT) --dart-define=API_URL=http://localhost:$(BACKEND_PORT)/api
+	@echo "Starting Flutter POS in Chrome at http://127.0.0.1:$(FLUTTER_WEB_PORT) connected to LOCAL backend (http://localhost:$(BACKEND_PORT)/api)..."
+	cd apps/pos_flutter && flutter run -d chrome --web-hostname=127.0.0.1 --web-port=$(FLUTTER_WEB_PORT) --dart-define=API_URL=http://localhost:$(BACKEND_PORT)/api
 
 flutter-web-serve:
 	@echo "Serving built web app locally on http://localhost:8000"
@@ -1118,6 +1118,12 @@ team-setup:
 
 team-clean:
 	@./scripts/agent-team.sh clean
+
+team-merge:
+	@./scripts/agent-team.sh merge $(FEATURE)
+
+team-logs:
+	@./scripts/agent-team.sh logs $(AGENT)
 
 # -----------------------------------------------------------------------------
 # Staging Environment (separate GCP project; see specs/014-staging-environment)
