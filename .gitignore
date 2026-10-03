@@ -25,5 +25,16 @@ dist/
 
 # Local generated files
 *.isar
-*.isar.lock
+# Multi-agent worktrees and logs
+.worktrees/
+.dev-logs/
+.dev-pids/
 
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+*.tfvars
+!*.tfvars.example
+!apps/sync_api/infra/envs/**/terraform.tfvars

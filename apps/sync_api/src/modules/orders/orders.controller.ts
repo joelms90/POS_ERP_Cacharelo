@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Param, Query, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
+import { OrdersAccessGuard } from './orders-access.guard';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { AddOrderItemsDto } from './dto/add-order-items.dto';
@@ -11,6 +12,7 @@ import { BRANCH_OPERATOR_ROLE, CASHIER_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE, S
 import { CancelOrderDto } from './dto/cancel-order.dto';
 
 @Controller('orders')
+@UseGuards(JwtAuthGuard, OrdersAccessGuard)
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 

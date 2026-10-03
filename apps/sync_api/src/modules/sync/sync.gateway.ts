@@ -1,3 +1,4 @@
+import { SyncAccessService } from './sync-access.service';
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -29,6 +30,7 @@ export class SyncGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
   constructor(
     private readonly jwtService: JwtService,
+    private readonly access: SyncAccessService,
     @Inject(forwardRef(() => SyncService))
     private readonly syncService: SyncService,
   ) {}
@@ -51,10 +53,12 @@ export class SyncGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       const secret = process.env.JWT_SECRET || 'dev_jwt_secret_key';
       const decoded = this.jwtService.verify(token, { secret });
 
+      await this.access.branch(decoded, branchId);
+
       // Save authenticated details on client
       client.user = decoded;
       client.branchId = branchId;
-      client.role = role;
+      client.role = decoded.role;
 
       // Register client in branch room
       if (!this.activeClients.has(branchId)) {
@@ -263,8 +267,9 @@ export class SyncGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         pushDto = payload;
       }
 
-      // Execute logic through the unmodified SyncService.push()
-      await this.syncService.push(pushDto);
+      await this.access.branch(client.user, client.branchId);
+      // Apply the same authorization as HTTP sync.
+      await this.syncService.push(pushDto, client.user);
 
       // Send ACK back to sender
       client.send(
@@ -307,6 +312,8 @@ export class SyncGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         return;
       }
 
+      await this.access.branch(client.user, branchId);
+      if (parsedData.branchId && parsedData.branchId !== branchId) throw new Error("Forbidden branch");
       // Query from changeLog for this sucursal since timestamp
       const changes = await this.syncService.getChangeLogSince(branchId, desde);
 

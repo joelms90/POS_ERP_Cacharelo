@@ -22,6 +22,7 @@ describe('InventoryService - Average Cost Recalculation', () => {
         innerJoin: jest.fn().mockImplementation(() => recordCall('innerJoin')),
         where: jest.fn().mockImplementation(() => recordCall('where')),
         limit: jest.fn().mockImplementation(() => recordCall('limit')),
+        for: jest.fn().mockImplementation(() => recordCall('for')),
         update: jest.fn().mockImplementation(() => recordCall('update')),
         set: jest.fn(function(data) {
           if (data && data.cost) {
@@ -257,6 +258,32 @@ describe('InventoryService - Average Cost Recalculation', () => {
 
       expect(result.success).toBe(true);
       expect(result.status).toBe('cancelled');
+    });
+  });
+
+  describe('transfer receipt stock conservation', () => {
+    it.each([0, 8, 10, 12])('clears transit exactly once when receiving %i of 10', async (received) => {
+      const mockDb = createMockDb([
+        [{ id: 'transfer', businessId: 'business', toBranchId: 'branch', status: 'in_transit' }],
+        [{ id: 'transit' }],
+        [{ id: 'item', productId: 'product', quantity: '10.000', unitCost: '10.00' }],
+        [],
+        [{ status: 'received' }],
+      ]);
+      mockInventoryRepository.getDb.mockReturnValue(mockDb);
+      await service.receiveTransfer('transfer', {
+        note: 'Synthetic discrepancy',
+        items: [{ productId: 'product', quantityReceived: received }],
+      }, { sub: 'operator', branchId: 'branch', roles: ['branch_operator'] });
+      const movements = mockLedgerService.applyMovement.mock.calls.map(call => call[1]);
+      const transitDelta = movements.filter(m => m.warehouseId === 'transit')
+        .reduce((sum, m) => sum + m.quantityDelta, 0);
+      const acceptedDelta = movements.filter(m => m.branchId === 'branch')
+        .reduce((sum, m) => sum + m.quantityDelta, 0);
+      expect(transitDelta).toBe(-10);
+      expect(acceptedDelta).toBe(received);
+      expect(movements.filter(m => m.eventType === 'transfer_shortage')
+        .reduce((sum, m) => sum + m.quantityDelta, 0)).toBe(received < 10 ? received - 10 : 0);
     });
   });
 });

@@ -1,93 +1,177 @@
 # Session Handoff
 
 **Date:** 2026-09-25
-**Branch:** `013-unify-roles`
-**Scope:** role unification, branch-operator workflows, and local POS/API troubleshooting.
+**Branch:** `013-unify-roles` (root) · `main` (`apps/pos_flutter` nested repo)
+**Scope:** staging environment (Terraform + GCP), branch-operator order queueing
+(Cobrar / GUARDAR ORDEN), local dev tooling fixes, and a production deploy.
 
-## Current local environment
+---
 
-| Component | Address | State |
-|---|---|---|
-| Nest API | `http://localhost:3001/api` | Running against local `pos_dev` database |
-| Flutter POS web | `http://localhost:8081` | Running locally |
-| Local database | `pos_dev` | Receipt/cancellation audit migration applied locally |
+## 1. Staging environment — IN PROGRESS (blocked on billing)
 
-The Flutter client must use the local API in development. Do not point this local workflow at the production Cloud Run URL.
+**Goal:** isolated `staging` so daily changes never touch prod. Prod is untouched.
 
-## Completed work
+### Done
+- **GCP project created:** `cacharelo-staging` (number `433118108267`), org
+  `cacharelo.com` (`938616780977`); `desarrollo@cacharelo.com` is Owner.
+- **Firebase added**; Hosting sites created:
+  - `https://cacharelo-pos-staging.web.app`
+  - `https://cacharelo-central-staging.web.app`
+- **Terraform refactor** in `apps/sync_api/infra/`:
+  - `modules/sync-api/` — reusable module (Cloud Run v2, Cloud SQL, Secret Manager,
+    Artifact Registry, service account + IAM, optional GCS releases bucket).
+  - `envs/staging/` — remote state `gs://cacharelo-tfstate` prefix `sync-api/staging`.
+  - `bootstrap/` — creates the tfstate bucket once.
+  - Legacy prod root `main.tf`/`variables.tf`/`outputs.tf` marked
+    **PARKED / DO NOT APPLY**.
+- **Config:** `env/prod.env`, `env/staging.env` (`STAGING_PROJECT=cacharelo-staging`);
+  `firebase.staging.json` for admin + POS;
+  `apps/pos_flutter/web/descargas-staging.html` (PIN `2468`).
+- **Makefile:** staging targets added (`deploy-staging`, `backend-deploy-staging`,
+  `backend-migrate-staging`, `backend-status-staging`, `admin-deploy-staging`,
+  `flutter-web-deploy-staging`, `flutter-apk-build-staging`,
+  `flutter-apk-upload-staging`, `flutter-portal-deploy-staging`), infra targets
+  repointed to `envs/$(INFRA_ENV)`, plus `staging-guard` (refuses to run against prod).
+- **Validated:** `terraform fmt` clean, `terraform validate` OK (module + bootstrap),
+  Makefile dry-runs resolve.
 
-### Roles and permissions
+### BLOCKED
+Billing is **not linked** to `cacharelo-staging`. `desarrollo@cacharelo.com` lacks
+`billing.resourceAssociations.create` and `billing.accounts.setIamPolicy` on billing
+account `01DAEB-F69644-4D6FF0`. Cloud Run / Cloud SQL require billing.
 
-- Established canonical operational roles: `owner`, `branch_operator`, `warehouse_purchasing_operator`, `waiter`, `cashier`, and `kitchen`.
-- Legacy `encargado` and `responsable` roles normalize to `branch_operator`.
-- Added branch-scoped authorization for operator requisitions, inbound transfer receipts, daily sales reporting, and audited order cancellations.
+**Unblock (one of):**
+- Console: https://console.cloud.google.com/billing/linkedaccount?project=cacharelo-staging
+- Or: grant `roles/billing.user` to the account, then
+  `gcloud billing projects link cacharelo-staging --billing-account=01DAEB-F69644-4D6FF0`
 
-### Branch operator POS workflow
+### Next steps (after billing is linked)
+```bash
+make infra-bootstrap
+make infra-apply
+cd apps/sync_api/infra/envs/staging && terraform output -raw api_url   # → STAGING_API_URL in env/staging.env
+make backend-migrate-staging
+make deploy-staging
+make flutter-apk-upload-staging        # optional
+```
 
-- Requisitions no longer require choosing an origin warehouse.
-- Product selection is a searchable catalog by name, SKU, or internal code.
-- Draft lines can be edited or deleted; discard is confirmed before leaving the draft.
-- Requisitions screen shows only the logged-in operator's requisitions and supports status filtering.
-- Added `Recibir` for inbound transfers and `Resumen` for daily cash/card sales.
-- Receipt supports actual received quantities and a discrepancy note.
-- Order cancellation requires a reason and is audited server-side.
-- Offline reconciliation now fetches `/requisitions/mine`, so it does not merge other operators' requisitions into the current user’s list.
+### Staging risks / notes
+- `apps/sync_api/infra/terraform.tfvars` is **tracked in git** and may contain the
+  prod DB password → rotate it and `git rm --cached apps/sync_api/infra/terraform.tfvars`.
+  (Staging uses Secret Manager, so no secrets need committing.)
+- Do **not** run `terraform apply` from `apps/sync_api/infra/` (legacy prod root).
+- Terraform creates Cloud Run with a placeholder image and `ignore_changes` on the
+  image; `gcloud run deploy --source` delivers the app image afterward.
 
-### Backend compatibility and reliability
+---
 
-- Tablet login binds a shared user to the terminal's requested branch in the issued JWT. Users must log out and log in again to obtain the new branch-scoped token.
-- Requisition creation derives business, branch, and actor from the JWT. Legacy `businessId` and `fromBranchId` request fields are tolerated for compatibility but ignored.
-- Fixed the local database schema gap that caused 500 responses from active-orders and sync-pull endpoints.
-- Added receipt/cancellation audit fields through an idempotent local migration:
-  - `stock_transfers`: `received_by`, `received_at`, `receipt_note`
-  - `stock_transfer_items`: `quantity_received`
-  - `orders`: `cancellation_reason`, `cancelled_by`, `cancelled_at`
+## 2. Branch operator — multiple orders + Cobrar / GUARDAR ORDEN (done)
 
-## Current data check
+- Enabled the park/save action for `branchOperator` (was hidden via
+  `showPrepararButton: false`).
+- POS tab: **GUARDAR ORDEN** saves the cart as an active `Llevar #N` order, sends a
+  kitchen comanda, clears the cart. Shows an "Editando …" banner when editing.
+- Órdenes tab: **Editar** reopens a parked order into the POS cart (only new lines
+  re-print); **Cobrar** / **Cancelar** unchanged.
+- `AppState`: `editingOrderTableId` + `beginEditingOrder()` / `clearEditingOrder()` /
+  `editingOrder`.
+- Both Cobrar modals now show the product breakdown (qty, name, modifiers, notes,
+  line total, subtotal, discount preview, total a pagar).
+- Files: `app_state.dart`, `encargado_pos_tab.dart`, `encargado_orders_tab.dart`,
+  `encargado_dashboard_screen.dart`.
+- Known limitation: changing the qty of an already-sent item does not re-send a
+  comanda (only new lines do).
 
-For branch `f99da201-e7ef-4ea6-9616-0bc7d5b4a9b7`:
+---
 
-- Three requisitions created by the operator exist in the local database and are `approved`.
-- Transfer `0928f30c-afac-478e-92e3-1e09850fc78b` is `in_transit` to that branch.
-- It should appear in the POS **Recibir** tab after a fresh login and refresh. It is correct for the receiving branch operator to see and receive transfers in this state.
+## 3. Local dev tooling (done)
 
-## Validation performed
+- `scripts/dev-all.sh`: background services now run with `</dev/null` (fixes Vite
+  `read EIO` and Flutter "Dart compiler exited unexpectedly"); added HTTP readiness
+  waits; each service starts in its own process group; `make dev-all-stop` kills the
+  whole process group.
+- Fixed the admin instance that was pointing at `:3001` (dev-all detects the backend
+  port and uses `:3000`).
 
-- Backend build passed: `npm run build` in `apps/sync_api`.
-- Focused backend tests passed: orders + requisitions (25 tests), and auth + requisitions (15 tests).
-- Flutter focused requisition flow passed: 4 tests.
-- `flutter analyze lib/ui/common/app_state.dart` had no errors; only pre-existing informational lint notices.
-- Local endpoint smoke checks returned 200 for active orders and sync pull after the migration.
+---
 
-## Important operational notes
+## 4. Production deploy (DONE this session)
 
-1. The JWT previously used by the browser had no branch assignment. It cannot use operator-scoped endpoints. Log out, then perform tablet login again using the local API.
-2. Do not send `businessId` or `fromBranchId` from new POS requisition payloads; authorization scope comes from the token.
-3. A transfer shown as `in_transit` is the expected input for **Recibir**. Confirm it with received quantities, adding a note for discrepancies.
-4. The local audit migration has not been deployed to production. Follow `docs/pre-deployment-checklist.md` and coordinate a database migration before any production backend deployment.
+Deployed **backend + admin + POS web** (no APK/portal).
 
-## Relevant commits
+- **Migration gap fixed:** `scripts/idempotent-deploy-migrations.ts` now adds
+  `inventory_alerts.warehouse_id` + `idx_ia_warehouse_status` and recreates the global
+  unique index to include `warehouse_id IS NULL`, plus `unq_ia_product_warehouse_active`.
+- `make backend-migrate` → completed ("Warehouse inventory alert support ensured.").
+- **Docker build fix:** `npm install -g pnpm` now pulls pnpm 12, which hard-fails on
+  ignored dependency build scripts (`ERR_PNPM_IGNORED_BUILDS`). Pinned both Dockerfile
+  stages to `pnpm@10.34.5`.
+- `make backend-deploy-fast` → revision `pos-sync-api-00119-8tk`.
+- `make admin-deploy` → `https://cacharelo-central.web.app`.
+- `make flutter-web-deploy` → `https://cacharelo-pos.web.app`.
 
-Root repository:
+**Verification:** backend `/api/health` 200; admin 200; POS 200; no backend ERROR logs
+in the 10 minutes after deploy.
 
-- `74a9e94` `feat(api): secure branch operator workflows`
-- `5d9fd15` `feat(pos): add branch operator daily workflows`
-- `48f5833` `fix(auth): bind tablet sessions to terminal branch`
-- `58d78a9` `feat(pos): search requisition products`
+APK/portal release (`make flutter-portal-deploy`) was intentionally **not** run; it
+needs a `pubspec.yaml` version bump before the next release.
 
-`apps/pos_flutter` is a nested repository. Its latest related commit is:
+### Working-tree caution
+There are large unrelated uncommitted changes in the root workspace and the nested
+Flutter repo (from other sessions). **Do not reset, checkout, or broadly stage files.**
 
-- `349caa1` `fix(pos): merge only operator requisitions`
 
-Do not flatten or reset the nested repository during follow-up work.
+## Paperclip local verification — 2026-09-30
 
-## Working-tree caution
+- Scope: launcher-only patch in `scripts/dev-all.sh`; existing application and nested Git work preserved.
+- Fixed Docker Desktop Compose plugin discovery, Compose service name (`db`), and fail-fast HTTP readiness.
+- `SKIP_MIGRATIONS=true RUN_MIGRATIONS_ON_STARTUP=false make dev-all-local` starts local PostgreSQL but fails backend compilation: optional `branchId`/`cashierId` in OpenShiftDto conflict with required IDs in ShiftsService (lines 25, 31, 34, 35). No verified web URL.
+- Focused checks: 27 Nest unit tests passed (requisitions, inventory, shifts); 6 Flutter tests passed (receive-transfer dialog and requisitions). PackageInfo test-plugin warnings remain. These are not end-to-end workflow verification.
+- Stopped only this run's failed backend watcher. Local PostgreSQL remains available; no migrations, data resets, production operations, commits, or pushes were performed.
+- Next: CEO review of cash-shift identity/authorization boundary, then coordinate the active role-unification session, reconcile the DTO/service contract in an isolated workspace, rerun local startup, and verify receipt → sale/payment → cash reconciliation with synthetic data.
+- Durable evidence: Paperclip MOR-1 document `cacharelo-local-verification`.
 
-There are existing unrelated changes in the root workspace and in the nested Flutter repository. Preserve them. Do not reset, checkout, or broadly stage files while preparing follow-up commits.
 
-## Recommended next steps
+## Paperclip synthetic workflow verification — 2026-10-01
 
-1. In the browser, log out and log in again, then open **Recibir** and pull to refresh. Confirm that the in-transit transfer appears.
-2. Receive the transfer with actual quantities and an optional discrepancy note; verify its status becomes received and inventory movement is recorded.
-3. If a requisition still appears only locally, capture the network request and response after the fresh login. The server record should be visible through `/api/requisitions/mine` with the authenticated branch-scoped token.
-4. Before deployment, run the full relevant backend/POS checks and coordinate the production migration per the deployment checklist.
+- Fixed receipt transit double deduction and concurrent duplicate reception in `apps/sync_api/src/modules/inventory/inventory.service.ts`; transaction locks the transfer before checking status. Added four stock-conservation regression cases; 11 focused tests pass. Existing edits were preserved using an isolated snapshot and narrow patches.
+- `node scripts/verify-synthetic-workflow.cjs` creates a fresh SYNTHETIC tenant on local `pos_dev` only; credentials stay in memory. Final live API/SQL probe: 33/35 assertions pass. Warehouse 20 → 10, receipt 8/10 → branch 8 and transit 0, two sales → branch 6. Concurrent receipt statuses 201/400; sequential payment retries 409 with one payment each. Cash: float 100 + cash sale 25 + in 10 − out 5 = 130; counted 128 → discrepancy −2; card 25 stays separate.
+- Two failing security assertions: anonymous and other-branch GET of a synthetic order both return 200. CEO security review required before changing order/sync authorization. No customer records accessed or modified. Fixtures retained for audit; no resets or historical corrections.
+- Remaining: authenticated Flutter pairing/UI journey, delivery semantics (Listo currently only changes local billing state), offline/retry checks, and approved order authorization fix. Broader workflow acceptance remains incomplete.
+- Evidence and decision path: Paperclip MOR-1 `cacharelo-local-verification`; preserve both Git histories, active agy session, and all existing work. No deployment, migration, commit, or push.
+
+## Paperclip order REST authorization checkpoint — 2026-10-01
+
+- Approved scoped OrdersAccessGuard and Flutter order token headers applied after isolated snapshot checks. TypeScript check and 38 focused backend tests pass; 9 Flutter widget tests pass with existing plugin warnings.
+- Expanded synthetic probe: 54/54 live HTTP and SQL assertions pass, including anonymous/cross-branch reads and mutations, preserved denied-mutation state, stock conservation, and cash reconciliation.
+- Local admin :1422, POS 127.0.0.1:8081 and API :3000/api/health return HTTP 200. Authenticated browser journey remains unverified.
+- Counter pickup readiness accepted for this milestone. Remaining: pairing/UI, offline replay, concurrent payment safety, and sync HTTP/websocket tenant boundaries (source findings only).
+- CEO security checkpoint review next; broader delivery incomplete. Dirty histories and agy session preserved. No migrations, resets, deploys, commits, pushes or consolidation.
+
+
+---
+Phase 1 Resumen de Sucursal admin assessment: existing admin architecture documents identify DashboardPage with sales metrics/live occupancy/shift totals, but no verified backend route contract for daily branch cash/card summary, active shift, or Corte X/Z. Backend specialist confirmed shifts/reports services exist but exact controllers/routes could not be verified; branch_operator may submit summaries while cashier owns drawer/Corte X/Z. No files or migrations changed. Admin production build passed. Recommendation: do not add speculative UI/API calls; feature requires backend contract and likely POS/cashier workflow ownership.
+
+
+---
+## Phase 1 Resumen de Sucursal — 2026-10-02
+Requested implementation: daily summary, active shift, cash/card totals, Corte X/Z for branch_operator. No source files were modified because backend specialist could not safely inspect/edit routes in this session and POS specialist clarified no files were actually changed. Admin inspection found DashboardPage metrics but no verified summary/Corte API contract. Verification only: backend build and existing Jest 21 suites/150 tests passed; admin build passed; Flutter analyze has 144 pre-existing issues and tests have unrelated failures. Next step: allocate an editing-capable backend session to inspect existing shifts/reports controllers, implement verified endpoints/tests, then POS UI integration.
+
+
+---
+## Phase 1 Resumen de Sucursal inspection — 2026-10-02 (phase1-resumen-admin-inspect)
+
+Inspection-only; no files modified. Verified knowledge map identifies `apps/business_control_tauri/src/pages/DashboardPage.tsx` as the existing sales metrics/live occupancy/shift totals dashboard. Admin architecture uses TanStack React Query/Axios; no verified API route contract was found for a branch daily cash/card summary, active-shift summary, or Corte X/Z. Existing assessment indicates shifts/reports backend services may exist, but exact controllers/routes and ownership semantics (branch_operator vs cashier for drawer/Corte) are unverified. Do not add speculative API calls or UI.
+
+Proposed minimal follow-up once backend contract is published: extend DashboardPage using existing API client/query pattern with contract-defined summary query, active shift state, and role-gated Corte action; reuse existing shift totals presentation. Backend must first document route, auth scope, date/branch parameters, response fields, and whether Corte X/Z is cashier-owned. Existing handoff records admin production build passed; no new check could be executed from this inspection context.
+
+
+---
+## Phase 1 Resumen de Sucursal — Flutter POS inspection (2026-10-02)
+Inspection-only; no files modified. Existing POS branch-operator implementation is in `apps/pos_flutter/lib/ui/branch_operator/`: `encargado_dashboard_screen.dart`, `encargado_pos_tab.dart`, and `encargado_orders_tab.dart`; shared operational state is `lib/ui/common/app_state.dart`. Handoff records existing order park/edit/Cobrar behavior in these files, but no verified Resumen de Sucursal cash/card or shift API integration. Canonical backend data model is `cash_shifts` (branch, opening float, live drawer amount, open/closed status, denomination counts, close snapshot); business rules define Corte X as non-closing audit and Corte Z as closing audit. Exact Flutter service methods/routes/DTOs for shifts, reports, daily branch summary, and Corte X/Z could not be verified from available contracts. Blockers: backend controller route/response/auth scope/date parameters are undocumented/unverified; ownership between `branch_operator` summary submission and `cashier` drawer/Corte must be confirmed; existing handoff notes Flutter analyze has 144 pre-existing issues and unrelated test failures. No speculative UI/API changes recommended until backend contract is published.
+
+
+---
+## Phase 1 Resumen de Sucursal — inspection closure
+
+Inspection complete with no source edits. Confirmed `apps/business_control_tauri/src/pages/DashboardPage.tsx` contains existing sales metrics/live occupancy/shift totals; no verified daily branch cash/card summary, active-shift detail contract, or Corte X/Z route/UI was found. Existing admin build passes. Full Playwright has six pre-existing failures as documented in the inspection report; no new failures were attributed to this work. Workspace released; backend contract remains prerequisite before implementation.

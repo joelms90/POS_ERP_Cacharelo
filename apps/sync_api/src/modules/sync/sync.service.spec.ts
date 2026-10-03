@@ -1,3 +1,6 @@
+import { OrdersRepository } from '../orders/repositories/orders.repository';
+import { SyncAccessService } from './sync-access.service';
+const actor = { sub: 'user', businessId: 'business', branchId: '11111111-1111-4111-8111-111111111111' };
 import { Test, TestingModule } from '@nestjs/testing';
 import { SyncService } from './sync.service';
 import { DRIZZLE_CONNECTION } from '../../database/database.module';
@@ -15,7 +18,7 @@ describe('SyncService', () => {
     onConflictDoNothing: jest.fn().mockResolvedValue({}),
     select: jest.fn().mockReturnThis(),
     from: jest.fn().mockReturnThis(),
-    where: jest.fn(async () => selectRows),
+    where: jest.fn(() => Object.assign(Promise.resolve(selectRows), { for: () => Promise.resolve(selectRows) })),
     update: jest.fn().mockReturnThis(),
     set: jest.fn().mockReturnThis(),
     execute: jest.fn().mockResolvedValue({}),
@@ -29,6 +32,8 @@ describe('SyncService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SyncService,
+        { provide: OrdersRepository, useValue: { deductInventoryForItems: jest.fn() } },
+        { provide: SyncAccessService, useValue: { push: jest.fn(), branch: jest.fn().mockResolvedValue(actor.branchId), device: jest.fn() } },
         {
           provide: DRIZZLE_CONNECTION,
           useValue: mockDb,
@@ -64,7 +69,7 @@ describe('SyncService', () => {
             branchId: '11111111-1111-4111-8111-111111111111',
             tableId: '22222222-2222-4222-8222-222222222222',
             waiterId: '33333333-3333-4333-8333-333333333333',
-            state: 'closed',
+            state: 'open',
             subtotal: '150.00',
             discount: '0.00',
             tax: '0.00',
@@ -95,7 +100,7 @@ describe('SyncService', () => {
         ],
       };
 
-      const result = await service.push(pushDto);
+      const result = await service.push(pushDto, actor);
       expect(result).toEqual({ success: true });
       expect(mockDb.transaction).toHaveBeenCalled();
       expect(mockDb.values).toHaveBeenNthCalledWith(
@@ -128,7 +133,7 @@ describe('SyncService', () => {
               branchId: '11111111-1111-4111-8111-111111111111',
               tableId: '22222222-2222-4222-8222-222222222222',
               waiterId: '33333333-3333-4333-8333-333333333333',
-              state: 'closed',
+              state: 'open',
               subtotal: '150.00',
               discount: '0.00',
               tax: '0.00',
@@ -144,7 +149,7 @@ describe('SyncService', () => {
               price: '150.00',
             },
           ],
-        }),
+        }, actor),
       ).rejects.toThrow('Sync push references do not exist');
       expect(mockDb.transaction).not.toHaveBeenCalled();
     });
@@ -155,7 +160,7 @@ describe('SyncService', () => {
       const result = await service.pull({
         branchId: '11111111-1111-4111-8111-111111111111',
         lastSyncedAt: '2026-06-25T00:00:00.000Z',
-      });
+      }, actor);
       expect(result).toBeDefined();
       expect(result.timestamp).toBeDefined();
       expect(result.changes).toBeDefined();
@@ -166,11 +171,11 @@ describe('SyncService', () => {
       await service.pull({
         branchId: '11111111-1111-4111-8111-111111111111',
         lastSyncedAt: '2026-06-25T00:00:00.000Z',
-      });
+      }, actor);
       await service.pull({
         branchId: '11111111-1111-4111-8111-111111111111',
         lastSyncedAt: '2026-06-25T00:00:00.000Z',
-      });
+      }, actor);
 
       expect(mockDb.execute).toHaveBeenCalledTimes(1);
     });
@@ -183,7 +188,7 @@ describe('SyncService', () => {
       const result = await service.ack({
         deviceId: 'device-1',
         lastSyncedAt: '2026-06-25T00:00:00.000Z',
-      });
+      }, actor);
 
       expect(result).toEqual({ success: true });
     });

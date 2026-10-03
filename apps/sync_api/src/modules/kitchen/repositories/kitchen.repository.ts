@@ -88,12 +88,7 @@ export class KitchenRepository {
 
       // Filter items matching the ticket station
       const filteredItems = items.filter((item) => {
-        const isBebida = this.isBarraCategory(item.categoryName, item.targetStation);
-        if (ticket.station === 'barra') {
-          return isBebida;
-        } else {
-          return !isBebida;
-        }
+        return this.resolveTargetStation(item.categoryName, item.targetStation) === ticket.station;
       });
 
       // Only add tickets that have items mapped to their station
@@ -117,6 +112,17 @@ export class KitchenRepository {
       'trago', 'barra'
     ];
     return barraKeywords.some((kw) => name.includes(kw));
+  }
+
+  /**
+   * BR-KDS-001: a null/empty station is an explicit no-KDS choice.
+   * BR-KDS-003: unknown legacy values retain name-based routing temporarily.
+   */
+  private resolveTargetStation(categoryName: string, targetStation?: string | null): 'cocina' | 'barra' | null {
+    if (targetStation === null || targetStation === '') return null;
+    // BR-KDS-002: an explicit station is the only destination for the item.
+    if (targetStation === 'cocina' || targetStation === 'barra') return targetStation;
+    return this.isBarraCategory(categoryName) ? 'barra' : 'cocina';
   }
 
   async createTicketsForOrder(orderId: string) {
@@ -150,10 +156,10 @@ export class KitchenRepository {
       let hasBarra = false;
 
       for (const item of unsentItems) {
-        const isBebida = this.isBarraCategory(item.categoryName, item.targetStation);
-        if (isBebida) {
+        const station = this.resolveTargetStation(item.categoryName, item.targetStation);
+        if (station === 'barra') {
           hasBarra = true;
-        } else {
+        } else if (station === 'cocina') {
           hasCocina = true;
         }
       }

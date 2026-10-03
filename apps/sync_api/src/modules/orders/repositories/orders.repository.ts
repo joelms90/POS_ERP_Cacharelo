@@ -1,4 +1,4 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, ConflictException } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
@@ -405,6 +405,11 @@ export class OrdersRepository {
 
       if (!order) {
         throw new NotFoundException(`Order ${orderId} not found`);
+      }
+
+      // Check under the row lock; the service precheck can race another payment.
+      if (order.state === 'closed' || order.state === 'cancelled') {
+        throw new ConflictException(`Cannot process payment for a ${order.state} order.`);
       }
 
       const now = new Date();

@@ -574,6 +574,10 @@ class AppState extends ChangeNotifier {
   // Tables state
   List<TableModel> tables = [];
 
+  // When the counter operator reopens a parked to-go order to add products,
+  // this holds the table id currently loaded into the POS cart.
+  int? editingOrderTableId;
+
   // Kitchen orders
   List<KitchenOrder> kitchenOrders = [];
   List<KitchenOrder> readyPickupOrders = [];
@@ -1587,7 +1591,8 @@ class AppState extends ChangeNotifier {
     try {
       final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
-          .get(Uri.parse('$baseUrl/orders/active?branchId=$terminalBranchId'))
+          .get(Uri.parse('$baseUrl/orders/active?branchId=$terminalBranchId'),
+              headers: await _operatorHeaders())
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200) {
@@ -1782,7 +1787,7 @@ class AppState extends ChangeNotifier {
       final response = await http
           .post(
             Uri.parse('$baseUrl/sync/pull'),
-            headers: {'Content-Type': 'application/json'},
+            headers: _jsonAuthHeaders,
             body: jsonEncode({
               'deviceId': deviceId ?? 'tablet-pos-1',
               'branchId': terminalBranchId,
@@ -2267,7 +2272,8 @@ class AppState extends ChangeNotifier {
       final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
           .get(Uri.parse(
-              '$baseUrl/cash-shifts/active?branchId=$terminalBranchId&cashierId=$currentUserId'))
+              '$baseUrl/cash-shifts/active?branchId=$terminalBranchId&cashierId=$currentUserId'),
+              headers: await _operatorHeaders())
           .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
@@ -2299,7 +2305,7 @@ class AppState extends ChangeNotifier {
       final response = await http
           .post(
             Uri.parse('$baseUrl/cash-shifts'),
-            headers: {'Content-Type': 'application/json'},
+            headers: await _operatorHeaders(),
             body: jsonEncode({
               'cashierId': currentUserId,
               'branchId': terminalBranchId,
@@ -2332,7 +2338,7 @@ class AppState extends ChangeNotifier {
       final response = await http
           .post(
             Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
-            headers: {'Content-Type': 'application/json'},
+            headers: await _operatorHeaders(),
             body: jsonEncode({
               'type': 'cash-in',
               'amount': amount.toStringAsFixed(2),
@@ -2368,7 +2374,7 @@ class AppState extends ChangeNotifier {
       final response = await http
           .post(
             Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
-            headers: {'Content-Type': 'application/json'},
+            headers: await _operatorHeaders(),
             body: jsonEncode({
               'type': 'cash-out',
               'amount': amount.toStringAsFixed(2),
@@ -2407,7 +2413,7 @@ class AppState extends ChangeNotifier {
       final response = await http
           .post(
             Uri.parse('$baseUrl/cash-shifts/$activeShiftId/close'),
-            headers: {'Content-Type': 'application/json'},
+            headers: await _operatorHeaders(),
             body: jsonEncode({
               'actualAmount': actualAmount.toStringAsFixed(2),
               if (denominationCounts != null)
@@ -2858,7 +2864,7 @@ class AppState extends ChangeNotifier {
         final response = await http
             .post(
               Uri.parse('$baseUrl/orders'),
-              headers: {'Content-Type': 'application/json'},
+              headers: await _operatorHeaders(),
               body: jsonEncode({
                 'branchId': terminalBranchId,
                 'tableId': tableRemoteId,
@@ -2888,7 +2894,7 @@ class AppState extends ChangeNotifier {
         final response = await http
             .post(
               Uri.parse('$baseUrl/orders/$orderId/items'),
-              headers: {'Content-Type': 'application/json'},
+              headers: await _operatorHeaders(),
               body: jsonEncode({'items': itemsPayload}),
             )
             .timeout(const Duration(seconds: 10));
@@ -2939,7 +2945,8 @@ class AppState extends ChangeNotifier {
     try {
       final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       await http
-          .post(Uri.parse('$baseUrl/orders/$orderId/billing'))
+          .post(Uri.parse('$baseUrl/orders/$orderId/billing'),
+              headers: await _operatorHeaders())
           .timeout(const Duration(seconds: 10));
     } catch (e) {
       debugPrint('Cloud billing request failed: $e');
@@ -3498,7 +3505,7 @@ class AppState extends ChangeNotifier {
       final response = await http
           .post(
             Uri.parse('$baseUrl/orders/$orderId/payments'),
-            headers: {'Content-Type': 'application/json'},
+            headers: await _operatorHeaders(),
             body: jsonEncode({
               'amount': amount.toStringAsFixed(2),
               'paymentMethod': _normalizePaymentMethod(paymentMethod),
@@ -3704,6 +3711,29 @@ class AppState extends ChangeNotifier {
 
     // 2. If none are free, create a new one
     return await createToGoTable();
+  }
+
+  /// Loads an existing parked to-go order for editing in the POS cart.
+  void beginEditingOrder(int tableId) {
+    final index = tables.indexWhere((t) => t.id == tableId);
+    if (index == -1) return;
+    editingOrderTableId = tableId;
+    notifyListeners();
+  }
+
+  /// Clears the order currently being edited in the POS cart.
+  void clearEditingOrder() {
+    if (editingOrderTableId == null) return;
+    editingOrderTableId = null;
+    notifyListeners();
+  }
+
+  /// Returns the parked order currently being edited, if any.
+  TableModel? get editingOrder {
+    final id = editingOrderTableId;
+    if (id == null) return null;
+    final index = tables.indexWhere((t) => t.id == id);
+    return index == -1 ? null : tables[index];
   }
 
   // Clean table (from cleaning to free)
@@ -4940,31 +4970,26 @@ class AppState extends ChangeNotifier {
       return false;
     }
 
-    final remaining = <Map<String, dynamic>>[];
     for (final job in List<Map<String, dynamic>>.from(_pendingSaleSyncJobs)) {
       final payload = job['payload'];
       if (payload is! Map<String, dynamic>) {
         continue;
       }
 
-      final pushed = await _pushSyncPayload(payload);
-      if (!pushed) {
-        remaining.add(job);
+      final pushed = await _pushSyncPayload(payload, job['id'].toString());
+      if (pushed) {
+        _pendingSaleSyncJobs.removeWhere((pending) => pending['id'] == job['id']);
       }
     }
 
-    _pendingSaleSyncJobs
-      ..clear()
-      ..addAll(remaining);
     await _persistPendingSaleSyncJobs();
     return _pendingSaleSyncJobs.isEmpty;
   }
 
-  Future<bool> _pushSyncPayload(Map<String, dynamic> payload) async {
+  Future<bool> _pushSyncPayload(Map<String, dynamic> payload, String jobId) async {
     if (socketConnectionState == SocketConnectionState.connected &&
         _socketService != null) {
-      final orderId = payload['id']?.toString() ?? _newUuid();
-      _socketService!.push(orderId, '', payload['payload'] ?? payload);
+      _socketService!.push(jobId, '', payload);
       return false; // Leave in queue until socket ack arrives
     }
 
@@ -4973,7 +4998,7 @@ class AppState extends ChangeNotifier {
       final response = await http
           .post(
             Uri.parse('$baseUrl/sync/push'),
-            headers: {'Content-Type': 'application/json'},
+            headers: _jsonAuthHeaders,
             body: jsonEncode(payload),
           )
           .timeout(const Duration(seconds: 8));
@@ -5089,6 +5114,10 @@ class AppState extends ChangeNotifier {
     required List<Map<String, dynamic>> items,
     String? note,
   }) async {
+    if (items.isEmpty) {
+      debugPrint('Cannot receive transfer: items list is empty');
+      return false;
+    }
     try {
       final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
@@ -5248,16 +5277,11 @@ class AppState extends ChangeNotifier {
     required Map<String, String> headers,
   }) async {
     final branchId = terminalBranchId;
-    final businessId = terminalBusinessId;
-    if (branchId == null || branchId.isEmpty) {
-      return localRequisitions;
-    }
+    if (branchId == null || branchId.isEmpty) return localRequisitions;
 
-    final uri = Uri.parse('$baseUrl/requisitions/branch/$branchId').replace(
-      queryParameters: businessId != null && businessId.isNotEmpty
-          ? {'businessId': businessId}
-          : null,
-    );
+    // The API derives the branch and requester from the signed-in operator,
+    // preventing a terminal from merging another operator's history.
+    final uri = Uri.parse('$baseUrl/requisitions/mine');
 
     try {
       final response = await http
@@ -5266,7 +5290,7 @@ class AppState extends ChangeNotifier {
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         debugPrint(
-            'Failed to fetch branch requisitions: ${response.statusCode} ${response.body}');
+            'Failed to fetch my requisitions: ${response.statusCode} ${response.body}');
         return localRequisitions;
       }
 
@@ -5316,7 +5340,7 @@ class AppState extends ChangeNotifier {
 
       return localById.values.toList();
     } catch (e) {
-      debugPrint('Error fetching branch requisitions: $e');
+      debugPrint('Error fetching my requisitions: $e');
       return localRequisitions;
     }
   }

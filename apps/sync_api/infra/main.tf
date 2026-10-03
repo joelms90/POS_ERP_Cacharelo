@@ -1,3 +1,12 @@
+# =============================================================================
+# LEGACY PRODUCTION ROOT - PARKED, DO NOT APPLY
+# -----------------------------------------------------------------------------
+# This root manages the existing production project and has drifted from reality.
+# Terraform now runs from envs/<env> (see envs/staging) using modules/sync-api.
+# Do NOT run `terraform apply` here. Kept only for reference / future import.
+# See specs/014-staging-environment/plan.md
+# =============================================================================
+
 terraform {
   required_version = ">= 1.5.0"
   required_providers {

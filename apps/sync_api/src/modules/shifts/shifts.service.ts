@@ -18,7 +18,7 @@ export class ShiftsService {
     private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
-  async openShift(openShiftDto: OpenShiftDto) {
+  async openShift(openShiftDto: OpenShiftDto & { branchId: string; cashierId: string }) {
     const { branchId, cashierId, initialFloat } = openShiftDto;
 
     // Prevent opening a shift if one is already open for that cashier & branch
@@ -27,8 +27,10 @@ export class ShiftsService {
       throw new ConflictException('A cash shift is already active for this cashier and branch.');
     }
 
-    // Auto-close any other open shifts for this branch (stale/abandoned by other cashiers)
-    await this.shiftsRepository.closeAllOpenForBranch(branchId);
+    // Never silently close another cashier's shift without reconciliation.
+    if (await this.shiftsRepository.findActiveShift(branchId)) {
+      throw new ConflictException('Another cash shift is active for this branch. Close it before opening a new one.');
+    }
 
     return this.shiftsRepository.create({
       branchId,

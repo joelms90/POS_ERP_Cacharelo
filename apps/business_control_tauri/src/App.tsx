@@ -142,7 +142,7 @@ function App() {
         {activeTab === 'assembly' && <AssemblyPage businessId={activeBusinessId} />}
         {activeTab === 'transfers' && <TransfersPage businessId={activeBusinessId} />}
         {activeTab === 'purchase-orders' && user && <PurchaseOrdersPage businessId={activeBusinessId} userId={user.id} />}
-        {activeTab === 'requisitions' && user && <RequisitionsPage businessId={activeBusinessId} userId={user.id} userRole={user.role} />}
+        {activeTab === 'requisitions' && user && <RequisitionsPage businessId={activeBusinessId} userId={user.id} userRole={user.role} userRoles={user.roles} />}
         {activeTab === 'help' && <HelpPage />}
         {activeTab === 'reports' && <ReportsPage businessId={activeBusinessId} />}
         {activeTab === 'tickets' && <TicketsPage businessId={activeBusinessId} />}

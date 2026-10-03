@@ -15,6 +15,7 @@ describe('ShiftsService', () => {
     findById: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    closeAllOpenForBranch: jest.fn().mockResolvedValue(undefined),
   };
 
   const mockTransactionsRepository = {

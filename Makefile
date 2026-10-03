@@ -1,9 +1,19 @@
 # Makefile for Empire POS-ERP project
 
-.PHONY: help install db-up db-down db-status db-migrate db-seed db-rollback db-reset db-pull-prod db-sync-from-prod db-clean db-clean-prod db-clean-today db-clean-today-prod db-clean-old-history-prod db-clean-all-history-sales-prod db-proxy dev-backend dev-backend-local dev-backend-prod dev-frontend lint test active-orders infra-init infra-plan infra-apply provision-infra infra-destroy backend-migrate backend-deploy backend-deploy-fast backend-status backend-logs landing-install landing-build landing-deploy landing-infra admin-install admin-dev admin-dev-prod admin-dev-local admin-test-e2e admin-test-e2e-ui admin-build admin-deploy admin-deploy-gcs flutter-web-build flutter-web-dev flutter-web-dev-prod flutter-web-dev-local flutter-macos-dev flutter-macos-dev-prod flutter-macos-dev-local flutter-macos-build-debug flutter-macos-2x-local flutter-macos-2x-prod flutter-web-serve flutter-web-deploy flutter-portal-deploy flutter-apk-build flutter-clean flutter-macos-build flutter-windows-build flutter-android-build flutter-desktop-releases flutter-all-releases flutter-release-info flutter-bump-version
+.DEFAULT_GOAL := help
 
-active-orders:
-	@cd apps/sync_api && npx tsx scripts/get-active-orders.ts $(BRANCH_ID)
+.PHONY: help install kill-port kill-dev-ports db-up db-down db-status db-migrate db-seed db-rollback db-reset db-pull-prod db-sync-from-prod db-clean db-clean-prod db-clean-today db-clean-today-prod db-clean-old-history-prod db-clean-all-history-sales-prod db-proxy dev-backend dev-backend-local dev-backend-prod dev-frontend lint test okf-validate active-orders infra-init infra-plan infra-apply provision-infra infra-destroy backend-migrate backend-deploy backend-deploy-fast backend-status backend-logs landing-install landing-build landing-deploy landing-infra admin-install admin-dev admin-dev-prod admin-dev-local admin-test-e2e admin-test-e2e-ui admin-build admin-deploy admin-deploy-gcs flutter-web-build flutter-web-dev flutter-web-dev-prod flutter-web-dev-local flutter-macos-dev flutter-macos-dev-prod flutter-macos-dev-local flutter-macos-build-debug flutter-macos-2x-local flutter-macos-2x-prod flutter-web-serve flutter-web-deploy flutter-portal-deploy flutter-apk-build flutter-clean flutter-macos-build flutter-windows-build flutter-android-build flutter-desktop-releases flutter-all-releases flutter-release-info flutter-bump-version
+
+# Environment configuration (per-env values; see env/*.env)
+-include env/prod.env
+-include env/staging.env
+
+# Terraform environment root to operate on (only staging exists for now)
+INFRA_ENV ?= staging
+
+# Staging derived values
+STAGING_DB_CONNECTION = $(STAGING_PROJECT):$(STAGING_REGION):$(STAGING_DB_INSTANCE)
+STAGING_MIGRATE_PORT ?= 5434
 
 # Default target: show help
 help:
@@ -34,6 +44,10 @@ help:
 	@echo "  db-proxy                         Start Cloud SQL Auth Proxy locally for DBeaver access"
 	@echo ""
 	@echo "Run & Development Targets:"
+	@echo "  dev-all-local      Start ALL services locally (DB + Backend + Admin Web + Flutter Web)"
+	@echo "  dev-all-stop       Stop all running local development services"
+	@echo "  kill-port          Kill process on specified port (e.g. make kill-port PORT=8081)"
+	@echo "  kill-dev-ports     Kill processes on all common dev ports (3000, 1420, 8081, etc.)"
 	@echo "  dev-backend        Run NestJS backend on localhost:3000 (alias to dev-backend-local)"
 	@echo "  dev-backend-local  Run NestJS backend on localhost:3000 connected to LOCAL Postgres (port 5432)"
 	@echo "  dev-backend-prod   Run NestJS backend on localhost:3000 connected to PRODUCTION Cloud SQL (via proxy port 5433)"
@@ -42,6 +56,7 @@ help:
 	@echo "Quality Assurance Targets:"
 	@echo "  lint             Analyze Flutter code quality and run linter"
 	@echo "  test             Run client widget tests and unit tests"
+	@echo "  okf-validate     Validate Open Knowledge Format (OKF v0.2) documentation bundle"
 	@echo ""
 	@echo "Infrastructure & Deployment Targets:"
 	@echo "  infra-init       Initialize Terraform configuration"
@@ -99,6 +114,19 @@ help:
 	@echo "  flutter-desktop-releases Build all desktop releases (macOS, Windows, Linux)"
 	@echo "  flutter-all-releases     Build ALL platform releases (Web, Android, Desktop)"
 	@echo "  flutter-release-info     Show information about release builds"
+	@echo ""
+	@echo "Staging Targets (separate GCP project; configure env/staging.env first):"
+	@echo "  deploy-staging               Deploy CURRENT changes: backend + admin + POS web"
+	@echo "  backend-deploy-staging       Deploy backend API to Cloud Run (staging)"
+	@echo "  backend-migrate-staging      Run DB migrations against staging (Cloud SQL proxy)"
+	@echo "  backend-status-staging       Show staging Cloud Run URL + health"
+	@echo "  admin-deploy-staging         Build & deploy admin dashboard to staging"
+	@echo "  flutter-web-deploy-staging   Build & deploy POS web to staging"
+	@echo "  flutter-apk-build-staging    Build Android APK targeting staging API"
+	@echo "  flutter-apk-upload-staging   Build + upload APK to staging download bucket"
+	@echo "  flutter-portal-deploy-staging Upload APK + deploy POS web (staging portal)"
+	@echo "  infra-bootstrap              Create Terraform remote state bucket (once)"
+	@echo "  infra-apply                  Apply Terraform for INFRA_ENV (default: staging)"
 	@echo "======================================================================="
 
 # Setup Targets
@@ -405,6 +433,9 @@ db-clean-all-history-sales-prod:
 		fi
 
 # Query Targets
+active-orders:
+	@cd apps/sync_api && npx tsx scripts/get-active-orders.ts $(BRANCH_ID)
+
 db-tickets-hoy:
 	@echo "🔍 Querying tickets cobrados hoy (local dev DB)..."
 	@mkdir -p apps/sync_api/data
@@ -439,6 +470,44 @@ db-tickets-hoy-prod:
 BACKEND_PORT ?= 3000
 ADMIN_PORT ?= 1420
 FLUTTER_WEB_PORT ?= 8081
+
+.PHONY: dev-all-local dev-all-stop dev-all-status
+
+dev-all-local:
+	@./scripts/dev-all.sh start
+
+dev-all-stop:
+	@./scripts/dev-all.sh stop
+
+dev-all-status:
+	@./scripts/dev-all.sh status
+
+kill-port:
+	@if [ -z "$(PORT)" ]; then \
+		echo "❌ Error: PORT is required."; \
+		echo "Usage: make kill-port PORT=<number> (e.g. make kill-port PORT=8081)"; \
+		exit 1; \
+	fi
+	@echo "Checking for process on port $(PORT)..."
+	@PIDS=$$(lsof -ti:$(PORT) 2>/dev/null); \
+	if [ -n "$$PIDS" ]; then \
+		echo "Killing process(es) on port $(PORT): $$PIDS"; \
+		kill -9 $$PIDS 2>/dev/null || true; \
+		echo "✅ Port $(PORT) freed."; \
+	else \
+		echo "Port $(PORT) is already free."; \
+	fi
+
+kill-dev-ports:
+	@echo "Freeing all development ports (3000, 3001, 1420, 1422, 5180, 8081)..."
+	@for p in 3000 3001 1420 1422 5180 8081; do \
+		PIDS=$$(lsof -ti:$$p 2>/dev/null); \
+		if [ -n "$$PIDS" ]; then \
+			echo "  • Port $$p: killing $$PIDS"; \
+			kill -9 $$PIDS 2>/dev/null || true; \
+		fi \
+	done
+	@echo "✅ All dev ports freed."
 
 dev-backend: dev-backend-local
 
@@ -480,26 +549,37 @@ test:
 	@echo "Running Flutter tests..."
 	cd apps/pos_flutter && flutter test
 
+okf-validate:
+	@echo "Validating Open Knowledge Format (OKF v0.2) documentation bundle..."
+	node scripts/validate-okf.mjs knowledge
+
 # Infrastructure & Deployment Targets
+# NOTE: the legacy prod Terraform root (apps/sync_api/infra/*.tf) is parked and
+# must NOT be applied. Terraform now operates on envs/<INFRA_ENV> (staging).
 infra-init:
-	@echo "Initializing Terraform..."
-	cd apps/sync_api/infra && terraform init
+	@echo "Initializing Terraform ($(INFRA_ENV))..."
+	cd apps/sync_api/infra/envs/$(INFRA_ENV) && terraform init
 
 infra-plan:
-	@echo "Planning Terraform changes..."
-	cd apps/sync_api/infra && terraform plan
+	@echo "Planning Terraform changes ($(INFRA_ENV))..."
+	cd apps/sync_api/infra/envs/$(INFRA_ENV) && terraform plan
 
 infra-apply:
-	@echo "Applying Terraform changes..."
-	cd apps/sync_api/infra && terraform apply
+	@echo "Applying Terraform changes ($(INFRA_ENV))..."
+	cd apps/sync_api/infra/envs/$(INFRA_ENV) && terraform apply
 
-provision-infra:
-	@echo "Provisioning Google Cloud Infrastructure (Cloud SQL, Cloud Run, Always Free WebSocket VM)..."
-	cd apps/sync_api/infra && terraform apply -auto-approve
+infra-bootstrap: staging-guard
+	@echo "Creating Terraform remote state bucket (run once)..."
+	cd apps/sync_api/infra/bootstrap && terraform init && \
+		terraform apply -auto-approve \
+			-var="project_id=$(STAGING_PROJECT)" \
+			-var="state_bucket_name=$(STAGING_TFSTATE_BUCKET)"
+
+provision-infra: infra-apply
 
 infra-destroy:
-	@echo "Destroying Terraform infrastructure..."
-	cd apps/sync_api/infra && terraform destroy
+	@echo "Destroying Terraform infrastructure ($(INFRA_ENV))..."
+	cd apps/sync_api/infra/envs/$(INFRA_ENV) && terraform destroy
 
 # Backend Deployment Targets
 backend-migrate:
@@ -987,9 +1067,134 @@ flutter-release-info:
 		echo "   Install: See INSTALL-WINDOWS.md"; \
 		echo ""; \
 	fi
-	@echo "────────────────────────────────────────────────────────────────────"
-	@echo ""
 	@echo "📚 Documentation:"
 	@echo "   - INSTALL-WINDOWS.md - Windows installation guide"
 	@echo "   - INSTALL-MACOS.md   - macOS installation guide"
 	@echo ""
+
+# -----------------------------------------------------------------------------
+# Model Context Protocol (MCP) Server for AI Assistants
+# -----------------------------------------------------------------------------
+.PHONY: mcp-start mcp-verify mcp-sync-check mcp-build
+
+mcp-start:
+	@echo "Starting POS-ERP MCP Server..."
+	cd apps/mcp_server && pnpm start
+
+mcp-verify:
+	@echo "Running POS-ERP MCP Diagnostic Verification..."
+	cd apps/mcp_server && pnpm test:verify
+
+mcp-sync-check:
+	@echo "Auditing Backend Endpoints vs MCP Tools..."
+	cd apps/mcp_server && pnpm sync:check
+
+mcp-build:
+	@echo "Building POS-ERP MCP Server..."
+	cd apps/mcp_server && pnpm build
+
+# -----------------------------------------------------------------------------
+# Multi-Agent Team Orchestration (agy + codex + opencode) & PDCA Quality Gates
+# -----------------------------------------------------------------------------
+.PHONY: check-backend check-admin check-pos check-all team-setup team-status team-clean team-check
+
+check-backend:
+	@./scripts/agent-team.sh check backend
+
+check-admin:
+	@./scripts/agent-team.sh check admin
+
+check-pos:
+	@./scripts/agent-team.sh check pos
+
+check-all:
+	@./scripts/agent-team.sh check all
+
+team-status:
+	@./scripts/agent-team.sh status
+
+team-setup:
+	@./scripts/agent-team.sh setup $(FEATURE)
+
+team-clean:
+	@./scripts/agent-team.sh clean
+
+# -----------------------------------------------------------------------------
+# Staging Environment (separate GCP project; see specs/014-staging-environment)
+# -----------------------------------------------------------------------------
+.PHONY: staging-guard deploy-staging backend-deploy-staging backend-migrate-staging backend-status-staging admin-deploy-staging flutter-web-deploy-staging flutter-apk-build-staging flutter-apk-upload-staging flutter-portal-deploy-staging
+
+staging-guard:
+	@if [ -z "$(STAGING_PROJECT)" ] || [ "$(STAGING_PROJECT)" = "REPLACE-WITH-STAGING-PROJECT-ID" ]; then \
+		echo "❌ STAGING_PROJECT is not set. Edit env/staging.env first."; exit 1; \
+	fi
+	@if [ "$(STAGING_PROJECT)" = "fresh-sensor-497515-d3" ]; then \
+		echo "❌ Refusing to run a staging target against the PROD project."; exit 1; \
+	fi
+
+# Deploy the CURRENT working tree (backend + admin + POS web) to staging.
+deploy-staging: staging-guard backend-deploy-staging admin-deploy-staging flutter-web-deploy-staging
+	@echo ""
+	@echo "✅ Staging deploy complete."
+	@echo "   API:   $(STAGING_API_URL)"
+	@echo "   Admin: https://$(STAGING_FIREBASE_SITE_ADMIN).web.app"
+	@echo "   POS:   https://$(STAGING_FIREBASE_SITE_POS).web.app"
+
+backend-deploy-staging: staging-guard
+	@echo "🚀 [staging] Deploying backend to Cloud Run ($(STAGING_PROJECT)/$(STAGING_SERVICE))..."
+	cd apps/sync_api && gcloud run deploy $(STAGING_SERVICE) \
+		--source . \
+		--region $(STAGING_REGION) \
+		--project $(STAGING_PROJECT) \
+		--platform managed \
+		--allow-unauthenticated \
+		--add-cloudsql-instances $(STAGING_DB_CONNECTION)
+
+backend-migrate-staging: staging-guard
+	@echo "🗄️  [staging] Running migrations via Cloud SQL proxy..."
+	@DB_PASS=$$(gcloud secrets versions access latest --secret=pos-db-password --project=$(STAGING_PROJECT)); \
+	cloud-sql-proxy $(STAGING_DB_CONNECTION) --port $(STAGING_MIGRATE_PORT) & \
+	PROXY_PID=$$!; \
+	sleep 5; \
+	cd apps/sync_api && \
+		DATABASE_URL="postgresql://$(STAGING_DB_USER):$$DB_PASS@localhost:$(STAGING_MIGRATE_PORT)/$(STAGING_DB_NAME)" \
+		NODE_ENV=production \
+		npx tsx scripts/idempotent-deploy-migrations.ts; \
+	EXIT=$$?; \
+	kill $$PROXY_PID 2>/dev/null || true; \
+	exit $$EXIT
+
+backend-status-staging: staging-guard
+	@echo "📊 [staging] Status"
+	@gcloud run services describe $(STAGING_SERVICE) --region $(STAGING_REGION) --project $(STAGING_PROJECT) --format="value(status.url)"
+	@curl -s "$$(gcloud run services describe $(STAGING_SERVICE) --region $(STAGING_REGION) --project $(STAGING_PROJECT) --format='value(status.url)')/api/health" | grep -q OK && echo "✅ Healthy" || echo "❌ Unhealthy"
+
+admin-deploy-staging: staging-guard
+	@echo "🖥️  [staging] Building & deploying admin dashboard..."
+	cd apps/business_control_tauri && VITE_API_URL=$(STAGING_API_URL) pnpm build
+	cd apps/business_control_tauri && firebase deploy --only hosting --project $(STAGING_PROJECT) -c firebase.staging.json
+
+flutter-web-deploy-staging: staging-guard
+	@echo "🌐 [staging] Building & deploying POS web..."
+	cd apps/pos_flutter && flutter build web --release --dart-define=API_URL=$(STAGING_API_URL)
+	@if [ -f apps/pos_flutter/web/descargas-staging.html ]; then \
+		cp apps/pos_flutter/web/descargas-staging.html apps/pos_flutter/build/web/descargas.html; \
+	fi
+	cd apps/pos_flutter && firebase deploy --only hosting --project $(STAGING_PROJECT) -c firebase.staging.json
+
+flutter-apk-build-staging: staging-guard
+	@echo "🤖 [staging] Building Android APK (API_URL=$(STAGING_API_URL))..."
+	cd apps/pos_flutter && flutter build apk --release --dart-define=API_URL=$(STAGING_API_URL)
+	@echo "   Output: apps/pos_flutter/build/app/outputs/flutter-apk/app-release.apk"
+
+flutter-apk-upload-staging: staging-guard flutter-apk-build-staging
+	@echo "☁️  [staging] Uploading APK to gs://$(STAGING_RELEASES_BUCKET)..."
+	gcloud storage cp apps/pos_flutter/build/app/outputs/flutter-apk/app-release.apk gs://$(STAGING_RELEASES_BUCKET)/android/$(STAGING_APK_NAME)
+	@if [ -f apps/pos_flutter/web/descargas-staging.html ]; then \
+		gcloud storage cp apps/pos_flutter/web/descargas-staging.html gs://$(STAGING_RELEASES_BUCKET)/index.html; \
+	fi
+	@echo "   APK: https://storage.googleapis.com/$(STAGING_RELEASES_BUCKET)/android/$(STAGING_APK_NAME)"
+
+flutter-portal-deploy-staging: flutter-apk-upload-staging flutter-web-deploy-staging
+	@echo "✅ [staging] Portal + APK + POS web deployed."
+

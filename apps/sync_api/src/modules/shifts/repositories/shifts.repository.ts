@@ -11,14 +11,14 @@ export class ShiftsRepository {
     private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
-  async findActiveShift(branchId: string, cashierId: string) {
+  async findActiveShift(branchId: string, cashierId?: string) {
     const results = await this.db
       .select()
       .from(schema.cashShifts)
       .where(
         and(
           eq(schema.cashShifts.branchId, branchId),
-          eq(schema.cashShifts.cashierId, cashierId),
+          cashierId ? eq(schema.cashShifts.cashierId, cashierId) : undefined,
           eq(schema.cashShifts.status, 'open'),
         ),
       );

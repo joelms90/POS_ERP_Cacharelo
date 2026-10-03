@@ -2,7 +2,7 @@ import { Injectable, Inject, NotFoundException, BadRequestException } from '@nes
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
-import { eq, and, inArray, desc, sql, isNull } from 'drizzle-orm';
+import { eq, and, or, inArray, desc, sql, isNull } from 'drizzle-orm';
 import { ThresholdsService } from '../thresholds/thresholds.service';
 
 @Injectable()
@@ -66,6 +66,13 @@ export class AlertsService {
       .from(schema.branches)
       .where(eq(schema.branches.businessId, businessId));
 
+    const warehouses = await this.db
+      .select({ id: schema.warehouses.id, name: schema.warehouses.name })
+      .from(schema.warehouses)
+      .where(
+        and(eq(schema.warehouses.businessId, businessId), eq(schema.warehouses.isActive, true)),
+      );
+
     // Per-branch thresholds (explicit overrides only)
     const thresholds = await this.db
       .select()
@@ -75,6 +82,20 @@ export class AlertsService {
     const thresholdMap = new Map<string, { minStock: number; maxStock: number }>();
     for (const t of thresholds) {
       thresholdMap.set(`${t.productId}|${t.branchId}`, {
+        minStock: parseFloat(t.minStock || '0'),
+        maxStock: parseFloat(t.maxStock || '0'),
+      });
+    }
+
+    // Per-warehouse thresholds (explicit overrides / minimums)
+    const warehouseThresholds = await this.db
+      .select()
+      .from(schema.warehouseStockThresholds)
+      .where(eq(schema.warehouseStockThresholds.businessId, businessId));
+
+    const warehouseThresholdMap = new Map<string, { minStock: number; maxStock: number }>();
+    for (const t of warehouseThresholds) {
+      warehouseThresholdMap.set(`${t.productId}|${t.warehouseId}`, {
         minStock: parseFloat(t.minStock || '0'),
         maxStock: parseFloat(t.maxStock || '0'),
       });
@@ -115,7 +136,35 @@ export class AlertsService {
         .groupBy(schema.stockLevels.productId, schema.stockLevels.branchId);
 
       for (const r of branchStockRows) {
-        branchStockMap.set(`${r.productId}|${r.branchId}`, parseFloat(r.qty || '0'));
+        if (r.branchId) {
+          branchStockMap.set(`${r.productId}|${r.branchId}`, parseFloat(r.qty || '0'));
+        }
+      }
+    }
+
+    // Warehouse-level stock
+    const warehouseStockMap = new Map<string, number>();
+    if (warehouses.length > 0) {
+      const warehouseIds = warehouses.map((w) => w.id);
+      const warehouseStockRows = await this.db
+        .select({
+          productId: schema.stockLevels.productId,
+          warehouseId: schema.stockLevels.warehouseId,
+          qty: sql<string>`COALESCE(SUM(${schema.stockLevels.quantity}), 0)::numeric`,
+        })
+        .from(schema.stockLevels)
+        .where(
+          and(
+            inArray(schema.stockLevels.productId, productIds),
+            inArray(schema.stockLevels.warehouseId, warehouseIds),
+          ),
+        )
+        .groupBy(schema.stockLevels.productId, schema.stockLevels.warehouseId);
+
+      for (const r of warehouseStockRows) {
+        if (r.warehouseId) {
+          warehouseStockMap.set(`${r.productId}|${r.warehouseId}`, parseFloat(r.qty || '0'));
+        }
       }
     }
 
@@ -132,8 +181,11 @@ export class AlertsService {
 
     const existingGlobalMap = new Map<string, typeof existingAlerts[number]>();
     const existingBranchMap = new Map<string, typeof existingAlerts[number]>();
+    const existingWarehouseMap = new Map<string, typeof existingAlerts[number]>();
     for (const a of existingAlerts) {
-      if (a.branchId) {
+      if (a.warehouseId) {
+        existingWarehouseMap.set(`${a.productId}|${a.warehouseId}`, a);
+      } else if (a.branchId) {
         existingBranchMap.set(`${a.productId}|${a.branchId}`, a);
       } else {
         existingGlobalMap.set(a.productId, a);
@@ -150,6 +202,7 @@ export class AlertsService {
         businessId: string;
         productId: string;
         branchId: string | null;
+        warehouseId: string | null;
         alertType: string;
         threshold: string;
         currentQty: string;
@@ -176,17 +229,27 @@ export class AlertsService {
           const pgCode = err?.code || err?.cause?.code;
           if (pgCode === '23505') {
             // Concurrent execution already inserted the active alert. Fall back to update.
-            const condition = input.branchId
-              ? and(
-                  eq(schema.inventoryAlerts.productId, input.productId),
-                  eq(schema.inventoryAlerts.branchId, input.branchId),
-                  sql`${schema.inventoryAlerts.status} IN ('active', 'acknowledged')`,
-                )
-              : and(
-                  eq(schema.inventoryAlerts.productId, input.productId),
-                  isNull(schema.inventoryAlerts.branchId),
-                  sql`${schema.inventoryAlerts.status} IN ('active', 'acknowledged')`,
-                );
+            let condition;
+            if (input.warehouseId) {
+              condition = and(
+                eq(schema.inventoryAlerts.productId, input.productId),
+                eq(schema.inventoryAlerts.warehouseId, input.warehouseId),
+                sql`${schema.inventoryAlerts.status} IN ('active', 'acknowledged')`,
+              );
+            } else if (input.branchId) {
+              condition = and(
+                eq(schema.inventoryAlerts.productId, input.productId),
+                eq(schema.inventoryAlerts.branchId, input.branchId),
+                sql`${schema.inventoryAlerts.status} IN ('active', 'acknowledged')`,
+              );
+            } else {
+              condition = and(
+                eq(schema.inventoryAlerts.productId, input.productId),
+                isNull(schema.inventoryAlerts.branchId),
+                isNull(schema.inventoryAlerts.warehouseId),
+                sql`${schema.inventoryAlerts.status} IN ('active', 'acknowledged')`,
+              );
+            }
 
             await this.db
               .update(schema.inventoryAlerts)
@@ -223,6 +286,7 @@ export class AlertsService {
           businessId,
           productId: product.id,
           branchId: null,
+          warehouseId: null,
           alertType: globalQty <= 0 ? 'out_of_stock' : 'low_stock',
           threshold: globalMin.toString(),
           currentQty: globalQty.toString(),
@@ -244,6 +308,7 @@ export class AlertsService {
           businessId,
           productId,
           branchId,
+          warehouseId: null,
           alertType: branchQty <= 0 ? 'out_of_stock' : 'low_stock',
           threshold: thr.minStock.toString(),
           currentQty: branchQty.toString(),
@@ -253,9 +318,39 @@ export class AlertsService {
       }
     }
 
-    // 3. Resolve any branch alert whose threshold was removed (no longer has a threshold)
+    // 3. WAREHOUSE alerts (needs purchase / production) — for explicit per-warehouse thresholds
+    for (const [key, thr] of warehouseThresholdMap.entries()) {
+      if (thr.minStock <= 0) continue;
+      const [productId, warehouseId] = key.split('|');
+      const whQty = warehouseStockMap.get(key) ?? 0;
+      const existing = existingWarehouseMap.get(key);
+
+      if (whQty < thr.minStock) {
+        await upsertAlert(existing, {
+          businessId,
+          productId,
+          branchId: null,
+          warehouseId,
+          alertType: whQty <= 0 ? 'out_of_stock' : 'low_stock',
+          threshold: thr.minStock.toString(),
+          currentQty: whQty.toString(),
+        });
+      } else if (existing) {
+        await resolveAlert(existing);
+      }
+    }
+
+    // 4. Resolve any branch alert whose threshold was removed (no longer has a threshold)
     for (const [key, existing] of existingBranchMap.entries()) {
       const thr = thresholdMap.get(key);
+      if (!thr || thr.minStock <= 0) {
+        await resolveAlert(existing);
+      }
+    }
+
+    // 5. Resolve any warehouse alert whose threshold was removed (no longer has a threshold)
+    for (const [key, existing] of existingWarehouseMap.entries()) {
+      const thr = warehouseThresholdMap.get(key);
       if (!thr || thr.minStock <= 0) {
         await resolveAlert(existing);
       }
@@ -268,16 +363,56 @@ export class AlertsService {
   // Queries
   // ---------------------------------------------------------------------------
 
-  async list(businessId: string, branchId?: string, status?: string) {
+  async list(
+    businessId: string,
+    filterOrBranchId?: string | { branchId?: string; warehouseId?: string; locationId?: string; status?: string },
+    statusParam?: string,
+  ) {
+    let branchId: string | undefined;
+    let warehouseId: string | undefined;
+    let locationId: string | undefined;
+    let status: string | undefined = statusParam;
+
+    if (typeof filterOrBranchId === 'object' && filterOrBranchId !== null) {
+      branchId = filterOrBranchId.branchId;
+      warehouseId = filterOrBranchId.warehouseId;
+      locationId = filterOrBranchId.locationId;
+      if (filterOrBranchId.status) status = filterOrBranchId.status;
+    } else if (typeof filterOrBranchId === 'string') {
+      branchId = filterOrBranchId;
+    }
+
     const conditions = [eq(schema.inventoryAlerts.businessId, businessId)];
-    if (branchId) conditions.push(eq(schema.inventoryAlerts.branchId, branchId));
-    if (status) conditions.push(eq(schema.inventoryAlerts.status, status));
+
+    if (warehouseId) {
+      conditions.push(eq(schema.inventoryAlerts.warehouseId, warehouseId));
+    } else if (locationId) {
+      conditions.push(
+        or(
+          eq(schema.inventoryAlerts.branchId, locationId),
+          eq(schema.inventoryAlerts.warehouseId, locationId),
+        )!,
+      );
+    } else if (branchId) {
+      // Support either branchId or warehouseId passed in branchId
+      conditions.push(
+        or(
+          eq(schema.inventoryAlerts.branchId, branchId),
+          eq(schema.inventoryAlerts.warehouseId, branchId),
+        )!,
+      );
+    }
+
+    if (status) {
+      conditions.push(eq(schema.inventoryAlerts.status, status));
+    }
 
     const alerts = await this.db
       .select({
         id: schema.inventoryAlerts.id,
         productId: schema.inventoryAlerts.productId,
         branchId: schema.inventoryAlerts.branchId,
+        warehouseId: schema.inventoryAlerts.warehouseId,
         alertType: schema.inventoryAlerts.alertType,
         threshold: schema.inventoryAlerts.threshold,
         currentQty: schema.inventoryAlerts.currentQty,
@@ -289,10 +424,12 @@ export class AlertsService {
         itemType: schema.products.itemType,
         providerId: schema.products.providerId,
         branchName: schema.branches.name,
+        warehouseName: schema.warehouses.name,
       })
       .from(schema.inventoryAlerts)
       .innerJoin(schema.products, eq(schema.inventoryAlerts.productId, schema.products.id))
       .leftJoin(schema.branches, eq(schema.inventoryAlerts.branchId, schema.branches.id))
+      .leftJoin(schema.warehouses, eq(schema.inventoryAlerts.warehouseId, schema.warehouses.id))
       .where(and(...conditions))
       .orderBy(desc(schema.inventoryAlerts.createdAt));
 
@@ -318,32 +455,57 @@ export class AlertsService {
     }
 
     return alerts.map((a) => {
-      if (!a.branchId) {
-        return { ...a, hasProvider: !!a.providerId, transferableQty: null };
+      let locationType: 'global' | 'branch' | 'warehouse' = 'global';
+      let locationName = 'Global';
+      if (a.warehouseId) {
+        locationType = 'warehouse';
+        locationName = a.warehouseName || 'Bodega';
+      } else if (a.branchId) {
+        locationType = 'branch';
+        locationName = a.branchName || 'Sucursal';
+      }
+
+      if (!a.branchId && !a.warehouseId) {
+        return { ...a, locationType, locationName, hasProvider: !!a.providerId, transferableQty: null };
+      }
+      if (a.warehouseId) {
+        return { ...a, locationType, locationName, hasProvider: !!a.providerId, transferableQty: null };
       }
       const global = globalStockMap.get(a.productId) ?? 0;
       const branchQty = parseFloat(a.currentQty || '0');
-      return { ...a, hasProvider: !!a.providerId, transferableQty: global - branchQty };
+      return {
+        ...a,
+        locationType,
+        locationName,
+        hasProvider: !!a.providerId,
+        transferableQty: Math.max(0, global - branchQty),
+      };
     });
   }
 
-  async getSummary(businessId: string, branchId?: string) {
+  async getSummary(
+    businessId: string,
+    filterOrBranchId?: string | { branchId?: string; warehouseId?: string; locationId?: string },
+  ) {
     await this.runAlertEngine(businessId);
 
-    const alerts = await this.list(businessId, branchId);
+    const alerts = await this.list(businessId, filterOrBranchId);
 
     const active = alerts.filter((a) => a.status === 'active' || a.status === 'acknowledged');
-    const globalActive = active.filter((a) => !a.branchId);
-    const branchActive = active.filter((a) => a.branchId);
+    const globalActive = active.filter((a) => !a.branchId && !a.warehouseId);
+    const branchActive = active.filter((a) => !!a.branchId);
+    const warehouseActive = active.filter((a) => !!a.warehouseId);
 
     const pendingRequisitions = await this.countPendingRequisitions(businessId);
     const draftPos = await this.countDraftPos(businessId);
 
     return {
       summary: {
-        outOfStock: globalActive.filter((a) => a.alertType === 'out_of_stock').length,
-        lowStock: globalActive.filter((a) => a.alertType === 'low_stock').length,
+        outOfStock: active.filter((a) => a.alertType === 'out_of_stock').length,
+        lowStock: active.filter((a) => a.alertType === 'low_stock').length,
+        globalAlerts: globalActive.length,
         branchAlerts: branchActive.length,
+        warehouseAlerts: warehouseActive.length,
         totalAlerts: active.length,
         pendingRequisitions,
         draftPurchaseOrders: draftPos,
@@ -500,7 +662,7 @@ export class AlertsService {
   }
 
   /**
-   * One-click draft purchase order from an alert (global low stock).
+   * One-click draft purchase order from an alert (global or warehouse low stock).
    */
   async generatePurchaseOrder(alertId: string, userId: string) {
     const [alert] = await this.db
@@ -524,13 +686,40 @@ export class AlertsService {
       throw new BadRequestException('Producto sin proveedor registrado.');
     }
 
-    const warehouse = await this.resolveDefaultWarehouse(alert.businessId);
+    let warehouse: any = null;
+    let minStock = parseFloat(product.minStock || '0');
+    let maxStock = parseFloat(product.maxStock || '0');
+    let currentStock = await this.getGlobalStock(alert.productId);
 
-    const globalStock = await this.getGlobalStock(alert.productId);
-    const globalMin = parseFloat(product.minStock || '0');
-    const globalMax = parseFloat(product.maxStock || '0');
-    let qty = globalMax - globalStock;
-    if (qty <= 0) qty = globalMin > 0 ? globalMin * 2 : 1;
+    if (alert.warehouseId) {
+      const [wh] = await this.db
+        .select()
+        .from(schema.warehouses)
+        .where(eq(schema.warehouses.id, alert.warehouseId))
+        .limit(1);
+      warehouse = wh ?? null;
+
+      const [whThr] = await this.db
+        .select()
+        .from(schema.warehouseStockThresholds)
+        .where(
+          and(
+            eq(schema.warehouseStockThresholds.warehouseId, alert.warehouseId),
+            eq(schema.warehouseStockThresholds.productId, alert.productId),
+          ),
+        )
+        .limit(1);
+      if (whThr) {
+        if (parseFloat(whThr.minStock || '0') > 0) minStock = parseFloat(whThr.minStock || '0');
+        if (parseFloat(whThr.maxStock || '0') > 0) maxStock = parseFloat(whThr.maxStock || '0');
+      }
+      currentStock = parseFloat(alert.currentQty || '0');
+    } else {
+      warehouse = await this.resolveDefaultWarehouse(alert.businessId);
+    }
+
+    let qty = maxStock - currentStock;
+    if (qty <= 0) qty = minStock > 0 ? minStock * 2 : 1;
 
     return this.db.transaction(async (tx) => {
       const [po] = await tx
@@ -542,7 +731,9 @@ export class AlertsService {
           poNumber: await this.nextPoNumber(tx, alert.businessId),
           status: 'draft',
           createdBy: userId,
-          notes: `Generada desde alerta de inventario (${alert.alertType})`,
+          notes: alert.warehouseId && warehouse
+            ? `Generada desde alerta de inventario (Bodega: ${warehouse.name})`
+            : `Generada desde alerta de inventario (${alert.alertType})`,
         })
         .returning();
 
@@ -558,8 +749,8 @@ export class AlertsService {
   }
 
   /**
-   * Bulk: create draft purchase orders from a selection of (global) alerts,
-   * grouping products by provider into one OC per provider.
+   * Bulk: create draft purchase orders from a selection of (global or warehouse) alerts,
+   * grouping products by provider and destination warehouse into draft OCs.
    */
   async generatePurchaseOrders(alertIds: string[], userId: string) {
     if (!alertIds || alertIds.length === 0) {
@@ -576,10 +767,10 @@ export class AlertsService {
     }
 
     const businessId = alerts[0].businessId;
-    const globalAlerts = alerts.filter((a) => !a.branchId);
+    const poAlerts = alerts.filter((a) => !a.branchId);
 
-    const items: Array<{ productId: string; quantity: number }> = [];
-    for (const alert of globalAlerts) {
+    const items: Array<{ productId: string; quantity: number; warehouseId?: string | null }> = [];
+    for (const alert of poAlerts) {
       const [product] = await this.db
         .select()
         .from(schema.products)
@@ -587,13 +778,32 @@ export class AlertsService {
         .limit(1);
       if (!product) continue;
 
-      const globalStock = await this.getGlobalStock(alert.productId);
-      const globalMin = parseFloat(product.minStock || '0');
-      const globalMax = parseFloat(product.maxStock || '0');
-      let qty = globalMax - globalStock;
-      if (qty <= 0) qty = globalMin > 0 ? globalMin * 2 : 1;
+      let minStock = parseFloat(product.minStock || '0');
+      let maxStock = parseFloat(product.maxStock || '0');
+      let currentStock = await this.getGlobalStock(alert.productId);
 
-      items.push({ productId: alert.productId, quantity: qty });
+      if (alert.warehouseId) {
+        const [whThr] = await this.db
+          .select()
+          .from(schema.warehouseStockThresholds)
+          .where(
+            and(
+              eq(schema.warehouseStockThresholds.warehouseId, alert.warehouseId),
+              eq(schema.warehouseStockThresholds.productId, alert.productId),
+            ),
+          )
+          .limit(1);
+        if (whThr) {
+          if (parseFloat(whThr.minStock || '0') > 0) minStock = parseFloat(whThr.minStock || '0');
+          if (parseFloat(whThr.maxStock || '0') > 0) maxStock = parseFloat(whThr.maxStock || '0');
+        }
+        currentStock = parseFloat(alert.currentQty || '0');
+      }
+
+      let qty = maxStock - currentStock;
+      if (qty <= 0) qty = minStock > 0 ? minStock * 2 : 1;
+
+      items.push({ productId: alert.productId, quantity: qty, warehouseId: alert.warehouseId || null });
     }
 
     return this.createPurchaseOrdersForProducts(
@@ -611,7 +821,7 @@ export class AlertsService {
   async generatePurchaseOrdersByProducts(
     businessId: string,
     userId: string,
-    items: Array<{ productId: string; quantity: number }>,
+    items: Array<{ productId: string; quantity: number; warehouseId?: string | null }>,
   ) {
     return this.createPurchaseOrdersForProducts(
       businessId,
@@ -624,16 +834,22 @@ export class AlertsService {
   private async createPurchaseOrdersForProducts(
     businessId: string,
     userId: string,
-    items: Array<{ productId: string; quantity: number }>,
+    items: Array<{ productId: string; quantity: number; warehouseId?: string | null }>,
     notes: string,
   ) {
     if (!items || items.length === 0) {
       throw new BadRequestException('No hay productos para generar la orden de compra.');
     }
 
-    const itemsByProvider = new Map<
+    const defaultWarehouse = await this.resolveDefaultWarehouse(businessId);
+
+    const itemsByGroup = new Map<
       string,
-      Array<{ productId: string; qty: number; cost: string }>
+      {
+        providerId: string;
+        warehouseId: string | null;
+        items: Array<{ productId: string; qty: number; cost: string }>;
+      }
     >();
     const skipped: string[] = [];
 
@@ -646,18 +862,28 @@ export class AlertsService {
         continue;
       }
 
-      const list = itemsByProvider.get(provider.providerId) || [];
-      list.push({ productId: it.productId, qty: it.quantity, cost: provider.cost });
-      itemsByProvider.set(provider.providerId, list);
+      const targetWarehouseId = it.warehouseId || defaultWarehouse?.id || null;
+      const groupKey = `${provider.providerId}|${targetWarehouseId || 'none'}`;
+
+      let group = itemsByGroup.get(groupKey);
+      if (!group) {
+        group = {
+          providerId: provider.providerId,
+          warehouseId: targetWarehouseId,
+          items: [],
+        };
+        itemsByGroup.set(groupKey, group);
+      }
+
+      group.items.push({ productId: it.productId, qty: it.quantity, cost: provider.cost });
     }
 
-    if (itemsByProvider.size === 0) {
+    if (itemsByGroup.size === 0) {
       throw new BadRequestException(
         'Ningún producto tiene un proveedor registrado.',
       );
     }
 
-    const warehouse = await this.resolveDefaultWarehouse(businessId);
     const purchaseOrders: Array<{
       purchaseOrderId: string;
       poNumber: string;
@@ -665,14 +891,14 @@ export class AlertsService {
     }> = [];
 
     await this.db.transaction(async (tx) => {
-      for (const [providerId, list] of itemsByProvider.entries()) {
+      for (const group of itemsByGroup.values()) {
         const poNumber = await this.nextPoNumber(tx, businessId);
         const [po] = await tx
           .insert(schema.purchaseOrders)
           .values({
             businessId,
-            providerId,
-            warehouseId: warehouse ? warehouse.id : null,
+            providerId: group.providerId,
+            warehouseId: group.warehouseId,
             poNumber,
             status: 'draft',
             createdBy: userId,
@@ -681,7 +907,7 @@ export class AlertsService {
           .returning();
 
         await tx.insert(schema.purchaseOrderItems).values(
-          list.map((it) => ({
+          group.items.map((it) => ({
             poId: po.id,
             productId: it.productId,
             quantityOrdered: it.qty.toFixed(3),
@@ -689,7 +915,7 @@ export class AlertsService {
           })),
         );
 
-        purchaseOrders.push({ purchaseOrderId: po.id, poNumber, itemCount: list.length });
+        purchaseOrders.push({ purchaseOrderId: po.id, poNumber, itemCount: group.items.length });
       }
     });
 

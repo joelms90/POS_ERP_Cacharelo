@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { api, InventoryAlert, InventoryAlertSummary, Branch, Provider } from '../services/api';
+import { api, InventoryAlert, InventoryAlertSummary, Branch, Warehouse, Provider } from '../services/api';
 import { Heading } from '../components/atoms/Heading';
 import { Button } from '../components/atoms/Button';
 import { Input } from '../components/atoms/Input';
@@ -19,6 +19,7 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
   const [summary, setSummary] = useState<InventoryAlertSummary['summary'] | null>(null);
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [branchFilter, setBranchFilter] = useState('');
   const [hideResolved, setHideResolved] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -47,14 +48,16 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
     setLoading(true);
     setError(null);
     try {
-      const [summaryData, branchesData, providersData] = await Promise.all([
+      const [summaryData, branchesData, warehousesData, providersData] = await Promise.all([
         api.getInventoryAlertSummary(businessId, branch || undefined),
         api.getBranches(businessId),
+        api.getWarehouses(businessId).catch(() => [] as Warehouse[]),
         api.getProviders(businessId).catch(() => [] as Provider[]),
       ]);
       setSummary(summaryData.summary);
       setAlerts(summaryData.alerts);
       setBranches(branchesData);
+      setWarehouses(warehousesData);
       setProviders(providersData);
     } catch (e: any) {
       setError(e?.message || 'No se pudo cargar el panel de inventario.');
@@ -220,12 +223,13 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
     provider.name.toLocaleLowerCase().includes(providerSearch.trim().toLocaleLowerCase())
   );
 
-  const SummaryCard: React.FC<{ label: string; value: number; tone: 'red' | 'amber' | 'green' | 'gold' }> = ({ label, value, tone }) => {
+  const SummaryCard: React.FC<{ label: string; value: number; tone: 'red' | 'amber' | 'green' | 'gold' | 'blue' }> = ({ label, value, tone }) => {
     const tones = {
       red: 'border-error-red/50 text-error-red',
       amber: 'border-aged-bronze text-champagne-gold',
       green: 'border-emerald-500/50 text-emerald-400',
       gold: 'border-champagne-gold/50 text-champagne-gold',
+      blue: 'border-blue-500/50 text-blue-400',
     };
     return (
       <div className={`bg-charcoal-surface border ${tones[tone]} rounded-lg p-4 flex flex-col gap-1`}>
@@ -253,10 +257,21 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
             onChange={(e) => handleBranchFilter(e.target.value)}
             className="bg-charcoal-surface border border-aged-bronze/35 rounded-md px-3 py-2 text-xs text-text-primary focus:outline-none"
           >
-            <option value="">Todas las sucursales</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
+            <option value="">Todas las ubicaciones</option>
+            {branches.length > 0 && (
+              <optgroup label="Sucursales">
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </optgroup>
+            )}
+            {warehouses.length > 0 && (
+              <optgroup label="Bodegas / Almacenes">
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </optgroup>
+            )}
           </select>
           <Button variant="secondary" size="sm" onClick={handleRefresh} disabled={refreshing}>
             {refreshing ? 'Actualizando...' : 'Actualizar alertas'}
@@ -272,9 +287,10 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
       )}
 
       {summary && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <SummaryCard label="Sin stock (global)" value={summary.outOfStock} tone="red" />
-          <SummaryCard label="Bajo mínimo (global)" value={summary.lowStock} tone="amber" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <SummaryCard label="Sin stock" value={summary.outOfStock} tone="red" />
+          <SummaryCard label="Bajo mínimo" value={summary.lowStock} tone="amber" />
+          <SummaryCard label="Alertas en bodegas" value={summary.warehouseAlerts ?? 0} tone="blue" />
           <SummaryCard label="Requisiciones sugeridas" value={summary.branchAlerts} tone="gold" />
           <SummaryCard label="OC en borrador" value={summary.draftPurchaseOrders} tone="green" />
         </div>
@@ -324,11 +340,14 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
         )}
 
         {visibleAlerts.map((alert) => {
-          const isGlobal = !alert.branchId;
+          const isWarehouse = !!alert.warehouseId;
+          const isBranch = !!alert.branchId;
+          const isGlobal = !isWarehouse && !isBranch;
           const hasTransferable = (alert.transferableQty ?? 0) > 0;
           const isRawMaterial = alert.itemType === 'raw_material';
-          const isRequisition = !isGlobal && hasTransferable;
+          const isRequisition = isBranch && hasTransferable;
           const buyable = isRawMaterial && !!alert.hasProvider;
+          const canSelect = (isGlobal || isWarehouse) && alert.status !== 'resolved' && canBuy(alert);
           return (
           <div
             key={alert.id}
@@ -337,7 +356,7 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
               alert.alertType === 'out_of_stock' ? 'border-error-red/40' : 'border-aged-bronze/30'
             }`}
           >
-            {isGlobal && alert.status !== 'resolved' && canBuy(alert) && (
+            {canSelect && (
               <input
                 type="checkbox"
                 checked={selectedIds.has(alert.id)}
@@ -354,6 +373,16 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
                 }`}>
                   {alert.alertType === 'out_of_stock' ? 'Sin stock' : 'Bajo mínimo'}
                 </span>
+                {isWarehouse && (
+                  <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                    Bodega
+                  </span>
+                )}
+                {isBranch && (
+                  <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                    Sucursal
+                  </span>
+                )}
                 <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-charcoal-surface/60 border border-aged-bronze/20 text-text-secondary">
                   {isRequisition
                     ? 'Requisición sugerida'
@@ -366,11 +395,13 @@ export const InventoryDashboardPage: React.FC<InventoryDashboardPageProps> = ({ 
                 )}
               </div>
               <div className="text-xs text-text-secondary mt-1">
-                {isGlobal
-                  ? 'Todo el negocio (stock global)'
-                  : hasTransferable
-                    ? `${alert.branchName} (${alert.transferableQty} disponible para traspasar)`
-                    : `${alert.branchName} (sin stock para traspasar)`}{' '}
+                {isWarehouse
+                  ? `Bodega: ${alert.warehouseName || alert.locationName || 'Bodega'}`
+                  : isGlobal
+                    ? 'Todo el negocio (stock global)'
+                    : hasTransferable
+                      ? `${alert.branchName || alert.locationName} (${alert.transferableQty} disponible para traspasar)`
+                      : `${alert.branchName || alert.locationName} (sin stock para traspasar)`}{' '}
                 · Stock actual: <span className="text-text-primary">{alert.currentQty}</span> · Mínimo: <span className="text-text-primary">{alert.threshold}</span>
               </div>
             </div>

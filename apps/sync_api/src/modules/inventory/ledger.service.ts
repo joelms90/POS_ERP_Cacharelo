@@ -56,7 +56,7 @@ export class LedgerService {
       );
     }
 
-    // 1. Append the immutable ledger row (source of truth).
+    // BR-INV-001: append the immutable ledger row (source of truth).
     await tx.insert(schema.stockLedger).values({
       businessId,
       productId,

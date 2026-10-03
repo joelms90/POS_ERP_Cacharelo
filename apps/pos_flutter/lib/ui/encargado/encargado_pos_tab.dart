@@ -24,12 +24,70 @@ class _EncargadoPosTabState extends State<EncargadoPosTab> {
   String _selectedCategory = '';
   String _searchQuery = '';
   List<CartEntry> _cart = [];
+  int? _editingTableId;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.state.addListener(_onStateChanged);
+    final editingId = widget.state.editingOrderTableId;
+    if (editingId != null) {
+      _loadOrderIntoCart(editingId);
+    }
+  }
 
   @override
   void dispose() {
+    widget.state.removeListener(_onStateChanged);
     _searchController.dispose();
     _notesController.dispose();
     super.dispose();
+  }
+
+  void _onStateChanged() {
+    final editingId = widget.state.editingOrderTableId;
+    if (editingId == _editingTableId) return;
+    if (editingId == null) {
+      if (mounted) setState(() => _editingTableId = null);
+      return;
+    }
+    _loadOrderIntoCart(editingId);
+  }
+
+  void _loadOrderIntoCart(int tableId) {
+    final index = widget.state.tables.indexWhere((t) => t.id == tableId);
+    if (index == -1) return;
+    final table = widget.state.tables[index];
+    final entries = table.items
+        .map((orderItem) => CartEntry(
+              item: orderItem.item,
+              quantity: orderItem.quantity,
+              isSent: true,
+              notes: orderItem.notes,
+              clientUuid: orderItem.clientUuid,
+              remoteId: orderItem.remoteId,
+            ))
+        .toList();
+    if (!mounted) return;
+    setState(() {
+      _editingTableId = tableId;
+      _cart = entries;
+      _notesController.clear();
+    });
+  }
+
+  List<OrderItem> _buildOrderItems() {
+    final defaultNotes = _notesController.text.trim();
+    return _cart
+        .map((entry) => OrderItem(
+              item: entry.item,
+              quantity: entry.quantity,
+              notes: entry.notes.isNotEmpty ? entry.notes : defaultNotes,
+              isSent: entry.isSent,
+              clientUuid: entry.clientUuid,
+              remoteId: entry.remoteId,
+            ))
+        .toList();
   }
 
   List<String> get _categories {
@@ -164,8 +222,10 @@ class _EncargadoPosTabState extends State<EncargadoPosTab> {
   }
 
   void _clearCart() {
+    widget.state.clearEditingOrder();
     setState(() {
       _cart = [];
+      _editingTableId = null;
       _notesController.clear();
     });
   }
@@ -173,35 +233,45 @@ class _EncargadoPosTabState extends State<EncargadoPosTab> {
   Future<void> _handleCharging() async {
     if (_cart.isEmpty) return;
 
-    final table = await widget.state.startToGoOrder();
-    if (table == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: EmpireColors.errorRed,
-            content: Text('No se pudo crear la orden'),
-          ),
-        );
-      }
-      return;
-    }
+    final editingId = _editingTableId;
+    TableModel? table;
 
-    final orderItems = _cart.map((entry) {
-      return OrderItem(
-        item: entry.item,
-        quantity: entry.quantity,
-        notes: _notesController.text.trim(),
-        isSent: true,
+    if (editingId != null) {
+      final index = widget.state.tables.indexWhere((t) => t.id == editingId);
+      if (index == -1) return;
+      table = widget.state.tables[index];
+      // Persist any newly added items before charging the parked order.
+      await widget.state.submitOrder(
+        table.id,
+        _buildOrderItems(),
+        1,
+        ['M'],
+        printComanda: true,
       );
-    }).toList();
-
-    widget.state.submitOrder(
-      table.id,
-      orderItems,
-      1,
-      ['M'],
-      printComanda: false,
-    );
+    } else {
+      table = await widget.state.startToGoOrder();
+      if (table == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: EmpireColors.errorRed,
+              content: Text('No se pudo crear la orden'),
+            ),
+          );
+        }
+        return;
+      }
+      final orderItems = _buildOrderItems()
+          .map((item) => item.copyWith(isSent: true))
+          .toList();
+      await widget.state.submitOrder(
+        table.id,
+        orderItems,
+        1,
+        ['M'],
+        printComanda: false,
+      );
+    }
 
     if (mounted) {
       await _showPaymentFlow(table);
@@ -223,49 +293,67 @@ class _EncargadoPosTabState extends State<EncargadoPosTab> {
     }
   }
 
-  Future<void> _handlePrepareOrder() async {
+  /// Parks the current cart as an active to-go order without charging it,
+  /// so the operator can take more orders and charge them later from the
+  /// Órdenes tab. A kitchen comanda is sent at this point.
+  Future<void> _handleSaveOrder() async {
     if (_cart.isEmpty) return;
 
-    final table = await widget.state.startToGoOrder();
-    if (table == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: EmpireColors.errorRed,
-            content: Text('No se pudo crear la orden'),
-          ),
-        );
+    final editingId = _editingTableId;
+    int tableId;
+    String label;
+
+    if (editingId != null) {
+      final index = widget.state.tables.indexWhere((t) => t.id == editingId);
+      if (index == -1) return;
+      tableId = editingId;
+      label = widget.state.tables[index].label;
+    } else {
+      final table = await widget.state.startToGoOrder();
+      if (table == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: EmpireColors.errorRed,
+              content: Text('No se pudo crear la orden'),
+            ),
+          );
+        }
+        return;
       }
+      tableId = table.id;
+      label = table.label;
+    }
+
+    final hasNewItems = _cart.any((entry) => !entry.isSent);
+    final saved = await widget.state.submitOrder(
+      tableId,
+      _buildOrderItems(),
+      1,
+      ['M'],
+      printComanda: true,
+    );
+
+    if (!mounted) return;
+    if (!saved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: EmpireColors.errorRed,
+          content: Text('No se pudo guardar la orden. Intenta de nuevo.'),
+        ),
+      );
       return;
     }
 
-    final orderItems = _cart.map((entry) {
-      return OrderItem(
-        item: entry.item,
-        quantity: entry.quantity,
-        notes: _notesController.text.trim(),
-        isSent: true,
-      );
-    }).toList();
-
-    widget.state.submitOrder(
-      table.id,
-      orderItems,
-      1,
-      ['M'],
-      printComanda: false,
-    );
-
     _clearCart();
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: EmpireColors.successGreen,
-          content: Text('Orden enviada a preparación'),
-        ),
-      );
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: EmpireColors.successGreen,
+        content: Text(hasNewItems
+            ? 'Orden $label guardada y enviada a cocina'
+            : 'Orden $label actualizada'),
+      ),
+    );
   }
 
   @override
@@ -413,6 +501,7 @@ class _EncargadoPosTabState extends State<EncargadoPosTab> {
       child: Column(
         children: [
           _buildCartHeader(),
+          _buildEditingBanner(),
           Expanded(child: _buildCartItemList()),
           if (_cart.isNotEmpty) _buildCartFooter(),
         ],
@@ -452,6 +541,46 @@ class _EncargadoPosTabState extends State<EncargadoPosTab> {
                 visualDensity: VisualDensity.compact,
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditingBanner() {
+    if (_editingTableId == null) return const SizedBox.shrink();
+    final table = widget.state.editingOrder;
+    final label = table?.label ?? 'orden';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: EmpireColors.champagneGold.withValues(alpha: 0.12),
+        border: const Border(
+          bottom: BorderSide(color: EmpireColors.agedBronzeDark, width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.edit, color: EmpireColors.champagneGold, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Editando $label · agrega productos y guarda o cobra',
+              style: const TextStyle(
+                color: EmpireColors.champagneGold,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: _clearCart,
+            style: TextButton.styleFrom(
+              foregroundColor: EmpireColors.textSecondary,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              visualDensity: VisualDensity.compact,
+            ),
+            child: const Text('Salir', style: TextStyle(fontSize: 11)),
+          ),
         ],
       ),
     );
@@ -638,9 +767,10 @@ class _EncargadoPosTabState extends State<EncargadoPosTab> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _handlePrepareOrder,
-                    icon: const Icon(Icons.receipt_long, size: 18),
-                    label: const Text('Preparar', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: _handleSaveOrder,
+                    icon: const Icon(Icons.save, size: 18),
+                    label: const Text('GUARDAR ORDEN',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: EmpireColors.champagneGold,
                       foregroundColor: EmpireColors.obsidian,
@@ -663,8 +793,19 @@ class _EncargadoPosTabState extends State<EncargadoPosTab> {
 class CartEntry {
   final MenuItem item;
   int quantity;
+  bool isSent;
+  String notes;
+  String? clientUuid;
+  String? remoteId;
 
-  CartEntry({required this.item, this.quantity = 1});
+  CartEntry({
+    required this.item,
+    this.quantity = 1,
+    this.isSent = false,
+    this.notes = '',
+    this.clientUuid,
+    this.remoteId,
+  });
 }
 
 class _EncargadoPaymentScreen extends StatefulWidget {
@@ -694,7 +835,11 @@ class _EncargadoPaymentScreenState extends State<_EncargadoPaymentScreen> {
     super.dispose();
   }
 
-  double get _total => widget.table.total;
+  double get _discountAmount => double.parse(
+      (widget.table.subtotal * (_discount / 100.0)).toStringAsFixed(2));
+
+  double get _total =>
+      double.parse((widget.table.subtotal - _discountAmount).toStringAsFixed(2));
 
   void _processPayment() {
     if (_processing) return;
@@ -778,6 +923,8 @@ class _EncargadoPaymentScreenState extends State<_EncargadoPaymentScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 16),
+            _buildItemsSummary(),
             const SizedBox(height: 16),
             _buildDiscountRow(),
             const SizedBox(height: 20),
@@ -913,6 +1060,126 @@ class _EncargadoPaymentScreenState extends State<_EncargadoPaymentScreen> {
     _cashController.text = (current + amount).toStringAsFixed(2);
     FocusScope.of(context).unfocus();
     setState(() {});
+  }
+
+  Widget _buildItemsSummary() {
+    final items = widget.table.items;
+    final totalUnits = items.fold<int>(0, (sum, i) => sum + i.quantity);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: EmpireColors.onyxSurface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: EmpireColors.agedBronzeDark),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.receipt_long,
+                  color: EmpireColors.champagneGold, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                'Productos ($totalUnits)',
+                style: const TextStyle(
+                  color: EmpireColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (items.isEmpty)
+            const Text(
+              'Sin productos en la orden',
+              style: TextStyle(color: EmpireColors.textSecondary, fontSize: 13),
+            )
+          else
+            ...items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 30,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 2),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: EmpireColors.charcoalSurface,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: EmpireColors.agedBronzeDark),
+                      ),
+                      child: Text(
+                        '${item.quantity}x',
+                        style: const TextStyle(
+                          color: EmpireColors.champagneGold,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.item.name,
+                            style: const TextStyle(
+                                color: EmpireColors.textPrimary, fontSize: 13),
+                          ),
+                          if (item.modifiers.isNotEmpty)
+                            Text(
+                              item.modifiers.join(', '),
+                              style: const TextStyle(
+                                  color: EmpireColors.textSecondary,
+                                  fontSize: 11),
+                            ),
+                          if (item.notes.isNotEmpty)
+                            Text(
+                              item.notes,
+                              style: const TextStyle(
+                                color: EmpireColors.textSecondary,
+                                fontSize: 11,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '\$${item.totalPrice.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: EmpireColors.textGold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const Divider(height: 18, color: EmpireColors.agedBronzeDark),
+          _buildInfoRow(
+              'Subtotal', '\$${widget.table.subtotal.toStringAsFixed(2)}'),
+          if (_discount > 0) ...[
+            const SizedBox(height: 6),
+            _buildInfoRow(
+              'Descuento (${_discount.toStringAsFixed(0)}%)',
+              '-\$${_discountAmount.toStringAsFixed(2)}',
+            ),
+          ],
+          const SizedBox(height: 6),
+          _buildInfoRow('Total a pagar', '\$${_total.toStringAsFixed(2)}'),
+        ],
+      ),
+    );
   }
 
   Widget _buildDiscountRow() {

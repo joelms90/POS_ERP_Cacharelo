@@ -24,4 +24,13 @@ export class CloseShiftDto {
   @IsOptional()
   @MaxLength(500)
   closeNotes?: string;
+
+  @IsNumberString()
+  @IsOptional()
+  nextShiftFloat?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  receivedBy?: string;
 }

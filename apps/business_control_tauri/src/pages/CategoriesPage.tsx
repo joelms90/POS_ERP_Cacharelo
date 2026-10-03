@@ -79,8 +79,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ businessId }) =>
         const updated = await api.updateCategory(editingCategory.id, {
           name: trimmedName,
           description: editingCategory.description?.trim() || undefined,
-          // `null` clears an existing KDS station. Sending `undefined` omits the
-          // field, leaving a category previously assigned to cocina/barra unchanged.
+          // BR-KDS-001: null explicitly clears an existing KDS station.
           targetStation: editingCategory.targetStation || null,
         });
         setCategories((prev) =>
@@ -92,7 +91,7 @@ export const CategoriesPage: React.FC<CategoriesPageProps> = ({ businessId }) =>
         const saved = await api.addCategory({
           name: trimmedName,
           description: editingCategory.description?.trim() || undefined,
-          // Explicitly persist no KDS station instead of allowing the DB default.
+          // BR-KDS-001: persist no KDS station instead of allowing the DB default.
           targetStation: editingCategory.targetStation || null,
         }, businessId);
         setCategories((prev) => [...prev, saved]);

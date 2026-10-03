@@ -28,6 +28,13 @@ export async function runMigrations() {
     });
     console.log('✅ Migrations completed successfully.');
 
+    // The original users.role column was varchar(20), which cannot store the
+    // 29-character warehouse_purchasing_operator role.
+    await db.execute(sql`
+      ALTER TABLE users ALTER COLUMN role TYPE varchar(50);
+    `);
+    console.log('✅ User role column length ensured.');
+
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS ticket_fiscal_configurations (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -305,10 +312,22 @@ export async function runMigrations() {
     await db.execute(sql`
       ALTER TABLE inventory_alerts ALTER COLUMN branch_id DROP NOT NULL;
     `);
+    await db.execute(sql`
+      ALTER TABLE inventory_alerts ADD COLUMN IF NOT EXISTS warehouse_id uuid REFERENCES warehouses(id);
+    `);
     await db.execute(
-      sql`CREATE UNIQUE INDEX IF NOT EXISTS unq_ia_product_global_active ON inventory_alerts(product_id) WHERE branch_id IS NULL AND status IN ('active', 'acknowledged');`,
+      sql`CREATE INDEX IF NOT EXISTS idx_ia_warehouse_status ON inventory_alerts(warehouse_id, status);`,
     );
-    console.log('✅ Global inventory alert support ensured.');
+    await db.execute(
+      sql`DROP INDEX IF EXISTS unq_ia_product_global_active;`,
+    );
+    await db.execute(
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS unq_ia_product_global_active ON inventory_alerts(product_id) WHERE branch_id IS NULL AND warehouse_id IS NULL AND status IN ('active', 'acknowledged');`,
+    );
+    await db.execute(
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS unq_ia_product_warehouse_active ON inventory_alerts(product_id, warehouse_id) WHERE warehouse_id IS NOT NULL AND status IN ('active', 'acknowledged');`,
+    );
+    console.log('✅ Global & warehouse inventory alert support ensured.');
 
     // Per-branch catalog (branch_products)
     await db.execute(sql`

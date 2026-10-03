@@ -36,12 +36,28 @@ This is a **monorepo** with multiple independent apps. Multiple development sess
 
 | Document | Purpose | When to Read |
 |----------|---------|--------------|
+| [`knowledge/index.md`](knowledge/index.md) | **Open Knowledge Format (OKF v0.2) Catalog** | AI agents navigating architecture, schemas & rules |
 | [`docs/AGENT_NAVIGATION_GUIDE.md`](docs/AGENT_NAVIGATION_GUIDE.md) | **Where to look by domain** | Before starting any code changes |
 | [`.claude/workspaces.md`](.claude/workspaces.md) | **Active workspace tracking** | ALWAYS read FIRST before starting work |
 | [`HANDOFF.md`](HANDOFF.md) | **Latest session state & handoff** | When picking up or resuming work |
 | [`INVENTORY_ARCHITECTURE.md`](INVENTORY_ARCHITECTURE.md) | **Inventory, BOM & OP architecture** | Before modifying inventory/production |
 | [`docs/pre-deployment-checklist.md`](docs/pre-deployment-checklist.md) | **DB migrations & deploy checklist** | Before migrating DB or deploying |
 | [`.claude/deployment-agent.md`](.claude/deployment-agent.md) | **Deployment operations manual** | When deploying any component |
+
+## Multi-Agent Team Orchestration (agy + codex + opencode)
+
+This monorepo supports autonomous parallel development using **`agy`**, **`codex`**, and **`opencode`**:
+- **`agy` (Root Master / Architect)**: Manages specs (`specs/`), DB migrations, Drizzle schemas, NestJS backend API contracts (`apps/sync_api`), and team coordination.
+- **`codex` (POS Flutter Specialist)**: POS Flutter client in `apps/pos_flutter` (Dart widgets, Riverpod state, POS screens).
+- **`opencode` (Admin Web Specialist)**: Admin dashboard in `apps/business_control_tauri` (React, Vite, Tailwind, Playwright E2E).
+
+### Fast Commands
+- `make team-setup FEATURE=<name>` - Prepare isolated worktrees (`.worktrees/backend`, `.worktrees/admin`, `.worktrees/pos`)
+- `./scripts/agent-team.sh dispatch codex pos "<prompt>"` - Dispatch codex headlessly in background
+- `./scripts/agent-team.sh dispatch opencode admin "<prompt>"` - Dispatch opencode headlessly in background
+- `make team-status` - Check status of active AI workers and logs
+- `make check-all` - Run PDCA verification gate across all apps (backend, admin, pos)
+- `make team-clean` - Safely terminate background workers and remove worktrees
 
 ## App Boundaries
 

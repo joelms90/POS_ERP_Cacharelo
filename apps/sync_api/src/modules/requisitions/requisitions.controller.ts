@@ -20,7 +20,7 @@ export class RequisitionsController {
 
   /** The POS never supplies a user or branch: both are determined from its signed login. */
   @Get('mine')
-  @Roles(BRANCH_OPERATOR_ROLE)
+  @Roles(BRANCH_OPERATOR_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE)
   async findMine(@Query('status') status: string | undefined, @Req() req: any) {
     return this.requisitionsService.findMine(req.user, status);
   }
@@ -36,19 +36,19 @@ export class RequisitionsController {
   }
 
   @Get('pending')
-  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE)
   async findPending(@Query('businessId') businessId: string, @Req() req: any) {
     return this.requisitionsService.findPendingForBusiness(businessId);
   }
 
   @Get()
-  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE)
   async findAll(@Query('businessId') businessId: string, @Req() req: any) {
     return this.requisitionsService.findAll(businessId);
   }
 
   @Patch(':id/status')
-  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE)
   async updateStatus(
     @Param('id') id: string,
     @Body() updateStatusDto: UpdateRequisitionStatusDto,

@@ -1,4 +1,6 @@
-import { Injectable, Logger, Inject, forwardRef, OnModuleInit, BadRequestException } from '@nestjs/common';
+import { OrdersRepository } from '../orders/repositories/orders.repository';
+import { SyncAccessService, SyncActor } from './sync-access.service';
+import { Injectable, Logger, Inject, forwardRef, OnModuleInit, BadRequestException, ConflictException } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../database/schema';
@@ -21,6 +23,8 @@ export class SyncService implements OnModuleInit {
     private readonly db: NodePgDatabase<typeof schema>,
     @Inject(forwardRef(() => SyncGateway))
     private readonly syncGateway: SyncGateway,
+    private readonly access: SyncAccessService,
+    private readonly ordersRepository: OrdersRepository,
   ) {}
 
   onModuleInit() {
@@ -66,9 +70,9 @@ export class SyncService implements OnModuleInit {
     }
   }
 
-  async push(pushSyncDto: PushSyncDto) {
+  async push(pushSyncDto: PushSyncDto, actor: SyncActor) {
     await this.validatePushReferences(pushSyncDto);
-    const pushData = this.normalizePushPayload(pushSyncDto);
+    let pushData = this.normalizePushPayload(pushSyncDto);
 
     const logsToInsert: any[] = [];
     const now = new Date();
@@ -76,6 +80,41 @@ export class SyncService implements OnModuleInit {
     try {
       // Run push changes in a single atomic transaction
       await this.db.transaction(async (tx) => {
+        // Stable order locks cover both new offline IDs and existing REST orders.
+        const orderIds = [...new Set([
+          ...(pushData.orders ?? []).map(row => row.id),
+          ...(pushData.orderItems ?? []).map(row => row.orderId),
+          ...(pushData.payments ?? []).map(row => row.orderId),
+        ])].sort();
+        const settledIds = new Set<string>();
+        for (const id of orderIds) {
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${id}))`);
+          const [existing] = await tx.select().from(schema.orders).where(eq(schema.orders.id, id)).for('update');
+          if (existing?.state === 'closed' || existing?.state === 'cancelled') settledIds.add(id);
+        }
+        await this.access.push(actor, pushData, tx);
+        // Lost ACK retries are no-ops. Reject changed settled records rather than
+        // reopening them and applying the inventory movement a second time.
+        const same = (row: any, existing: any, fields: string[]) => existing && fields.every(key =>
+          row[key] === undefined || String(row[key] ?? '') === String(existing[key] ?? ''));
+        for (const row of pushData.orders ?? []) if (settledIds.has(row.id)) {
+          const [existing] = await tx.select().from(schema.orders).where(eq(schema.orders.id, row.id));
+          if (!same(row, existing, ['branchId','tableId','waiterId','state','subtotal','discount','tax','total','deletedAt'])) throw new ConflictException('Settled order cannot change');
+        }
+        for (const row of pushData.orderItems ?? []) if (settledIds.has(row.orderId)) {
+          const [existing] = await tx.select().from(schema.orderItems).where(eq(schema.orderItems.id, row.id));
+          if (!same(row, existing, ['orderId','productId','quantity','price','deletedAt'])) throw new ConflictException('Settled items cannot change');
+        }
+        for (const row of pushData.payments ?? []) if (settledIds.has(row.orderId)) {
+          const [existing] = await tx.select().from(schema.payments).where(eq(schema.payments.id, row.id));
+          if (!same(row, existing, ['orderId','amount','paymentMethod','referenceCode'])) throw new ConflictException('Settled payments cannot change');
+        }
+        pushData = {
+          ...pushData,
+          orders: pushData.orders?.filter(row => !settledIds.has(row.id)),
+          orderItems: pushData.orderItems?.filter(row => !settledIds.has(row.orderId)),
+          payments: pushData.payments?.filter(row => !settledIds.has(row.orderId)),
+        };
         // 1. Upsert Orders
         if (pushData.orders && pushData.orders.length > 0) {
           await tx
@@ -230,6 +269,18 @@ export class SyncService implements OnModuleInit {
             .insert(schema.cashTransactions)
             .values(pushData.cashTransactions)
             .onConflictDoNothing();
+        }
+
+        // Apply the same recipe/stock rules as online settlement exactly once.
+        for (const order of pushData.orders ?? []) if (order.state === 'closed') {
+          const payments = await tx.select().from(schema.payments).where(eq(schema.payments.orderId, order.id));
+          const totalPaid = payments.reduce((sum, row) => sum + Number(row.amount), 0);
+          if (!Number.isFinite(Number(order.total)) || totalPaid < Number(order.total) || payments.some(row => !(Number(row.amount) > 0))) {
+            throw new BadRequestException('Closed sale requires a complete positive payment');
+          }
+          const items = await tx.select().from(schema.orderItems).where(and(eq(schema.orderItems.orderId, order.id), sql`${schema.orderItems.deletedAt} IS NULL`));
+          if (!items.length || items.some(row => !(row.quantity > 0))) throw new BadRequestException('Closed sale requires positive items');
+          await this.ordersRepository.deductInventoryForItems(tx, items, order.branchId);
         }
 
         // Write changes to changeLog table inside same transaction
@@ -388,61 +439,65 @@ export class SyncService implements OnModuleInit {
     return ids.filter((id) => !found.has(id));
   }
 
-  async pull(pullSyncDto: PullSyncDto) {
-    await this.maybeHealTakeawayTables(pullSyncDto.branchId);
+  async pull(pullSyncDto: PullSyncDto, actor: SyncActor) {
+    const branchId = await this.access.branch(actor, pullSyncDto.branchId);
+    await this.maybeHealTakeawayTables(branchId);
 
     const lastSyncedAt = pullSyncDto.lastSyncedAt
       ? new Date(pullSyncDto.lastSyncedAt)
       : new Date(0);
     const serverTimestamp = new Date();
 
+    const branchOrders = (await this.db.select({ id: schema.orders.id }).from(schema.orders).where(eq(schema.orders.branchId, branchId))).map(row => row.id);
+    const branchShifts = (await this.db.select({ id: schema.cashShifts.id }).from(schema.cashShifts).where(eq(schema.cashShifts.branchId, branchId))).map(row => row.id);
+
     // Query updates across all tables since lastSyncedAt
     const businesses = await this.db
       .select()
       .from(schema.businesses)
-      .where(gt(schema.businesses.updatedAt, lastSyncedAt));
+      .where(and(eq(schema.businesses.id, actor.businessId), gt(schema.businesses.updatedAt, lastSyncedAt)));
     const branches = await this.db
       .select()
       .from(schema.branches)
-      .where(gt(schema.branches.updatedAt, lastSyncedAt));
+      .where(and(eq(schema.branches.id, branchId), gt(schema.branches.updatedAt, lastSyncedAt)));
     const branchTables = await this.db
       .select()
       .from(schema.branchTables)
-      .where(gt(schema.branchTables.updatedAt, lastSyncedAt));
+      .where(and(eq(schema.branchTables.branchId, branchId), gt(schema.branchTables.updatedAt, lastSyncedAt)));
     const users = await this.db
       .select()
       .from(schema.users)
-      .where(gt(schema.users.updatedAt, lastSyncedAt));
+      .where(and(and(eq(schema.users.businessId, actor.businessId), eq(schema.users.branchId, branchId)), gt(schema.users.updatedAt, lastSyncedAt)));
     const categories = await this.db
       .select()
       .from(schema.categories)
-      .where(gt(schema.categories.updatedAt, lastSyncedAt));
+      .where(and(eq(schema.categories.businessId, actor.businessId), gt(schema.categories.updatedAt, lastSyncedAt)));
     const products = await this.db
       .select()
       .from(schema.products)
-      .where(gt(schema.products.updatedAt, lastSyncedAt));
+      .where(and(eq(schema.products.businessId, actor.businessId), gt(schema.products.updatedAt, lastSyncedAt)));
     const orders = await this.db
       .select()
       .from(schema.orders)
-      .where(gt(schema.orders.updatedAt, lastSyncedAt));
+      .where(and(eq(schema.orders.branchId, branchId), gt(schema.orders.updatedAt, lastSyncedAt)));
     const orderItems = await this.db
       .select()
       .from(schema.orderItems)
-      .where(gt(schema.orderItems.updatedAt, lastSyncedAt));
+      .where(and(inArray(schema.orderItems.orderId, branchOrders), gt(schema.orderItems.updatedAt, lastSyncedAt)));
 
     // Immutable logs (queried via createdAt)
     const payments = await this.db
       .select()
       .from(schema.payments)
-      .where(gt(schema.payments.createdAt, lastSyncedAt));
+      .where(and(inArray(schema.payments.orderId, branchOrders), gt(schema.payments.createdAt, lastSyncedAt)));
     const cashShifts = await this.db
       .select()
       .from(schema.cashShifts)
-      .where(gt(schema.cashShifts.openedAt, lastSyncedAt));
+      .where(and(eq(schema.cashShifts.branchId, branchId), gt(schema.cashShifts.openedAt, lastSyncedAt)));
     const cashTransactions = await this.db
       .select()
       .from(schema.cashTransactions)
-      .where(gt(schema.cashTransactions.createdAt, lastSyncedAt));
+      .where(and(inArray(schema.cashTransactions.shiftId, branchShifts), gt(schema.cashTransactions.createdAt, lastSyncedAt)));
 
     // Strip sensitive passwords and PINs before sending users to client tablets
     const sanitizedUsers = users.map((u) => {
@@ -509,7 +564,8 @@ export class SyncService implements OnModuleInit {
     }
   }
 
-  async ack(ackSyncDto: AckSyncDto) {
+  async ack(ackSyncDto: AckSyncDto, actor: SyncActor) {
+    await this.access.device(actor, ackSyncDto.deviceId);
     const { deviceId, lastSyncedAt } = ackSyncDto;
     const syncTime = new Date(lastSyncedAt);
 

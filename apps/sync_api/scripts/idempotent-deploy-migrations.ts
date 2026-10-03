@@ -413,6 +413,27 @@ async function main() {
     `);
     console.log('Global inventory alert support ensured.');
 
+    // 15b. Inventory alerts: warehouse-scoped alerts
+    await client.query(`
+      ALTER TABLE "inventory_alerts"
+        ADD COLUMN IF NOT EXISTS "warehouse_id" uuid REFERENCES "public"."warehouses"("id");
+    `);
+    await client.query(
+      'CREATE INDEX IF NOT EXISTS "idx_ia_warehouse_status" ON "inventory_alerts" USING btree ("warehouse_id","status");',
+    );
+    await client.query('DROP INDEX IF EXISTS "unq_ia_product_global_active";');
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "unq_ia_product_global_active"
+      ON "inventory_alerts" ("product_id")
+      WHERE "branch_id" IS NULL AND "warehouse_id" IS NULL AND "status" IN ('active', 'acknowledged');
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "unq_ia_product_warehouse_active"
+      ON "inventory_alerts" ("product_id","warehouse_id")
+      WHERE "warehouse_id" IS NOT NULL AND "status" IN ('active', 'acknowledged');
+    `);
+    console.log('Warehouse inventory alert support ensured.');
+
     // 16. Per-branch catalog (branch_products)
     await client.query(`
       CREATE TABLE IF NOT EXISTS "branch_products" (
@@ -450,6 +471,14 @@ async function main() {
       WHERE "status" IS NULL OR "destination_warehouse_id" IS NULL;
     `);
     console.log('Production runs OP lifecycle and routing columns ensured.');
+
+    // 18. The canonical warehouse purchasing role is 29 characters long.
+    // Legacy databases defined users.role as varchar(20), causing user create
+    // and update operations to fail with a PostgreSQL value-too-long error.
+    await client.query(`
+      ALTER TABLE "users" ALTER COLUMN "role" TYPE varchar(50);
+    `);
+    console.log('User role column length ensured.');
 
     console.log('✅ Idempotent migrations executed successfully!');
   } catch (error) {

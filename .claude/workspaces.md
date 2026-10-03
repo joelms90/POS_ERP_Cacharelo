@@ -7,13 +7,45 @@
 ---
 
 ## Currently Active Sessions
+### Session: phase1-resumen-pos-inspect
+- **Scope**: Inspect apps/pos_flutter branch-operator/cashier screens and shift/Corte/report flows for Phase 1 Resumen de Sucursal; no file edits.
+- **Status**: ✅ Completed
+
+### Session: phase1-resumen-backend-verify
+- **Scope**: Inspect and implement/verify backend shifts/reports endpoints for Phase 1 Resumen de Sucursal; branch_operator auth; focused tests; no migrations.
+- **Status**: ✅ Completed
+
+### Session: phase1-resumen-admin-inspect
+- **Scope**: Inspect DashboardPage and API client patterns for Phase 1 Resumen de Sucursal; no edits unless necessary, run admin checks.
+- **Status**: ✅ Completed
+
+### Session: phase1-resumen-sucursal-continuation
+- **Scope**: Continue Phase 1 Resumen de Sucursal: verify/implement backend shifts/reports contract, then coordinate Admin and Flutter UI integration. No migrations unless explicitly approved.
+- **Status**: ✅ Completed
+
+### Session: phase1-resumen-admin
+- **Scope**: Inspect and minimally implement Resumen de Sucursal UI in admin; no migrations.
+- **Status**: ✅ Completed
+
+### Session: fase-1-resumen-sucursal
+- **Scope**: Implement Phase 1 Resumen de Sucursal for branch_operator: daily summary, active shifts, Corte X/Z, cash/card totals. Coordinate backend and POS; avoid migrations until approved.
+- **Status**: ✅ Completed
+
+
+### Session: Paperclip Cacharelo local tooling
+- **Approved order security follow-up**: isolated snapshot compiled and 38 focused tests pass; scoped orders guard and Flutter order request headers applied after baseline checks. 54/54 live assertions and 9 Flutter widget tests pass. No editing lock retained; CEO security checkpoint review next. No migrations or Git operations.
+- **2026-10-01 follow-up**: Isolated inventory receipt fixes applied after baseline comparison; 11 tests and 33/35 live synthetic API assertions pass. Two order authorization failures escalated to CEO; Flutter pairing/delivery remain unverified. Scope additionally includes inventory service/spec and `scripts/verify-synthetic-workflow.cjs`; no current editing lock retained.
+- **Session Name**: `paperclip-mor-1`
+- **Scope**: `scripts/dev-all.sh` and cash-shift identity fix in `apps/sync_api/src/modules/shifts/`; local startup verification.
+- **Status**: Identity fix approved in Paperclip interaction dc839ab0-38b3-4d9a-b941-253220131680. Isolated backend snapshot compiled; 35 shift tests passed. Narrow patch applied after baseline comparison; local startup verification ongoing. Existing DTO/service-test edits preserved.
+- **Coordination**: Existing `agy` tmux pane observed; no application edits, resets, staging, commits, or pushes.
 
 ### Session: Role and permission unification
 - **Session Name**: `013-unify-roles`
 - **Branch**: `013-unify-roles`
 - **Primary Focus**: Align operational roles, authorization rules, and inventory workflow permissions across the API, dashboard, and Flutter POS.
 - **Apps Touched**: `apps/sync_api/`, `apps/business_control_tauri/`, `apps/pos_flutter/`
-- **Status**: 🔄 In progress
+- **Status**: ✅ Completed
 
 ---
 

@@ -835,9 +835,11 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                           <td className="px-4 py-3 text-right font-mono">{item.quantityOrdered}</td>
                           <td className="px-4 py-3 text-right font-mono text-champagne-gold">{item.quantityReceived || 0}</td>
                           <td className="px-4 py-3 text-right font-mono">${item.unitCostEstimated}</td>
-                          <td className="px-4 py-3 text-right font-mono text-champagne-gold">${item.unitCostActual || '—'}</td>
+                          <td className="px-4 py-3 text-right font-mono text-champagne-gold">
+                            {Number(item.unitCostActual || 0) > 0 ? `$${item.unitCostActual}` : '—'}
+                          </td>
                           <td className="px-4 py-3 text-right font-mono text-champagne-gold font-semibold">
-                            ${((item.unitCostActual || item.unitCostEstimated) * item.quantityOrdered).toFixed(2)}
+                            ${(((Number(item.unitCostActual || 0) > 0 ? Number(item.unitCostActual) : Number(item.unitCostEstimated || 0))) * Number(item.quantityOrdered || 0)).toFixed(2)}
                           </td>
                         </tr>
                       ))}

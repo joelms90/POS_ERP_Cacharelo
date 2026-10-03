@@ -75,18 +75,35 @@ export class PurchaseOrdersService {
     const expectedByProduct = new Map(
       orderWithItems?.items.map((item) => [item.productId, item]) ?? [],
     );
-    const hasMismatch = receiptData.items.some((item) => {
+
+    const normalizedItems = receiptData.items.map((item) => ({
+      productId: item.productId,
+      quantityReceived: Number(item.quantityReceived),
+      unitCostActual: Number(item.unitCostActual || 0),
+    }));
+
+    const hasMismatch = normalizedItems.some((item) => {
       const expected = expectedByProduct.get(item.productId);
       if (!expected) return true;
-      return Number(expected.quantityOrdered) !== item.quantityReceived ||
-        Number(expected.unitCostEstimated) !== item.unitCostActual;
+      const expectedRemaining = Math.max(
+        0,
+        Number(expected.quantityOrdered) - Number(expected.quantityReceived || 0),
+      );
+      const receivedQty = item.quantityReceived;
+      const expectedCost = Number(expected.unitCostEstimated);
+      const actualCost = item.unitCostActual;
+
+      const qtyDiff = Math.abs(expectedRemaining - receivedQty) > 0.0001;
+      const costDiff = Math.abs(expectedCost - actualCost) > 0.0001;
+      return qtyDiff || costDiff;
     });
+
     if (hasMismatch && !receiptData.notes?.trim()) {
       throw new BadRequestException(
         'Debes registrar una nota cuando la cantidad o el costo recibido difiere de la orden de compra.',
       );
     }
     const auditedNotes = `${receiptData.notes?.trim() || 'Recepción sin discrepancias'}\nRecibido por: ${receivedBy}`;
-    return this.inventoryService.processPurchaseOrderReception(id, receiptData.items, auditedNotes);
+    return this.inventoryService.processPurchaseOrderReception(id, normalizedItems, auditedNotes);
   }
 }

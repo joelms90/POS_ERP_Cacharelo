@@ -8,6 +8,8 @@
 
 | Domain / Task | What to Inspect First | Key Source Files |
 | :--- | :--- | :--- |
+| **📚 Open Knowledge Base (OKF)** | [`knowledge/index.md`](../knowledge/index.md) | Machine-readable OKF v0.2 bundle (`make okf-validate`) |
+| **⚖️ Authoritative Business Rules** | [`knowledge/business-rules/index.md`](../knowledge/business-rules/index.md) | `knowledge/business-rules/inventory-rules.md`<br>`knowledge/business-rules/purchasing-rules.md`<br>`knowledge/business-rules/kds-routing-rules.md`<br>`knowledge/business-rules/roles-permissions-rules.md` |
 | **🗄️ Database & Migrations** | [`docs/pre-deployment-checklist.md`](../docs/pre-deployment-checklist.md) | `apps/sync_api/src/database/schema.ts`<br>`apps/sync_api/scripts/idempotent-deploy-migrations.ts` |
 | **📦 Inventory, BOM & Production (OP)** | [`INVENTORY_ARCHITECTURE.md`](../INVENTORY_ARCHITECTURE.md) | `apps/sync_api/src/modules/inventory/`<br>`apps/business_control_tauri/src/pages/AssemblyPage.tsx` |
 | **🖥️ Admin Dashboard (React/Vite)** | [`apps/business_control_tauri/README.md`](../apps/business_control_tauri/README.md) | `apps/business_control_tauri/src/services/api.ts`<br>`apps/business_control_tauri/src/pages/`<br>`apps/business_control_tauri/src/components/` |

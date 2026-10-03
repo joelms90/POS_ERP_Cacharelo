@@ -638,7 +638,8 @@ export class InventoryService {
         .select()
         .from(schema.stockTransfers)
         .where(eq(schema.stockTransfers.id, transferId))
-        .limit(1);
+        .limit(1)
+        .for('update');
 
       if (!transfer) {
         throw new NotFoundException(`Traspaso con ID ${transferId} no encontrado`);
@@ -666,23 +667,30 @@ export class InventoryService {
         .where(eq(schema.stockTransferItems.transferId, transferId));
 
       const receivedByProduct = new Map(receipt.items.map((item) => [item.productId, item.quantityReceived]));
-      if (receivedByProduct.size !== items.length || items.some((item) => !receivedByProduct.has(item.productId))) {
-        throw new BadRequestException('Debes confirmar la cantidad recibida de cada producto del traspaso.');
+
+      const existingProductIds = new Set(items.map((i) => i.productId));
+      const addedItems = receipt.items.filter((i) => !existingProductIds.has(i.productId));
+
+      let hasDiscrepancy = addedItems.length > 0;
+      for (const item of items) {
+        const qtyReceived = receivedByProduct.get(item.productId) ?? 0;
+        if (qtyReceived !== parseFloat(item.quantity)) {
+          hasDiscrepancy = true;
+        }
       }
-      const hasDiscrepancy = items.some((item) => receivedByProduct.get(item.productId)! !== parseFloat(item.quantity));
+
       if (hasDiscrepancy && !receipt.note?.trim()) {
         throw new BadRequestException('Registra una nota para aceptar una recepción con diferencias.');
       }
 
       for (const item of items) {
-        const quantityReceived = receivedByProduct.get(item.productId)!;
-        if (quantityReceived > parseFloat(item.quantity)) {
-          throw new BadRequestException('La cantidad recibida no puede ser mayor a la cantidad enviada.');
-        }
+        const quantityReceived = receivedByProduct.get(item.productId) ?? 0;
         await this.ledgerService.applyMovement(tx, {
           businessId: transfer.businessId,
           productId: item.productId,
-          quantityDelta: -parseFloat(item.quantity),
+          // Accepted units leave transit here; shortages leave in the separate
+          // audited movement below. Extra received units were never in transit.
+          quantityDelta: -Math.min(quantityReceived, parseFloat(item.quantity)),
           eventType: 'transit_out',
           warehouseId: transitWh.id,
           unitCost: item.unitCost,
@@ -691,18 +699,20 @@ export class InventoryService {
           notes: 'Sale de tránsito',
         });
 
-        await this.ledgerService.applyMovement(tx, {
-          businessId: transfer.businessId,
-          productId: item.productId,
-          quantityDelta: quantityReceived,
-          eventType: 'transfer_in',
-          warehouseId: transfer.toWarehouseId || null,
-          branchId: transfer.toBranchId || null,
-          unitCost: item.unitCost,
-          referenceType: 'transfer',
-          referenceId: transferId,
-          notes: `Traspaso recibido por ${actor.name || actor.sub}${receipt.note ? `: ${receipt.note.trim()}` : ''}`,
-        });
+        if (quantityReceived > 0) {
+          await this.ledgerService.applyMovement(tx, {
+            businessId: transfer.businessId,
+            productId: item.productId,
+            quantityDelta: quantityReceived,
+            eventType: 'transfer_in',
+            warehouseId: transfer.toWarehouseId || null,
+            branchId: transfer.toBranchId || null,
+            unitCost: item.unitCost,
+            referenceType: 'transfer',
+            referenceId: transferId,
+            notes: `Traspaso recibido por ${actor.name || actor.sub}${receipt.note ? `: ${receipt.note.trim()}` : ''}`,
+          });
+        }
 
         // Remove any shortage from the transit location so it cannot be received twice.
         const shortage = parseFloat(item.quantity) - quantityReceived;
@@ -723,6 +733,39 @@ export class InventoryService {
         await tx.update(schema.stockTransferItems)
           .set({ quantityReceived: quantityReceived.toFixed(3) })
           .where(eq(schema.stockTransferItems.id, item.id));
+      }
+
+      for (const addedItem of addedItems) {
+        if (addedItem.quantityReceived > 0) {
+          const [prod] = await tx
+            .select({ cost: schema.products.cost })
+            .from(schema.products)
+            .where(eq(schema.products.id, addedItem.productId))
+            .limit(1);
+          const unitCost = prod?.cost || '0.00';
+
+          await tx.insert(schema.stockTransferItems).values({
+            transferId,
+            productId: addedItem.productId,
+            quantity: '0.000',
+            quantityReceived: addedItem.quantityReceived.toFixed(3),
+            unitCost,
+            totalCost: (parseFloat(unitCost) * addedItem.quantityReceived).toFixed(2),
+          });
+
+          await this.ledgerService.applyMovement(tx, {
+            businessId: transfer.businessId,
+            productId: addedItem.productId,
+            quantityDelta: addedItem.quantityReceived,
+            eventType: 'transfer_in',
+            warehouseId: transfer.toWarehouseId || null,
+            branchId: transfer.toBranchId || null,
+            unitCost,
+            referenceType: 'transfer',
+            referenceId: transferId,
+            notes: `Traspaso recibido con producto extra por ${actor.name || actor.sub}${receipt.note ? `: ${receipt.note.trim()}` : ''}`,
+          });
+        }
       }
 
       const [updated] = await tx
@@ -1074,7 +1117,7 @@ export class InventoryService {
         await tx
           .update(schema.purchaseOrderItems)
           .set({
-            quantityReceived: item.quantityReceived.toString(),
+            quantityReceived: sql`COALESCE(${schema.purchaseOrderItems.quantityReceived}, 0) + ${item.quantityReceived}`,
             unitCostActual: item.unitCostActual.toString(),
           })
           .where(

@@ -11,6 +11,7 @@ interface RequisitionsPageProps {
   businessId: string;
   userId: string;
   userRole: string;
+  userRoles?: string[];
 }
 
 interface RequisitionLineItem {
@@ -19,7 +20,7 @@ interface RequisitionLineItem {
   quantityRequested: number;
 }
 
-export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, userId, userRole }) => {
+export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, userId, userRole, userRoles }) => {
   const [requisitions, setRequisitions] = useState<BranchRequisition[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -60,7 +61,12 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const isApprover = userRole === 'owner' || userRole === 'inventory_admin' || userRole === 'support_tech';
+  const effectiveRoles = (userRoles && userRoles.length > 0 ? userRoles : [userRole]).map((r) => r.toLowerCase());
+  const isApprover = effectiveRoles.some((r) =>
+    ['owner', 'inventory_admin', 'support_tech', 'warehouse_purchasing_operator'].includes(r)
+  );
+  const isOwner = effectiveRoles.includes('owner');
+  const isSelfCreated = (req: BranchRequisition) => (req.createdBy === userId || req.requestedById === userId) && !isOwner;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -377,13 +383,22 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
                                     </svg>
                                   </button>
                                   {isApprover && isPending(req.status) && (
-                                    <button
-                                      onClick={() => setApprovingReq(req)}
-                                      className="text-champagne-gold hover:underline text-xs px-2"
-                                      title="Aprobar / Rechazar"
-                                    >
-                                      Revisar
-                                    </button>
+                                    isSelfCreated(req) ? (
+                                      <span
+                                        className="text-text-secondary/60 text-xs px-2 italic select-none"
+                                        title="No puedes autorizar tu propia requisición (requiere otro operador o propietario)"
+                                      >
+                                        Propia
+                                      </span>
+                                    ) : (
+                                      <button
+                                        onClick={() => setApprovingReq(req)}
+                                        className="text-champagne-gold hover:underline text-xs px-2"
+                                        title="Aprobar / Rechazar"
+                                      >
+                                        Revisar
+                                      </button>
+                                    )
                                   )}
                                 </div>
                               </td>
@@ -578,20 +593,28 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
                   <p><span className="text-text-secondary">Notas:</span> {approvingReq.notes || '—'}</p>
                   <p><span className="text-text-secondary">Items:</span> {approvingReq.itemCount || 0}</p>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">Notas de aprobación / razón de rechazo</label>
-                  <textarea
-                    value={approvalNotes}
-                    onChange={(e) => setApprovalNotes(e.target.value)}
-                    className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-xs"
-                    rows={3}
-                    placeholder="Ej. Aprobado, enviar el lunes..."
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <Button onClick={handleApprove} className="flex-1 bg-success-green hover:bg-success-green/90 text-onyx-surface">Aprobar</Button>
-                  <Button onClick={handleReject} className="flex-1 bg-error-red hover:bg-error-red/90 text-white">Rechazar</Button>
-                </div>
+                {isSelfCreated(approvingReq) ? (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded text-amber-200 text-xs">
+                    ⚠️ No puedes autorizar tu propia requisición. Esta acción debe ser realizada por otro operador o el propietario.
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">Notas de aprobación / razón de rechazo</label>
+                      <textarea
+                        value={approvalNotes}
+                        onChange={(e) => setApprovalNotes(e.target.value)}
+                        className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-xs"
+                        rows={3}
+                        placeholder="Ej. Aprobado, enviar el lunes..."
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <Button onClick={handleApprove} className="flex-1 bg-success-green hover:bg-success-green/90 text-onyx-surface">Aprobar</Button>
+                      <Button onClick={handleReject} className="flex-1 bg-error-red hover:bg-error-red/90 text-white">Rechazar</Button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

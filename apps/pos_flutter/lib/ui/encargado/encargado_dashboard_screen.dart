@@ -57,6 +57,13 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
     }
   }
 
+  void _editOrder(int tableId) {
+    widget.state.beginEditingOrder(tableId);
+    if (_selectedIndex != 0) {
+      setState(() => _selectedIndex = 0);
+    }
+  }
+
   void _triggerSync(BuildContext context) async {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -129,14 +136,20 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
                                   state: widget.state,
                                   showPrepararButton: true,
                                 ),
-                                EncargadoOrdersTab(state: widget.state),
+                                EncargadoOrdersTab(
+                                  state: widget.state,
+                                  onEditOrder: _editOrder,
+                                ),
                                 RequisitionsScreen(state: widget.state),
                               ]
                             : [
                                 EncargadoPosTab(
                                     state: widget.state,
-                                    showPrepararButton: false),
-                                EncargadoOrdersTab(state: widget.state),
+                                    showPrepararButton: true),
+                                EncargadoOrdersTab(
+                                  state: widget.state,
+                                  onEditOrder: _editOrder,
+                                ),
                                 RequisitionsScreen(state: widget.state),
                                 InventoryReceiptsTab(state: widget.state),
                                 DailySalesTab(state: widget.state),
@@ -194,12 +207,21 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.storefront,
-                  color: EmpireColors.champagneGold, size: 20),
+              Icon(
+                widget.state.currentUserRole ==
+                        UserRole.warehousePurchasingOperator
+                    ? Icons.warehouse
+                    : Icons.storefront,
+                color: EmpireColors.champagneGold,
+                size: 20,
+              ),
               const SizedBox(width: 8),
               Text(
-                'MOSTRADOR',
-                style: TextStyle(
+                widget.state.currentUserRole ==
+                        UserRole.warehousePurchasingOperator
+                    ? 'ALMACÉN / BODEGA'
+                    : 'MOSTRADOR',
+                style: const TextStyle(
                   color: EmpireColors.champagneGold,
                   fontWeight: FontWeight.bold,
                   fontSize: 14,

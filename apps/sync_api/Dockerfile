@@ -1,8 +1,8 @@
 # Stage 1: Build
 FROM node:20-alpine AS builder
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm (pinned: pnpm 12+ hard-fails on ignored dependency build scripts)
+RUN npm install -g pnpm@10.34.5
 
 WORKDIR /app
 
@@ -21,8 +21,8 @@ RUN pnpm build
 # Stage 2: Production Runtime
 FROM node:20-alpine AS runner
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm (pinned: pnpm 12+ hard-fails on ignored dependency build scripts)
+RUN npm install -g pnpm@10.34.5
 
 WORKDIR /app
 

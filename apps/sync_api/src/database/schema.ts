@@ -119,7 +119,9 @@ export const users = pgTable('users', {
   email: varchar('email', { length: 255 }).unique(),
   passwordHash: varchar('password_hash', { length: 255 }),
   pin: varchar('pin', { length: 255 }).notNull(), // Checked for uniqueness per business
-  role: varchar('role', { length: 20 }).notNull(), // waiter, cashier, kitchen, admin
+  // Keep this in sync with the database migration. The longest operational role
+  // (`warehouse_purchasing_operator`) is 29 characters.
+  role: varchar('role', { length: 50 }).notNull(),
   roles: jsonb('roles').$type<string[]>().default([]).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true })
     .defaultNow()
@@ -969,7 +971,8 @@ export const inventoryAlerts = pgTable(
     productId: uuid('product_id')
       .references(() => products.id)
       .notNull(),
-    branchId: uuid('branch_id').references(() => branches.id), // null = global (needs purchase) alert
+    branchId: uuid('branch_id').references(() => branches.id), // null = global or warehouse alert
+    warehouseId: uuid('warehouse_id').references(() => warehouses.id), // null = global or branch alert
     alertType: varchar('alert_type', { length: 20 }).notNull(), // 'low_stock' | 'out_of_stock'
     threshold: decimal('threshold', { precision: 12, scale: 3 }).notNull(),
     currentQty: decimal('current_qty', { precision: 12, scale: 3 }).notNull(),
@@ -987,12 +990,16 @@ export const inventoryAlerts = pgTable(
       .where(sql`${table.status} IN ('active', 'acknowledged')`),
     unqActiveGlobalAlert: uniqueIndex('unq_ia_product_global_active')
       .on(table.productId)
-      .where(sql`${table.branchId} IS NULL AND ${table.status} IN ('active', 'acknowledged')`),
+      .where(sql`${table.branchId} IS NULL AND ${table.warehouseId} IS NULL AND ${table.status} IN ('active', 'acknowledged')`),
+    unqActiveWarehouseAlert: uniqueIndex('unq_ia_product_warehouse_active')
+      .on(table.productId, table.warehouseId)
+      .where(sql`${table.warehouseId} IS NOT NULL AND ${table.status} IN ('active', 'acknowledged')`),
     idxBusinessStatus: index('idx_ia_business_status').on(
       table.businessId,
       table.status,
     ),
     idxBranchStatus: index('idx_ia_branch_status').on(table.branchId, table.status),
+    idxWarehouseStatus: index('idx_ia_warehouse_status').on(table.warehouseId, table.status),
     idxProduct: index('idx_ia_product').on(table.productId),
   }),
 );

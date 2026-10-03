@@ -4,8 +4,13 @@ import '../common/app_state.dart';
 
 class EncargadoOrdersTab extends StatefulWidget {
   final AppState state;
+  final void Function(int tableId)? onEditOrder;
 
-  const EncargadoOrdersTab({super.key, required this.state});
+  const EncargadoOrdersTab({
+    super.key,
+    required this.state,
+    this.onEditOrder,
+  });
 
   @override
   State<EncargadoOrdersTab> createState() => _EncargadoOrdersTabState();
@@ -324,6 +329,20 @@ class _EncargadoOrdersTabState extends State<EncargadoOrdersTab> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (!isBilling && widget.onEditOrder != null) ...[
+                  TextButton.icon(
+                    onPressed: () => widget.onEditOrder!(table.id),
+                    icon: const Icon(Icons.edit, size: 14),
+                    label: const Text('Editar',
+                        style: TextStyle(fontSize: 11)),
+                    style: TextButton.styleFrom(
+                      foregroundColor: EmpireColors.champagneGold,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 TextButton.icon(
                   onPressed: () => _handleCancelOrder(table),
                   icon: const Icon(Icons.close, size: 14),
@@ -400,7 +419,11 @@ class _EncargadoOrderPaymentScreenState
     super.dispose();
   }
 
-  double get _total => widget.table.total;
+  double get _discountAmount => double.parse(
+      (widget.table.subtotal * (_discount / 100.0)).toStringAsFixed(2));
+
+  double get _total =>
+      double.parse((widget.table.subtotal - _discountAmount).toStringAsFixed(2));
 
   void _processPayment() {
     if (_processing) return;
@@ -487,6 +510,8 @@ class _EncargadoOrderPaymentScreenState
                 ],
               ),
             ),
+            const SizedBox(height: 16),
+            _buildItemsSummary(),
             const SizedBox(height: 16),
             _buildDiscountRow(),
             const SizedBox(height: 20),
@@ -642,6 +667,126 @@ class _EncargadoOrderPaymentScreenState
     _cashController.text = (current + amount).toStringAsFixed(2);
     FocusScope.of(context).unfocus();
     setState(() {});
+  }
+
+  Widget _buildItemsSummary() {
+    final items = widget.table.items;
+    final totalUnits = items.fold<int>(0, (sum, i) => sum + i.quantity);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: EmpireColors.onyxSurface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: EmpireColors.agedBronzeDark),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.receipt_long,
+                  color: EmpireColors.champagneGold, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                'Productos ($totalUnits)',
+                style: const TextStyle(
+                  color: EmpireColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (items.isEmpty)
+            const Text(
+              'Sin productos en la orden',
+              style: TextStyle(color: EmpireColors.textSecondary, fontSize: 13),
+            )
+          else
+            ...items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 30,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 2),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: EmpireColors.charcoalSurface,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: EmpireColors.agedBronzeDark),
+                      ),
+                      child: Text(
+                        '${item.quantity}x',
+                        style: const TextStyle(
+                          color: EmpireColors.champagneGold,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.item.name,
+                            style: const TextStyle(
+                                color: EmpireColors.textPrimary, fontSize: 13),
+                          ),
+                          if (item.modifiers.isNotEmpty)
+                            Text(
+                              item.modifiers.join(', '),
+                              style: const TextStyle(
+                                  color: EmpireColors.textSecondary,
+                                  fontSize: 11),
+                            ),
+                          if (item.notes.isNotEmpty)
+                            Text(
+                              item.notes,
+                              style: const TextStyle(
+                                color: EmpireColors.textSecondary,
+                                fontSize: 11,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '\$${item.totalPrice.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: EmpireColors.textGold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const Divider(height: 18, color: EmpireColors.agedBronzeDark),
+          _buildInfoRow(
+              'Subtotal', '\$${widget.table.subtotal.toStringAsFixed(2)}'),
+          if (_discount > 0) ...[
+            const SizedBox(height: 6),
+            _buildInfoRow(
+              'Descuento (${_discount.toStringAsFixed(0)}%)',
+              '-\$${_discountAmount.toStringAsFixed(2)}',
+            ),
+          ],
+          const SizedBox(height: 6),
+          _buildInfoRow('Total a pagar', '\$${_total.toStringAsFixed(2)}'),
+        ],
+      ),
+    );
   }
 
   Widget _buildDiscountRow() {

@@ -61,15 +61,15 @@ describe('PurchaseOrdersService', () => {
   describe('findOne', () => {
     it('should return a single purchase order', async () => {
       const order = { id: '1', poNumber: 'PO-001', businessId: 'bus-1', status: 'draft' };
-      mockPurchaseOrdersRepository.findById.mockResolvedValue(order);
+      mockPurchaseOrdersRepository.findByIdWithItems.mockResolvedValue(order);
 
       const result = await service.findOne('1');
       expect(result).toEqual(order);
-      expect(repository.findById).toHaveBeenCalledWith('1');
+      expect(repository.findByIdWithItems).toHaveBeenCalledWith('1');
     });
 
     it('should throw NotFoundException if not found', async () => {
-      mockPurchaseOrdersRepository.findById.mockResolvedValue(null);
+      mockPurchaseOrdersRepository.findByIdWithItems.mockResolvedValue(null);
       await expect(service.findOne('999')).rejects.toThrow(NotFoundException);
     });
   });
@@ -146,18 +146,49 @@ describe('PurchaseOrdersService', () => {
 
   describe('receiveOrder', () => {
     it('should call processPurchaseOrderReception if status is sent', async () => {
-      const existing = { id: '1', poNumber: 'PO-001', businessId: 'bus-1', status: 'sent' };
+      const existing = {
+        id: '1',
+        poNumber: 'PO-001',
+        businessId: 'bus-1',
+        status: 'sent',
+        items: [{ productId: 'prod-1', quantityOrdered: '10.000', quantityReceived: '0.000', unitCostEstimated: '6.00' }],
+      };
       const receiptData = {
         items: [{ productId: 'prod-1', quantityReceived: 10, unitCostActual: 6.0 }],
         notes: 'Delivered',
       };
 
       mockPurchaseOrdersRepository.findById.mockResolvedValue(existing);
+      mockPurchaseOrdersRepository.findByIdWithItems.mockResolvedValue(existing);
       mockInventoryService.processPurchaseOrderReception.mockResolvedValue({ success: true, status: 'received' });
 
       const result = await service.receiveOrder('1', receiptData);
       expect(result).toEqual({ success: true, status: 'received' });
-      expect(mockInventoryService.processPurchaseOrderReception).toHaveBeenCalledWith('1', receiptData.items, receiptData.notes);
+      expect(mockInventoryService.processPurchaseOrderReception).toHaveBeenCalledWith(
+        '1',
+        receiptData.items,
+        'Delivered\nRecibido por: operador',
+      );
+    });
+
+    it('should throw BadRequestException if quantity or cost differs without notes', async () => {
+      const existing = {
+        id: '1',
+        poNumber: 'PO-001',
+        businessId: 'bus-1',
+        status: 'sent',
+        items: [{ productId: 'prod-1', quantityOrdered: '10.000', quantityReceived: '0.000', unitCostEstimated: '12.00' }],
+      };
+      const receiptData = {
+        items: [{ productId: 'prod-1', quantityReceived: 10, unitCostActual: 0.0 }],
+      };
+
+      mockPurchaseOrdersRepository.findById.mockResolvedValue(existing);
+      mockPurchaseOrdersRepository.findByIdWithItems.mockResolvedValue(existing);
+
+      await expect(service.receiveOrder('1', receiptData)).rejects.toThrow(
+        'Debes registrar una nota cuando la cantidad o el costo recibido difiere de la orden de compra.',
+      );
     });
 
     it('should throw BadRequestException if status is draft', async () => {

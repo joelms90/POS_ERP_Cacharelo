@@ -27,6 +27,7 @@ export interface AuthUser {
   name: string;
   email?: string;
   role: 'owner' | 'inventory_admin' | 'support_tech' | 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable';
+  roles?: Array<'owner' | 'inventory_admin' | 'support_tech' | 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable'>;
   businessAccess?: Array<{ businessId: string; role: 'owner' | 'inventory_admin' | 'support_tech' }>;
 }
 
@@ -247,7 +248,8 @@ export interface BranchRequisition {
   fromBranchId: string;
   toWarehouseId: string;
   requestedById: string;
-    status: 'pending' | 'pending_approval' | 'approved' | 'rejected' | 'completed';
+  createdBy?: string;
+  status: 'pending' | 'pending_approval' | 'approved' | 'rejected' | 'completed';
   notes?: string;
   approvalNotes?: string;
   approvedById?: string;
@@ -264,6 +266,7 @@ export interface InventoryAlert {
   id: string;
   productId: string;
   branchId: string | null;
+  warehouseId?: string | null;
   alertType: 'low_stock' | 'out_of_stock';
   threshold: string;
   currentQty: string;
@@ -273,6 +276,9 @@ export interface InventoryAlert {
   productName: string;
   productSku: string | null;
   branchName: string | null;
+  warehouseName?: string | null;
+  locationType?: 'global' | 'branch' | 'warehouse';
+  locationName?: string | null;
   itemType?: string;
   hasProvider?: boolean;
   transferableQty: number | null;
@@ -282,7 +288,9 @@ export interface InventoryAlertSummary {
   summary: {
     outOfStock: number;
     lowStock: number;
+    globalAlerts?: number;
     branchAlerts: number;
+    warehouseAlerts?: number;
     totalAlerts: number;
     pendingRequisitions: number;
     draftPurchaseOrders: number;
@@ -1479,15 +1487,19 @@ export const api = {
   /**
    * Intelligent Inventory Control — Panel de Inventario
    */
-  async getInventoryAlertSummary(businessId: string, branchId?: string): Promise<InventoryAlertSummary> {
+  async getInventoryAlertSummary(businessId: string, branchId?: string, warehouseId?: string, locationId?: string): Promise<InventoryAlertSummary> {
     let url = `/inventory/alerts/summary?businessId=${businessId}`;
     if (branchId) url += `&branchId=${branchId}`;
+    if (warehouseId) url += `&warehouseId=${warehouseId}`;
+    if (locationId) url += `&locationId=${locationId}`;
     return apiRequest<InventoryAlertSummary>(url);
   },
 
-  async getInventoryAlerts(businessId: string, branchId?: string, status?: string): Promise<InventoryAlert[]> {
+  async getInventoryAlerts(businessId: string, branchId?: string, status?: string, warehouseId?: string, locationId?: string): Promise<InventoryAlert[]> {
     let url = `/inventory/alerts?businessId=${businessId}`;
     if (branchId) url += `&branchId=${branchId}`;
+    if (warehouseId) url += `&warehouseId=${warehouseId}`;
+    if (locationId) url += `&locationId=${locationId}`;
     if (status) url += `&status=${status}`;
     return apiRequest<InventoryAlert[]>(url);
   },

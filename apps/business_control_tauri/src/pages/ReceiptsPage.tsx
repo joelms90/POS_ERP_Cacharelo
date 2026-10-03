@@ -142,16 +142,21 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
       }
 
       const items = po.items.map((item) => {
-        const ordered = item.quantityOrdered;
-        const previouslyReceived = item.quantityReceived || 0;
+        const ordered = Number(item.quantityOrdered || 0);
+        const previouslyReceived = Number(item.quantityReceived || 0);
         const remainingQty = Math.max(0, ordered - previouslyReceived);
         const prod = products.find((p) => p.id === item.productId);
         const prodName = prod?.name || item.productName || 'Producto sin nombre';
+        const actualCost = Number(item.unitCostActual || 0);
+        const estimatedCost = Number(item.unitCostEstimated || 0);
+        const productCost = Number(prod?.cost || 0);
+        const resolvedCost = actualCost > 0 ? actualCost : (estimatedCost > 0 ? estimatedCost : productCost);
+
         return {
           productId: item.productId,
           productName: prodName,
           quantity: remainingQty,
-          unitCost: item.unitCostActual || item.unitCostEstimated || 0,
+          unitCost: resolvedCost,
           uom: prod?.uom || 'piece',
         };
       });
@@ -262,11 +267,40 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
     setIsSubmitting(true);
     try {
       if (isPoLinked && selectedPoId) {
+        const selectedPo = purchaseOrders.find((p) => p.id === selectedPoId);
+        if (selectedPo?.items) {
+          const expectedMap = new Map(
+            selectedPo.items.map((it) => [it.productId, it]),
+          );
+          const hasMismatch = itemsList.some((it) => {
+            const exp = expectedMap.get(it.productId);
+            if (!exp) return true;
+            const remaining = Math.max(
+              0,
+              Number(exp.quantityOrdered || 0) - Number(exp.quantityReceived || 0),
+            );
+            const cost = Number(exp.unitCostEstimated || 0);
+            return (
+              Math.abs(remaining - Number(it.quantity)) > 0.0001 ||
+              Math.abs(cost - Number(it.unitCost)) > 0.0001
+            );
+          });
+
+          if (hasMismatch && !notes.trim()) {
+            showToast(
+              'Debes registrar una nota en "Notas / Comentarios" explicando la diferencia de cantidad o costo respecto a la orden.',
+              'warning',
+            );
+            setIsSubmitting(false);
+            return;
+          }
+        }
+
         const payload = {
           items: itemsList.map((it) => ({
             productId: it.productId,
-            quantityReceived: it.quantity,
-            unitCostActual: it.unitCost,
+            quantityReceived: Number(it.quantity),
+            unitCostActual: Number(it.unitCost),
           })),
           notes: notes.trim() || undefined,
         };
