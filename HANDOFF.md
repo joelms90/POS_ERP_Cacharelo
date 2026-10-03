@@ -175,3 +175,21 @@ Inspection-only; no files modified. Existing POS branch-operator implementation 
 ## Phase 1 Resumen de Sucursal — inspection closure
 
 Inspection complete with no source edits. Confirmed `apps/business_control_tauri/src/pages/DashboardPage.tsx` contains existing sales metrics/live occupancy/shift totals; no verified daily branch cash/card summary, active-shift detail contract, or Corte X/Z route/UI was found. Existing admin build passes. Full Playwright has six pre-existing failures as documented in the inspection report; no new failures were attributed to this work. Workspace released; backend contract remains prerequisite before implementation.
+
+---
+## Integration of `013-unify-roles` into `main` (2026-10-02)
+
+- **Scope**: Reconciled and merged active role-unification, orders access guard, staging infra, OKF catalog, and multi-agent developer tooling from branch `013-unify-roles` into `main`.
+- **Commits**:
+  - `apps/pos_flutter`: Committed branch operator workflows, order editing, and version bump (`aa71533` + `c648f65`).
+  - Root: Committed staging infra, MCP server, OKF v0.2 knowledge catalog, and dev tooling (`e422e13`).
+  - Fast-forward merge of `013-unify-roles` into `main` completed with zero conflicts.
+- **PDCA Quality Verification**:
+  - Backend API (`apps/sync_api`): PASSED (build OK, 21/21 suites, 150/150 unit tests pass).
+  - Admin Web (`apps/business_control_tauri`): PASSED (`tsc + vite` build OK).
+  - POS Flutter (`apps/pos_flutter`): PASSED (`flutter analyze` OK).
+  - OKF Documentation (`knowledge/`): PASSED (27/27 concept documents conform to OKF v0.2).
+- **Backend Contract Verified**:
+  - `cash-shifts` controller: `@Controller('cash-shifts')` with `@Roles(CASHIER_ROLE, BRANCH_OPERATOR_ROLE)` at `apps/sync_api/src/modules/shifts/shifts.controller.ts`.
+  - `reports` controller: `@Controller('reports')` at `apps/sync_api/src/modules/reports/reports.controller.ts` providing `sales-dashboard`, `sales/payment-methods`, `cash-shifts`, and `cash-shifts/:id/audit`.
+- **Status**: `main` is clean, all tests pass, and ready for deployment or feature extensions.
