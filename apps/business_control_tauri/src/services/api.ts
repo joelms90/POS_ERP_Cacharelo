@@ -1339,6 +1339,19 @@ export const api = {
     return apiRequest<any[]>(url);
   },
 
+  async getSalesDashboard(params: {
+    businessId: string;
+    startDate?: string;
+    endDate?: string;
+    branchId?: string;
+  }): Promise<SalesDashboardSummary> {
+    const query = new URLSearchParams({ businessId: params.businessId });
+    if (params.startDate) query.set('startDate', params.startDate);
+    if (params.endDate) query.set('endDate', params.endDate);
+    if (params.branchId) query.set('branchId', params.branchId);
+    return apiRequest<SalesDashboardSummary>(`/reports/sales-dashboard?${query.toString()}`);
+  },
+
   async getPaymentMethodsSalesReport(params: {
     businessId: string;
     startDate?: string;
@@ -1714,6 +1727,18 @@ export interface SupplierProduct {
   conversionFactor: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface SalesDashboardSummary {
+  totalSales: number;
+  totalOrdersCount: number;
+  financial?: {
+    grossSales?: number;
+    netSales?: number;
+    collectedSales?: number;
+    ordersCount?: number;
+    paymentMix?: Array<{ paymentMethod: string; totalAmount: number; paymentsCount?: number; sharePercent?: number }>;
+  };
 }
 
 export interface PaymentMethodSalesReportLine {

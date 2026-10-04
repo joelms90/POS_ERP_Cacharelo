@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { api, Employee, Branch } from '../services/api';
+import { api, Employee, Branch, CashShiftHeader, CashShiftAuditReport, SalesDashboardSummary, PaymentMethodSalesReportLine } from '../services/api';
 import { UserForm } from '../components/organisms/UserForm';
 import { UsersGrid } from '../components/organisms/UsersGrid';
 import { ToastContainer } from '../components/molecules/ToastNotification';
@@ -16,6 +16,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ businessId }) => {
   const [editingUser, setEditingUser] = useState<Employee | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
+  const [summary, setSummary] = useState<SalesDashboardSummary | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodSalesReportLine[]>([]);
+  const [activeShift, setActiveShift] = useState<CashShiftHeader | null>(null);
+  const [lastClosedShift, setLastClosedShift] = useState<CashShiftHeader | null>(null);
+  const [shiftAudit, setShiftAudit] = useState<CashShiftAuditReport | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -57,6 +63,41 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ businessId }) => {
     fetchUsers();
   }, [fetchUsers]);
 
+  const fetchSummary = useCallback(async () => {
+    setSummaryLoading(true);
+    const today = new Date();
+    const startDate = today.toISOString().slice(0, 10);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const endDate = tomorrow.toISOString().slice(0, 10);
+    try {
+      const params = { businessId, startDate, endDate, branchId: selectedBranchId || undefined };
+      const [sales, payments, shifts] = await Promise.all([
+        api.getSalesDashboard(params),
+        api.getPaymentMethodsSalesReport(params),
+        api.getCashShiftsList(params),
+      ]);
+      setSummary(sales);
+      setPaymentMethods(payments);
+      const open = shifts.filter((shift) => shift.status === 'open').sort((a, b) => b.openedAt.localeCompare(a.openedAt))[0] ?? null;
+      const closed = shifts.filter((shift) => shift.status === 'closed').sort((a, b) => (b.closedAt ?? '').localeCompare(a.closedAt ?? ''))[0] ?? null;
+      setActiveShift(open);
+      setLastClosedShift(closed);
+      // Shift audit is restricted to the cashier/branch operator who owns the shift.
+      // The admin summary already has payment totals, so do not issue an unauthorized
+      // audit request that would make the entire dashboard load fail for admin users.
+      setShiftAudit(null);
+    } catch (error: any) {
+      showToast(error.message || 'No se pudo cargar el resumen de sucursal.', 'error');
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, [businessId, selectedBranchId, showToast]);
+
+  useEffect(() => {
+    fetchSummary();
+  }, [fetchSummary]);
+
   // Callbacks for UserForm
   const handleUserSaved = (savedUser: Employee) => {
     if (editingUser) {
@@ -83,7 +124,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ businessId }) => {
   };
 
   return (
-    <div className="flex flex-col gap-8 h-full animate-fade-in relative">
+    <div className="flex flex-col gap-8 min-h-full animate-fade-in relative">
+      <section aria-label="Resumen de sucursal" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="rounded border border-aged-bronze/20 bg-onyx-surface p-4"><p className="text-xs uppercase tracking-widest text-text-secondary">Ventas del día</p><p className="text-2xl text-champagne-gold mt-2">{summaryLoading ? '—' : `$${Number(summary?.totalSales ?? 0).toFixed(2)}`}</p><p className="text-xs text-text-secondary mt-1">{summary?.totalOrdersCount ?? 0} tickets</p></div>
+        <div className="rounded border border-aged-bronze/20 bg-onyx-surface p-4"><p className="text-xs uppercase tracking-widest text-text-secondary">Efectivo</p><p className="text-2xl text-text-primary mt-2">${Number(paymentMethods.find((p) => p.paymentMethod.toLowerCase() === 'cash')?.totalAmount ?? shiftAudit?.salesSummary.cashSales ?? 0).toFixed(2)}</p></div>
+        <div className="rounded border border-aged-bronze/20 bg-onyx-surface p-4"><p className="text-xs uppercase tracking-widest text-text-secondary">Tarjeta</p><p className="text-2xl text-text-primary mt-2">${Number(paymentMethods.find((p) => ['card','tarjeta'].includes(p.paymentMethod.toLowerCase()))?.totalAmount ?? shiftAudit?.salesSummary.cardSales ?? 0).toFixed(2)}</p></div>
+        <div className="rounded border border-aged-bronze/20 bg-onyx-surface p-4"><p className="text-xs uppercase tracking-widest text-text-secondary">Corte X</p><p className="text-lg text-text-primary mt-2">{activeShift ? `${activeShift.cashierName} · Abierto` : 'Sin turno abierto'}</p><p className="text-xs text-text-secondary mt-1">{activeShift ? `Desde ${new Date(activeShift.openedAt).toLocaleTimeString()}` : 'No hay arqueo parcial activo'}</p></div>
+        <div className="rounded border border-aged-bronze/20 bg-onyx-surface p-4"><p className="text-xs uppercase tracking-widest text-text-secondary">Corte Z</p><p className="text-lg text-text-primary mt-2">{lastClosedShift ? 'Cerrado' : 'Pendiente'}</p><p className="text-xs text-text-secondary mt-1">{lastClosedShift?.closedAt ? new Date(lastClosedShift.closedAt).toLocaleString() : 'Se genera al cerrar la caja'}</p></div>
+      </section>
+
       {/* Top action header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-aged-bronze/10 pb-4">
         <div>
@@ -112,8 +161,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ businessId }) => {
           </select>
 
           <button
-            onClick={() => fetchUsers()}
-            disabled={isLoading}
+            onClick={() => { fetchUsers(); fetchSummary(); }}
+            disabled={isLoading || summaryLoading}
             className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-aged-bronze/40 hover:border-champagne-gold/60 bg-onyx-surface hover:bg-charcoal-surface/60 rounded text-sm text-text-secondary hover:text-champagne-gold font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed select-none active:scale-98"
           >
             <svg
