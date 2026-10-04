@@ -28,6 +28,8 @@ class EncargadoDashboardScreen extends StatefulWidget {
 class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
   int _selectedIndex = 0;
   int _activeOrdersCount = 0;
+  int _summaryRefreshToken = 0;
+  int _lastSalesSummaryRevision = 0;
   bool _isPrinterQueueOpen = false;
 
   @override
@@ -52,8 +54,18 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
             t.zone == 'Para Llevar' &&
             (t.state == TableState.occupied || t.state == TableState.billing))
         .length;
-    if (count != _activeOrdersCount) {
-      setState(() => _activeOrdersCount = count);
+    final reportChanged =
+        widget.state.salesSummaryRevision != _lastSalesSummaryRevision;
+    if (count != _activeOrdersCount || reportChanged) {
+      setState(() {
+        _activeOrdersCount = count;
+        if (reportChanged) {
+          _lastSalesSummaryRevision = widget.state.salesSummaryRevision;
+          if (_selectedIndex == 4 && !widget.showFullFeatures) {
+            _summaryRefreshToken++;
+          }
+        }
+      });
     }
   }
 
@@ -152,7 +164,10 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
                                 ),
                                 RequisitionsScreen(state: widget.state),
                                 InventoryReceiptsTab(state: widget.state),
-                                DailySalesTab(state: widget.state),
+                                DailySalesTab(
+                                  key: ValueKey(_summaryRefreshToken),
+                                  state: widget.state,
+                                ),
                               ],
                       ),
                     ),
@@ -414,7 +429,14 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
     final isSelected = _selectedIndex == index;
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => _selectedIndex = index),
+        onTap: () => setState(() {
+          _selectedIndex = index;
+          // DailySalesTab loads its report in initState. Recreate it whenever
+          // the operator opens Resumen so completed payments are reflected.
+          if (index == 4 && !widget.showFullFeatures) {
+            _summaryRefreshToken++;
+          }
+        }),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           color: isSelected

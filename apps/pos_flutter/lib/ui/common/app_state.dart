@@ -588,6 +588,11 @@ class AppState extends ChangeNotifier {
   // Recent closed sales history
   List<Map<String, dynamic>> recentClosedSales = [];
 
+  /// Increments after a cloud payment is accepted so report views can refresh
+  /// even when they remain mounted inside an IndexedStack.
+  int salesSummaryRevision = 0;
+  String? dailySalesSummaryError;
+
   bool isShiftOpen = false;
   double cashDrawerAmount = 0.0;
   double initialFloat = 0.0;
@@ -2442,11 +2447,14 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>?> getCashShiftAuditReport(String shiftId) async {
+  Future<Map<String, dynamic>?> getCorteXReport(String shiftId) async {
     try {
       final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
-          .get(Uri.parse('$baseUrl/reports/cash-shifts/$shiftId/audit'))
+          .get(
+            Uri.parse('$baseUrl/cash-shifts/$shiftId/corte-x'),
+            headers: await _operatorHeaders(),
+          )
           .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
@@ -2454,9 +2462,14 @@ class AppState extends ChangeNotifier {
       }
       return null;
     } catch (e) {
-      debugPrint('Error getting cash shift audit: $e');
+      debugPrint('Error getting Corte X: $e');
       return null;
     }
+  }
+
+  /// Backward-compatible alias for callers that need the current shift audit.
+  Future<Map<String, dynamic>?> getCashShiftAuditReport(String shiftId) {
+    return getCorteXReport(shiftId);
   }
 
   // Waiter Order submission
@@ -3537,8 +3550,13 @@ class AppState extends ChangeNotifier {
         await _updateClosedPaidTableStateOnServer(tableId);
       }
 
-      // Sync table states after successful payment to update other devices
+      // Sync table states after successful payment to update other devices.
       await syncTableStates(notify: true);
+      // The daily report is backed by completed payments, not table state. Mark
+      // the report stale only after the payment request has succeeded so an
+      // open Resumen tab refreshes after the backend commit.
+      salesSummaryRevision++;
+      notifyListeners();
       if (shouldCloseLocal) {
         _forceCloseLocalPaidTable(tableId, orderId: orderId);
       }
@@ -5141,16 +5159,28 @@ class AppState extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>?> fetchTodaySalesSummary() async {
-    if (!isTerminalConfigured) return null;
+    dailySalesSummaryError = null;
+    if (!isTerminalConfigured) {
+      dailySalesSummaryError = 'Terminal no configurada.';
+      return null;
+    }
     try {
       final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
           .get(Uri.parse('$baseUrl/orders/reports/daily-summary'),
               headers: await _operatorHeaders())
           .timeout(const Duration(seconds: 8));
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) {
+        dailySalesSummaryError =
+            'No se pudo cargar el resumen (HTTP ${response.statusCode}).';
+        debugPrint(
+            'Unable to load daily sales summary: ${response.statusCode} ${response.body}');
+        return null;
+      }
       return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
     } catch (error) {
+      dailySalesSummaryError =
+          'No se pudo cargar el resumen. Verifique su conexión.';
       debugPrint('Unable to load daily sales summary: $error');
       return null;
     }
@@ -5459,12 +5489,10 @@ class AppState extends ChangeNotifier {
   String formatRow(String left, String right, [int? width]) {
     final w = width ?? ticketWidth;
     if (left.length + right.length >= w) {
-      final allowedLeftWidth = w - right.length - 1;
-      if (allowedLeftWidth > 0) {
-        left = left.substring(0, allowedLeftWidth);
-      } else {
-        return right.substring(0, min(right.length, w));
-      }
+      // Keep the complete label/value instead of silently truncating either
+      // side. Long rows are wrapped so operation labels and product names stay
+      // readable on narrow thermal paper.
+      return '$left\n${right.padLeft(min(w, max(right.length, 0)))}';
     }
     final padding = w - left.length - right.length;
     return left + ' ' * padding + right;
