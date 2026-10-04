@@ -46,7 +46,7 @@ test.describe('Admin Console E2E Navigation', () => {
     for (const section of sections) {
       console.log(`Testing navigation to: ${section.name}`);
       
-      const navButton = page.locator('aside nav button', { hasText: section.name });
+      const navButton = page.locator('aside nav').getByRole('button', { name: section.name, exact: true });
       await expect(navButton).toBeVisible();
       await navButton.click();
 
@@ -63,6 +63,15 @@ test.describe('Admin Console E2E Navigation', () => {
       const contentText = await mainContent.textContent();
       expect(contentText?.trim().length).toBeGreaterThan(0);
     }
+  });
+
+  test('shows the branch summary cards on Personal (PINs)', async ({ page }) => {
+    await page.locator('aside nav button', { hasText: 'Personal (PINs)' }).click();
+    await expect(page.getByText('Ventas del día')).toBeVisible();
+    await expect(page.getByText('Efectivo')).toBeVisible();
+    await expect(page.getByText('Tarjeta')).toBeVisible();
+    await expect(page.getByText('Corte X')).toBeVisible();
+    await expect(page.getByText('Corte Z')).toBeVisible();
   });
 
   test('should switch businesses and retain navigation functionality', async ({ page }) => {
