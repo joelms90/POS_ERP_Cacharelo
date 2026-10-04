@@ -117,6 +117,9 @@ class DailySalesTab extends StatefulWidget {
 
 class _DailySalesTabState extends State<DailySalesTab> {
   Map<String, dynamic>? _summary;
+  String? _error;
+  bool _loading = true;
+
   @override
   void initState() {
     super.initState();
@@ -124,11 +127,33 @@ class _DailySalesTabState extends State<DailySalesTab> {
   }
 
   Future<void> _refresh() async {
+    if (mounted) setState(() => _loading = true);
     final value = await widget.state.fetchTodaySalesSummary();
-    if (mounted) setState(() => _summary = value);
+    if (mounted) {
+      setState(() {
+        _summary = value;
+        _error = value == null ? widget.state.dailySalesSummaryError : null;
+        _loading = false;
+      });
+    }
   }
 
-  double _amount(String key) => (_summary?[key] as num?)?.toDouble() ?? 0;
+  double _amount(String key) {
+    final direct = _summary?[key];
+    if (direct is num) return direct.toDouble();
+    final totals = _summary?['totals'];
+    if (totals is Map) {
+      final normalizedKey = switch (key) {
+        'cashTotal' => 'cash',
+        'cardTotal' => 'card',
+        _ => key,
+      };
+      if (totals[normalizedKey] is num) {
+        return (totals[normalizedKey] as num).toDouble();
+      }
+    }
+    return 0;
+  }
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: EmpireColors.obsidian,
@@ -141,22 +166,46 @@ class _DailySalesTabState extends State<DailySalesTab> {
                     fontSize: 20,
                     fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            _SalesCard(
-                label: 'Efectivo',
-                amount: _amount('cashTotal'),
-                icon: Icons.payments_outlined),
-            _SalesCard(
-                label: 'Tarjeta',
-                amount: _amount('cardTotal'),
-                icon: Icons.credit_card),
-            _SalesCard(
-                label: 'Total cobrado',
-                amount: _amount('total'),
-                icon: Icons.point_of_sale),
-            const SizedBox(height: 12),
-            Text('Solo incluye ventas de tu sucursal registradas hoy.',
-                style: TextStyle(
-                    color: EmpireColors.textSecondary.withValues(alpha: 0.8))),
+            if (_loading)
+              const Center(
+                  child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: CircularProgressIndicator(
+                          color: EmpireColors.champagneGold)))
+            else if (_error != null)
+              Card(
+                color: EmpireColors.onyxSurface,
+                child: ListTile(
+                  leading: const Icon(Icons.error_outline,
+                      color: EmpireColors.errorRed),
+                  title: Text(_error!,
+                      style: const TextStyle(color: EmpireColors.textPrimary)),
+                  trailing: IconButton(
+                    tooltip: 'Reintentar',
+                    onPressed: _refresh,
+                    icon: const Icon(Icons.refresh,
+                        color: EmpireColors.champagneGold),
+                  ),
+                ),
+              )
+            else ...[
+              _SalesCard(
+                  label: 'Efectivo',
+                  amount: _amount('cashTotal'),
+                  icon: Icons.payments_outlined),
+              _SalesCard(
+                  label: 'Tarjeta',
+                  amount: _amount('cardTotal'),
+                  icon: Icons.credit_card),
+              _SalesCard(
+                  label: 'Total cobrado',
+                  amount: _amount('total'),
+                  icon: Icons.point_of_sale),
+              const SizedBox(height: 12),
+              Text('Solo incluye ventas de tu sucursal registradas hoy.',
+                  style: TextStyle(
+                      color: EmpireColors.textSecondary.withValues(alpha: 0.8))),
+            ],
           ]),
         ),
       );
