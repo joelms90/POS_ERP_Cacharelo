@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, ForbiddenException } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../database/schema';
@@ -565,11 +565,16 @@ export class ReportsService {
       .orderBy(desc(schema.cashShifts.openedAt));
   }
 
-  async getCashShiftAuditReport(shiftId: string) {
+  async getCashShiftAuditReport(
+    shiftId: string,
+    actor?: { sub?: string; branchId?: string; businessId?: string },
+  ) {
     const shiftList = await this.db
       .select({
         id: schema.cashShifts.id,
+        cashierId: schema.cashShifts.cashierId,
         cashierName: schema.users.name,
+        businessId: schema.branches.businessId,
         branchId: schema.cashShifts.branchId,
         branchName: schema.branches.name,
         initialFloat: schema.cashShifts.initialFloat,
@@ -591,6 +596,11 @@ export class ReportsService {
     }
 
     const shift = shiftList[0];
+    if (!actor?.sub || !actor.branchId || !actor.businessId ||
+        shift.cashierId !== actor.sub || shift.branchId !== actor.branchId ||
+        shift.businessId !== actor.businessId) {
+      throw new ForbiddenException('Solo puedes acceder a la auditoria de tu caja y sucursal.');
+    }
     if (shift.status === 'closed' && shift.closeSnapshot) {
       return shift.closeSnapshot;
     }

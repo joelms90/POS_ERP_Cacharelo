@@ -58,6 +58,28 @@ export class ShiftsService {
     return shift;
   }
 
+  /**
+   * Generate a live Corte X (open shift) or final Corte Z (closed shift).
+   * Both reports use the same payment and cash-movement calculations as closeShift,
+   * keeping cash/card totals consistent across the POS and branch dashboard.
+   */
+  async getCorteReport(shiftId: string, corte: 'x' | 'z') {
+    const shift = await this.getShiftById(shiftId);
+    if (corte === 'z' && shift.status !== 'closed') {
+      throw new ConflictException('El Corte Z solo está disponible para turnos cerrados.');
+    }
+
+    const closedAt = shift.closedAt ? new Date(shift.closedAt) : new Date();
+    const actualCash = shift.status === 'closed' ? this.parseMoney(shift.cashDrawerAmount) : undefined;
+    return this.buildShiftReport(shift, {
+      closedAt,
+      actualCash,
+      denominationCounts: (shift.denominationCounts ?? undefined) as Record<string, number> | undefined,
+      closeNotes: shift.closeNotes ?? undefined,
+      status: shift.status as 'open' | 'closed',
+    });
+  }
+
   async createTransaction(shiftId: string, createTransactionDto: CreateTransactionDto) {
     const { type, amount, reason } = createTransactionDto;
 

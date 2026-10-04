@@ -61,6 +61,34 @@ describe('ShiftsService', () => {
     jest.clearAllMocks();
   });
 
+  describe('Corte X/Z reports', () => {
+    const openShift = {
+      id: 'shift-1', branchId: 'branch-1', cashierId: 'cashier-1',
+      status: 'open', initialFloat: '100.00', cashDrawerAmount: '100.00',
+      openedAt: new Date('2026-09-24T08:00:00Z'), closedAt: null,
+      denominationCounts: null, closeNotes: null,
+    };
+
+    it('returns a live Corte X with cash/card totals for an open shift', async () => {
+      mockShiftsRepository.findById.mockResolvedValue(openShift);
+      mockTransactionsRepository.findByShiftId.mockResolvedValue([]);
+
+      const report = await service.getCorteReport('shift-1', 'x');
+      expect(report.summary).toMatchObject({
+        initialFloat: 100,
+        cashSales: 150,
+        cardSales: 300,
+        totalSales: 450,
+        actualCash: null,
+      });
+    });
+
+    it('only permits Corte Z after the shift is closed', async () => {
+      mockShiftsRepository.findById.mockResolvedValue(openShift);
+      await expect(service.getCorteReport('shift-1', 'z')).rejects.toThrow(ConflictException);
+    });
+  });
+
   describe('openShift', () => {
     it('should open shift successfully when no active shift exists', async () => {
       const openDto = {

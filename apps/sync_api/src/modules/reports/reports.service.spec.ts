@@ -36,6 +36,33 @@ describe('ReportsService', () => {
     jest.clearAllMocks();
   });
 
+  it('denies cash-shift audit access when the actor does not own the shift', async () => {
+    const query = makeQuery([{
+      id: 'shift-1', cashierId: 'cashier-1', businessId: 'business-1', branchId: 'branch-1',
+      status: 'closed', closeSnapshot: { summary: {} },
+    }]);
+    mockDb.select.mockReturnValue(query);
+
+    await expect(service.getCashShiftAuditReport('shift-1', {
+      sub: 'cashier-2', branchId: 'branch-1', businessId: 'business-1',
+    })).rejects.toThrow('Solo puedes acceder');
+    await expect(service.getCashShiftAuditReport('shift-1', {
+      sub: 'cashier-1', branchId: 'other-branch', businessId: 'business-1',
+    })).rejects.toThrow('Solo puedes acceder');
+  });
+
+  it('returns a closed shift snapshot for its authenticated owner', async () => {
+    const snapshot = { summary: { totalSales: 10 } };
+    mockDb.select.mockReturnValue(makeQuery([{
+      id: 'shift-1', cashierId: 'cashier-1', businessId: 'business-1', branchId: 'branch-1',
+      status: 'closed', closeSnapshot: snapshot,
+    }]));
+
+    await expect(service.getCashShiftAuditReport('shift-1', {
+      sub: 'cashier-1', branchId: 'branch-1', businessId: 'business-1',
+    })).resolves.toEqual(snapshot);
+  });
+
   it('returns collected sales and reconciliation exceptions for mismatched orders', async () => {
     const orders = [
       {

@@ -41,6 +41,20 @@ export class ShiftsController {
     return this.ownedShift(id, req);
   }
 
+  @Get(':id/corte-x')
+  @HttpCode(HttpStatus.OK)
+  async corteX(@Param('id') id: string, @Req() req: ShiftRequest) {
+    await this.ownedShift(id, req);
+    return this.shiftsService.getCorteReport(id, 'x');
+  }
+
+  @Get(':id/corte-z')
+  @HttpCode(HttpStatus.OK)
+  async corteZ(@Param('id') id: string, @Req() req: ShiftRequest) {
+    await this.ownedShift(id, req);
+    return this.shiftsService.getCorteReport(id, 'z');
+  }
+
   @Post(':id/transactions')
   @HttpCode(HttpStatus.CREATED)
   async addTransaction(
