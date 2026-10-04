@@ -7,6 +7,26 @@
 ---
 
 ## Currently Active Sessions
+### Session: fix-flutter-web-local-host
+- **Scope**: Fix Flutter web local Make target host binding/diagnostics for localhost:8081; Makefile only.
+- **Status**: 🔄 In progress
+
+### Session: resumen-live-refresh
+- **Scope**: Diagnose and fix Flutter branch operator Resumen sales summary not reflecting newly completed orders/payments; POS app only.
+- **Status**: ✅ Completed
+
+### Session: inspect-branch-operator-summary
+- **Scope**: Inspect and minimally fix apps/pos_flutter branch_operator Resumen/dashboard today's sales refresh after orders; no other apps.
+- **Status**: ✅ Completed
+
+### Session: resume-phase1-verification
+- **Scope**: Run quality verification for current Phase 1 Resumen de Sucursal changes across backend/Admin/POS; inspect diffs, fix only regressions, update handoff.
+- **Status**: ✅ Completed
+
+### Session: phase1-resumen-sucursal-final
+- **Scope**: Finish Phase 1 Resumen de Sucursal: verify/implement backend summary/Corte contract and integrate Admin + POS UI, with tests and no migrations unless required.
+- **Status**: ✅ Completed
+
 ### Session: phase1-resumen-pos-inspect
 - **Scope**: Inspect apps/pos_flutter branch-operator/cashier screens and shift/Corte/report flows for Phase 1 Resumen de Sucursal; no file edits.
 - **Status**: ✅ Completed

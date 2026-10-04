@@ -54,9 +54,9 @@ cmd_setup() {
     echo -e "${BOLD}${BLUE}==> Setting up isolated worktrees for feature: ${feature}${NC}"
     cd "${REPO_ROOT}"
 
-    declare -A APPS=( ["backend"]="apps/sync_api" ["admin"]="apps/business_control_tauri" ["pos"]="apps/pos_flutter" )
+    local apps=("backend" "admin" "pos")
 
-    for app in "${!APPS[@]}"; do
+    for app in "${apps[@]}"; do
         local branch="${feature}/${app}"
         local target_dir="${WORKTREE_BASE}/${app}"
 
@@ -70,6 +70,13 @@ cmd_setup() {
                 echo -e "  • Creating branch ${branch} -> ${target_dir}"
                 git worktree add -b "${branch}" "${target_dir}" HEAD
             fi
+        fi
+
+        # Ensure node_modules are symlinked so builds and compilers work without reinstalling
+        if [ "$app" = "backend" ] && [ -d "${REPO_ROOT}/apps/sync_api/node_modules" ]; then
+            ln -sfn "${REPO_ROOT}/apps/sync_api/node_modules" "${target_dir}/apps/sync_api/node_modules"
+        elif [ "$app" = "admin" ] && [ -d "${REPO_ROOT}/apps/business_control_tauri/node_modules" ]; then
+            ln -sfn "${REPO_ROOT}/apps/business_control_tauri/node_modules" "${target_dir}/apps/business_control_tauri/node_modules"
         fi
     done
 

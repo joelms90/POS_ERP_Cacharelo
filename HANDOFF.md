@@ -7,6 +7,19 @@
 
 ---
 
+## Backend cash-shift audit authorization (Phase 1)
+- Secured `GET /reports/cash-shifts/:id/audit` with JWT, cashier/branch_operator roles, and service-level business/branch/cashier ownership checks.
+- Added focused HTTP authorization and ReportsService ownership tests; no migrations run.
+- Existing authenticated `GET /orders/reports/daily-summary` provides branch-scoped daily totals; no additional summary endpoint is required. `GET /cash-shifts/active` provides the operator's active shift and `GET /cash-shifts/:id/corte-x|corte-z` provides live/final cash-card reconciliation (Z requires a closed shift). `cash-shifts` list plus per-shift audit remains available for detailed reconciliation.
+- Focused Corte X/Z service tests added; backend build and full Jest suite pass (159 tests). No migrations run.
+- POS now sends operator auth for Corte reports and consumes the verified `/cash-shifts/:id/corte-x` contract. Daily Resumen normalizes the backend `totals.cash/card/total` payload for its cards.
+- Admin Dashboard now avoids the cashier-only audit endpoint and uses branch-scoped payment/shifts reports for summary cards; admin navigation/build verification passes.
+
+## Phase 1 Resumen de Sucursal — Admin UI (completed)
+- Dashboard loads verified `/reports/sales-dashboard`, `/reports/sales/payment-methods`, and `/reports/cash-shifts` contracts for the selected branch and current day.
+- Added daily sales/ticket, cash/card, active Corte X, and latest Corte Z cards; no restricted cashier shift endpoints are used.
+- Added Playwright coverage for summary cards and fixed navigation locators; admin build and navigation spec pass.
+
 ## 1. Staging environment — IN PROGRESS (blocked on billing)
 
 **Goal:** isolated `staging` so daily changes never touch prod. Prod is untouched.
@@ -193,3 +206,56 @@ Inspection complete with no source edits. Confirmed `apps/business_control_tauri
   - `cash-shifts` controller: `@Controller('cash-shifts')` with `@Roles(CASHIER_ROLE, BRANCH_OPERATOR_ROLE)` at `apps/sync_api/src/modules/shifts/shifts.controller.ts`.
   - `reports` controller: `@Controller('reports')` at `apps/sync_api/src/modules/reports/reports.controller.ts` providing `sales-dashboard`, `sales/payment-methods`, `cash-shifts`, and `cash-shifts/:id/audit`.
 - **Status**: `main` is clean, all tests pass, and ready for deployment or feature extensions.
+
+
+---
+## Phase 1 Resumen de Sucursal backend (2026-09-18)
+- Added branch-owned `GET /cash-shifts/:id/corte-x` and `/corte-z` endpoints backed by `ShiftsService.getCorteReport`; Corte Z requires a closed shift and both reports expose payment-method totals/reconciliation.
+- Added focused Corte X/Z service tests in `apps/sync_api/src/modules/shifts/shifts.service.spec.ts`; preserved concurrent reports audit authorization edits.
+- No migrations run. Build/test verification pending final QA worker result.
+
+
+---
+## Phase 1 Resumen de Sucursal — Admin integration (2026-10-02)
+Implemented verified-contract DashboardPage integration. Added typed `getSalesDashboard` API client method and daily branch summary cards for total sales/tickets, cash/card payment totals, and active shift/Corte X indicator. Active shift is derived from `GET /reports/cash-shifts` and audit data from `/reports/cash-shifts/:id/audit`; no `/cash-shifts/active` call is made. Modified `apps/business_control_tauri/src/pages/DashboardPage.tsx` and `src/services/api.ts`. QA agent reported admin gate failed without diagnostics; exact build status remains unverified and should be rerun locally.
+
+
+---
+POS verification completed: flutter analyze exited with no errors (144 existing info/warning lints). Focused tests receive_transfer_dialog (2/2), waiter_ordering_screen (3/3), waiter_billing_flow (3/3 after fix) pass. Initial billing failures were caused by formatRow truncating long operation/product labels; fixed apps/pos_flutter/lib/ui/common/app_state.dart to wrap oversized rows. split_checkout_view remains 4 failing tests (10%, $17.24, Monto Recibido, item-split button finders; ListTile DecoratedBox assertions), unrelated to operator/Corte/Resumen scope and untouched.
+
+
+---
+## Backend reports/shifts authorization diagnostics (current session)
+- Inspected uncommitted backend authorization changes.
+- Fixed clear TypeScript regression in `apps/sync_api/src/modules/reports/reports.controller.ts`: injected `@Req() req` was referenced but missing and placed after optional query parameters; added scope validation and reordered parameter before optional queries.
+- Focused reports/shifts Jest suites pass (reports authorization/service and shifts authorization/service). Nest build rerun pending/verify due prior generated `dist` ENOTEMPTY filesystem error.
+- Remaining concern: several legacy reports endpoints remain unguarded; not changed in this narrow regression pass because likely pre-existing contract.
+
+
+
+---
+- Refined scope check to use shared `assertBusinessAccess`, preserving multi-business/global-owner authorization semantics; still requires an associated business and enforces branch match when actor is branch-bound.
+
+
+---
+## Phase 1 verification continuation — 2026-10-02
+- Ran coordinated verification on current uncommitted changes. Backend build and focused reports/shifts suites pass (22 suites / 159 tests reported); Admin TypeScript/Vite build and navigation Playwright pass (3/3); POS analyze passes with 144 pre-existing info/warning lints; focused POS tests pass (waiter billing 3/3, waiter ordering 3/3, receive transfer 2/2).
+- Fixed clear regressions: reports controller now injects request and validates business/branch scope; Admin Dashboard no longer calls cashier-only shift audit; POS ticket row labels wrap instead of truncating.
+- Remaining known issue: unrelated `split_checkout_view` has 4 existing test failures. Legacy reports endpoints remain unauthenticated and were intentionally not broadened in this scoped pass. No migrations, deployments, commits, or resets performed.
+
+
+---
+## inspect-branch-operator-summary (2026-09-18)
+- Inspected `apps/pos_flutter` branch_operator Resumen flow and order/payment sync.
+- Root cause: `DailySalesTab` calls `fetchTodaySalesSummary()` only from `initState`; dashboard uses `IndexedStack`, so tab remains mounted and does not refetch when returning after an order/payment.
+- Fix: added `_summaryRefreshToken` and a `ValueKey` on `DailySalesTab`; tapping Resumen increments token, recreating tab and fetching current report. Modified only `apps/pos_flutter/lib/ui/encargado/encargado_dashboard_screen.dart`.
+- Summary API source remains `GET /orders/reports/daily-summary` via `AppState.fetchTodaySalesSummary`; payment flow posts `/orders/:id/payments`, then syncs table state, but previously did not trigger report refetch.
+- QA reported `check-pos`/Flutter analyze passed with no issues. No other app files modified by this session; pre-existing workspace changes preserved.
+
+
+---
+## Resumen Flutter live-refresh follow-up
+- Diagnosed stale/zero Resumen: payment requests were launched unawaited, while DailySalesTab only fetched in initState and null/error responses were rendered as $0.00.
+- POS hardening now increments `salesSummaryRevision` after successful cloud payment, recreates/refetches mounted Resumen, and exposes loading/error/retry instead of masking API failures.
+- Relevant files: `apps/pos_flutter/lib/ui/common/app_state.dart`, `ui/encargado/encargado_dashboard_screen.dart`, `ui/encargado/operator_operations_tabs.dart`.
+- Verification: POS Flutter quality gate/analyze passed; no migrations.
