@@ -1,5 +1,12 @@
 # Staging Environment Plan (`014-staging-environment`)
 
+**Status:** Archived / Parked (Waiting for GCP billing account association)  
+**Archive Branch:** `archive/014-staging-environment`  
+**Archived Date:** 2026-10-13  
+
+> [!NOTE]
+> All infrastructure modules, environment configurations, and deployment targets have been preserved in `main` and captured in the `archive/014-staging-environment` branch. Execution is parked until billing association is granted on `cacharelo-staging`.
+
 ## Goal
 
 Introduce an isolated **staging** environment so day-to-day changes never touch

@@ -43,6 +43,14 @@ export class OrdersController {
     return this.ordersService.getDailyPaymentSummary(req.user, date);
   }
 
+  @Get('reports/tickets-today')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(BRANCH_OPERATOR_ROLE, CASHIER_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
+  async ticketsToday(@Query('date') date: string | undefined, @Query('branchId') branchId: string | undefined, @Req() req: any) {
+    return this.ordersService.getTodayTickets(req.user, date, branchId);
+  }
+
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id') id: string) {

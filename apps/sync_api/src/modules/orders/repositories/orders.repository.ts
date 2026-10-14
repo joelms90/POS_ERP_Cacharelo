@@ -381,6 +381,108 @@ export class OrdersRepository {
     };
   }
 
+  async getTodayTickets(branchId: string, dateStr?: string) {
+    const date = dateStr || new Date().toISOString().slice(0, 10);
+    const closedOrders = await this.db
+      .select({
+        id: schema.orders.id,
+        createdAt: schema.orders.createdAt,
+        total: schema.orders.total,
+        discount: schema.orders.discount,
+        subtotal: schema.orders.subtotal,
+        tax: schema.orders.tax,
+        state: schema.orders.state,
+        tableLabel: schema.branchTables.label,
+        tableId: schema.orders.tableId,
+        waiterName: schema.users.name,
+      })
+      .from(schema.orders)
+      .leftJoin(schema.branchTables, eq(schema.orders.tableId, schema.branchTables.id))
+      .leftJoin(schema.users, eq(schema.orders.waiterId, schema.users.id))
+      .where(and(
+        eq(schema.orders.branchId, branchId),
+        eq(schema.orders.state, 'closed'),
+        sql`${schema.orders.createdAt} >= ${date}::date`,
+        sql`${schema.orders.createdAt} < (${date}::date + interval '1 day')`,
+        isNull(schema.orders.deletedAt),
+      ))
+      .orderBy(sql`${schema.orders.createdAt} DESC`);
+
+    if (closedOrders.length === 0) {
+      return { tickets: [], date };
+    }
+
+    const orderIds = closedOrders.map((o) => o.id);
+
+    const allItems = await this.db
+      .select({
+        orderId: schema.orderItems.orderId,
+        quantity: schema.orderItems.quantity,
+        productName: schema.products.name,
+        price: schema.orderItems.price,
+        notes: schema.orderItems.notes,
+        assignedGuest: schema.orderItems.assignedGuest,
+      })
+      .from(schema.orderItems)
+      .leftJoin(schema.products, eq(schema.orderItems.productId, schema.products.id))
+      .where(and(
+        inArray(schema.orderItems.orderId, orderIds),
+        isNull(schema.orderItems.deletedAt),
+      ));
+
+    const allPayments = await this.db
+      .select({
+        orderId: schema.payments.orderId,
+        amount: schema.payments.amount,
+        paymentMethod: schema.payments.paymentMethod,
+        referenceCode: schema.payments.referenceCode,
+      })
+      .from(schema.payments)
+      .where(inArray(schema.payments.orderId, orderIds));
+
+    const tickets = closedOrders.map((order) => {
+      const items = allItems
+        .filter((i) => i.orderId === order.id)
+        .map((i) => ({
+          quantity: i.quantity,
+          productName: i.productName || 'Producto',
+          price: Number(i.price),
+          notes: i.notes,
+          assignedGuest: i.assignedGuest,
+        }));
+
+      const payments = allPayments
+        .filter((p) => p.orderId === order.id)
+        .map((p) => ({
+          method: p.paymentMethod,
+          amount: Number(p.amount),
+          reference: p.referenceCode,
+        }));
+
+      const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+
+      return {
+        id: order.id,
+        tableLabel: order.tableLabel || 'Para Llevar',
+        waiterName: order.waiterName || 'Cajero',
+        createdAt: order.createdAt,
+        subtotal: Number(order.subtotal),
+        discount: Number(order.discount),
+        tax: Number(order.tax),
+        total: Number(order.total),
+        totalPaid,
+        items,
+        payments,
+      };
+    });
+
+    return {
+      date,
+      ticketCount: tickets.length,
+      tickets,
+    };
+  }
+
   async createPayment(
     orderId: string,
     paymentData: {

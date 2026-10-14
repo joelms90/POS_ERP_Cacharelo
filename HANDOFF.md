@@ -19,9 +19,12 @@
 - Added daily sales/ticket, cash/card, active Corte X, and latest Corte Z cards; no restricted cashier shift endpoints are used.
 - Added Playwright coverage for summary cards and fixed navigation locators; admin build and navigation spec pass.
 
-## 1. Staging environment — IN PROGRESS (blocked on billing)
+## Staging environment — ARCHIVED / PARKED (Branch: archive/014-staging-environment)
 
-**Goal:** isolated `staging` so daily changes never touch prod. Prod is untouched.
+**Status:** Archived / Parked (Waiting for GCP billing account association).  
+**Dedicated Branch:** `archive/014-staging-environment`  
+**Archived Date:** 2026-10-13  
+**Note:** All staging infra definitions (`apps/sync_api/infra/envs/staging`, `modules/sync-api`, `bootstrap`), configuration (`env/staging.env`, `firebase.staging.json`, `descargas-staging.html`), and Makefile targets are preserved on `main` and captured on `archive/014-staging-environment`. This feature does not affect production workflows and remains on hold until billing is linked.
 
 ### Done
 - **GCP project created:** `cacharelo-staging` (number `433118108267`), org

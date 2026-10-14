@@ -5186,6 +5186,34 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<List<Map<String, dynamic>>> fetchTodayTickets() async {
+    if (!isTerminalConfigured) return [];
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/orders/reports/tickets-today'),
+            headers: await _operatorHeaders(),
+          )
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded['tickets'] is List) {
+          return List<Map<String, dynamic>>.from(
+            (decoded['tickets'] as List).map(
+              (t) => Map<String, dynamic>.from(t as Map),
+            ),
+          );
+        }
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching today tickets: $e');
+      return [];
+    }
+  }
+
   Future<bool> syncPendingRequisitions() async {
     if (!isTerminalConfigured) return false;
 

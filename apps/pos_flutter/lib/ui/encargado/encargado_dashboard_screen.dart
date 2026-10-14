@@ -9,6 +9,7 @@ import '../requisitions/create_requisition.dart';
 import 'encargado_pos_tab.dart';
 import 'encargado_orders_tab.dart';
 import 'operator_operations_tabs.dart';
+import 'encargado_caja_tab.dart';
 
 class EncargadoDashboardScreen extends StatefulWidget {
   final AppState state;
@@ -164,7 +165,7 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
                                 ),
                                 RequisitionsScreen(state: widget.state),
                                 InventoryReceiptsTab(state: widget.state),
-                                DailySalesTab(
+                                EncargadoCajaTab(
                                   key: ValueKey(_summaryRefreshToken),
                                   state: widget.state,
                                 ),
@@ -416,7 +417,7 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
                   badge: _activeOrdersCount),
               _buildNavItem(2, Icons.inventory_2_outlined, 'Requisiciones'),
               _buildNavItem(3, Icons.local_shipping_outlined, 'Recibir'),
-              _buildNavItem(4, Icons.today_outlined, 'Resumen'),
+              _buildNavItem(4, Icons.point_of_sale, 'Caja'),
             ],
           ],
         ),
@@ -431,8 +432,8 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
       child: InkWell(
         onTap: () => setState(() {
           _selectedIndex = index;
-          // DailySalesTab loads its report in initState. Recreate it whenever
-          // the operator opens Resumen so completed payments are reflected.
+          // EncargadoCajaTab loads tickets & shift in initState. Recreate it whenever
+          // the operator opens Caja so completed payments and shift updates are reflected.
           if (index == 4 && !widget.showFullFeatures) {
             _summaryRefreshToken++;
           }

@@ -230,6 +230,14 @@ export class OrdersService {
     return this.ordersRepository.getDailyPaymentSummary(actor.branchId, date);
   }
 
+  async getTodayTickets(actor: any, requestedDate?: string, branchId?: string) {
+    const effectiveBranchId = branchId || actor.branchId;
+    if (!effectiveBranchId) throw new ForbiddenException('El operador no tiene una sucursal asignada.');
+    const date = requestedDate || new Date().toISOString().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new BadRequestException('La fecha debe tener formato AAAA-MM-DD.');
+    return this.ordersRepository.getTodayTickets(effectiveBranchId, date);
+  }
+
   private async _logChanges(branchId: string, entries: Array<{ entity: string; entityId: string; payload: any }>) {
     try {
       for (const entry of entries) {
