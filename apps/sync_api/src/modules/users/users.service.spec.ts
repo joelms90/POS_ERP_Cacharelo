@@ -139,5 +139,28 @@ describe('UsersService', () => {
 
       await expect(service.create(createUserDto)).rejects.toThrow(ConflictException);
     });
+
+    it('should store encryptedPin and return decrypted PIN upon creation', async () => {
+      const createUserDto = {
+        name: 'New Waiter',
+        pin: '9876',
+        role: 'waiter' as const,
+        businessId: 'bus-1',
+      };
+
+      mockUsersRepository.findAll.mockResolvedValue([]);
+      mockUsersRepository.create.mockImplementation((dto) => Promise.resolve({
+        id: 'user-new',
+        ...dto,
+      }));
+
+      const created = await service.create(createUserDto);
+      expect(created.pin).toBe('9876');
+      expect(mockUsersRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          encryptedPin: expect.stringMatching(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/),
+        }),
+      );
+    });
   });
 });

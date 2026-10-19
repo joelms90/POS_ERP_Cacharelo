@@ -119,6 +119,7 @@ export const users = pgTable('users', {
   email: varchar('email', { length: 255 }).unique(),
   passwordHash: varchar('password_hash', { length: 255 }),
   pin: varchar('pin', { length: 255 }).notNull(), // Checked for uniqueness per business
+  encryptedPin: varchar('encrypted_pin', { length: 255 }), // AES-256-GCM encrypted for admin recovery
   // Keep this in sync with the database migration. The longest operational role
   // (`warehouse_purchasing_operator`) is 29 characters.
   role: varchar('role', { length: 50 }).notNull(),

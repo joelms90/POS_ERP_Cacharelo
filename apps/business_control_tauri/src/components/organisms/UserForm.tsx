@@ -75,7 +75,7 @@ export const UserForm: React.FC<UserFormProps> = ({
     }
 
     setName(editingUser.name);
-    setPin('');
+    setPin(editingUser.pin || '');
     setRoles(getPosRoles(editingUser));
     setBranchId(editingUser.branchId || '');
     setNameError(null);
@@ -202,7 +202,13 @@ export const UserForm: React.FC<UserFormProps> = ({
       <div className="grid grid-cols-1 gap-4">
         {/* PIN Input */}
         <FormField
-          label={isEditing ? 'Nuevo PIN (opcional)' : 'PIN de Acceso (4 dígitos)'}
+          label={
+            isEditing
+              ? editingUser?.pin
+                ? 'PIN de Acceso (editable)'
+                : 'Asignar PIN (4 dígitos)'
+              : 'PIN de Acceso (4 dígitos)'
+          }
           error={pinError || undefined}
           required={!isEditing}
         >
@@ -215,7 +221,7 @@ export const UserForm: React.FC<UserFormProps> = ({
               setPin(val);
               if (pinError) setPinError(null);
             }}
-            placeholder={isEditing ? 'Dejar vacío para conservar' : 'Ej. 4321'}
+            placeholder="Ej. 4321"
             disabled={isLoading}
           />
         </FormField>

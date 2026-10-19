@@ -118,7 +118,13 @@ export const UsersGrid: React.FC<UsersGridProps> = ({
                   {/* PIN */}
                   <td className="px-6 py-4 whitespace-nowrap font-mono tracking-widest text-text-secondary">
                     {showPins[user.id] ? (
-                      <span className="text-champagne-gold font-bold">{user.pin}</span>
+                      user.pin ? (
+                        <span className="text-champagne-gold font-bold tracking-widest">{user.pin}</span>
+                      ) : (
+                        <span className="text-xs text-text-secondary/70 italic font-sans tracking-normal">
+                          No visible (edita para asignar)
+                        </span>
+                      )
                     ) : (
                       <span>••••</span>
                     )}

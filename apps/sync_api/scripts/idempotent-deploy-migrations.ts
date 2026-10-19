@@ -480,6 +480,12 @@ async function main() {
     `);
     console.log('User role column length ensured.');
 
+    // 19. Encrypted PIN for reversible administrative recovery of staff PINs
+    await client.query(`
+      ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "encrypted_pin" varchar(255);
+    `);
+    console.log('User encrypted_pin column ensured.');
+
     console.log('✅ Idempotent migrations executed successfully!');
   } catch (error) {
     console.error('❌ Failed to run idempotent migrations:', error);

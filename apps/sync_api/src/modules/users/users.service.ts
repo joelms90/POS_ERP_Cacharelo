@@ -7,6 +7,7 @@ import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 import * as bcrypt from 'bcrypt';
 import { ADMIN_ROLES, UserRole } from '../auth/roles';
 import { BranchesRepository } from '../branches/repositories/branches.repository';
+import { encryptPin, decryptPin } from './utils/pin-crypto';
 
 @Injectable()
 export class UsersService {
@@ -52,8 +53,9 @@ export class UsersService {
       }
     }
 
-    // Hash PIN and password
+    // Hash PIN and password, and encrypt PIN for admin recovery
     const pinHash = await bcrypt.hash(pin, 10);
+    const encryptedPin = encryptPin(pin);
     let passwordHash: string | undefined;
     if (password) {
       passwordHash = await bcrypt.hash(password, 10);
@@ -65,6 +67,7 @@ export class UsersService {
       branchId: branchId || null,
       email: email || null,
       pin: pinHash,
+      encryptedPin,
       passwordHash: passwordHash || null,
       role: normalizedRoles[0],
       roles: normalizedRoles,
@@ -171,6 +174,7 @@ export class UsersService {
         }
       }
       updates.pin = await bcrypt.hash(pin, 10);
+      updates.encryptedPin = encryptPin(pin);
     }
 
     // Handle password hashing
@@ -254,9 +258,11 @@ export class UsersService {
 
   private sanitizeUser(user: any) {
     if (!user) return null;
-    const { passwordHash, pin, ...sanitized } = user;
+    const { passwordHash, pin, encryptedPin, ...sanitized } = user;
+    const decryptedPin = decryptPin(encryptedPin);
     return {
       ...sanitized,
+      pin: decryptedPin || undefined,
       roles: this.normalizeRoles(sanitized.roles, sanitized.role),
     };
   }
