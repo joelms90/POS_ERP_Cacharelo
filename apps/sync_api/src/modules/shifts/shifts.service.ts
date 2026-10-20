@@ -7,7 +7,7 @@ import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { DRIZZLE_CONNECTION } from '../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../database/schema';
-import { eq, and, gte, lte, isNull } from 'drizzle-orm';
+import { eq, and, gte, lte, isNull, gt, asc } from 'drizzle-orm';
 
 @Injectable()
 export class ShiftsService {
@@ -44,13 +44,41 @@ export class ShiftsService {
       }
     }
 
+    // Find the latest closed shift for this branch to avoid overlapping
+    const lastClosedShift = await this.shiftsRepository.findLastClosedShift(branchId);
+    const minTimestamp = lastClosedShift?.closedAt
+      ? new Date(lastClosedShift.closedAt)
+      : new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    // If there were sales made today before the register was officially opened,
+    // start openedAt from the earliest unassigned payment so they are included in Corte X/Z
+    const unassignedPayments = await this.db
+      .select({ createdAt: schema.payments.createdAt })
+      .from(schema.payments)
+      .innerJoin(schema.orders, eq(schema.payments.orderId, schema.orders.id))
+      .where(
+        and(
+          eq(schema.orders.branchId, branchId),
+          eq(schema.orders.state, 'closed'),
+          isNull(schema.orders.deletedAt),
+          gt(schema.payments.createdAt, minTimestamp),
+        ),
+      )
+      .orderBy(asc(schema.payments.createdAt))
+      .limit(1);
+
+    const openedAt =
+      unassignedPayments.length > 0 && unassignedPayments[0].createdAt < new Date()
+        ? unassignedPayments[0].createdAt
+        : new Date();
+
     return this.shiftsRepository.create({
       branchId,
       cashierId,
       initialFloat,
       cashDrawerAmount: initialFloat,
       status: 'open',
-      openedAt: new Date(),
+      openedAt,
     });
   }
 

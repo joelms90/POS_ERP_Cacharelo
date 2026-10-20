@@ -13,12 +13,29 @@ describe('Cash shift HTTP authorization', () => {
   let jwt: JwtService;
   const actor = { sub: 'cashier-a', branchId: 'branch-a', businessId: 'business-a', role: 'branch_operator' };
   const shift = { id: 'shift-a', cashierId: actor.sub, branchId: actor.branchId, status: 'open', initialFloat: '100.00', cashDrawerAmount: '100.00' };
-  const repo = { findActiveShift: jest.fn(), findById: jest.fn(), create: jest.fn(), update: jest.fn(), closeAllOpenForBranch: jest.fn() };
+  const repo = {
+    findActiveShift: jest.fn(),
+    findLastClosedShift: jest.fn().mockResolvedValue(null),
+    findById: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    closeAllOpenForBranch: jest.fn(),
+  };
+  const mockAuthDb = {
+    select: jest.fn().mockReturnThis(),
+    from: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnValue({
+      orderBy: jest.fn().mockReturnValue({
+        limit: jest.fn().mockResolvedValue([]),
+      }),
+    }),
+  };
   const transactions = { create: jest.fn(), findByShiftId: jest.fn() };
   const token = (claims = actor) => jwt.sign(claims, { secret: process.env.JWT_SECRET || 'dev_jwt_secret_key' });
   beforeAll(async () => {
     const module = await Test.createTestingModule({ imports: [ShiftsModule, DatabaseModule] })
-      .overrideProvider(DRIZZLE_CONNECTION).useValue({})
+      .overrideProvider(DRIZZLE_CONNECTION).useValue(mockAuthDb)
       .overrideProvider(ShiftsRepository).useValue(repo)
       .overrideProvider(TransactionsRepository).useValue(transactions)
       .compile();
@@ -30,7 +47,16 @@ describe('Cash shift HTTP authorization', () => {
     jest.resetAllMocks();
     repo.findById.mockResolvedValue(shift);
     repo.findActiveShift.mockResolvedValue(null);
+    repo.findLastClosedShift.mockResolvedValue(null);
     repo.create.mockImplementation(async (data) => ({ id: 'new', ...data }));
+    mockAuthDb.select.mockReturnThis();
+    mockAuthDb.from.mockReturnThis();
+    mockAuthDb.innerJoin.mockReturnThis();
+    mockAuthDb.where.mockReturnValue({
+      orderBy: jest.fn().mockReturnValue({
+        limit: jest.fn().mockResolvedValue([]),
+      }),
+    });
   });
   afterAll(async () => { await app?.close(); });
 

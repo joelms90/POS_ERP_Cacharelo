@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 
 @Injectable()
 export class ShiftsRepository {
@@ -22,6 +22,21 @@ export class ShiftsRepository {
           eq(schema.cashShifts.status, 'open'),
         ),
       );
+    return results[0] || null;
+  }
+
+  async findLastClosedShift(branchId: string) {
+    const results = await this.db
+      .select()
+      .from(schema.cashShifts)
+      .where(
+        and(
+          eq(schema.cashShifts.branchId, branchId),
+          eq(schema.cashShifts.status, 'closed'),
+        ),
+      )
+      .orderBy(desc(schema.cashShifts.closedAt))
+      .limit(1);
     return results[0] || null;
   }
 

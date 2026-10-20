@@ -12,6 +12,7 @@ describe('ShiftsService', () => {
 
   const mockShiftsRepository = {
     findActiveShift: jest.fn(),
+    findLastClosedShift: jest.fn().mockResolvedValue(null),
     findById: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
@@ -27,10 +28,16 @@ describe('ShiftsService', () => {
     select: jest.fn().mockReturnThis(),
     from: jest.fn().mockReturnThis(),
     innerJoin: jest.fn().mockReturnThis(),
-    where: jest.fn().mockResolvedValue([
-      { paymentMethod: 'cash', amount: '150.00' },
-      { paymentMethod: 'card', amount: '300.00' },
-    ]),
+    where: jest.fn().mockImplementation(() => {
+      const p: any = Promise.resolve([
+        { paymentMethod: 'cash', amount: '150.00' },
+        { paymentMethod: 'card', amount: '300.00' },
+      ]);
+      p.orderBy = jest.fn().mockReturnValue({
+        limit: jest.fn().mockResolvedValue([]),
+      });
+      return p;
+    }),
   };
 
   beforeEach(async () => {
