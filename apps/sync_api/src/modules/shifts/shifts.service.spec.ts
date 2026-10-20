@@ -106,16 +106,69 @@ describe('ShiftsService', () => {
       expect(shiftsRepository.findActiveShift).toHaveBeenCalledWith('branch-1', 'cashier-1');
     });
 
-    it('should throw ConflictException if shift is already active', async () => {
+    it('should throw ConflictException if shift is already active for this cashier', async () => {
       const openDto = {
         cashierId: 'cashier-1',
         branchId: 'branch-1',
         initialFloat: '1000.00',
       };
 
-      mockShiftsRepository.findActiveShift.mockResolvedValue({ id: 'shift-active', status: 'open' });
+      mockShiftsRepository.findActiveShift.mockResolvedValueOnce({ id: 'shift-active', status: 'open' });
 
-      await expect(service.openShift(openDto)).rejects.toThrow(ConflictException);
+      await expect(service.openShift(openDto)).rejects.toThrow(
+        new ConflictException('A cash shift is already active for this cashier and branch.')
+      );
+    });
+
+    it('should throw ConflictException if another cashier has an active shift within 24 hours', async () => {
+      const openDto = {
+        cashierId: 'cashier-1',
+        branchId: 'branch-1',
+        initialFloat: '1000.00',
+      };
+
+      // First call (branchId, cashierId): null
+      mockShiftsRepository.findActiveShift.mockResolvedValueOnce(null);
+      // Second call (branchId): active shift opened 2 hours ago
+      mockShiftsRepository.findActiveShift.mockResolvedValueOnce({
+        id: 'shift-other',
+        branchId: 'branch-1',
+        cashierId: 'cashier-2',
+        status: 'open',
+        openedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      });
+
+      await expect(service.openShift(openDto)).rejects.toThrow(
+        new ConflictException('Another cash shift is active for this branch. Close it before opening a new one.')
+      );
+    });
+
+    it('should auto-close stale active shift (>24h) and open new shift', async () => {
+      const openDto = {
+        cashierId: 'cashier-1',
+        branchId: 'branch-1',
+        initialFloat: '1000.00',
+      };
+
+      // First call (branchId, cashierId): null
+      mockShiftsRepository.findActiveShift.mockResolvedValueOnce(null);
+      // Second call (branchId): stale active shift opened 30 hours ago
+      mockShiftsRepository.findActiveShift.mockResolvedValueOnce({
+        id: 'shift-stale',
+        branchId: 'branch-1',
+        cashierId: 'cashier-2',
+        status: 'open',
+        openedAt: new Date(Date.now() - 30 * 60 * 60 * 1000),
+      });
+      mockShiftsRepository.update.mockResolvedValueOnce({ id: 'shift-stale', status: 'closed' });
+      mockShiftsRepository.create.mockResolvedValueOnce({ id: 'shift-new', ...openDto, status: 'open' });
+
+      const result = await service.openShift(openDto);
+      expect(result.id).toBe('shift-new');
+      expect(mockShiftsRepository.update).toHaveBeenCalledWith('shift-stale', expect.objectContaining({
+        status: 'closed',
+        closeNotes: expect.stringContaining('>24h'),
+      }));
     });
   });
 

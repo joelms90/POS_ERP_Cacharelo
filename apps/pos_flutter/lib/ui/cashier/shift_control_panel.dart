@@ -208,10 +208,12 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               backgroundColor: EmpireColors.errorRed,
-              content:
-                  Text('Error al abrir el turno de caja. Valida tu conexión.'),
+              content: Text(
+                widget.state.lastShiftError ??
+                    'Error al abrir el turno de caja. Valida tu conexión.',
+              ),
             ),
           );
         }
@@ -267,10 +269,12 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               backgroundColor: EmpireColors.errorRed,
-              content:
-                  Text('Error al registrar transacción. Valida tu conexión.'),
+              content: Text(
+                widget.state.lastShiftError ??
+                    'Error al registrar transacción. Valida tu conexión.',
+              ),
             ),
           );
         }
@@ -636,9 +640,11 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             backgroundColor: EmpireColors.errorRed,
-            content: Text('Error al cerrar el turno de caja.'),
+            content: Text(
+              widget.state.lastShiftError ?? 'Error al cerrar el turno de caja.',
+            ),
           ),
         );
       }

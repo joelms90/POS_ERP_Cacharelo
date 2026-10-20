@@ -27,9 +27,21 @@ export class ShiftsService {
       throw new ConflictException('A cash shift is already active for this cashier and branch.');
     }
 
-    // Never silently close another cashier's shift without reconciliation.
-    if (await this.shiftsRepository.findActiveShift(branchId)) {
-      throw new ConflictException('Another cash shift is active for this branch. Close it before opening a new one.');
+    // Check if another shift is currently active for this branch
+    const otherActiveShift = await this.shiftsRepository.findActiveShift(branchId);
+    if (otherActiveShift) {
+      // If the other shift is older than 24 hours (e.g. from a previous date), auto-close it
+      // so morning shift opening is not permanently blocked by an unclosed historical shift.
+      const isStale = (Date.now() - new Date(otherActiveShift.openedAt).getTime()) > 24 * 60 * 60 * 1000;
+      if (isStale) {
+        await this.shiftsRepository.update(otherActiveShift.id, {
+          status: 'closed',
+          closedAt: new Date(),
+          closeNotes: 'Cierre automático por turno previo no cerrado (>24h)',
+        });
+      } else {
+        throw new ConflictException('Another cash shift is active for this branch. Close it before opening a new one.');
+      }
     }
 
     return this.shiftsRepository.create({

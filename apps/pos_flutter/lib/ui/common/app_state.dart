@@ -597,6 +597,7 @@ class AppState extends ChangeNotifier {
   double cashDrawerAmount = 0.0;
   double initialFloat = 0.0;
   String? activeShiftId;
+  String? lastShiftError;
 
   // Offline & sync states
   bool isOnline = true;
@@ -2300,9 +2301,11 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> openShift(double floatAmount) async {
+    lastShiftError = null;
     if (!isTerminalConfigured ||
         terminalBranchId == null ||
         currentUserId == null) {
+      lastShiftError = 'La terminal o sucursal no está configurada.';
       return false;
     }
     try {
@@ -2325,19 +2328,36 @@ class AppState extends ChangeNotifier {
         initialFloat = floatAmount;
         cashDrawerAmount = floatAmount;
         isShiftOpen = true;
+        lastShiftError = null;
         notifyListeners();
         return true;
       }
+
+      try {
+        final errorData = jsonDecode(response.body);
+        lastShiftError = errorData['message']?.toString() ??
+            'Error al abrir turno (${response.statusCode})';
+      } catch (_) {
+        lastShiftError = 'Error ${response.statusCode}: ${response.body}';
+      }
+      debugPrint('openShift failed: $lastShiftError');
+      notifyListeners();
       return false;
     } catch (e) {
+      lastShiftError = 'Error de conexión: $e';
       debugPrint('Error opening shift: $e');
+      notifyListeners();
       return false;
     }
   }
 
   Future<bool> addCashDrop(double amount,
       {String reason = 'Ingreso de caja'}) async {
-    if (activeShiftId == null) return false;
+    lastShiftError = null;
+    if (activeShiftId == null) {
+      lastShiftError = 'No hay turno activo para registrar ingreso.';
+      return false;
+    }
     try {
       final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
@@ -2364,16 +2384,30 @@ class AppState extends ChangeNotifier {
         notifyListeners();
         return true;
       }
+      try {
+        final errorData = jsonDecode(response.body);
+        lastShiftError = errorData['message']?.toString() ??
+            'Error al registrar ingreso (${response.statusCode})';
+      } catch (_) {
+        lastShiftError = 'Error ${response.statusCode}: ${response.body}';
+      }
+      notifyListeners();
       return false;
     } catch (e) {
+      lastShiftError = 'Error de conexión: $e';
       debugPrint('Error adding cash drop: $e');
+      notifyListeners();
       return false;
     }
   }
 
   Future<bool> removeCashDrop(double amount,
       {String reason = 'Retiro de caja'}) async {
-    if (activeShiftId == null) return false;
+    lastShiftError = null;
+    if (activeShiftId == null) {
+      lastShiftError = 'No hay turno activo para registrar retiro.';
+      return false;
+    }
     try {
       final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
@@ -2400,9 +2434,19 @@ class AppState extends ChangeNotifier {
         notifyListeners();
         return true;
       }
+      try {
+        final errorData = jsonDecode(response.body);
+        lastShiftError = errorData['message']?.toString() ??
+            'Error al registrar retiro (${response.statusCode})';
+      } catch (_) {
+        lastShiftError = 'Error ${response.statusCode}: ${response.body}';
+      }
+      notifyListeners();
       return false;
     } catch (e) {
+      lastShiftError = 'Error de conexión: $e';
       debugPrint('Error removing cash withdrawal: $e');
+      notifyListeners();
       return false;
     }
   }
@@ -2412,7 +2456,11 @@ class AppState extends ChangeNotifier {
     Map<String, num>? denominationCounts,
     String? closeNotes,
   }) async {
-    if (activeShiftId == null) return null;
+    lastShiftError = null;
+    if (activeShiftId == null) {
+      lastShiftError = 'No hay turno activo para cerrar.';
+      return null;
+    }
     try {
       final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
@@ -2435,14 +2483,25 @@ class AppState extends ChangeNotifier {
         activeShiftId = null;
         initialFloat = 0.0;
         cashDrawerAmount = 0.0;
+        lastShiftError = null;
         notifyListeners();
         return Map<String, dynamic>.from(
           data['report'] ?? data['reconciliation'] ?? {},
         );
       }
+      try {
+        final errorData = jsonDecode(response.body);
+        lastShiftError = errorData['message']?.toString() ??
+            'Error al cerrar turno (${response.statusCode})';
+      } catch (_) {
+        lastShiftError = 'Error ${response.statusCode}: ${response.body}';
+      }
+      notifyListeners();
       return null;
     } catch (e) {
+      lastShiftError = 'Error de conexión: $e';
       debugPrint('Error closing shift: $e');
+      notifyListeners();
       return null;
     }
   }
