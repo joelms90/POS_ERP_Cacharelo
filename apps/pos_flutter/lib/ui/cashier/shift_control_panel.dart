@@ -89,10 +89,33 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
     _closeNotesController.clear();
   }
 
+  String _formatDateTime(dynamic dateVal) {
+    if (dateVal == null) return 'N/A';
+    DateTime? dt;
+    if (dateVal is DateTime) {
+      dt = dateVal.toLocal();
+    } else if (dateVal is String) {
+      dt = DateTime.tryParse(dateVal)?.toLocal();
+    }
+    if (dt == null) return dateVal.toString();
+
+    final months = [
+      'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+      'jul', 'ago', 'sep', 'oct', 'nov', 'dic'
+    ];
+    final day = dt.day.toString().padLeft(2, '0');
+    final month = months[dt.month - 1];
+    final year = dt.year;
+    final hour = dt.hour.toString().padLeft(2, '0');
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return '$day $month $year · $hour:$minute';
+  }
+
   String _formatCorteReport(
     String title,
     Map<String, dynamic> report, {
     bool includeCounted = false,
+    bool isCorteX = false,
   }) {
     final summary = _summary(report);
     final shiftInfo = report['shiftInfo'] is Map
@@ -110,71 +133,154 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
         (report['closeNotes'] ?? _closeNotesController.text).toString().trim();
 
     final buffer = StringBuffer();
-    buffer.writeln(title);
-    buffer.writeln('Fecha: ${DateTime.now().toLocal()}');
-    buffer.writeln('Operador: ${widget.state.currentUserName}');
-    if (shiftInfo['branchName'] != null) {
-      buffer.writeln('Sucursal: ${shiftInfo['branchName']}');
+    const divider = '----------------------------------------';
+    const doubleDivider = '========================================';
+
+    final shiftId =
+        (shiftInfo['id'] ?? widget.state.activeShiftId ?? '').toString();
+    final folio =
+        shiftId.length > 8 ? shiftId.substring(0, 8).toUpperCase() : shiftId;
+    final branchName = shiftInfo['branchName'] ??
+        widget.state.terminalBranchName ??
+        'Sucursal';
+    final cashierName = shiftInfo['cashierName'] ??
+        widget.state.currentUserName ??
+        'Operador';
+    final stationId = widget.state.localStationId ?? 'Caja 01';
+
+    buffer.writeln(doubleDivider);
+    buffer.writeln(widget.state.formatCenter('CACHARELO POS'));
+    buffer.writeln(widget.state.formatCenter(title));
+    if (isCorteX) {
+      buffer.writeln(
+          widget.state.formatCenter('Reporte Informativo · Sin Cierre'));
     }
+    buffer.writeln(doubleDivider);
+
+    buffer.writeln(
+        'Estado: ${isCorteX ? 'Turno Abierto (En Operación)' : 'Turno Cerrado'}');
+    if (folio.isNotEmpty) buffer.writeln('Folio Turno: #$folio');
+    buffer.writeln('Caja: $stationId');
+    buffer.writeln('Sucursal: $branchName');
+    buffer.writeln('Cajero de turno: $cashierName');
+    buffer.writeln('Generado por: ${widget.state.currentUserName}');
     if (shiftInfo['openedAt'] != null) {
-      buffer.writeln('Apertura: ${shiftInfo['openedAt']}');
+      buffer.writeln('Apertura: ${_formatDateTime(shiftInfo['openedAt'])}');
     }
-    if (shiftInfo['closedAt'] != null) {
-      buffer.writeln('Cierre: ${shiftInfo['closedAt']}');
+    if (isCorteX) {
+      buffer.writeln('Fecha consulta: ${_formatDateTime(DateTime.now())}');
+    } else if (shiftInfo['closedAt'] != null) {
+      buffer.writeln('Cierre: ${_formatDateTime(shiftInfo['closedAt'])}');
+    } else {
+      buffer.writeln('Fecha reporte: ${_formatDateTime(DateTime.now())}');
     }
+
     buffer.writeln('');
-    buffer.writeln('VENTAS');
-    buffer.writeln(
-        'Efectivo: \$${_money(summary['cashSales']).toStringAsFixed(2)}');
-    buffer.writeln(
-        'Tarjeta: \$${_money(summary['cardSales']).toStringAsFixed(2)}');
-    buffer.writeln(
-        'Otros: \$${_money(summary['otherSales']).toStringAsFixed(2)}');
-    buffer.writeln(
-        'Total ventas: \$${_money(summary['totalSales']).toStringAsFixed(2)}');
+    buffer.writeln(divider);
+    buffer.writeln('RESUMEN DE VENTAS');
+    buffer.writeln(divider);
+    buffer.writeln(widget.state.formatRow(
+        'Efectivo:', '\$${_money(summary['cashSales']).toStringAsFixed(2)}'));
+    buffer.writeln(widget.state.formatRow(
+        'Tarjeta:', '\$${_money(summary['cardSales']).toStringAsFixed(2)}'));
+    if (_money(summary['otherSales']) > 0) {
+      buffer.writeln(widget.state.formatRow(
+          'Otros:', '\$${_money(summary['otherSales']).toStringAsFixed(2)}'));
+    }
+    buffer.writeln(divider);
+    buffer.writeln(widget.state.formatRow(
+        'TOTAL VENTAS:', '\$${_money(summary['totalSales']).toStringAsFixed(2)}'));
+    buffer.writeln(divider);
+
     buffer.writeln('');
-    buffer.writeln('EFECTIVO EN CAJA');
-    buffer.writeln(
-        'Fondo inicial: \$${_money(summary['initialFloat']).toStringAsFixed(2)}');
-    buffer.writeln(
-        'Ventas efectivo: \$${_money(summary['cashSales']).toStringAsFixed(2)}');
-    buffer.writeln(
-        'Ingresos: \$${_money(summary['manualCashIn']).toStringAsFixed(2)}');
-    buffer.writeln(
-        'Retiros: \$${_money(summary['manualCashOut']).toStringAsFixed(2)}');
-    buffer.writeln(
-        'Esperado sistema: \$${_money(summary['expectedCash']).toStringAsFixed(2)}');
+    buffer.writeln(divider);
+    buffer.writeln('CONTROL DE EFECTIVO EN CAJA');
+    buffer.writeln(divider);
+    buffer.writeln(widget.state.formatRow(
+        'Fondo inicial:', '\$${_money(summary['initialFloat']).toStringAsFixed(2)}'));
+    buffer.writeln(widget.state.formatRow('Ventas en efectivo:',
+        '+\$${_money(summary['cashSales']).toStringAsFixed(2)}'));
+    buffer.writeln(widget.state.formatRow('Ingresos de caja:',
+        '+\$${_money(summary['manualCashIn']).toStringAsFixed(2)}'));
+    buffer.writeln(widget.state.formatRow('Retiros de caja:',
+        '-\$${_money(summary['manualCashOut']).toStringAsFixed(2)}'));
+    buffer.writeln(divider);
+    buffer.writeln(widget.state.formatRow('EFECTIVO ESPERADO:',
+        '\$${_money(summary['expectedCash']).toStringAsFixed(2)}'));
+
     if (includeCounted) {
-      buffer.writeln(
-          'Contado fisico: \$${_money(summary['actualCash']).toStringAsFixed(2)}');
-      buffer.writeln(
-          'Diferencia: \$${_money(summary['cashDifference']).toStringAsFixed(2)}');
+      buffer.writeln(widget.state.formatRow('Efectivo contado:',
+          '\$${_money(summary['actualCash']).toStringAsFixed(2)}'));
+      buffer.writeln(divider);
+      final diff = _money(summary['cashDifference']);
+      final diffLabel = diff.abs() < 0.01
+          ? '(\$0.00 Cuadrado)'
+          : diff > 0
+              ? '(+\$${diff.toStringAsFixed(2)} Sobrante)'
+              : '(-\$${diff.abs().toStringAsFixed(2)} Faltante)';
+      buffer.writeln(widget.state.formatRow('DIFERENCIA:', diffLabel));
+      buffer.writeln(divider);
     }
-    if (denominations.isNotEmpty) {
+
+    if (includeCounted && denominations.isNotEmpty) {
       buffer.writeln('');
-      buffer.writeln('DENOMINACIONES');
+      buffer.writeln(divider);
+      buffer.writeln('CONTEO DE DENOMINACIONES');
+      buffer.writeln(divider);
       denominations.forEach((value, count) {
-        final subtotal = _money(value) * _money(count);
-        buffer.writeln('\$$value x $count = \$${subtotal.toStringAsFixed(2)}');
+        final c = int.tryParse(count.toString()) ?? 0;
+        if (c > 0) {
+          final subtotal = _money(value) * c;
+          buffer.writeln(widget.state
+              .formatRow('\$$value x $c', '=\$${subtotal.toStringAsFixed(2)}'));
+        }
       });
     }
+
     if (movements.isNotEmpty) {
       buffer.writeln('');
-      buffer.writeln('MOVIMIENTOS');
+      buffer.writeln(divider);
+      buffer.writeln('MOVIMIENTOS DE CAJA');
+      buffer.writeln(divider);
       for (final raw in movements) {
         if (raw is! Map) continue;
         final movement = Map<String, dynamic>.from(raw);
-        final type = movement['type']?.toString() ?? '';
-        final reason = movement['reason']?.toString() ?? '';
-        buffer.writeln(
-            '$type \$${_money(movement['amount']).toStringAsFixed(2)} - $reason');
+        final rawType = movement['type']?.toString().toLowerCase() ?? '';
+        final isAdd = rawType == 'cash-in';
+        final typeLabel = isAdd ? 'Ingreso' : 'Retiro';
+        final sign = isAdd ? '+' : '-';
+        String reason = (movement['reason']?.toString() ?? 'Manual').trim();
+        reason = reason
+            .replaceFirst(
+                RegExp(r'^(Ingreso|Retiro) de caja manual:?\s*',
+                    caseSensitive: false),
+                '')
+            .trim();
+        if (reason.isEmpty) {
+          reason = isAdd ? 'Ingreso general' : 'Retiro general';
+        }
+        final amt = '$sign\$${_money(movement['amount']).toStringAsFixed(2)}';
+        buffer.writeln(widget.state.formatRow('$typeLabel · $reason', amt));
       }
     }
+
     if (notes.isNotEmpty) {
       buffer.writeln('');
-      buffer.writeln('NOTAS');
+      buffer.writeln(divider);
+      buffer.writeln('OBSERVACIONES');
       buffer.writeln(notes);
     }
+
+    buffer.writeln('');
+    buffer.writeln(doubleDivider);
+    if (isCorteX) {
+      buffer.writeln(widget.state.formatCenterLines(
+          '* Corte informativo de consulta.\nNo se ha realizado conteo físico\nni cierre de caja registradora.'));
+    } else {
+      buffer.writeln(widget.state.formatCenterLines(
+          '* Cierre registrado y auditado.\nComprobante oficial de turno.'));
+    }
+    buffer.writeln(doubleDivider);
     return buffer.toString();
   }
 
@@ -228,8 +334,8 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
     }
   }
 
-  void _performCashDrop(bool isAdd) async {
-    final double? amount = double.tryParse(_dropController.text);
+  void _performCashDrop(bool isAdd, String category) async {
+    final double? amount = double.tryParse(_dropController.text.trim());
     if (amount != null && amount > 0) {
       showDialog(
         context: context,
@@ -240,10 +346,8 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
       );
 
       final String userNote = _dropNoteController.text.trim();
-      final String reasonBase =
-          isAdd ? 'Ingreso de caja manual' : 'Retiro de caja manual';
       final String reason =
-          userNote.isEmpty ? reasonBase : '$reasonBase: $userNote';
+          userNote.isEmpty ? category : '$category: $userNote';
       final bool success = isAdd
           ? await widget.state.addCashDrop(amount, reason: reason)
           : await widget.state.removeCashDrop(amount, reason: reason);
@@ -283,62 +387,111 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
   }
 
   void _showDropDialog(bool isAdd) {
+    String selectedCategory = isAdd ? 'Aporte de cambio' : 'Gasto operativo';
+    final categories = isAdd
+        ? [
+            'Aporte de cambio',
+            'Reposición de fondo de caja',
+            'Corrección de movimiento',
+            'Otro ingreso',
+          ]
+        : [
+            'Gasto operativo',
+            'Entrega a encargado / Retiro parcial',
+            'Transferencia a otra caja',
+            'Corrección de movimiento',
+            'Otro retiro',
+          ];
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: EmpireColors.obsidian,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: EmpireColors.agedBronze, width: 1.5),
-        ),
-        title: Text(
-          isAdd
-              ? 'Ingreso de Efectivo (Cash-in)'
-              : 'Retiro de Efectivo (Cash-out)',
-          style: const TextStyle(
-            color: EmpireColors.champagneGold,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: EmpireColors.obsidian,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: EmpireColors.agedBronze, width: 1.5),
           ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _dropController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Monto en \$',
-                hintText: '0.00',
-              ),
-              style: const TextStyle(color: EmpireColors.textPrimary),
+          title: Text(
+            isAdd
+                ? 'Ingreso de Efectivo a Caja'
+                : 'Retiro de Efectivo de Caja',
+            style: const TextStyle(
+              color: EmpireColors.champagneGold,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _dropNoteController,
-              decoration: InputDecoration(
-                labelText: 'Nota (opcional)',
-                hintText: isAdd ? 'Ej: Cambio de billetes' : 'Ej: Pago a proveedor',
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: selectedCategory,
+                dropdownColor: EmpireColors.charcoalSurface,
+                decoration: const InputDecoration(
+                  labelText: 'Clasificación / Concepto',
+                ),
+                style: const TextStyle(
+                    color: EmpireColors.textPrimary, fontSize: 13),
+                items: categories.map((cat) {
+                  return DropdownMenuItem<String>(
+                    value: cat,
+                    child: Text(cat,
+                        style:
+                            const TextStyle(color: EmpireColors.textPrimary)),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setDialogState(() => selectedCategory = val);
+                  }
+                },
               ),
-              style: const TextStyle(color: EmpireColors.textPrimary),
-              maxLength: 200,
+              const SizedBox(height: 12),
+              TextField(
+                controller: _dropController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Monto en \$',
+                  hintText: '0.00',
+                ),
+                style: const TextStyle(color: EmpireColors.textPrimary),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _dropNoteController,
+                decoration: InputDecoration(
+                  labelText: 'Detalle / Observaciones (opcional)',
+                  hintText: isAdd
+                      ? 'Ej: Billetes de 20 para cambio'
+                      : 'Ej: Pago de recibo de luz CFE',
+                ),
+                style: const TextStyle(color: EmpireColors.textPrimary),
+                maxLength: 200,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'CANCELAR',
+                style: TextStyle(color: EmpireColors.textSecondary),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => _performCashDrop(isAdd, selectedCategory),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isAdd
+                    ? EmpireColors.successGreen
+                    : EmpireColors.warningOrange,
+              ),
+              child: const Text('CONFIRMAR'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'CANCELAR',
-              style: TextStyle(color: EmpireColors.textSecondary),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => _performCashDrop(isAdd),
-            child: const Text('CONFIRMAR'),
-          ),
-        ],
       ),
     );
   }
@@ -582,16 +735,17 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
 
     if (report != null) {
       final reportDetails = _formatCorteReport(
-        'Corte Z - Cierre de Caja',
+        'CORTE Z (CIERRE DEFINITIVO)',
         report,
         includeCounted: true,
+        isCorteX: false,
       );
       _clearCloseInputs();
 
       unawaited(widget.state.enqueueCajaPrintJob(
         PrintJob(
           id: 'report_z_${DateTime.now().millisecondsSinceEpoch}',
-          title: 'Corte Z - Cierre de Caja',
+          title: 'Corte Z - Cierre Definitivo',
           details: reportDetails,
           target: 'Caja',
           timestamp: DateTime.now(),
@@ -672,14 +826,15 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
 
     if (auditData != null) {
       final reportDetails = _formatCorteReport(
-        'Corte X - Arqueo Parcial',
+        'CORTE X (REPORTE INFORMATIVO)',
         auditData,
+        isCorteX: true,
       );
 
       unawaited(widget.state.enqueueCajaPrintJob(
         PrintJob(
           id: 'report_x_${DateTime.now().millisecondsSinceEpoch}',
-          title: 'Corte X - Resumen Parcial',
+          title: 'Corte X - Reporte Informativo',
           details: reportDetails,
           target: 'Caja',
           timestamp: DateTime.now(),
@@ -697,7 +852,7 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
                   color: EmpireColors.champagneGold, width: 1.5),
             ),
             title: const Text(
-              'Resumen de Turno Parcial (Corte X)',
+              'Corte X (Reporte Informativo)',
               style: TextStyle(
                 color: EmpireColors.champagneGold,
                 fontWeight: FontWeight.bold,
@@ -733,6 +888,332 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
         );
       }
     }
+  }
+
+  void _showArqueoDialog() async {
+    final shiftId = widget.state.activeShiftId;
+    if (shiftId == null) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: EmpireColors.champagneGold),
+      ),
+    );
+
+    final Map<String, dynamic>? auditData =
+        await widget.state.getCashShiftAuditReport(shiftId);
+
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+
+    if (!mounted || auditData == null) return;
+
+    final expectedCash = _money(_summary(auditData)['expectedCash']);
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final countedCash = _countedCashFromDenominations();
+          final difference = countedCash - expectedCash;
+
+          return AlertDialog(
+            backgroundColor: EmpireColors.obsidian,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(
+                color: EmpireColors.champagneGold,
+                width: 1.5,
+              ),
+            ),
+            title: const Text(
+              'Arqueo de Caja (Verificación Física)',
+              style: TextStyle(
+                color: EmpireColors.champagneGold,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: SizedBox(
+              width: 480,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: EmpireColors.charcoalSurface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: EmpireColors.agedBronzeDark),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Efectivo Esperado (Sistema):',
+                                style: TextStyle(
+                                  color: EmpireColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                '\$${expectedCash.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  color: EmpireColors.champagneGold,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Efectivo Contado (Físico):',
+                                style: TextStyle(
+                                  color: EmpireColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                '\$${countedCash.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  color: EmpireColors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(
+                            color: EmpireColors.agedBronzeDark,
+                            height: 16,
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Diferencia:',
+                                style: TextStyle(
+                                  color: EmpireColors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                '${difference >= 0 ? '+' : ''}\$${difference.toStringAsFixed(2)} ${difference.abs() < 0.01 ? '(Cuadrado)' : difference > 0 ? '(Sobrante)' : '(Faltante)'}',
+                                style: TextStyle(
+                                  color: difference.abs() < 0.01
+                                      ? EmpireColors.successGreen
+                                      : difference > 0
+                                          ? Colors.blueAccent
+                                          : EmpireColors.errorRed,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'CONTEO DE DENOMINACIONES',
+                      style: TextStyle(
+                        color: EmpireColors.textGold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ..._denominations.map((value) {
+                      final controller = _denominationControllers[value]!;
+                      final count = int.tryParse(controller.text.trim()) ?? 0;
+                      final subtotal = value * count;
+                      final label = value == value.roundToDouble()
+                          ? '\$${value.toInt()}'
+                          : '\$${value.toStringAsFixed(1)}';
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 52,
+                              child: Text(
+                                label,
+                                style: const TextStyle(
+                                  color: EmpireColors.champagneGold,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            _DenomButton(
+                              icon: Icons.remove,
+                              onTap: () {
+                                if (count > 0) {
+                                  controller.text = (count - 1).toString();
+                                  setDialogState(() {});
+                                }
+                              },
+                            ),
+                            const SizedBox(width: 4),
+                            SizedBox(
+                              width: 58,
+                              child: TextField(
+                                controller: controller,
+                                textAlign: TextAlign.center,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                onChanged: (_) => setDialogState(() {}),
+                                decoration: const InputDecoration(
+                                  hintText: '0',
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    vertical: 8,
+                                    horizontal: 4,
+                                  ),
+                                ),
+                                style: const TextStyle(
+                                  color: EmpireColors.textPrimary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            _DenomButton(
+                              icon: Icons.add,
+                              onTap: () {
+                                controller.text = (count + 1).toString();
+                                setDialogState(() {});
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '= \$${subtotal.toStringAsFixed(2)}',
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  color: count > 0
+                                      ? EmpireColors.textPrimary
+                                      : EmpireColors.textSecondary
+                                          .withValues(alpha: 0.4),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text(
+                  'CANCELAR',
+                  style: TextStyle(color: EmpireColors.textSecondary),
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  final reportCopy = Map<String, dynamic>.from(auditData);
+                  final summaryCopy =
+                      Map<String, dynamic>.from(_summary(reportCopy));
+                  summaryCopy['actualCash'] = countedCash;
+                  summaryCopy['cashDifference'] = difference;
+                  reportCopy['summary'] = summaryCopy;
+                  reportCopy['denominationCounts'] = _denominationCounts();
+
+                  final reportDetails = _formatCorteReport(
+                    'ARQUEO DE CAJA (VERIFICACIÓN PARCIAL)',
+                    reportCopy,
+                    includeCounted: true,
+                    isCorteX: false,
+                  );
+
+                  unawaited(widget.state.enqueueCajaPrintJob(
+                    PrintJob(
+                      id: 'arqueo_${DateTime.now().millisecondsSinceEpoch}',
+                      title: 'Arqueo de Caja - Verificación',
+                      details: reportDetails,
+                      target: 'Caja',
+                      timestamp: DateTime.now(),
+                    ),
+                  ));
+
+                  Navigator.of(context).pop();
+
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      backgroundColor: EmpireColors.obsidian,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(
+                          color: EmpireColors.champagneGold,
+                          width: 1.5,
+                        ),
+                      ),
+                      title: const Text(
+                        'Comprobante de Arqueo Generado',
+                        style: TextStyle(
+                          color: EmpireColors.champagneGold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      content: SingleChildScrollView(
+                        child: Text(
+                          reportDetails,
+                          style: const TextStyle(
+                            color: EmpireColors.textPrimary,
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text(
+                            'CERRAR',
+                            style: TextStyle(color: EmpireColors.textSecondary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.print, size: 16),
+                label: const Text('IMPRIMIR ARQUEO'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: EmpireColors.champagneGold,
+                  foregroundColor: Colors.black,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -868,7 +1349,8 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
               icon: const Icon(Icons.arrow_downward, size: 16),
               label: const Text('INGRESO (CASH-IN)'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: EmpireColors.successGreen.withOpacity(0.8),
+                backgroundColor:
+                    EmpireColors.successGreen.withValues(alpha: 0.8),
                 foregroundColor: Colors.white,
               ),
             ),
@@ -878,38 +1360,57 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
               icon: const Icon(Icons.arrow_upward, size: 16),
               label: const Text('RETIRO (CASH-OUT)'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: EmpireColors.errorRed.withOpacity(0.8),
+                backgroundColor: EmpireColors.errorRed.withValues(alpha: 0.8),
                 foregroundColor: Colors.white,
               ),
             ),
 
             const SizedBox(height: 24),
 
-            // Z / X Reports
+            // Z / X Reports & Arqueo
             const Text(
-              'CORTES PARCIALES / FINALES',
+              'AUDITORÍA Y CIERRES DE CAJA',
               style: TextStyle(
-                color: EmpireColors.textSecondary,
+                color: EmpireColors.textGold,
                 fontWeight: FontWeight.bold,
-                fontSize: 11,
+                fontSize: 12,
               ),
             ),
             const SizedBox(height: 10),
-            OutlinedButton(
+            OutlinedButton.icon(
               onPressed: _printCorteX,
-              child: const Text('CORTEX (PARCIAL)'),
+              icon: const Icon(Icons.assessment_outlined, size: 16),
+              label: const Text('CORTE X (INFORMATIVO)'),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: EmpireColors.champagneGold),
+                foregroundColor: EmpireColors.champagneGold,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
             ),
             const SizedBox(height: 10),
-            OutlinedButton(
+            OutlinedButton.icon(
+              onPressed: _showArqueoDialog,
+              icon: const Icon(Icons.fact_check_outlined, size: 16),
+              label: const Text('ARQUEO FÍSICO (VERIFICACIÓN)'),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: EmpireColors.agedBronze),
+                foregroundColor: EmpireColors.champagneGold,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
               onPressed: _showCierreDialog,
+              icon: const Icon(Icons.lock, size: 16),
+              label: const Text('CORTE Z (CIERRE DE CAJA)'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: EmpireColors.errorRed,
                 side: const BorderSide(
                   color: EmpireColors.errorRed,
                   width: 1.2,
                 ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              child: const Text('CORTE Z (CIERRE DE CAJA)'),
             ),
           ],
         ),

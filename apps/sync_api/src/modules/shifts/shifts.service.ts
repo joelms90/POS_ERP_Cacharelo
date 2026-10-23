@@ -279,14 +279,41 @@ export class ShiftsService {
     const cashDifference =
       actualCash === undefined ? null : this.roundMoney(actualCash - expectedCash);
 
+    let cashierName: string | null = null;
+    let branchName: string | null = null;
+    try {
+      if (shift.cashierId) {
+        const [u] = await this.db
+          .select({ name: schema.users.name })
+          .from(schema.users)
+          .where(eq(schema.users.id, shift.cashierId))
+          .limit(1);
+        cashierName = u?.name ?? null;
+      }
+      if (shift.branchId) {
+        const [b] = await this.db
+          .select({ name: schema.branches.name })
+          .from(schema.branches)
+          .where(eq(schema.branches.id, shift.branchId))
+          .limit(1);
+        branchName = b?.name ?? null;
+      }
+    } catch (_) {
+      // Non-critical fallback
+    }
+
+    const isShiftClosed = (options.status ?? shift.status) === 'closed';
+
     return {
       shiftInfo: {
         id: shift.id,
         cashierId: shift.cashierId,
+        cashierName,
         branchId: shift.branchId,
+        branchName,
         status: options.status ?? shift.status,
         openedAt: shift.openedAt,
-        closedAt: options.closedAt,
+        closedAt: isShiftClosed ? (shift.closedAt || options.closedAt) : null,
       },
       summary: {
         initialFloat: this.roundMoney(initialFloat),
