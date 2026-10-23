@@ -36,9 +36,17 @@ describe('Cash-shift audit authorization', () => {
     expect(reports.getCashShiftAuditReport).not.toHaveBeenCalled();
   });
 
-  it.each(['cashier', 'branch_operator'])('allows authenticated %s through to ownership service check', async role => {
-    await request(app.getHttpServer()).get('/reports/cash-shifts/shift-1/audit')
-      .auth(token({ ...actor, role }), { type: 'bearer' }).expect(200);
-    expect(reports.getCashShiftAuditReport).toHaveBeenCalledWith('shift-1', expect.objectContaining({ sub: actor.sub }));
-  });
+  it.each(['cashier', 'branch_operator', 'owner', 'inventory_admin', 'support_tech'])(
+    'allows authenticated %s through to ownership service check',
+    async (role) => {
+      await request(app.getHttpServer())
+        .get('/reports/cash-shifts/shift-1/audit')
+        .auth(token({ ...actor, role }), { type: 'bearer' })
+        .expect(200);
+      expect(reports.getCashShiftAuditReport).toHaveBeenCalledWith(
+        'shift-1',
+        expect.objectContaining({ sub: actor.sub }),
+      );
+    },
+  );
 });

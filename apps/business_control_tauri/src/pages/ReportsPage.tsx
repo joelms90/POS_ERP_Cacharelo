@@ -805,99 +805,113 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
               </svg>
               <span className="text-xs text-text-secondary">Generando arqueo...</span>
             </div>
-          ) : selectedShiftAudit ? (
-            <div className="flex-1 flex flex-col min-h-0 overflow-y-auto pr-1 text-xs gap-4 select-text">
-              <div className="bg-charcoal/40 p-3 rounded-lg border border-aged-bronze/20 flex flex-col gap-1.5">
-                <div className="flex justify-between font-bold text-text-primary text-[13px]">
-                  <span>{selectedShiftAudit.shiftInfo.cashierName}</span>
-                  <span className="text-champagne-gold font-mono">{selectedShiftAudit.shiftInfo.status === 'open' ? 'Turno Abierto' : 'Turno Cerrado'}</span>
+          ) : selectedShiftAudit ? (() => {
+            const shiftInfo = selectedShiftAudit.shiftInfo || ({} as any);
+            const initialFloat = shiftInfo.initialFloat ?? selectedShiftAudit.summary?.initialFloat ?? 0;
+            const cashDrawerAmount = shiftInfo.cashDrawerAmount ?? selectedShiftAudit.summary?.actualCash ?? 0;
+            const cashSales = selectedShiftAudit.salesSummary?.cashSales ?? selectedShiftAudit.summary?.cashSales ?? 0;
+            const cardSales = selectedShiftAudit.salesSummary?.cardSales ?? selectedShiftAudit.summary?.cardSales ?? 0;
+            const totalSales = selectedShiftAudit.salesSummary?.totalSales ?? selectedShiftAudit.summary?.totalSales ?? (cashSales + cardSales);
+            const expectedCash = selectedShiftAudit.expectedCash ?? selectedShiftAudit.summary?.expectedCash ?? 0;
+            const discrepancy = selectedShiftAudit.discrepancy ?? selectedShiftAudit.summary?.cashDifference ?? 0;
+            const txs = selectedShiftAudit.transactions || selectedShiftAudit.cashMovements || [];
+
+            return (
+              <div className="flex-1 flex flex-col min-h-0 overflow-y-auto pr-1 text-xs gap-4 select-text">
+                <div className="bg-charcoal/40 p-3 rounded-lg border border-aged-bronze/20 flex flex-col gap-1.5">
+                  <div className="flex justify-between font-bold text-text-primary text-[13px]">
+                    <span>{shiftInfo.cashierName || 'Operador'}</span>
+                    <span className="text-champagne-gold font-mono">{shiftInfo.status === 'open' ? 'Turno Abierto' : 'Turno Cerrado'}</span>
+                  </div>
+                  <div className="text-text-secondary text-[10.5px]">
+                    <div>Sucursal: <strong className="text-text-primary">{shiftInfo.branchName || 'Sucursal'}</strong></div>
+                    {shiftInfo.openedAt && (
+                      <div>Apertura: {new Date(shiftInfo.openedAt).toLocaleString('es-MX')}</div>
+                    )}
+                    {shiftInfo.closedAt && (
+                      <div>Cierre: {new Date(shiftInfo.closedAt).toLocaleString('es-MX')}</div>
+                    )}
+                  </div>
                 </div>
-                <div className="text-text-secondary text-[10.5px]">
-                  <div>Sucursal: <strong className="text-text-primary">{selectedShiftAudit.shiftInfo.branchName}</strong></div>
-                  <div>Apertura: {new Date(selectedShiftAudit.shiftInfo.openedAt).toLocaleString('es-MX')}</div>
-                  {selectedShiftAudit.shiftInfo.closedAt && (
-                    <div>Cierre: {new Date(selectedShiftAudit.shiftInfo.closedAt).toLocaleString('es-MX')}</div>
+
+                <div className="flex flex-col gap-1.5 border-b border-aged-bronze/20 pb-3">
+                  <div className="flex justify-between text-text-secondary">
+                    <span>(+) Fondo Inicial de Caja:</span>
+                    <span className="font-mono text-text-primary font-medium">{formatCurrency(initialFloat)}</span>
+                  </div>
+                  <div className="flex justify-between text-text-secondary">
+                    <span>(+) Ventas Efectivo Sistema:</span>
+                    <span className="font-mono text-text-primary font-medium">{formatCurrency(cashSales)}</span>
+                  </div>
+
+                  {txs.length > 0 && (
+                    <div className="bg-charcoal/20 p-2 rounded flex flex-col gap-1 my-1 border border-aged-bronze/10">
+                      <span className="text-[10px] font-bold text-text-secondary uppercase">Movimientos de Turno:</span>
+                      {txs.map((t) => (
+                        <div key={t.id} className="flex justify-between text-[11px] font-mono">
+                          <span className="text-text-secondary truncate w-36">
+                            {t.type === 'cash-in' ? '[+] Ingreso' : '[-] Retiro'}: {t.reason}
+                          </span>
+                          <span className={t.type === 'cash-in' ? 'text-successGreen' : 'text-red-400'}>
+                            {t.type === 'cash-in' ? '+' : '-'}{formatCurrency(t.amount)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   )}
-                </div>
-              </div>
 
-              <div className="flex flex-col gap-1.5 border-b border-aged-bronze/20 pb-3">
-                <div className="flex justify-between text-text-secondary">
-                  <span>(+) Fondo Inicial de Caja:</span>
-                  <span className="font-mono text-text-primary font-medium">{formatCurrency(selectedShiftAudit.shiftInfo.initialFloat)}</span>
-                </div>
-                <div className="flex justify-between text-text-secondary">
-                  <span>(+) Ventas Efectivo Sistema:</span>
-                  <span className="font-mono text-text-primary font-medium">{formatCurrency(selectedShiftAudit.salesSummary.cashSales)}</span>
+                  <div className="flex justify-between font-bold text-text-primary border-t border-aged-bronze/15 pt-2 mt-1">
+                    <span>(=) Efectivo Esperado en Caja:</span>
+                    <span className="font-mono">{formatCurrency(expectedCash)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-text-primary">
+                    <span>(=) Efectivo Físico Entregado:</span>
+                    <span className="font-mono text-champagne-gold">
+                      {shiftInfo.status === 'open' ? 'Sin arqueo físico' : formatCurrency(cashDrawerAmount)}
+                    </span>
+                  </div>
                 </div>
 
-                {selectedShiftAudit.transactions.length > 0 && (
-                  <div className="bg-charcoal/20 p-2 rounded flex flex-col gap-1 my-1 border border-aged-bronze/10">
-                    <span className="text-[10px] font-bold text-text-secondary uppercase">Movimientos de Turno:</span>
-                    {selectedShiftAudit.transactions.map((t) => (
-                      <div key={t.id} className="flex justify-between text-[11px] font-mono">
-                        <span className="text-text-secondary truncate w-36">
-                          {t.type === 'cash-in' ? '[+] Ingreso' : '[-] Retiro'}: {t.reason}
-                        </span>
-                        <span className={t.type === 'cash-in' ? 'text-successGreen' : 'text-red-400'}>
-                          {t.type === 'cash-in' ? '+' : '-'}{formatCurrency(t.amount)}
-                        </span>
-                      </div>
-                    ))}
+                {shiftInfo.status === 'closed' ? (
+                  <div className={`p-4 rounded-lg border text-center flex flex-col gap-1 ${
+                    discrepancy === 0
+                      ? 'bg-successGreen/5 border-successGreen/30 text-successGreen'
+                      : discrepancy > 0
+                      ? 'bg-successGreen/5 border-successGreen/30 text-successGreen'
+                      : 'bg-red-500/5 border-red-500/30 text-red-400'
+                  }`}>
+                    <span className="text-[10px] uppercase font-bold tracking-wider opacity-75">Resultado del Arqueo</span>
+                    <span className="text-xl font-extrabold font-mono">
+                      {discrepancy === 0 
+                        ? 'DIFERENCIA: $0.00 (Cuadrado)' 
+                        : `${discrepancy > 0 ? 'SOBRANTE' : 'FALTANTE'}: ${formatCurrency(Math.abs(discrepancy))}`}
+                    </span>
+                    <span className="text-[10px] opacity-75">
+                      {discrepancy === 0 
+                        ? 'El arqueo físico coincide exactamente con el sistema.' 
+                        : `Hay una discrepancia de ${formatCurrency(Math.abs(discrepancy))} frente a las ventas esperadas.`}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-400 text-center text-[11px] leading-relaxed">
+                    ⚠️ <strong>Caja en operación</strong>. Se está auditando el corte parcial (Corte X). El resultado del arqueo final y discrepancias se mostrará cuando el cajero realice el Corte Z en su terminal.
                   </div>
                 )}
 
-                <div className="flex justify-between font-bold text-text-primary border-t border-aged-bronze/15 pt-2 mt-1">
-                  <span>(=) Efectivo Esperado en Caja:</span>
-                  <span className="font-mono">{formatCurrency(selectedShiftAudit.expectedCash)}</span>
-                </div>
-                <div className="flex justify-between font-bold text-text-primary">
-                  <span>(=) Efectivo Físico Entregado:</span>
-                  <span className="font-mono text-champagne-gold">
-                    {selectedShiftAudit.shiftInfo.status === 'open' ? 'Sin arqueo físico' : formatCurrency(selectedShiftAudit.shiftInfo.cashDrawerAmount)}
-                  </span>
-                </div>
-              </div>
-
-              {selectedShiftAudit.shiftInfo.status === 'closed' ? (
-                <div className={`p-4 rounded-lg border text-center flex flex-col gap-1 ${
-                  selectedShiftAudit.discrepancy === 0
-                    ? 'bg-successGreen/5 border-successGreen/30 text-successGreen'
-                    : selectedShiftAudit.discrepancy > 0
-                    ? 'bg-successGreen/5 border-successGreen/30 text-successGreen'
-                    : 'bg-red-500/5 border-red-500/30 text-red-400'
-                }`}>
-                  <span className="text-[10px] uppercase font-bold tracking-wider opacity-75">Resultado del Arqueo</span>
-                  <span className="text-xl font-extrabold font-mono">
-                    {selectedShiftAudit.discrepancy === 0 
-                      ? 'DIFERENCIA: $0.00 (Cuadrado)' 
-                      : `${selectedShiftAudit.discrepancy > 0 ? 'SOBRANTE' : 'FALTANTE'}: ${formatCurrency(Math.abs(selectedShiftAudit.discrepancy))}`}
-                  </span>
-                  <span className="text-[10px] opacity-75">
-                    {selectedShiftAudit.discrepancy === 0 
-                      ? 'El arqueo físico coincide exactamente con el sistema.' 
-                      : `Hay una discrepancia de ${formatCurrency(Math.abs(selectedShiftAudit.discrepancy))} frente a las ventas esperadas.`}
-                  </span>
-                </div>
-              ) : (
-                <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-400 text-center text-[11px] leading-relaxed">
-                  ⚠️ <strong>Caja en operación</strong>. Se está auditando el corte parcial (Corte X). El resultado del arqueo final y discrepancias se mostrará cuando el cajero realice el Corte Z en su terminal.
-                </div>
-              )}
-
-              <div className="bg-charcoal/10 border border-aged-bronze/15 rounded-lg p-3 flex flex-col gap-1.5 mt-2">
-                <span className="text-[10px] font-bold text-text-secondary uppercase mb-1">Otros Medios de Pago</span>
-                <div className="flex justify-between text-text-secondary">
-                  <span>Tarjeta / Electrónico Sistema:</span>
-                  <span className="font-mono text-text-primary">{formatCurrency(selectedShiftAudit.salesSummary.cardSales)}</span>
-                </div>
-                <div className="flex justify-between font-bold text-text-primary border-t border-aged-bronze/10 pt-2 mt-1">
-                  <span>Venta Total del Turno:</span>
-                  <span className="font-mono text-champagne-gold">{formatCurrency(selectedShiftAudit.salesSummary.totalSales)}</span>
+                <div className="bg-charcoal/10 border border-aged-bronze/15 rounded-lg p-3 flex flex-col gap-1.5 mt-2">
+                  <span className="text-[10px] font-bold text-text-secondary uppercase mb-1">Otros Medios de Pago</span>
+                  <div className="flex justify-between text-text-secondary">
+                    <span>Tarjeta / Electrónico Sistema:</span>
+                    <span className="font-mono text-text-primary">{formatCurrency(cardSales)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-text-primary border-t border-aged-bronze/10 pt-2 mt-1">
+                    <span>Venta Total del Turno:</span>
+                    <span className="font-mono text-champagne-gold">{formatCurrency(totalSales)}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
+            );
+          })() : (
             <div className="flex-1 flex flex-col items-center justify-center text-center text-text-secondary italic text-xs p-6">
               Selecciona un turno de la lista para ver la auditoría de caja detallada
             </div>

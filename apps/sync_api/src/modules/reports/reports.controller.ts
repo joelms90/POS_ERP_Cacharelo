@@ -11,6 +11,8 @@ import {
   OWNER_ROLE,
   INVENTORY_ADMIN_ROLE,
   SUPPORT_TECH_ROLE,
+  ENCARGADO_ROLE,
+  RESPONSABLE_ROLE,
 } from '../auth/roles';
 
 type ReportRequest = { user?: { sub?: string; branchId?: string; businessId?: string; businessAccess?: Array<{ businessId?: string; role?: string }>; role?: string; roles?: string[] } };
@@ -146,7 +148,13 @@ export class ReportsController {
 
   @Get('cash-shifts/:id/audit')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(CASHIER_ROLE, BRANCH_OPERATOR_ROLE)
+  @Roles(
+    ...REPORT_ADMIN_ROLES,
+    CASHIER_ROLE,
+    BRANCH_OPERATOR_ROLE,
+    ENCARGADO_ROLE,
+    RESPONSABLE_ROLE,
+  )
   async getCashShiftAuditReport(
     @Param('id') id: string,
     @Req() req: ReportRequest,

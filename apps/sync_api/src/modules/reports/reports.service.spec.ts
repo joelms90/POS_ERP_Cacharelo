@@ -51,7 +51,7 @@ describe('ReportsService', () => {
     })).rejects.toThrow('Solo puedes acceder');
   });
 
-  it('returns a closed shift snapshot for its authenticated owner', async () => {
+  it('returns a normalized closed shift snapshot for its authenticated owner', async () => {
     const snapshot = { summary: { totalSales: 10 } };
     mockDb.select.mockReturnValue(makeQuery([{
       id: 'shift-1', cashierId: 'cashier-1', businessId: 'business-1', branchId: 'branch-1',
@@ -60,7 +60,24 @@ describe('ReportsService', () => {
 
     await expect(service.getCashShiftAuditReport('shift-1', {
       sub: 'cashier-1', branchId: 'branch-1', businessId: 'business-1',
-    })).resolves.toEqual(snapshot);
+    })).resolves.toEqual(expect.objectContaining({
+      summary: expect.objectContaining({ totalSales: 10 }),
+      salesSummary: expect.objectContaining({ totalSales: 10 }),
+    }));
+  });
+
+  it('allows business admins and owners to audit any shift without cashier/branch restriction', async () => {
+    const snapshot = { summary: { totalSales: 250 } };
+    mockDb.select.mockReturnValue(makeQuery([{
+      id: 'shift-1', cashierId: 'cashier-1', businessId: 'business-1', branchId: 'branch-1',
+      status: 'closed', closeSnapshot: snapshot,
+    }]));
+
+    await expect(service.getCashShiftAuditReport('shift-1', {
+      sub: 'admin-user', businessId: 'business-1', role: 'owner', roles: ['owner'],
+    })).resolves.toEqual(expect.objectContaining({
+      salesSummary: expect.objectContaining({ totalSales: 250 }),
+    }));
   });
 
   it('returns collected sales and reconciliation exceptions for mismatched orders', async () => {

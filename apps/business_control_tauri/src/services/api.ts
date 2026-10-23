@@ -1771,12 +1771,31 @@ export interface CashShiftAuditReport {
     initialFloat: number;
     cashDrawerAmount: number;
   };
+  summary?: {
+    initialFloat?: number;
+    cashSales?: number;
+    cardSales?: number;
+    otherSales?: number;
+    totalSales?: number;
+    manualCashIn?: number;
+    manualCashOut?: number;
+    expectedCash?: number;
+    actualCash?: number | null;
+    cashDifference?: number | null;
+  };
   salesSummary: {
     cashSales: number;
     cardSales: number;
     totalSales: number;
   };
   transactions: Array<{
+    id: string;
+    type: 'cash-in' | 'cash-out';
+    amount: number;
+    reason: string;
+    createdAt: string;
+  }>;
+  cashMovements?: Array<{
     id: string;
     type: 'cash-in' | 'cash-out';
     amount: number;

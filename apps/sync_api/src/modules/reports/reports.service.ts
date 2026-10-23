@@ -3,6 +3,8 @@ import { DRIZZLE_CONNECTION } from '../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../database/schema';
 import { eq, and, isNull, gte, lte, lt, gt, inArray, desc } from 'drizzle-orm';
+import { assertBusinessAccess, getUserRoles, isGlobalOwner } from '../auth/business-access';
+import { ADMIN_ROLES, BRANCH_OPERATOR_ROLE, normalizeOperationalRole } from '../auth/roles';
 
 export type ReconciliationExceptionType =
   | 'zero_total_with_items'
@@ -567,7 +569,14 @@ export class ReportsService {
 
   async getCashShiftAuditReport(
     shiftId: string,
-    actor?: { sub?: string; branchId?: string; businessId?: string },
+    actor?: {
+      sub?: string;
+      branchId?: string;
+      businessId?: string;
+      role?: string;
+      roles?: string[];
+      businessAccess?: Array<{ businessId?: string; role?: string }>;
+    },
   ) {
     const shiftList = await this.db
       .select({
@@ -587,7 +596,7 @@ export class ReportsService {
         closeSnapshot: schema.cashShifts.closeSnapshot,
       })
       .from(schema.cashShifts)
-      .innerJoin(schema.users, eq(schema.cashShifts.cashierId, schema.users.id))
+      .leftJoin(schema.users, eq(schema.cashShifts.cashierId, schema.users.id))
       .innerJoin(schema.branches, eq(schema.cashShifts.branchId, schema.branches.id))
       .where(eq(schema.cashShifts.id, shiftId));
 
@@ -596,13 +605,118 @@ export class ReportsService {
     }
 
     const shift = shiftList[0];
-    if (!actor?.sub || !actor.branchId || !actor.businessId ||
-        shift.cashierId !== actor.sub || shift.branchId !== actor.branchId ||
-        shift.businessId !== actor.businessId) {
-      throw new ForbiddenException('Solo puedes acceder a la auditoria de tu caja y sucursal.');
+    if (actor) {
+      assertBusinessAccess(actor, shift.businessId);
+
+      const roles = getUserRoles(actor);
+      const isAdmin =
+        roles.some((r) => ADMIN_ROLES.includes(r as any)) || isGlobalOwner(actor);
+      const isBranchSupervisor = roles.some(
+        (r) => normalizeOperationalRole(r) === BRANCH_OPERATOR_ROLE,
+      );
+
+      if (isAdmin) {
+        // Admins and owners can audit any shift within their business
+      } else if (isBranchSupervisor) {
+        // Branch operators can audit shifts in their assigned branch
+        if (!actor.branchId || actor.branchId !== shift.branchId) {
+          throw new ForbiddenException('Solo puedes acceder a la auditoria de tu sucursal.');
+        }
+      } else {
+        // Standard cashiers can only access their own shift in their assigned branch
+        if (
+          !actor.sub ||
+          !actor.branchId ||
+          shift.cashierId !== actor.sub ||
+          shift.branchId !== actor.branchId
+        ) {
+          throw new ForbiddenException('Solo puedes acceder a la auditoria de tu caja y sucursal.');
+        }
+      }
     }
+
     if (shift.status === 'closed' && shift.closeSnapshot) {
-      return shift.closeSnapshot;
+      const snap = shift.closeSnapshot as any;
+      const initialFloat =
+        snap.shiftInfo?.initialFloat ??
+        snap.summary?.initialFloat ??
+        this.parseMoney(shift.initialFloat);
+      const cashDrawerAmount =
+        snap.shiftInfo?.cashDrawerAmount ??
+        snap.summary?.actualCash ??
+        this.parseMoney(shift.cashDrawerAmount);
+      const cashSales =
+        snap.salesSummary?.cashSales ?? snap.summary?.cashSales ?? 0;
+      const cardSales =
+        snap.salesSummary?.cardSales ?? snap.summary?.cardSales ?? 0;
+      const otherSales =
+        snap.salesSummary?.otherSales ?? snap.summary?.otherSales ?? 0;
+      const totalSales =
+        snap.salesSummary?.totalSales ??
+        snap.summary?.totalSales ??
+        cashSales + cardSales + otherSales;
+      const manualCashIn = snap.summary?.manualCashIn ?? 0;
+      const manualCashOut = snap.summary?.manualCashOut ?? 0;
+      const expectedCash =
+        snap.expectedCash ??
+        snap.summary?.expectedCash ??
+        initialFloat + cashSales + manualCashIn - manualCashOut;
+      const discrepancy =
+        snap.discrepancy ??
+        snap.summary?.cashDifference ??
+        cashDrawerAmount - expectedCash;
+      const rawTxs = snap.transactions || snap.cashMovements || [];
+      const transactions = rawTxs.map((t: any) => ({
+        id: t.id,
+        type: t.type,
+        amount: this.parseMoney(t.amount),
+        reason: t.reason,
+        createdAt: t.createdAt,
+      }));
+
+      return {
+        ...snap,
+        shiftInfo: {
+          id: shift.id,
+          cashierId: shift.cashierId,
+          cashierName:
+            snap.shiftInfo?.cashierName || shift.cashierName || 'Operador',
+          branchId: shift.branchId,
+          branchName:
+            snap.shiftInfo?.branchName || shift.branchName || 'Sucursal',
+          status: 'closed' as const,
+          openedAt: snap.shiftInfo?.openedAt || shift.openedAt,
+          closedAt: snap.shiftInfo?.closedAt || shift.closedAt,
+          initialFloat: this.roundMoney(initialFloat),
+          cashDrawerAmount: this.roundMoney(cashDrawerAmount),
+        },
+        summary: snap.summary || {
+          initialFloat: this.roundMoney(initialFloat),
+          cashSales: this.roundMoney(cashSales),
+          cardSales: this.roundMoney(cardSales),
+          otherSales: this.roundMoney(otherSales),
+          totalSales: this.roundMoney(totalSales),
+          manualCashIn: this.roundMoney(manualCashIn),
+          manualCashOut: this.roundMoney(manualCashOut),
+          expectedCash: this.roundMoney(expectedCash),
+          actualCash: this.roundMoney(cashDrawerAmount),
+          cashDifference: this.roundMoney(discrepancy),
+        },
+        salesSummary: {
+          cashSales: this.roundMoney(cashSales),
+          cardSales: this.roundMoney(cardSales),
+          totalSales: this.roundMoney(totalSales),
+        },
+        salesByPaymentMethod: snap.salesByPaymentMethod || [],
+        transactions,
+        cashMovements: transactions,
+        expectedCash: this.roundMoney(expectedCash),
+        discrepancy: this.roundMoney(discrepancy),
+        denominationCounts:
+          snap.denominationCounts ?? shift.denominationCounts ?? null,
+        closeNotes: snap.closeNotes ?? shift.closeNotes ?? null,
+        generatedAt: snap.generatedAt ?? new Date(),
+      };
     }
 
     const openedAt = new Date(shift.openedAt);
@@ -693,9 +807,9 @@ export class ReportsService {
     return {
       shiftInfo: {
         id: shift.id,
-        cashierName: shift.cashierName,
+        cashierName: shift.cashierName || 'Operador',
         branchId: shift.branchId,
-        branchName: shift.branchName,
+        branchName: shift.branchName || 'Sucursal',
         status: shift.status,
         openedAt: shift.openedAt,
         closedAt: shift.closedAt,
