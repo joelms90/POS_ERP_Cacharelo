@@ -9,6 +9,7 @@ import 'waiter/waiter_ordering_screen.dart';
 import 'cashier/cashier_dashboard_screen.dart';
 import 'kitchen/kitchen_dashboard_screen.dart';
 import 'encargado/encargado_dashboard_screen.dart';
+import 'warehouse/warehouse_dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final AppState state;
@@ -470,8 +471,7 @@ class _LoginScreenState extends State<LoginScreen> {
             state: widget.state, showFullFeatures: false);
         break;
       case UserRole.warehousePurchasingOperator:
-        nextScreen = EncargadoDashboardScreen(
-            state: widget.state, showFullFeatures: false);
+        nextScreen = WarehouseDashboardScreen(state: widget.state);
         break;
       default:
         return;

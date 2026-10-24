@@ -2015,7 +2015,7 @@ class AppState extends ChangeNotifier {
   }
 
   // Predefined Menu Items
-  static final List<MenuItem> menu = [
+  static const List<MenuItem> menu = [
     MenuItem(
       id: '1',
       name: 'Lasagna Bolognesa',
@@ -5214,6 +5214,157 @@ class AppState extends ChangeNotifier {
     } catch (error) {
       debugPrint('Unable to receive transfer: $error');
       return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchWarehousePurchaseOrders() async {
+    if (!isTerminalConfigured || terminalBusinessId == null) return const [];
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .get(
+            Uri.parse(
+                '$baseUrl/purchase-orders?businessId=${Uri.encodeQueryComponent(terminalBusinessId!)}'),
+            headers: await _operatorHeaders(),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return const [];
+      final body = jsonDecode(response.body);
+      if (body is! List) return const [];
+      return body
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .where((item) =>
+              item['status'] == 'sent' || item['status'] == 'partially_received')
+          .toList();
+    } catch (error) {
+      debugPrint('Unable to load warehouse purchase orders: $error');
+      return const [];
+    }
+  }
+
+  Future<bool> receivePurchaseOrder({
+    required String poId,
+    String? warehouseId,
+    String? invoiceNumber,
+    required List<Map<String, dynamic>> items,
+    String? receivingNotes,
+  }) async {
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/purchase-orders/$poId/receive'),
+            headers: await _operatorHeaders(),
+            body: jsonEncode({
+              if (warehouseId != null) 'warehouseId': warehouseId,
+              if (invoiceNumber != null && invoiceNumber.trim().isNotEmpty)
+                'invoiceNumber': invoiceNumber.trim(),
+              'items': items,
+              if (receivingNotes != null && receivingNotes.trim().isNotEmpty)
+                'receivingNotes': receivingNotes.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+      return response.statusCode >= 200 && response.statusCode < 300;
+    } catch (error) {
+      debugPrint('Unable to receive purchase order: $error');
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchWarehousePendingRequisitions() async {
+    if (!isTerminalConfigured || terminalBusinessId == null) return const [];
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .get(
+            Uri.parse(
+                '$baseUrl/requisitions/pending?businessId=${Uri.encodeQueryComponent(terminalBusinessId!)}'),
+            headers: await _operatorHeaders(),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return const [];
+      final body = jsonDecode(response.body);
+      if (body is! List) return const [];
+      return body
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+    } catch (error) {
+      debugPrint('Unable to load pending warehouse requisitions: $error');
+      return const [];
+    }
+  }
+
+  Future<bool> updateRequisitionStatus({
+    required String requisitionId,
+    required String status,
+    String? notes,
+  }) async {
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .patch(
+            Uri.parse('$baseUrl/requisitions/$requisitionId/status'),
+            headers: await _operatorHeaders(),
+            body: jsonEncode({
+              'status': status,
+              if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+      return response.statusCode >= 200 && response.statusCode < 300;
+    } catch (error) {
+      debugPrint('Unable to update requisition status: $error');
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchWarehouseStock({String? warehouseId}) async {
+    if (!isTerminalConfigured || terminalBusinessId == null) return const [];
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final whQuery = warehouseId != null
+          ? '&warehouseId=${Uri.encodeQueryComponent(warehouseId)}'
+          : '';
+      final response = await http
+          .get(
+            Uri.parse(
+                '$baseUrl/inventory/stock?businessId=${Uri.encodeQueryComponent(terminalBusinessId!)}$whQuery'),
+            headers: await _operatorHeaders(),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return const [];
+      final body = jsonDecode(response.body);
+      if (body is! List) return const [];
+      return body
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+    } catch (error) {
+      debugPrint('Unable to load warehouse stock: $error');
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchWarehousesList() async {
+    if (!isTerminalConfigured || terminalBusinessId == null) return const [];
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .get(
+            Uri.parse(
+                '$baseUrl/warehouses?businessId=${Uri.encodeQueryComponent(terminalBusinessId!)}'),
+            headers: await _operatorHeaders(),
+          )
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return const [];
+      final body = jsonDecode(response.body);
+      if (body is! List) return const [];
+      return body
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+    } catch (error) {
+      debugPrint('Unable to load warehouses: $error');
+      return const [];
     }
   }
 

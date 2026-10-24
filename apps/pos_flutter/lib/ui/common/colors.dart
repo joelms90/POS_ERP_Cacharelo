@@ -21,6 +21,7 @@ class EmpireColors {
   static const Color errorRed = Color(0xFFE53935);
   static const Color warningOrange = Color(0xFFFFB300);
   static const Color cleaningGrey = Color(0xFF757575);
+  static const Color infoCyan = Color(0xFF00BCD4);
 
   // Text Colors
   static const Color textPrimary = Color(0xFFEAEAEA);
