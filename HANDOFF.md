@@ -4,6 +4,22 @@
 **Branch:** `main`
 **Scope:** Fix cash-shift audit authorization (`GET /reports/cash-shifts/:id/audit`), snapshot normalization for Admin Web Reports page, Corte X/Z improvements, and production deployments.
 
+## Mesas Activas Branch Filtering & Multi-Business Orders Access (2026-10-24)
+- **OrdersAccessGuard Authorization**:
+  - Updated `OrdersAccessGuard` on `/orders/active/business` to use `assertBusinessAccess(actor, req.query.businessId)` instead of strict single-business matching (`req.query.businessId !== actor.businessId`).
+  - Allows global `owner` and multi-business administrators to query active orders for any configured business entity without encountering `403 Forbidden`.
+  - Updated unit tests in `orders-access.guard.spec.ts` (170 tests passing).
+- **Mesas Activas UI & Contextual States**:
+  - Added branch selector (`Autocomplete` with "Todas las sucursales" + individual branch options) to [`MesasActivasPage.tsx`](file:///Users/joelmorales/web/POS-ERP/apps/business_control_tauri/src/pages/MesasActivasPage.tsx).
+  - Added table configuration awareness via `api.getBranchTables`:
+    - Case A: Unconfigured branch / Quick-service (0 tables) displays informative explanation comparing Comedor/Mesas vs. Mostrador/Venta Rápida (Operador de Sucursal) with direct quick-action buttons `[ 🛠️ Configurar Mesas en Sucursales ]` and `[ 🧾 Ver Tickets del Día ]`.
+    - Case B: Comedor with 0 active orders displays green status badge ("Todas las mesas están disponibles") with total table count, capacity estimate, and room names.
+    - Case C: Handled multi-business 403 / access errors gracefully with warning card and retry action.
+- **Production Status**:
+  - Backend Cloud Run API: Live revision `pos-sync-api-00125-bct` serving 100% traffic (Healthy). Verified with curl `businessId=...bf03` returning 200 OK.
+  - Admin Dashboard: Live at `https://cacharelo-central.web.app`.
+  - Flutter Web POS: Live at `https://cacharelo-pos.web.app`.
+
 ---
 
 ## Cash Shift Audit Fix & Production Deployment (2026-10-24)
