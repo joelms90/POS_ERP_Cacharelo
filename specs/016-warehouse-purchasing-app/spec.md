@@ -1,58 +1,73 @@
-# Feature Specification: Dedicated Warehouse & Purchasing Operator App
+# Feature Specification: Dedicated Warehouse Operator App (Almacén y Bodega)
 
 **Feature Branch**: `016-warehouse-purchasing-app`  
 **Created**: 2026-10-24  
 **Status**: Draft  
-**Input**: Dedicated application experience for the canonical role `warehouse_purchasing_operator` across the Flutter client (`apps/pos_flutter`), consuming backend purchase orders, receipts, transfers, and requisitions contracts.
+**Input**: Dedicated application experience in the Flutter client (`apps/pos_flutter`) for the canonical role `warehouse_purchasing_operator`, strictly scoped to warehouse physical operations: receiving goods from suppliers into storage and dispatching stock transfers to fulfill branch requisitions.
 
 ---
 
-## 1. Summary
+## 1. Summary & Core Purpose
 
-Currently, when a user with the canonical role `warehouse_purchasing_operator` logs into the Flutter POS client, they are redirected to `EncargadoDashboardScreen(showFullFeatures: false)`. This screen was originally designed for retail store counters (displaying POS tables, waiter orders, cash drawer, and tickets), which does not align with the operational needs of a central warehouse or commissary bodega.
+Currently, when a user with the canonical role `warehouse_purchasing_operator` logs into the Flutter POS client, they are redirected to `EncargadoDashboardScreen(showFullFeatures: false)`. This screen was originally designed for retail store counters (displaying POS tables, waiter orders, cash drawer, and tickets), which does not align with the operational reality of a central warehouse or commissary bodega.
 
-This feature introduces a **dedicated, tablet/desktop-optimized Warehouse & Purchasing Operator workspace in Flutter (`WarehouseDashboardScreen`)**. It empowers the warehouse operator to:
-1. **Receive supplier purchase orders (Órdenes de Compra)** with quantity and unit cost verification, registering discrepancies and computing weighted average costs.
-2. **Review, approve, and dispatch branch requisitions (Requisiciones de Sucursal)** into stock transfers with picking guidance.
-3. **Audit warehouse stock levels and conduct quick counts** with barcode/SKU search and variance logging.
-4. **Draft and issue new purchase orders to suppliers** when inventory drops below safety thresholds.
+This feature introduces a **dedicated, tablet/desktop-optimized Warehouse Operator workspace in Flutter (`WarehouseDashboardScreen`)**. It is strictly focused on the physical inventory flow of the warehouse:
+1. **Recepción de Proveedores (Entradas a Bodega)**: El operador recibe la mercancía física que llega de proveedores contra Órdenes de Compra previamente emitidas, valida cantidades reales, reporta mermas o daños y confirma la entrada al inventario de la bodega.
+2. **Surtido y Despacho a Sucursales (Salidas de Bodega)**: El operador recibe las solicitudes de insumos (requisiciones) emitidas por las sucursales, realiza el surtido físico en bodega (*picking*) y despacha el traspaso para entregarlo a la sucursal.
+3. **Auditoría de Existencias y Conteo Físico**: Consulta rápida de stock físico en bodega con escáner de código de barras / SKU y registro de ajustes por merma o rotura.
 
 ---
 
-## 2. User Scenarios & Testing *(mandatory)*
+## 2. Segregation of Duties & Boundaries *(mandatory)*
 
-### User Story 1 - Recepción de Órdenes de Compra de Proveedores (Priority: P1)
+To maintain strict internal controls, anti-fraud standards, and audit integrity, the Warehouse Operator terminal in Flutter adheres to the following explicit boundaries:
 
-As a **Warehouse & Purchasing Operator**,  
-I need to inspect incoming supplier deliveries against issued Purchase Orders (`sent` or `partially_received`),  
-So that I can verify delivered quantities, update real unit costs, log discrepancies/damaged goods, and immediately update warehouse stock and weighted average costs.
+### ❌ Lo que el Operador de Almacén NO puede hacer en la app:
+- **NO puede crear, editar ni eliminar Órdenes de Compra (OC) originales**: La negociación, creación de órdenes y acuerdo de precios con proveedores es responsabilidad exclusiva de Compras / Administración desde el panel web central (`business_control_tauri`). El operador de almacén solo recibe lo que Compras ya autorizó.
+- **NO puede crear, editar ni eliminar Requisiciones de Sucursales**: Las requisiciones son generadas exclusivamente por el personal de cada sucursal (tienda, cafetería o cocina). El operador de almacén no puede inventar ni alterar los pedidos originales de las tiendas; únicamente puede surtirlos, aprobarlos según el stock disponible o reportar desabasto.
 
-**Why this priority**: Core responsibility of warehouse receiving. Without PO receipt, central inventory is inaccurate, preventing branch distribution.
+### ✅ Lo que el Operador de Almacén SÍ hace en la app:
+- **Recibir entregas físicas**: Coteja lo que el camión o proveedor entrega físicamente contra la OC emitida, anota piezas faltantes o dañadas y da entrada al stock de la bodega.
+- **Surtir y despachar pedidos a sucursales**: Prepara los insumos solicitados por las sucursales y registra la salida del inventario de bodega hacia la sucursal.
+- **Auditar y ajustar stock físico de bodega**: Realiza conteos de bodega y registra ajustes justificados (mermas, roturas, caducidades).
 
-**Independent Test**: Can be tested by selecting an existing PO in `sent` status, entering received quantities and unit costs (with 1 item partial or damaged), confirming reception, and verifying that warehouse stock increases and the PO status transitions to `received` or `partially_received`.
+---
+
+## 3. User Scenarios & Testing *(mandatory)*
+
+### User Story 1 - Recepción de Mercancía de Proveedores y Entrada a Bodega (Priority: P1)
+
+As a **Warehouse Operator**,  
+I need to open an issued Purchase Order (`sent` or `partially_received`) when a supplier arrives at the warehouse dock,  
+So that I can verify physically delivered items against the PO, record damaged/missing units, and confirm the formal entry into the bodega's inventory.
+
+**Why this priority**: Essential inbound workflow. Without receiving verification, physical items sitting in the warehouse do not exist in the system ledger.
+
+**Independent Test**: Can be tested by selecting an issued PO in `sent` status, entering received quantities and actual invoice costs, confirming reception, and verifying that the destination warehouse stock increments in `stock_ledger` and the PO transitions to `received` or `partially_received`.
 
 **Acceptance Scenarios**:
-1. **Given** an open PO in `sent` status, **When** the operator opens the PO reception view, **Then** all line items display requested quantities, expected unit costs, and input fields for `receivedQuantity`, `actualUnitCost`, and `rejectionReason`.
-2. **Given** complete delivery of all items at the agreed cost, **When** the operator submits the reception, **Then** warehouse stock is incremented, weighted average cost is recalculated in `products.cost`, and the PO status updates to `received`.
-3. **Given** a delivery with missing or damaged items, **When** the operator enters a received quantity less than ordered and provides a discrepancy note, **Then** only the received quantity increments stock, the rejected items are audited, and the PO status updates to `partially_received`.
+1. **Given** an open PO in `sent` status emitted by administration, **When** the operator opens the reception view, **Then** all line items display original ordered quantities and expected costs as read-only references, with editable fields for `receivedQuantity`, `actualUnitCost`, and `rejectionReason`.
+2. **Given** complete delivery of all items, **When** the operator submits the reception, **Then** warehouse stock is incremented, weighted average cost is recalculated in `products.cost`, and the PO status updates to `received`.
+3. **Given** missing or damaged items, **When** the operator inputs a quantity less than ordered and enters a discrepancy reason (e.g. `Empaque roto por transportista`), **Then** only the sound units enter inventory, the rejected units are audited, and the PO status updates to `partially_received`.
+4. **Given** an issued PO, **When** viewing it in the warehouse app, **Then** the operator has NO options to add new products, delete line items, or cancel the original PO.
 
 ---
 
-### User Story 2 - Aprobación y Despacho de Requisiciones de Sucursales (Priority: P1)
+### User Story 2 - Surtido y Despacho de Requisiciones a Sucursales (Priority: P1)
 
-As a **Warehouse & Purchasing Operator**,  
-I need to review material requisitions sent by store branches (cafeterías, kioscos, cocina),  
-So that I can verify warehouse stock availability, approve or place on standby, and dispatch the requested stock as an inter-branch transfer.
+As a **Warehouse Operator**,  
+I need to inspect pending requisitions sent by store branches (cafeterías, cocinas, kioscos),  
+So that I can verify on-hand warehouse stock, pack the items (*picking*), and dispatch the stock transfer to the destination branch.
 
-**Why this priority**: Required for store replenishment. Branches cannot fulfill customer orders without stock shipped from the central warehouse.
+**Why this priority**: Essential outbound workflow. Retail branches cannot operate or serve customers without receiving their requested supplies from the central warehouse.
 
-**Independent Test**: Can be tested by creating a branch requisition from the POS or Admin, viewing it in the Warehouse app, approving it, and marking it as dispatched.
+**Independent Test**: Can be tested by creating a requisition from a store branch, opening it in the Warehouse app, approving/packing the available items, and tapping `Despachar Traspaso`, verifying that warehouse stock decrements and the transfer transitions to `in_transit`.
 
 **Acceptance Scenarios**:
-1. **Given** a requisition in `pending_approval` status, **When** the warehouse operator views the requisition, **Then** the screen shows requested quantities alongside current warehouse stock availability (highlighting shortages in red/amber).
-2. **Given** sufficient stock, **When** the operator approves the requisition, **Then** the system transitions the status to `approved`, creates a linked `stock_transfers` record in `in_transit`, and decrements available warehouse stock.
-3. **Given** the separation-of-duties rule, **When** the operator who created the requisition attempts to approve their own requisition, **Then** the system prevents self-approval and displays an explanatory security notice.
-4. **Given** stock shortages or unconfirmed delivery dates, **When** the operator marks the requisition as `standby` with a note, **Then** the branch receives the status update and the request remains open for future fulfillment.
+1. **Given** a branch requisition in `pending_approval` status, **When** the warehouse operator views the request, **Then** the requested items and quantities appear as read-only from the branch, displayed alongside current warehouse stock availability.
+2. **Given** sufficient stock in bodega, **When** the operator approves and prepares the order, **Then** tapping `Despachar Traspaso` decrements available warehouse stock and creates/transitions the linked `stock_transfers` record to `in_transit`.
+3. **Given** insufficient stock in bodega for certain items, **When** the operator cannot fulfill a request immediately, **Then** the operator can place the requisition in `standby` with an explanation note (e.g. `En espera de entrega de proveedor martes`).
+4. **Given** the segregation-of-duties rule, **When** an operator attempts to approve a requisition where `requested_by == current_user_id`, **Then** the system blocks self-approval and displays a security notice.
 
 ---
 
@@ -72,58 +87,60 @@ So that I can verify real-time physical inventory in the bodega and register man
 
 ---
 
-### User Story 4 - Creación y Envío Rápido de Órdenes de Compra (Priority: P3)
+### User Story 4 - Historial de Movimientos de Bodega (Priority: P3)
 
-As a **Purchasing Operator**,  
-I need to quickly create and send Purchase Orders to registered suppliers when inventory is low,  
-So that we reorder raw materials before stockouts affect production.
+As a **Warehouse Operator**,  
+I need to review recent receipts and outbound dispatches completed during the shift,  
+So that I can verify what was received, what was shipped, and provide handover notes to the next warehouse shift.
 
-**Why this priority**: Allows the purchasing operator to close the procurement loop directly from their terminal without switching to the full desktop Admin panel.
+**Why this priority**: Operational traceability and shift handover verification.
 
-**Independent Test**: Can be tested by selecting a supplier, adding 3 products with target quantities, saving as `draft`, and clicking `Enviar Orden` to transition to `sent`.
+**Independent Test**: Can be tested by completing a PO receipt and a transfer dispatch, opening the Historial tab, and verifying that both entries appear with timestamp, folio, and item summary.
 
 **Acceptance Scenarios**:
-1. **Given** the purchase orders tab, **When** the operator taps `Nueva Orden de Compra`, **Then** they select a provider, add products from that provider's catalog, specify estimated quantities and unit costs, and save the draft.
-2. **Given** a draft order, **When** reviewed and confirmed, **Then** the operator taps `Enviar al Proveedor`, setting status to `sent` and generating folio `OC-XXXX`.
+1. **Given** completed receipts or dispatches, **When** the operator visits the Historial tab, **Then** records are listed chronologically with badges indicating `Entrada (Proveedor)` or `Salida (Traspaso a Sucursal)`.
+2. **Given** an entry in the history, **When** tapped, **Then** the operator can inspect the full breakdown of quantities received/dispatched and discrepancy notes.
 
 ---
 
-## 3. Dedicated Flutter Navigation & UI Architecture
+## 4. Dedicated Flutter Navigation & UI Architecture
 
-### 3.1 Routing on Login
+### 4.1 Routing on Login
 In [`apps/pos_flutter/lib/ui/login_screen.dart`](file:///Users/joelmorales/web/POS-ERP/apps/pos_flutter/lib/ui/login_screen.dart):
-- When `currentUserRole == UserRole.warehousePurchasingOperator`, route to `WarehouseDashboardScreen` instead of `EncargadoDashboardScreen`.
-- If an operator possesses multiple roles (e.g. `['branch_operator', 'warehouse_purchasing_operator']`), provide a clean workspace switcher in the header.
+- When `currentUserRole == UserRole.warehousePurchasingOperator`, route directly to `WarehouseDashboardScreen`.
+- Complete removal of restaurant/cafetería artifacts: no dining tables, no dining rooms, no waiter carts, no cash drawer / corte X / corte Z panels.
 
-### 3.2 Navigation Tabs in `WarehouseDashboardScreen`
+### 4.2 Navigation Tabs in `WarehouseDashboardScreen`
 The interface is structured for landscape tablets, touch all-in-one terminals, and desktop displays:
-1. **📥 Recepciones (PO Receiving)**: List of incoming orders (`sent`, `partially_received`). Detailed check-in view with numeric keypad for actual counts and unit costs.
-2. **📋 Requisiciones (Branch Requests)**: Incoming requests grouped by branch and urgency. One-tap approval, partial fulfillment, and dispatch to transit.
-3. **📦 Inventario de Bodega (Stock & Counts)**: Live on-hand stock by category/shelf, barcode search, and quick adjustment modal.
-4. **📝 Órdenes de Compra (Purchasing)**: Procurement pipeline (`draft`, `sent`, `received`, `cancelled`) with PO creation flow.
+1. **📥 Entradas (Recepciones OC)**: Lista de Órdenes de Compra enviadas por Compras listas para recibir. Modal de check-in físico con teclado numérico para cantidades reales, costos de factura y mermas.
+2. **📤 Salidas (Surtido a Sucursales)**: Bandeja de Requisiciones solicitadas por las sucursales. Lista de picking físico y botón `Despachar Traspaso`.
+3. **📦 Inventario de Bodega**: Existencias en vivo de insumos por categoría/estante, buscador por código de barras y modal de ajuste por merma/conteo.
+4. **📜 Historial de Turno**: Registro cronológico de recepciones y despachos ejecutados durante la jornada.
 
 ---
 
-## 4. Requirements & Business Rules *(mandatory)*
+## 5. Requirements & Business Rules *(mandatory)*
 
 ### Functional Requirements
 - **FR-001**: System MUST route `UserRole.warehousePurchasingOperator` to a dedicated `WarehouseDashboardScreen` in Flutter POS.
-- **FR-002**: PO Receiving screen MUST display the original ordered quantity and cost as reference while allowing the operator to enter actual delivered values.
-- **FR-003**: System MUST require an auditable discrepancy note whenever received quantity is less than ordered or damaged items are rejected.
-- **FR-004**: Completing a PO receipt MUST trigger the weighted average cost recalculation on the backend and update destination warehouse stock.
-- **FR-005**: Requisition approvals MUST prevent self-approval (the user ID approving cannot match `requested_by`).
-- **FR-006**: Requisition dispatch MUST generate a corresponding `stock_transfers` record moving inventory into `in_transit` state.
-- **FR-007**: Physical counts and adjustments MUST capture adjustment reason codes: `merma`, `conteo_fisico`, `caducidad`, `rotura`, or `correccion`.
-- **FR-008**: Warehouse operator UI MUST display the currently active Warehouse (Bodega) with selector support if the business has multiple warehouses.
-- **FR-009**: The Flutter app MUST support USB and Bluetooth barcode scanners transmitting newline-terminated strings into product lookup fields.
-- **FR-010**: The warehouse workspace MUST function with offline resilience: cached product catalogs and offline requisition queues sync automatically upon reconnection.
+- **FR-002**: PO Receiving screen MUST display the original ordered quantity and cost as read-only reference while allowing the operator to enter actual delivered values.
+- **FR-003**: System MUST NOT allow the warehouse operator in Flutter to create, edit line items, or delete original Purchase Orders.
+- **FR-004**: System MUST NOT allow the warehouse operator in Flutter to create or delete branch requisitions on behalf of branches.
+- **FR-005**: System MUST require an auditable discrepancy note whenever received quantity is less than ordered or damaged items are rejected.
+- **FR-006**: Completing a PO receipt MUST trigger the weighted average cost recalculation on the backend and update destination warehouse stock in `stock_ledger`.
+- **FR-007**: Requisition approvals MUST prevent self-approval (the user ID approving cannot match `requested_by`).
+- **FR-008**: Requisition dispatch MUST generate a corresponding `stock_transfers` record moving inventory into `in_transit` state.
+- **FR-009**: Physical counts and adjustments MUST capture adjustment reason codes: `merma`, `conteo_fisico`, `caducidad`, `rotura`, or `correccion`.
+- **FR-010**: Warehouse operator UI MUST display the currently active Warehouse (Bodega) with selector support if the business has multiple warehouses.
+- **FR-011**: The Flutter app MUST support USB and Bluetooth barcode scanners transmitting newline-terminated strings into product lookup fields.
+- **FR-012**: The warehouse workspace MUST function with offline resilience: cached product catalogs and offline requisition queues sync automatically upon reconnection.
 
 ---
 
-## 5. Success Criteria *(mandatory)*
+## 6. Success Criteria *(mandatory)*
 
 - **SC-001**: Warehouse operators can complete a full PO reception (verifying items, costs, and saving) in under 60 seconds on a tablet.
 - **SC-002**: Requisitions sent from any retail branch appear in the Warehouse screen within 5 seconds via existing WebSocket sync or 15-second polling fallback.
 - **SC-003**: 100% of inventory movements generated from warehouse receipts and transfers reflect correctly in the backend `stock_ledger` and `inventory_movements`.
-- **SC-004**: No store counter artifacts (tables, table layouts, guest seats, cash drawer float/arqueos) are displayed to the warehouse operator.
+- **SC-004**: Zero store counter artifacts (tables, table layouts, guest seats, cash drawer float/arqueos) are displayed to the warehouse operator.
 - **SC-005**: Unit and widget tests for the new Flutter screens pass with 0 errors.
