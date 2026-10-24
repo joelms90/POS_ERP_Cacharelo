@@ -35,8 +35,13 @@ describe('OrdersAccessGuard', () => {
   it('rejects operator business-wide listing', async () => {
     await expect(probe({route:{path:'/api/orders/active/business'},query:{businessId:'business'}}).result).rejects.toBeInstanceOf(ForbiddenException);
   });
-  it('allows owner business-wide listing only for own business', async () => {
+  it('allows owner business-wide listing across businesses', async () => {
     await expect(probe({user:{...actor,role:'owner'},route:{path:'/api/orders/active/business'},query:{businessId:'business'}}).result).resolves.toBe(true);
-    await expect(probe({user:{...actor,role:'owner'},route:{path:'/api/orders/active/business'},query:{businessId:'other'}}).result).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(probe({user:{...actor,role:'owner'},route:{path:'/api/orders/active/business'},query:{businessId:'other'}}).result).resolves.toBe(true);
+    await expect(probe({user:{...actor,role:'owner'},route:{path:'/api/orders/active/business'},query:{}}).result).rejects.toBeInstanceOf(ForbiddenException);
+  });
+  it('allows scoped admin listing for configured business and rejects unconfigured', async () => {
+    await expect(probe({user:{...actor,role:'inventory_admin',businessAccess:[{businessId:'business-2'}]},route:{path:'/api/orders/active/business'},query:{businessId:'business-2'}}).result).resolves.toBe(true);
+    await expect(probe({user:{...actor,role:'inventory_admin',businessAccess:[{businessId:'business-2'}]},route:{path:'/api/orders/active/business'},query:{businessId:'other'}}).result).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

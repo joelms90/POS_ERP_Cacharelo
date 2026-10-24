@@ -3,6 +3,7 @@ import { DRIZZLE_CONNECTION } from '../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../database/schema';
 import { eq } from 'drizzle-orm';
+import { assertBusinessAccess, getUserRoles } from '../auth/business-access';
 
 @Injectable()
 export class OrdersAccessGuard implements CanActivate {
@@ -11,12 +12,17 @@ export class OrdersAccessGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
     const actor = req.user;
-    if (!actor?.sub || !actor.businessId) throw new ForbiddenException();
-    const management = ['owner', 'inventory_admin', 'support_tech'].includes(actor.role);
+    if (!actor?.sub) throw new ForbiddenException();
+    const roles = getUserRoles(actor);
+    const management = ['owner', 'inventory_admin', 'support_tech'].some(
+      (r) => roles.includes(r) || actor.role === r,
+    );
     if (req.route?.path === '/orders/active/business' || req.route?.path === '/api/orders/active/business') {
-      if (!management || req.query.businessId !== actor.businessId) throw new ForbiddenException();
+      if (!management || !req.query?.businessId) throw new ForbiddenException();
+      assertBusinessAccess(actor, req.query.businessId);
       return true;
     }
+    if (!actor.businessId) throw new ForbiddenException();
     let branchId = req.body?.branchId ?? req.query.branchId ?? actor.branchId;
     if (req.params.id) {
       const [order] = await this.db.select().from(schema.orders).where(eq(schema.orders.id, req.params.id));

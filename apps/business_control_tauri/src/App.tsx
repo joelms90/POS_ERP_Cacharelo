@@ -146,7 +146,7 @@ function App() {
         {activeTab === 'help' && <HelpPage />}
         {activeTab === 'reports' && <ReportsPage businessId={activeBusinessId} />}
         {activeTab === 'tickets' && <TicketsPage businessId={activeBusinessId} />}
-        {activeTab === 'mesas' && <MesasActivasPage businessId={activeBusinessId} />}
+        {activeTab === 'mesas' && <MesasActivasPage businessId={activeBusinessId} onNavigateTab={(tab) => setActiveTab(tab as any)} />}
         {activeTab === 'ticket-settings' && <TicketSettingsPage businessId={activeBusinessId} />}
         {activeTab === 'pos-simulator' && <PosSimulatorPage businessId={activeBusinessId} />}
       </AdminLayout>
