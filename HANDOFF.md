@@ -1,8 +1,20 @@
 # Session Handoff
 
-**Date:** 2026-10-03
-**Branch:** `main` (integrated `013-unify-roles` and `015-resumen-sucursal`)
-**Scope:** Multi-Agent Team Orchestrator integration (Antigravity CLI Lead Architect + codex, claude, opencode runners via scripts/agent-team.sh), Resumen de Sucursal & Cortes de Caja (Corte X / Corte Z) across Backend, Admin Web, and POS Flutter.
+**Date:** 2026-10-24
+**Branch:** `main`
+**Scope:** Fix cash-shift audit authorization (`GET /reports/cash-shifts/:id/audit`), snapshot normalization for Admin Web Reports page, Corte X/Z improvements, and production deployments.
+
+---
+
+## Cash Shift Audit Fix & Production Deployment (2026-10-24)
+- **Backend Authorization Fix**: Added `REPORT_ADMIN_ROLES` (`owner`, `inventory_admin`, `support_tech`), `BRANCH_OPERATOR_ROLE`, `ENCARGADO_ROLE`, and `RESPONSABLE_ROLE` to `@Roles(...)` on `GET /reports/cash-shifts/:id/audit`.
+- **Ownership Logic**: Updated `ReportsService.getCashShiftAudit` with hierarchical authorization: admins/owners audit all shifts in their business via `assertBusinessAccess`, branch operators audit any shift in their branch, cashiers audit their own shift. Added `leftJoin` on users to handle unassigned shifts gracefully.
+- **Snapshot Normalization**: Returned closeSnapshot now bridges both formats: provides `salesSummary`, `summary`, `transactions`, and `cashMovements` so legacy and new frontends never encounter missing properties.
+- **Admin UI Robustness**: `ReportsPage.tsx` now safely extracts audit metrics with defensive optional chaining and fallbacks (`?.` and `??`), preventing `TypeError` on historical or partially-closed shifts.
+- **Production Status**:
+  - Backend Cloud Run API: Live revision `pos-sync-api-00124-k8m` serving 100% traffic (Healthy).
+  - Admin Dashboard: Live at `https://cacharelo-central.web.app`.
+  - Flutter Web POS: Live at `https://cacharelo-pos.web.app`.
 
 ---
 
