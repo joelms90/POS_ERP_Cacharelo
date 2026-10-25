@@ -32,6 +32,12 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
   final FocusNode _barcodeSearchFocusNode = FocusNode();
   String _stockFilterQuery = '';
 
+  double _asDouble(dynamic val, [double fallback = 0.0]) {
+    if (val == null) return fallback;
+    if (val is num) return val.toDouble();
+    return double.tryParse(val.toString().trim()) ?? fallback;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -141,7 +147,9 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
               'Proveedor';
           final status = po['status']?.toString() ?? 'sent';
           final rawItems = po['items'] as List? ?? const [];
-          final itemsCount = rawItems.length;
+          final itemsCount = (po['itemCount'] as num?)?.toInt() ??
+              int.tryParse(po['itemCount']?.toString() ?? '') ??
+              rawItems.length;
           final orderDate = po['orderDate']?.toString() ?? '';
 
           return Card(
@@ -251,23 +259,48 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
     );
   }
 
-  void _openPoReceivingDialog(Map<String, dynamic> po) {
-    final rawItems = po['items'] as List? ?? const [];
+  Future<void> _openPoReceivingDialog(Map<String, dynamic> po) async {
     final poId = po['id']?.toString() ?? '';
     final poNumber = po['poNumber']?.toString() ?? 'OC';
     final provider = po['providerName']?.toString() ??
         po['provider']?['name']?.toString() ??
         'Proveedor';
 
+    List rawItems = po['items'] as List? ?? const [];
+    if (rawItems.isEmpty && poId.isNotEmpty) {
+      setState(() => _isLoading = true);
+      final fullPo = await widget.state.fetchPurchaseOrderById(poId);
+      setState(() => _isLoading = false);
+      if (fullPo != null && fullPo['items'] is List) {
+        rawItems = fullPo['items'] as List;
+      }
+    }
+
+    if (rawItems.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: EmpireColors.warningOrange,
+            content: Text('Esta orden de compra no tiene productos registrados.'),
+          ),
+        );
+      }
+      return;
+    }
+
     // Editable controllers per item
     final controllers = <Map<String, dynamic>>[];
     for (final item in rawItems) {
-      final ordered = (item['quantityOrdered'] as num?)?.toDouble() ?? 0.0;
-      final prevReceived =
-          (item['quantityReceived'] as num?)?.toDouble() ?? 0.0;
+      final ordered = _asDouble(item['quantityOrdered']);
+      final prevReceived = _asDouble(item['quantityReceived']);
       final pending = (ordered - prevReceived).clamp(0.0, double.infinity);
-      final estimatedCost =
-          (item['unitCostEstimated'] as num?)?.toDouble() ?? 0.0;
+      final estimatedCost = _asDouble(item['unitCostEstimated']);
+
+      final defaultQty = pending > 0
+          ? (pending == pending.roundToDouble()
+              ? pending.toInt().toString()
+              : pending.toString())
+          : '0';
 
       controllers.add({
         'productId': item['productId']?.toString() ?? '',
@@ -277,8 +310,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
         'unit': item['unit']?.toString() ?? 'pza',
         'ordered': ordered,
         'pending': pending,
-        'qtyController':
-            TextEditingController(text: pending.toStringAsFixed(0)),
+        'qtyController': TextEditingController(text: defaultQty),
         'costController':
             TextEditingController(text: estimatedCost.toStringAsFixed(2)),
         'notesController': TextEditingController(),
@@ -288,6 +320,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
     final invoiceController = TextEditingController();
     final generalNotesController = TextEditingController();
 
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -551,6 +584,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                       return {
                         'productId': row['productId'],
                         'quantityReceived': qty,
+                        'unitCostActual': cost,
                         'actualUnitCost': cost,
                         if (notes.isNotEmpty) 'rejectionReason': notes,
                       };

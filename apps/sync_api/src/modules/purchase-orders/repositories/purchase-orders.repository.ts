@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
-import { eq, and, isNull, count, inArray } from 'drizzle-orm';
+import { eq, and, isNull, inArray, desc } from 'drizzle-orm';
 
 @Injectable()
 export class PurchaseOrdersRepository {
@@ -13,35 +13,57 @@ export class PurchaseOrdersRepository {
 
   async findAll(businessId: string) {
     const orders = await this.db
-      .select()
+      .select({
+        purchaseOrder: schema.purchaseOrders,
+        providerName: schema.providers.name,
+        warehouseName: schema.warehouses.name,
+      })
       .from(schema.purchaseOrders)
+      .leftJoin(schema.providers, eq(schema.purchaseOrders.providerId, schema.providers.id))
+      .leftJoin(schema.warehouses, eq(schema.purchaseOrders.warehouseId, schema.warehouses.id))
       .where(
         and(
           eq(schema.purchaseOrders.businessId, businessId),
           isNull(schema.purchaseOrders.deletedAt),
         ),
       )
-      .orderBy(schema.purchaseOrders.createdAt);
+      .orderBy(desc(schema.purchaseOrders.createdAt));
 
     if (orders.length === 0) return [];
 
-    const orderIds = orders.map((o) => o.id);
+    const orderIds = orders.map((o) => o.purchaseOrder.id);
 
-    const itemCounts = await this.db
+    const items = await this.db
       .select({
-        poId: schema.purchaseOrderItems.poId,
-        itemCount: count(schema.purchaseOrderItems.id),
+        purchaseOrderItem: schema.purchaseOrderItems,
+        productName: schema.products.name,
+        unit: schema.products.uom,
       })
       .from(schema.purchaseOrderItems)
-      .where(inArray(schema.purchaseOrderItems.poId, orderIds))
-      .groupBy(schema.purchaseOrderItems.poId);
+      .leftJoin(schema.products, eq(schema.purchaseOrderItems.productId, schema.products.id))
+      .where(inArray(schema.purchaseOrderItems.poId, orderIds));
 
-    const countMap = new Map(itemCounts.map((ic) => [ic.poId, Number(ic.itemCount)]));
+    const itemsMap = new Map<string, any[]>();
+    for (const item of items) {
+      const list = itemsMap.get(item.purchaseOrderItem.poId) || [];
+      list.push({
+        ...item.purchaseOrderItem,
+        productName: item.productName || 'Insumo',
+        unit: item.unit || 'pza',
+      });
+      itemsMap.set(item.purchaseOrderItem.poId, list);
+    }
 
-    return orders.map((o) => ({
-      ...o,
-      itemCount: countMap.get(o.id) || 0,
-    }));
+    return orders.map((o) => {
+      const poItems = itemsMap.get(o.purchaseOrder.id) || [];
+      return {
+        ...o.purchaseOrder,
+        providerName: o.providerName || null,
+        warehouseName: o.warehouseName || null,
+        itemCount: poItems.length,
+        items: poItems,
+      };
+    });
   }
 
   async findById(id: string) {
@@ -58,23 +80,44 @@ export class PurchaseOrdersRepository {
   }
 
   async findByIdWithItems(id: string) {
-    const order = await this.findById(id);
-    if (!order) return null;
+    const results = await this.db
+      .select({
+        purchaseOrder: schema.purchaseOrders,
+        providerName: schema.providers.name,
+        warehouseName: schema.warehouses.name,
+      })
+      .from(schema.purchaseOrders)
+      .leftJoin(schema.providers, eq(schema.purchaseOrders.providerId, schema.providers.id))
+      .leftJoin(schema.warehouses, eq(schema.purchaseOrders.warehouseId, schema.warehouses.id))
+      .where(
+        and(
+          eq(schema.purchaseOrders.id, id),
+          isNull(schema.purchaseOrders.deletedAt),
+        ),
+      );
+
+    const orderRow = results[0];
+    if (!orderRow) return null;
 
     const items = await this.db
       .select({
         purchaseOrderItem: schema.purchaseOrderItems,
         productName: schema.products.name,
+        unit: schema.products.uom,
       })
       .from(schema.purchaseOrderItems)
       .leftJoin(schema.products, eq(schema.purchaseOrderItems.productId, schema.products.id))
       .where(eq(schema.purchaseOrderItems.poId, id));
 
     return {
-      ...order,
+      ...orderRow.purchaseOrder,
+      providerName: orderRow.providerName || null,
+      warehouseName: orderRow.warehouseName || null,
+      itemCount: items.length,
       items: items.map((i) => ({
         ...i.purchaseOrderItem,
-        productName: i.productName,
+        productName: i.productName || 'Insumo',
+        unit: i.unit || 'pza',
       })),
     };
   }

@@ -4,6 +4,27 @@
 **Branch:** `main`
 **Scope:** Fix cash-shift audit authorization (`GET /reports/cash-shifts/:id/audit`), snapshot normalization for Admin Web Reports page, Corte X/Z improvements, and production deployments.
 
+## Dedicated Warehouse & Purchasing Operator App Release (2026-10-24)
+- **Role Isolation & Segregation of Duties**:
+  - Decoupled `warehouse_purchasing_operator` from `EncargadoDashboardScreen`.
+  - Routed directly to [`WarehouseDashboardScreen`](file:///Users/joelmorales/web/POS-ERP/apps/pos_flutter/lib/ui/warehouse/warehouse_dashboard_screen.dart) from `LoginScreen`.
+  - Stripped all dining room and storefront artifacts: **NO POS sales register**, **NO dining tables/orders**, **NO cash drawer / corte X/Z**.
+  - Enforced pure executor role: warehouse operators cannot create, edit line items, or delete original purchase orders or store branch requisitions.
+- **Dedicated Tabs**:
+  - **Entradas (Proveedores)**: Receives supplier deliveries against authorized POs (`status=sent,partially_received`). Captures invoice number, actual delivered quantities, actual unit costs, and damage/rejection notes (`POST /purchase-orders/:id/receive`).
+  - **Salidas (Sucursales)**: Surtido and dispatch of branch replenishment requests. Dispatches goods to in-transit (`PATCH /requisitions/:id/status` -> `approved`) or puts requests on `standby` with mandatory justification notes.
+  - **Inventario en Bodega**: Live stock inquiry per warehouse with multi-bodega selector and barcode scanner (HID/search) integration.
+- **Verification**:
+  - `flutter analyze`: 0 errors across monorepo.
+  - Flutter widget tests: 3 passed in [`test/warehouse_flow_test.dart`](file:///Users/joelmorales/web/POS-ERP/apps/pos_flutter/test/warehouse_flow_test.dart).
+- **Production Deployments Completed**:
+  - **Web POS**: `make flutter-web-deploy` deployed to `https://cacharelo-pos.web.app` (HTTP 200).
+  - **Full Release Portal & Android APK**: `make flutter-portal-deploy` built release APK (61.2MB), updated download portal at `https://cacharelo-pos.web.app/descargas.html` (PIN: `9876`), and published to Firebase Hosting.
+  - **Backend API**: Cloud Run revision `pos-sync-api-00125-bct` (100% traffic, Healthy).
+  - **Admin Dashboard**: Live at `https://cacharelo-central.web.app`.
+
+---
+
 ## Mesas Activas Branch Filtering & Multi-Business Orders Access (2026-10-24)
 - **OrdersAccessGuard Authorization**:
   - Updated `OrdersAccessGuard` on `/orders/active/business` to use `assertBusinessAccess(actor, req.query.businessId)` instead of strict single-business matching (`req.query.businessId !== actor.businessId`).

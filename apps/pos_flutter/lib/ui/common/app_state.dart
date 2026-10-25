@@ -5242,6 +5242,27 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>?> fetchPurchaseOrderById(String poId) async {
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/purchase-orders/$poId'),
+            headers: await _operatorHeaders(),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return null;
+      final body = jsonDecode(response.body);
+      if (body is Map) {
+        return Map<String, dynamic>.from(body);
+      }
+      return null;
+    } catch (error) {
+      debugPrint('Unable to load purchase order details for $poId: $error');
+      return null;
+    }
+  }
+
   Future<bool> receivePurchaseOrder({
     required String poId,
     String? warehouseId,
@@ -5251,6 +5272,29 @@ class AppState extends ChangeNotifier {
   }) async {
     try {
       final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final combinedNotes = [
+        if (invoiceNumber != null && invoiceNumber.trim().isNotEmpty)
+          'Factura/Remisión: ${invoiceNumber.trim()}',
+        if (receivingNotes != null && receivingNotes.trim().isNotEmpty)
+          receivingNotes.trim(),
+      ].join(' · ');
+
+      final normalizedItems = items.map((it) {
+        final cost = (it['unitCostActual'] ?? it['actualUnitCost'] as num?)?.toDouble() ??
+            double.tryParse((it['unitCostActual'] ?? it['actualUnitCost'])?.toString() ?? '0') ??
+            0.0;
+        final qty = (it['quantityReceived'] as num?)?.toDouble() ??
+            double.tryParse(it['quantityReceived']?.toString() ?? '0') ??
+            0.0;
+        return {
+          'productId': it['productId']?.toString() ?? '',
+          'quantityReceived': qty,
+          'unitCostActual': cost,
+          'actualUnitCost': cost,
+          if (it['rejectionReason'] != null) 'rejectionReason': it['rejectionReason'],
+        };
+      }).toList();
+
       final response = await http
           .post(
             Uri.parse('$baseUrl/purchase-orders/$poId/receive'),
@@ -5259,9 +5303,9 @@ class AppState extends ChangeNotifier {
               if (warehouseId != null) 'warehouseId': warehouseId,
               if (invoiceNumber != null && invoiceNumber.trim().isNotEmpty)
                 'invoiceNumber': invoiceNumber.trim(),
-              'items': items,
-              if (receivingNotes != null && receivingNotes.trim().isNotEmpty)
-                'receivingNotes': receivingNotes.trim(),
+              'items': normalizedItems,
+              'notes': combinedNotes.isNotEmpty ? combinedNotes : 'Recepción de orden de compra',
+              'receivingNotes': combinedNotes.isNotEmpty ? combinedNotes : 'Recepción de orden de compra',
             }),
           )
           .timeout(const Duration(seconds: 15));
