@@ -1,7 +1,7 @@
 import { ArrayMinSize, ArrayUnique, IsArray, IsString, IsEmail, IsOptional, Length, IsUUID, IsEnum, Matches } from 'class-validator';
 import type { UserRole } from '../../auth/roles';
 
-export const USER_ROLES = ['waiter', 'cashier', 'kitchen', 'branch_operator', 'warehouse_purchasing_operator', 'encargado', 'responsable', 'owner', 'inventory_admin', 'support_tech'] as const;
+export const USER_ROLES = ['waiter', 'cashier', 'kitchen', 'branch_operator', 'warehouse_purchasing_operator', 'encargado', 'responsable', 'owner', 'inventory_admin', 'support_tech', 'web_inquiries_viewer'] as const;
 
 export class CreateUserDto {
   @IsUUID()

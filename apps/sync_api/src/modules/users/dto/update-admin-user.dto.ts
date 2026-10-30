@@ -18,8 +18,8 @@ export class UpdateAdminUserDto {
   @Length(6, 100)
   password?: string;
 
-  @IsEnum(['owner', 'inventory_admin', 'support_tech'], {
-    message: 'Role must be one of: owner, inventory_admin, support_tech',
+  @IsEnum(['owner', 'inventory_admin', 'support_tech', 'web_inquiries_viewer'], {
+    message: 'Role must be one of: owner, inventory_admin, support_tech, web_inquiries_viewer',
   })
   @IsOptional()
   role?: AdminRole;

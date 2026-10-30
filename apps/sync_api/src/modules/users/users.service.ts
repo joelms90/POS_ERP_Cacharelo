@@ -95,7 +95,7 @@ export class UsersService {
       throw new BadRequestException('businessId is required');
     }
     if (!ADMIN_ROLES.includes(createUserDto.role as any)) {
-      throw new BadRequestException('role must be owner, inventory_admin, or support_tech');
+      throw new BadRequestException('role must be one of ADMIN_ROLES');
     }
     if (!createUserDto.email || !createUserDto.password) {
       throw new BadRequestException('email and password are required for Business Control admins');
@@ -204,7 +204,7 @@ export class UsersService {
       throw new BadRequestException('User is not a Business Control admin');
     }
     if (updateUserDto.role && !ADMIN_ROLES.includes(updateUserDto.role as any)) {
-      throw new BadRequestException('role must be owner, inventory_admin, or support_tech');
+      throw new BadRequestException('role must be one of ADMIN_ROLES');
     }
     const { businessAccess, ...userUpdates } = updateUserDto;
     const updated = await this.update(id, {
@@ -302,7 +302,7 @@ export class UsersService {
     const unique = new Map<string, { businessId: string; role: string }>();
     for (const item of source) {
       if (!ADMIN_ROLES.includes(item.role as any)) {
-        throw new BadRequestException('businessAccess role must be owner, inventory_admin, or support_tech');
+        throw new BadRequestException('businessAccess role must be one of ADMIN_ROLES');
       }
       unique.set(item.businessId, {
         businessId: item.businessId,

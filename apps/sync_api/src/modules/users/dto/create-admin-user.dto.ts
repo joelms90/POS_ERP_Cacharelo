@@ -6,8 +6,8 @@ export class AdminBusinessAccessDto {
   @IsUUID()
   businessId: string;
 
-  @IsEnum(['owner', 'inventory_admin', 'support_tech'], {
-    message: 'Role must be one of: owner, inventory_admin, support_tech',
+  @IsEnum(['owner', 'inventory_admin', 'support_tech', 'web_inquiries_viewer'], {
+    message: 'Role must be one of: owner, inventory_admin, support_tech, web_inquiries_viewer',
   })
   role: AdminRole;
 }
@@ -33,8 +33,8 @@ export class CreateAdminUserDto {
   @Matches(/^\d{4}$/, { message: 'PIN must consist of exactly 4 digits' })
   pin?: string;
 
-  @IsEnum(['owner', 'inventory_admin', 'support_tech'], {
-    message: 'Role must be one of: owner, inventory_admin, support_tech',
+  @IsEnum(['owner', 'inventory_admin', 'support_tech', 'web_inquiries_viewer'], {
+    message: 'Role must be one of: owner, inventory_admin, support_tech, web_inquiries_viewer',
   })
   role: AdminRole;
 

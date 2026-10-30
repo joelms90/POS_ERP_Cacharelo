@@ -1,4 +1,4 @@
-export const ADMIN_ROLES = ['owner', 'inventory_admin', 'support_tech'] as const;
+export const ADMIN_ROLES = ['owner', 'inventory_admin', 'support_tech', 'web_inquiries_viewer'] as const;
 export const POS_ROLES = ['waiter', 'cashier', 'kitchen', 'branch_operator', 'warehouse_purchasing_operator', 'encargado', 'responsable'] as const;
 
 export type AdminRole = (typeof ADMIN_ROLES)[number];
@@ -8,6 +8,7 @@ export type UserRole = AdminRole | PosRole;
 export const OWNER_ROLE: AdminRole = 'owner';
 export const INVENTORY_ADMIN_ROLE: AdminRole = 'inventory_admin';
 export const SUPPORT_TECH_ROLE: AdminRole = 'support_tech';
+export const WEB_INQUIRIES_VIEWER_ROLE: AdminRole = 'web_inquiries_viewer';
 
 export const BRANCH_OPERATOR_ROLE: PosRole = 'branch_operator';
 export const CASHIER_ROLE: PosRole = 'cashier';

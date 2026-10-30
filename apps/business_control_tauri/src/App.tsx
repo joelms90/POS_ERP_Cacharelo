@@ -34,6 +34,7 @@ export const roleTabs: Record<string, AdminTab[]> = {
   support_tech: ['tickets', 'mesas', 'personal', 'inventory-dashboard', 'branch-catalog', 'warehouse-inventory', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'purchase-orders', 'requisitions', 'help'],
   warehouse_purchasing_operator: ['inventory-dashboard', 'warehouse-inventory', 'receipts', 'warehouses', 'providers', 'transfers', 'purchase-orders', 'requisitions', 'help'],
   branch_operator: ['requisitions', 'help'],
+  web_inquiries_viewer: ['inquiries'],
 };
 
 function App() {
@@ -49,7 +50,7 @@ function App() {
   });
   const [globalError, setGlobalError] = useState<string | null>(null);
   const allowedTabs = roleTabs[user?.role || 'owner'] || roleTabs.owner;
-  const allowedBusinessIds = user?.role === 'inventory_admin' || user?.role === 'support_tech' || user?.role === 'warehouse_purchasing_operator' || user?.role === 'branch_operator'
+  const allowedBusinessIds = user?.role === 'inventory_admin' || user?.role === 'support_tech' || user?.role === 'warehouse_purchasing_operator' || user?.role === 'branch_operator' || user?.role === 'web_inquiries_viewer'
     ? (user.businessAccess?.map((access) => access.businessId) || (user.businessId ? [user.businessId] : []))
     : undefined;
 

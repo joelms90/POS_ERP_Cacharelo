@@ -5,8 +5,8 @@ export interface Employee {
   name: string;
   email?: string;
   pin: string;
-  role: 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable' | 'owner' | 'inventory_admin' | 'support_tech';
-  roles?: Array<'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable' | 'owner' | 'inventory_admin' | 'support_tech'>;
+  role: 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable' | 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer';
+  roles?: Array<'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable' | 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer'>;
 }
 
 export interface AdminUser {
@@ -14,8 +14,8 @@ export interface AdminUser {
   businessId?: string;
   name: string;
   email: string;
-  role: 'owner' | 'inventory_admin' | 'support_tech';
-  businessAccess: Array<{ businessId: string; role: 'owner' | 'inventory_admin' | 'support_tech' }>;
+  role: 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer';
+  businessAccess: Array<{ businessId: string; role: 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer' }>;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -26,9 +26,9 @@ export interface AuthUser {
   branchId?: string;
   name: string;
   email?: string;
-  role: 'owner' | 'inventory_admin' | 'support_tech' | 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable';
-  roles?: Array<'owner' | 'inventory_admin' | 'support_tech' | 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable'>;
-  businessAccess?: Array<{ businessId: string; role: 'owner' | 'inventory_admin' | 'support_tech' }>;
+  role: 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer' | 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable';
+  roles?: Array<'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer' | 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable'>;
+  businessAccess?: Array<{ businessId: string; role: 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer' }>;
 }
 
 export interface Warehouse {
@@ -517,8 +517,8 @@ export const api = {
     name: string;
     email: string;
     password: string;
-    role: 'owner' | 'inventory_admin' | 'support_tech';
-    businessAccess?: Array<{ businessId: string; role: 'owner' | 'inventory_admin' | 'support_tech' }>;
+    role: AdminUser['role'];
+    businessAccess?: Array<{ businessId: string; role: AdminUser['role'] }>;
   }): Promise<AdminUser> {
     return apiRequest<AdminUser>('/admin-users', {
       method: 'POST',

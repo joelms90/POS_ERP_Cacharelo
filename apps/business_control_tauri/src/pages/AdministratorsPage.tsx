@@ -9,7 +9,7 @@ interface AdministratorsPageProps {
   businessId: string;
 }
 
-type AdminRole = 'owner' | 'inventory_admin' | 'support_tech';
+type AdminRole = 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer';
 
 const businessOptions = [
   { id: 'd3b07384-d113-4a0e-a555-e5b12824bf01', name: 'Cafetería' },
@@ -25,6 +25,7 @@ const businessName = (id: string) =>
 const roleLabel = (role: AdminRole) => {
   if (role === 'owner') return 'Owner';
   if (role === 'support_tech') return 'Soporte Técnico';
+  if (role === 'web_inquiries_viewer') return 'Atención de Consultas Web';
   return 'Administrador de Inventario';
 };
 
@@ -218,6 +219,7 @@ export const AdministratorsPage: React.FC<AdministratorsPageProps> = ({ business
             >
               <option value="inventory_admin">Administrador de Inventario</option>
               <option value="support_tech">Soporte Técnico</option>
+              <option value="web_inquiries_viewer">Atención de Consultas Web</option>
               <option value="owner">Owner</option>
             </select>
           </label>
