@@ -1,9 +1,9 @@
 import { IsString, IsNotEmpty, IsEnum, IsOptional } from 'class-validator';
 
 export class UpdateRequisitionStatusDto {
-  @IsEnum(['pending', 'approved', 'rejected', 'completed'])
+  @IsEnum(['pending', 'pending_approval', 'approved', 'standby', 'rejected', 'completed'])
   @IsNotEmpty()
-  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  status: 'pending' | 'pending_approval' | 'approved' | 'standby' | 'rejected' | 'completed';
 
   @IsString()
   @IsOptional()

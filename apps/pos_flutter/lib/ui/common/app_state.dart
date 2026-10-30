@@ -5339,6 +5339,25 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>?> fetchRequisitionById(String reqId) async {
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/requisitions/$reqId'),
+            headers: await _operatorHeaders(),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return null;
+      final body = jsonDecode(response.body);
+      if (body is Map) return Map<String, dynamic>.from(body);
+      return null;
+    } catch (error) {
+      debugPrint('Unable to fetch requisition $reqId: $error');
+      return null;
+    }
+  }
+
   Future<bool> updateRequisitionStatus({
     required String requisitionId,
     required String status,
@@ -5386,6 +5405,31 @@ class AppState extends ChangeNotifier {
     } catch (error) {
       debugPrint('Unable to load warehouse stock: $error');
       return const [];
+    }
+  }
+
+  Future<bool> adjustWarehouseStock({
+    required String productId,
+    required String warehouseId,
+    required double newQuantity,
+  }) async {
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/inventory/stock/adjust'),
+            headers: await _operatorHeaders(),
+            body: jsonEncode({
+              'productId': productId,
+              'warehouseId': warehouseId,
+              'quantity': newQuantity,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+      return response.statusCode >= 200 && response.statusCode < 300;
+    } catch (error) {
+      debugPrint('Unable to adjust warehouse stock: $error');
+      return false;
     }
   }
 

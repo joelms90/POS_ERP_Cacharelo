@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
-import { eq, and, inArray, count, asc } from 'drizzle-orm';
+import { eq, and, inArray, desc, asc } from 'drizzle-orm';
 
 @Injectable()
 export class RequisitionsRepository {
@@ -10,6 +10,50 @@ export class RequisitionsRepository {
     @Inject(DRIZZLE_CONNECTION)
     private readonly db: NodePgDatabase<typeof schema>,
   ) {}
+
+  private async populateRequisitions(
+    rows: Array<{
+      requisition: typeof schema.branchRequisitions.$inferSelect;
+      fromBranchName: string | null;
+      toWarehouseName: string | null;
+    }>,
+  ) {
+    if (rows.length === 0) return [];
+
+    const reqIds = rows.map((r) => r.requisition.id);
+
+    const items = await this.db
+      .select({
+        requisitionItem: schema.branchRequisitionItems,
+        productName: schema.products.name,
+        unit: schema.products.uom,
+      })
+      .from(schema.branchRequisitionItems)
+      .leftJoin(schema.products, eq(schema.branchRequisitionItems.productId, schema.products.id))
+      .where(inArray(schema.branchRequisitionItems.requisitionId, reqIds));
+
+    const itemsMap = new Map<string, any[]>();
+    for (const item of items) {
+      const list = itemsMap.get(item.requisitionItem.requisitionId) || [];
+      list.push({
+        ...item.requisitionItem,
+        productName: item.productName || 'Insumo',
+        unit: item.unit || 'pza',
+      });
+      itemsMap.set(item.requisitionItem.requisitionId, list);
+    }
+
+    return rows.map((r) => {
+      const reqItems = itemsMap.get(r.requisition.id) || [];
+      return {
+        ...r.requisition,
+        fromBranchName: r.fromBranchName || null,
+        toWarehouseName: r.toWarehouseName || null,
+        itemCount: reqItems.length,
+        items: reqItems,
+      };
+    });
+  }
 
   async findById(id: string) {
     const results = await this.db
@@ -20,25 +64,20 @@ export class RequisitionsRepository {
   }
 
   async findByIdWithItems(id: string) {
-    const requisition = await this.findById(id);
-    if (!requisition) return null;
-
-    const items = await this.db
+    const rows = await this.db
       .select({
-        requisitionItem: schema.branchRequisitionItems,
-        productName: schema.products.name,
+        requisition: schema.branchRequisitions,
+        fromBranchName: schema.branches.name,
+        toWarehouseName: schema.warehouses.name,
       })
-      .from(schema.branchRequisitionItems)
-      .leftJoin(schema.products, eq(schema.branchRequisitionItems.productId, schema.products.id))
-      .where(eq(schema.branchRequisitionItems.requisitionId, id));
+      .from(schema.branchRequisitions)
+      .leftJoin(schema.branches, eq(schema.branchRequisitions.fromBranchId, schema.branches.id))
+      .leftJoin(schema.warehouses, eq(schema.branchRequisitions.toWarehouseId, schema.warehouses.id))
+      .where(eq(schema.branchRequisitions.id, id));
 
-    return {
-      ...requisition,
-      items: items.map((i) => ({
-        ...i.requisitionItem,
-        productName: i.productName,
-      })),
-    };
+    if (rows.length === 0) return null;
+    const populated = await this.populateRequisitions(rows);
+    return populated[0] || null;
   }
 
   async findByBranch(branchId: string, businessId?: string) {
@@ -46,23 +85,35 @@ export class RequisitionsRepository {
     if (businessId) {
       conditions.push(eq(schema.branchRequisitions.businessId, businessId));
     }
-    const requisitions = await this.db
-      .select()
+    const rows = await this.db
+      .select({
+        requisition: schema.branchRequisitions,
+        fromBranchName: schema.branches.name,
+        toWarehouseName: schema.warehouses.name,
+      })
       .from(schema.branchRequisitions)
+      .leftJoin(schema.branches, eq(schema.branchRequisitions.fromBranchId, schema.branches.id))
+      .leftJoin(schema.warehouses, eq(schema.branchRequisitions.toWarehouseId, schema.warehouses.id))
       .where(and(...conditions))
-      .orderBy(schema.branchRequisitions.createdAt);
+      .orderBy(desc(schema.branchRequisitions.createdAt));
 
-    return this.attachItemCounts(requisitions);
+    return this.populateRequisitions(rows);
   }
 
   async findAll(businessId: string) {
-    const requisitions = await this.db
-      .select()
+    const rows = await this.db
+      .select({
+        requisition: schema.branchRequisitions,
+        fromBranchName: schema.branches.name,
+        toWarehouseName: schema.warehouses.name,
+      })
       .from(schema.branchRequisitions)
+      .leftJoin(schema.branches, eq(schema.branchRequisitions.fromBranchId, schema.branches.id))
+      .leftJoin(schema.warehouses, eq(schema.branchRequisitions.toWarehouseId, schema.warehouses.id))
       .where(eq(schema.branchRequisitions.businessId, businessId))
-      .orderBy(schema.branchRequisitions.createdAt);
+      .orderBy(desc(schema.branchRequisitions.createdAt));
 
-    return this.attachItemCounts(requisitions);
+    return this.populateRequisitions(rows);
   }
 
   async findByRequester(businessId: string, branchId: string, createdBy: string, status?: string) {
@@ -72,49 +123,40 @@ export class RequisitionsRepository {
       eq(schema.branchRequisitions.createdBy, createdBy),
     ];
     if (status) conditions.push(eq(schema.branchRequisitions.status, status));
-    const requisitions = await this.db
-      .select()
-      .from(schema.branchRequisitions)
-      .where(and(...conditions))
-      .orderBy(asc(schema.branchRequisitions.createdAt));
-    return this.attachItemCounts(requisitions);
-  }
-
-  private async attachItemCounts(requisitions: any[]) {
-    if (requisitions.length === 0) return [];
-
-    const reqIds = requisitions.map((r) => r.id);
-
-    const itemCounts = await this.db
+    const rows = await this.db
       .select({
-        requisitionId: schema.branchRequisitionItems.requisitionId,
-        itemCount: count(schema.branchRequisitionItems.id),
+        requisition: schema.branchRequisitions,
+        fromBranchName: schema.branches.name,
+        toWarehouseName: schema.warehouses.name,
       })
-      .from(schema.branchRequisitionItems)
-      .where(inArray(schema.branchRequisitionItems.requisitionId, reqIds))
-      .groupBy(schema.branchRequisitionItems.requisitionId);
+      .from(schema.branchRequisitions)
+      .leftJoin(schema.branches, eq(schema.branchRequisitions.fromBranchId, schema.branches.id))
+      .leftJoin(schema.warehouses, eq(schema.branchRequisitions.toWarehouseId, schema.warehouses.id))
+      .where(and(...conditions))
+      .orderBy(desc(schema.branchRequisitions.createdAt));
 
-    const countMap = new Map(itemCounts.map((ic) => [ic.requisitionId, Number(ic.itemCount)]));
-
-    return requisitions.map((r) => ({
-      ...r,
-      itemCount: countMap.get(r.id) || 0,
-    }));
+    return this.populateRequisitions(rows);
   }
 
   async findPendingForBusiness(businessId: string) {
-    const requisitions = await this.db
-      .select()
+    const rows = await this.db
+      .select({
+        requisition: schema.branchRequisitions,
+        fromBranchName: schema.branches.name,
+        toWarehouseName: schema.warehouses.name,
+      })
       .from(schema.branchRequisitions)
+      .leftJoin(schema.branches, eq(schema.branchRequisitions.fromBranchId, schema.branches.id))
+      .leftJoin(schema.warehouses, eq(schema.branchRequisitions.toWarehouseId, schema.warehouses.id))
       .where(
         and(
           eq(schema.branchRequisitions.businessId, businessId),
-          eq(schema.branchRequisitions.status, 'pending'),
+          inArray(schema.branchRequisitions.status, ['pending', 'pending_approval', 'standby']),
         ),
       )
-      .orderBy(schema.branchRequisitions.createdAt);
+      .orderBy(desc(schema.branchRequisitions.createdAt));
 
-    return this.attachItemCounts(requisitions);
+    return this.populateRequisitions(rows);
   }
 
   async create(data: {
@@ -224,7 +266,7 @@ export class RequisitionsRepository {
 
   async updateStatus(
     id: string,
-    status: 'pending' | 'approved' | 'rejected' | 'completed',
+    status: 'pending' | 'pending_approval' | 'approved' | 'rejected' | 'completed' | 'standby',
     approvalNotes?: string,
   ) {
     return await this.db.transaction(async (tx) => {
@@ -233,6 +275,7 @@ export class RequisitionsRepository {
         .update(schema.branchRequisitions)
         .set({
           status,
+          ...(approvalNotes ? { notes: approvalNotes } : {}),
           updatedAt: new Date(),
         })
         .where(eq(schema.branchRequisitions.id, id))

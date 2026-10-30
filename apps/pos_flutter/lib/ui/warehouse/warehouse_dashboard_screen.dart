@@ -691,6 +691,9 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
               'Sucursal';
           final status = req['status']?.toString() ?? 'pending';
           final rawItems = req['items'] as List? ?? const [];
+          final itemsCount = (req['itemCount'] as num?)?.toInt() ??
+              int.tryParse(req['itemCount']?.toString() ?? '') ??
+              rawItems.length;
           final notes = req['notes']?.toString();
           final createdAt = req['createdAt']?.toString() ?? '';
 
@@ -732,7 +735,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                                 ),
                               ),
                               Text(
-                                'Fecha de solicitud: ${createdAt.split('T').first}',
+                                '$itemsCount insumos solicitados • Solicitud: ${createdAt.split('T').first}',
                                 style: const TextStyle(
                                     color: EmpireColors.textSecondary,
                                     fontSize: 12),
@@ -784,7 +787,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                   const Divider(color: Colors.white10),
                   const SizedBox(height: 8),
 
-                  // Requested items preview
+                  // Requested items preview chips
                   Wrap(
                     spacing: 8,
                     runSpacing: 6,
@@ -792,10 +795,13 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                       final name = item['productName']?.toString() ??
                           item['product']?['name']?.toString() ??
                           'Insumo';
-                      final qty = item['quantityRequested']?.toString() ?? '1';
+                      final qty = _asDouble(item['quantityRequested'], 1.0);
+                      final unit = item['unit']?.toString() ?? item['uom']?.toString() ?? '';
+                      final qtyFormatted =
+                          qty % 1 == 0 ? qty.toInt().toString() : qty.toString();
                       return Chip(
                         backgroundColor: Colors.black45,
-                        label: Text('$name: $qty',
+                        label: Text('$name: $qtyFormatted $unit'.trim(),
                             style: const TextStyle(
                                 color: Colors.white70, fontSize: 12)),
                         padding: const EdgeInsets.all(4),
@@ -819,9 +825,9 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                       ),
                       const SizedBox(width: 12),
                       ElevatedButton.icon(
-                        onPressed: () => _dispatchRequisition(reqId, branch),
+                        onPressed: () => _openRequisitionDispatchDialog(req),
                         icon: const Icon(Icons.send_outlined, size: 16),
-                        label: const Text('Despachar Traspaso a Sucursal'),
+                        label: const Text('Surtir y Despachar'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: EmpireColors.successGreen,
                           foregroundColor: Colors.white,
@@ -838,55 +844,313 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
     );
   }
 
-  Future<void> _dispatchRequisition(String reqId, String branch) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: EmpireColors.charcoalSurface,
-        title: const Text('Confirmar Despacho de Traspaso',
-            style: TextStyle(color: EmpireColors.champagneGold)),
-        content: Text(
-          '¿Confirmas que los insumos fueron surtidos de la bodega y despachados hacia "$branch"?\n\nEl stock se descontará del almacén y quedará en tránsito hacia la sucursal.',
-          style: const TextStyle(color: EmpireColors.textPrimary, fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar',
-                style: TextStyle(color: EmpireColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: EmpireColors.successGreen,
-                foregroundColor: Colors.white),
-            child: const Text('Sí, Despachar'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _openRequisitionDispatchDialog(Map<String, dynamic> req) async {
+    final reqId = req['id']?.toString() ?? '';
+    final branch = req['fromBranchName']?.toString() ??
+        req['fromBranch']?['name']?.toString() ??
+        'Sucursal';
 
-    if (confirmed == true) {
+    List<dynamic> items = (req['items'] as List?) ?? [];
+    if (items.isEmpty && reqId.isNotEmpty) {
       setState(() => _isLoading = true);
-      final ok = await widget.state.updateRequisitionStatus(
-        requisitionId: reqId,
-        status: 'approved',
-      );
+      final fullReq = await widget.state.fetchRequisitionById(reqId);
       setState(() => _isLoading = false);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor:
-                ok ? EmpireColors.successGreen : EmpireColors.errorRed,
-            content: Text(ok
-                ? 'Traspaso despachado exitosamente hacia la sucursal.'
-                : 'Error al despachar el traspaso.'),
-          ),
-        );
-        if (ok) _refreshCurrentTab();
+      if (fullReq != null && fullReq['items'] is List) {
+        items = fullReq['items'] as List;
       }
     }
+
+    if (items.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: EmpireColors.warningOrange,
+            content: Text('No hay insumos detallados en esta requisición.'),
+          ),
+        );
+      }
+      return;
+    }
+
+    final List<Map<String, dynamic>> rows = [];
+    for (var item in items) {
+      final name = item['productName']?.toString() ??
+          item['product']?['name']?.toString() ??
+          'Insumo';
+      final unit = item['unit']?.toString() ?? item['uom']?.toString() ?? 'pza';
+      final qtyReq = _asDouble(item['quantityRequested'], 1.0);
+      final qtyFormatted =
+          qtyReq % 1 == 0 ? qtyReq.toInt().toString() : qtyReq.toString();
+
+      rows.add({
+        'productId': item['productId'],
+        'productName': name,
+        'unit': unit,
+        'qtyRequested': qtyReq,
+        'controller': TextEditingController(text: qtyFormatted),
+      });
+    }
+
+    final dispatchNotesController = TextEditingController();
+
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: EmpireColors.charcoalSurface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Colors.white24),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: EmpireColors.successGreen.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.outbox,
+                    color: EmpireColors.successGreen, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Surtir y Despachar a Sucursal',
+                      style: TextStyle(
+                        color: EmpireColors.champagneGold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    Text(
+                      'Destino: $branch',
+                      style: const TextStyle(
+                          color: EmpireColors.textSecondary, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 650,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline,
+                            color: EmpireColors.infoCyan, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Verifica los insumos surtidos de la bodega para su entrega a "$branch". Al confirmar, se generará la salida del inventario.',
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Insumos Solicitados:',
+                    style: TextStyle(
+                      color: EmpireColors.champagneGold,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Table(
+                    columnWidths: const {
+                      0: FlexColumnWidth(3),
+                      1: FlexColumnWidth(1.5),
+                      2: FlexColumnWidth(2),
+                    },
+                    defaultVerticalAlignment:
+                        TableCellVerticalAlignment.middle,
+                    children: [
+                      const TableRow(
+                        decoration: BoxDecoration(
+                          border:
+                              Border(bottom: BorderSide(color: Colors.white24)),
+                        ),
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Text('Insumo',
+                                style: TextStyle(
+                                    color: Colors.white60,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12)),
+                          ),
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Text('Solicitado',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    color: Colors.white60,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12)),
+                          ),
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Text('A Despachar',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    color: EmpireColors.champagneGold,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                      ...rows.map((row) {
+                        final reqDisplay = row['qtyRequested'] % 1 == 0
+                            ? row['qtyRequested'].toInt().toString()
+                            : row['qtyRequested'].toString();
+                        return TableRow(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    row['productName'],
+                                    style: const TextStyle(
+                                      color: EmpireColors.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Unidad: ${row['unit']}',
+                                    style: const TextStyle(
+                                        color: Colors.white38, fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              child: Text(
+                                '$reqDisplay ${row['unit']}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                    color: Colors.white70, fontSize: 13),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: TextField(
+                                controller: row['controller'],
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: EmpireColors.champagneGold,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                decoration: const InputDecoration(
+                                  filled: true,
+                                  fillColor: Colors.black38,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(
+                                      vertical: 8, horizontal: 8),
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: dispatchNotesController,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: const InputDecoration(
+                      labelText: 'Notas de despacho / Chofer / Folio (opcional)',
+                      labelStyle:
+                          TextStyle(color: Colors.white54, fontSize: 12),
+                      hintText: 'Ej. Entregado completo en camioneta 02',
+                      hintStyle:
+                          TextStyle(color: Colors.white30, fontSize: 12),
+                      filled: true,
+                      fillColor: Colors.black26,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Cancelar',
+                  style: TextStyle(color: EmpireColors.textSecondary)),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.of(dialogCtx).pop();
+                setState(() => _isLoading = true);
+
+                final notes = dispatchNotesController.text.trim();
+                final ok = await widget.state.updateRequisitionStatus(
+                  requisitionId: reqId,
+                  status: 'approved',
+                  notes: notes.isNotEmpty ? notes : null,
+                );
+
+                setState(() => _isLoading = false);
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: ok
+                          ? EmpireColors.successGreen
+                          : EmpireColors.errorRed,
+                      content: Text(ok
+                          ? 'Traspaso surtido y despachado exitosamente hacia "$branch".'
+                          : 'Error al despachar la requisición.'),
+                    ),
+                  );
+                  if (ok) _refreshCurrentTab();
+                }
+              },
+              icon: const Icon(Icons.send_outlined, size: 18),
+              label: const Text('Confirmar Despacho a Sucursal'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: EmpireColors.successGreen,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _standbyRequisition(String reqId) async {
@@ -961,15 +1225,206 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // TAB 3: INVENTARIO DE BODEGA & CÓDIGO DE BARRAS
+  // TAB 3: INVENTARIO DE BODEGA & CÓDIGO DE BARRAS (SIN COSTOS / EMPLEADOS OPERATIVOS)
   // ---------------------------------------------------------------------------
+  Future<void> _openStockAdjustmentDialog(Map<String, dynamic> item) async {
+    final productId =
+        item['productId']?.toString() ?? item['id']?.toString() ?? '';
+    final name = item['productName'] ?? item['name'] ?? 'Insumo';
+    final sku = item['sku'] ?? 'S/SKU';
+    final unit = item['unit'] ?? item['uom'] ?? 'pza';
+    final currentStock =
+        _asDouble(item['currentStock'] ?? item['quantity'], 0.0);
+    final currentStockFormatted = currentStock % 1 == 0
+        ? currentStock.toInt().toString()
+        : currentStock.toString();
+
+    final newQtyController =
+        TextEditingController(text: currentStockFormatted);
+    final reasonController = TextEditingController(text: 'Conteo físico');
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: EmpireColors.charcoalSurface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Colors.white24),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: EmpireColors.champagneGold.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.tune,
+                    color: EmpireColors.champagneGold, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Ajuste Físico de Existencia',
+                      style: TextStyle(
+                        color: EmpireColors.champagneGold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      '$name (SKU: $sku)',
+                      style: const TextStyle(
+                          color: EmpireColors.textSecondary, fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Stock actual en sistema:',
+                        style: TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                      Text(
+                        '$currentStockFormatted $unit',
+                        style: const TextStyle(
+                          color: EmpireColors.champagneGold,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Nueva Cantidad Física Contada:',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: newQtyController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                  decoration: InputDecoration(
+                    suffixText: unit,
+                    suffixStyle:
+                        const TextStyle(color: EmpireColors.champagneGold),
+                    filled: true,
+                    fillColor: Colors.black38,
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Motivo del Ajuste:',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: reasonController,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: const InputDecoration(
+                    hintText: 'Ej. Conteo físico, Merma por daño, etc.',
+                    hintStyle:
+                        TextStyle(color: Colors.white30, fontSize: 12),
+                    filled: true,
+                    fillColor: Colors.black38,
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(false),
+              child: const Text('Cancelar',
+                  style: TextStyle(color: EmpireColors.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: EmpireColors.champagneGold,
+                foregroundColor: EmpireColors.obsidian,
+              ),
+              child: const Text('Guardar Ajuste'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && _selectedWarehouseId != null) {
+      final newQty = double.tryParse(newQtyController.text.trim());
+      if (newQty == null || newQty < 0) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: EmpireColors.errorRed,
+              content: Text('Por favor ingresa una cantidad válida.'),
+            ),
+          );
+        }
+        return;
+      }
+
+      setState(() => _isLoading = true);
+      final ok = await widget.state.adjustWarehouseStock(
+        productId: productId,
+        warehouseId: _selectedWarehouseId!,
+        newQuantity: newQty,
+      );
+      setState(() => _isLoading = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor:
+                ok ? EmpireColors.successGreen : EmpireColors.errorRed,
+            content: Text(ok
+                ? 'Existencia de "$name" ajustada a $newQty $unit.'
+                : 'Error al ajustar la existencia.'),
+          ),
+        );
+        if (ok) _refreshCurrentTab();
+      }
+    }
+  }
+
   Widget _buildWarehouseStockTab() {
     final filtered = _warehouseStock.where((item) {
       if (_stockFilterQuery.isEmpty) return true;
       final q = _stockFilterQuery.toLowerCase();
       final name = (item['productName'] ?? item['name'] ?? '').toString().toLowerCase();
       final sku = (item['sku'] ?? '').toString().toLowerCase();
-      final barcode = (item['barcode'] ?? '').toString().toLowerCase();
+      final barcode = (item['barcode'] ?? item['internalCode'] ?? '').toString().toLowerCase();
       return name.contains(q) || sku.contains(q) || barcode.contains(q);
     }).toList();
 
@@ -1024,7 +1479,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
           ),
         ),
 
-        // Stock List
+        // Stock List (NO COSTS SHOWN)
         Expanded(
           child: filtered.isEmpty
               ? Center(
@@ -1044,10 +1499,15 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                     final item = filtered[index];
                     final name = item['productName'] ?? item['name'] ?? 'Insumo';
                     final sku = item['sku'] ?? 'S/SKU';
-                    final barcode = item['barcode'] ?? 'S/Código';
-                    final stock = (item['currentStock'] ?? item['quantity'] ?? 0);
-                    final unit = item['unit'] ?? 'pza';
-                    final cost = item['averageCost'] ?? item['cost'] ?? '0.00';
+                    final barcode = item['barcode'] ?? item['internalCode'] ?? 'S/Código';
+                    final stockNum = _asDouble(item['currentStock'] ?? item['quantity'], 0.0);
+                    final unit = item['unit'] ?? item['uom'] ?? 'pza';
+                    final stockFormatted = stockNum % 1 == 0
+                        ? stockNum.toInt().toString()
+                        : stockNum.toString();
+
+                    final isOutOfStock = stockNum <= 0;
+                    final isLowStock = stockNum > 0 && stockNum <= 5;
 
                     return Card(
                       color: EmpireColors.charcoalSurface,
@@ -1059,7 +1519,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                         leading: CircleAvatar(
                           backgroundColor:
                               EmpireColors.champagneGold.withOpacity(0.12),
-                          child: const Icon(Icons.inventory,
+                          child: const Icon(Icons.inventory_2,
                               color: EmpireColors.champagneGold, size: 20),
                         ),
                         title: Text(
@@ -1071,32 +1531,52 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                           ),
                         ),
                         subtitle: Text(
-                          'SKU: $sku • Código: $barcode • Costo prom: \$$cost',
+                          'SKU: $sku • Código: $barcode',
                           style: const TextStyle(
                               color: EmpireColors.textSecondary, fontSize: 12),
                         ),
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black38,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: stock > 0
-                                  ? EmpireColors.successGreen.withOpacity(0.4)
-                                  : EmpireColors.errorRed.withOpacity(0.4),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black38,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isOutOfStock
+                                      ? EmpireColors.errorRed.withOpacity(0.5)
+                                      : isLowStock
+                                          ? EmpireColors.warningOrange.withOpacity(0.5)
+                                          : EmpireColors.successGreen.withOpacity(0.5),
+                                ),
+                              ),
+                              child: Text(
+                                isOutOfStock
+                                    ? 'Agotado (0 $unit)'
+                                    : isLowStock
+                                        ? '$stockFormatted $unit (Bajo)'
+                                        : '$stockFormatted $unit',
+                                style: TextStyle(
+                                  color: isOutOfStock
+                                      ? EmpireColors.errorRed
+                                      : isLowStock
+                                          ? EmpireColors.warningOrange
+                                          : EmpireColors.successGreen,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            '$stock $unit',
-                            style: TextStyle(
-                              color: stock > 0
-                                  ? EmpireColors.successGreen
-                                  : EmpireColors.errorRed,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.tune,
+                                  color: EmpireColors.champagneGold, size: 20),
+                              tooltip: 'Ajustar conteo físico',
+                              onPressed: () => _openStockAdjustmentDialog(item),
                             ),
-                          ),
+                          ],
                         ),
                       ),
                     );

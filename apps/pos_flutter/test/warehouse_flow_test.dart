@@ -79,5 +79,27 @@ void main() {
 
       expect(find.text('No hay requisiciones pendientes de surtir'), findsOneWidget);
     });
+
+    testWidgets('confirms costs and monetary values are never exposed to warehouse operators',
+        (tester) async {
+      final appState = AppState();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: WarehouseDashboardScreen(state: appState),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Tap on Tab 3 (Inventario de Bodega)
+      await tester.tap(find.text('Inventario de Bodega'));
+      await tester.pumpAndSettle();
+
+      // No cost labels or cost prefixes should exist
+      expect(find.textContaining('Costo prom'), findsNothing);
+      expect(find.textContaining('Costo unitario'), findsNothing);
+      expect(find.textContaining('Valor inventario'), findsNothing);
+    });
   });
 }
