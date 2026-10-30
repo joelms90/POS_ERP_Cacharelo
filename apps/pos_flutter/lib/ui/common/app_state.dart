@@ -5362,6 +5362,7 @@ class AppState extends ChangeNotifier {
     required String requisitionId,
     required String status,
     String? notes,
+    String? warehouseId,
   }) async {
     try {
       final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
@@ -5372,6 +5373,8 @@ class AppState extends ChangeNotifier {
             body: jsonEncode({
               'status': status,
               if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+              if (warehouseId != null && warehouseId.trim().isNotEmpty)
+                'warehouseId': warehouseId.trim(),
             }),
           )
           .timeout(const Duration(seconds: 10));

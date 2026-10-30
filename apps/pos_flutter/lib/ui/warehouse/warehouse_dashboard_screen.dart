@@ -734,11 +734,39 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                                   fontSize: 16,
                                 ),
                               ),
-                              Text(
-                                '$itemsCount insumos solicitados • Solicitud: ${createdAt.split('T').first}',
-                                style: const TextStyle(
-                                    color: EmpireColors.textSecondary,
-                                    fontSize: 12),
+                              Row(
+                                children: [
+                                  Text(
+                                    '$itemsCount insumos solicitados • Solicitud: ${createdAt.split('T').first}',
+                                    style: const TextStyle(
+                                        color: EmpireColors.textSecondary,
+                                        fontSize: 12),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: req['toWarehouseName'] != null
+                                          ? EmpireColors.champagneGold
+                                              .withOpacity(0.15)
+                                          : Colors.white10,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      req['toWarehouseName'] != null
+                                          ? 'Bodega: ${req['toWarehouseName']}'
+                                          : 'Bodega: Asignar al surtir',
+                                      style: TextStyle(
+                                        color: req['toWarehouseName'] != null
+                                            ? EmpireColors.champagneGold
+                                            : Colors.white54,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -892,6 +920,9 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
     }
 
     final dispatchNotesController = TextEditingController();
+    String currentDispatchWarehouseId = req['toWarehouseId']?.toString() ??
+        _selectedWarehouseId ??
+        (_warehouses.isNotEmpty ? _warehouses.first['id']?.toString() ?? '' : '');
 
     if (!mounted) return;
 
@@ -899,7 +930,9 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
       context: context,
       barrierDismissible: false,
       builder: (dialogCtx) {
-        return AlertDialog(
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
           backgroundColor: EmpireColors.charcoalSurface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -963,6 +996,66 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                             style: const TextStyle(
                                 color: Colors.white70, fontSize: 12),
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: EmpireColors.onyxSurface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: EmpireColors.champagneGold.withOpacity(0.4)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.warehouse_outlined,
+                                color: EmpireColors.champagneGold, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Bodega de Salida (Origen del Inventario):',
+                              style: TextStyle(
+                                color: EmpireColors.champagneGold,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: currentDispatchWarehouseId.isNotEmpty
+                              ? currentDispatchWarehouseId
+                              : null,
+                          dropdownColor: EmpireColors.charcoalSurface,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 13),
+                          decoration: const InputDecoration(
+                            filled: true,
+                            fillColor: Colors.black38,
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            border: OutlineInputBorder(),
+                          ),
+                          items: _warehouses.map((w) {
+                            return DropdownMenuItem<String>(
+                              value: w['id']?.toString(),
+                              child: Text(
+                                  w['name']?.toString() ?? 'Bodega'),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setDialogState(() {
+                                currentDispatchWarehouseId = val;
+                              });
+                            }
+                          },
                         ),
                       ],
                     ),
@@ -1120,6 +1213,9 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                   requisitionId: reqId,
                   status: 'approved',
                   notes: notes.isNotEmpty ? notes : null,
+                  warehouseId: currentDispatchWarehouseId.isNotEmpty
+                      ? currentDispatchWarehouseId
+                      : null,
                 );
 
                 setState(() => _isLoading = false);
@@ -1148,6 +1244,8 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
               ),
             ),
           ],
+        );
+          },
         );
       },
     );
