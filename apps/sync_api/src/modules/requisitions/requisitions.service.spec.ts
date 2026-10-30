@@ -65,9 +65,14 @@ describe('RequisitionsService', () => {
 
       await service.createForOperator(dto, actor);
 
-      expect(repository.createForBranch).toHaveBeenCalledWith({
-        businessId: 'bus-1', fromBranchId: 'branch-1', createdBy: 'user-1',
-        notes: 'Faltan insumos', items: dto.items,
+      expect(repository.create).toHaveBeenCalledWith({
+        id: undefined,
+        businessId: 'bus-1',
+        fromBranchId: 'branch-1',
+        toWarehouseId: null,
+        createdBy: 'user-1',
+        notes: 'Faltan insumos',
+        items: dto.items,
       });
     });
 
@@ -158,7 +163,7 @@ describe('RequisitionsService', () => {
       });
 
       expect(result).toEqual(updated);
-      expect(repository.updateStatus).toHaveBeenCalledWith('req-1', 'approved', 'Approved notes');
+      expect(repository.updateStatus).toHaveBeenCalledWith('req-1', 'approved', 'Approved notes', undefined);
     });
 
     it('should throw NotFoundException if requisition not found', async () => {

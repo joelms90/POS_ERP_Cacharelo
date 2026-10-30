@@ -863,8 +863,7 @@ export const branchRequisitions = pgTable('branch_requisitions', {
     .references(() => branches.id)
     .notNull(),
   toWarehouseId: uuid('to_warehouse_id')
-    .references(() => warehouses.id)
-    .notNull(),
+    .references(() => warehouses.id),
   status: varchar('status', { length: 20 })
     .default('pending_approval')
     .notNull(), // 'pending_approval', 'approved', 'standby', 'rejected', 'completed'

@@ -25,6 +25,7 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
   const [branches, setBranches] = useState<Branch[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [stockLevels, setStockLevels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +49,7 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
   const [viewingReqItems, setViewingReqItems] = useState<BranchRequisitionItem[]>([]);
 
   const [approvingReq, setApprovingReq] = useState<BranchRequisition | null>(null);
+  const [approvalWarehouseId, setApprovalWarehouseId] = useState('');
   const [approvalNotes, setApprovalNotes] = useState('');
 
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
@@ -72,19 +74,20 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
     setLoading(true);
     setError(null);
     try {
-      const [branchesData, warehousesData, productsData, requisitionsData] = await Promise.all([
+      const [branchesData, warehousesData, productsData, requisitionsData, stockData] = await Promise.all([
         api.getBranches(businessId),
         api.getWarehouses(businessId),
         api.getProducts(businessId),
         api.getAllRequisitions(businessId),
+        api.getStockLevels(businessId).catch(() => []),
       ]);
       setBranches(branchesData);
       setWarehouses(warehousesData);
       setProducts(productsData);
       setRequisitions(requisitionsData);
+      setStockLevels(stockData || []);
 
       if (branchesData.length > 0) setFromBranchId(branchesData[0].id);
-      if (warehousesData.length > 0) setToWarehouseId(warehousesData[0].id);
     } catch (err: any) {
       setError('Error al cargar datos');
     } finally {
@@ -98,7 +101,7 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
 
   const resetForm = () => {
     setFromBranchId(branches.length > 0 ? branches[0].id : '');
-    setToWarehouseId(warehouses.length > 0 ? warehouses[0].id : '');
+    setToWarehouseId('');
     setReqNotes('');
     setItems([]);
     setSelectedProductId('');
@@ -164,10 +167,6 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
       showToast('Seleccione la sucursal que solicita.', 'warning');
       return;
     }
-    if (!toWarehouseId) {
-      showToast('Seleccione la bodega.', 'warning');
-      return;
-    }
     if (items.length === 0) {
       showToast('Agregue al menos un producto.', 'warning');
       return;
@@ -178,7 +177,7 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
       await api.createRequisition({
         businessId,
         fromBranchId,
-        toWarehouseId,
+        toWarehouseId: toWarehouseId || undefined,
         createdBy: userId,
         notes: reqNotes || undefined,
         items: items.map((it) => ({ productId: it.productId, quantityRequested: it.quantityRequested })),
@@ -210,10 +209,15 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
   const handleApprove = async () => {
     if (!approvingReq) return;
     try {
-      await api.updateRequisitionStatus(approvingReq.id, { status: 'approved', notes: approvalNotes || undefined });
+      await api.updateRequisitionStatus(approvingReq.id, {
+        status: 'approved',
+        notes: approvalNotes || undefined,
+        warehouseId: approvalWarehouseId || approvingReq.toWarehouseId || undefined,
+      });
       showToast('Requisición aprobada. Se generó el traspaso.', 'success');
       setApprovingReq(null);
       setApprovalNotes('');
+      setApprovalWarehouseId('');
       await fetchData();
     } catch (err: any) {
       showToast(err.message || 'Error al aprobar.', 'error');
@@ -362,7 +366,7 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
                       ) : (
                         filteredReqs.map((req) => {
                           const branchName = branches.find((b) => b.id === req.fromBranchId)?.name || '—';
-                          const whName = warehouses.find((w) => w.id === req.toWarehouseId)?.name || '—';
+                          const whName = warehouses.find((w) => w.id === req.toWarehouseId)?.name || 'Por asignar';
                           return (
                             <tr key={req.id} className="hover:bg-charcoal-surface/20 transition-colors">
                               <td className="px-6 py-4 font-medium text-text-primary text-xs">{branchName}</td>
@@ -441,20 +445,72 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
                 </select>
               </FormField>
 
-              <FormField label="Bodega Proveedora" required>
+              <FormField label="Bodega Proveedora (Opcional - Sugerida por Existencias)">
                 <select
                   value={toWarehouseId}
                   onChange={(e) => setToWarehouseId(e.target.value)}
                   className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-sm"
-                  required
                   data-testid="req-to-warehouse"
                 >
-                  <option value="">Seleccionar...</option>
+                  <option value="">Cualquier bodega disponible (se asigna al despachar)</option>
                   {warehouses.map((w) => (
                     <option key={w.id} value={w.id}>{w.name}</option>
                   ))}
                 </select>
               </FormField>
+
+              {/* Warehouse Stock Suggestions */}
+              {items.length > 0 && (
+                <div className="bg-charcoal/40 border border-aged-bronze/20 rounded p-3 text-xs space-y-2">
+                  <div className="flex items-center gap-1.5 text-champagne-gold font-medium">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Disponibilidad en Bodegas:</span>
+                  </div>
+                  <div className="space-y-1 text-[11px]">
+                    {warehouses.map((w) => {
+                      const warehouseStockItems = stockLevels.filter(
+                        (s) => s.warehouseId === w.id && items.some((it) => it.productId === s.productId)
+                      );
+                      const hasStockAny = warehouseStockItems.some((s) => parseFloat(s.quantity || '0') > 0);
+                      const isSelected = toWarehouseId === w.id;
+
+                      return (
+                        <div
+                          key={w.id}
+                          onClick={() => setToWarehouseId(w.id)}
+                          className={`p-2 rounded cursor-pointer transition-colors border flex flex-col gap-1 ${
+                            isSelected
+                              ? 'bg-champagne-gold/15 border-champagne-gold/60 text-champagne-gold'
+                              : 'bg-onyx-surface/60 border-aged-bronze/20 hover:border-aged-bronze/50 text-text-secondary'
+                          }`}
+                        >
+                          <div className="flex justify-between items-center font-medium">
+                            <span className={isSelected ? 'text-white' : 'text-text-primary'}>{w.name}</span>
+                            {hasStockAny ? (
+                              <span className="text-[10px] bg-success-green/20 text-success-green px-1.5 py-0.5 rounded font-mono">
+                                Con existencias
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-text-secondary/50">Sin existencias registradas</span>
+                            )}
+                          </div>
+                          {warehouseStockItems.length > 0 && (
+                            <div className="text-[10px] text-text-secondary/80 flex flex-wrap gap-x-2">
+                              {warehouseStockItems.map((st) => (
+                                <span key={st.id || st.productId}>
+                                  {st.productName}: <strong className="text-text-primary">{st.quantity} {st.uom || ''}</strong>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <FormField label="Notas">
                 <textarea
@@ -462,6 +518,7 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
                   onChange={(e) => setReqNotes(e.target.value)}
                   className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-sm"
                   rows={2}
+                  placeholder="Detalles sobre entrega o urgencia..."
                 />
               </FormField>
 
@@ -589,7 +646,7 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
               <div className="p-6 space-y-4">
                 <div className="text-xs space-y-1">
                   <p><span className="text-text-secondary">Sucursal:</span> {branches.find(b => b.id === approvingReq.fromBranchId)?.name || '—'}</p>
-                  <p><span className="text-text-secondary">Bodega:</span> {warehouses.find(w => w.id === approvingReq.toWarehouseId)?.name || '—'}</p>
+                  <p><span className="text-text-secondary">Bodega Solicitada:</span> {warehouses.find(w => w.id === approvingReq.toWarehouseId)?.name || 'Sin especificar (a asignar)'}</p>
                   <p><span className="text-text-secondary">Notas:</span> {approvingReq.notes || '—'}</p>
                   <p><span className="text-text-secondary">Items:</span> {approvingReq.itemCount || 0}</p>
                 </div>
@@ -600,13 +657,28 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
                 ) : (
                   <>
                     <div>
+                      <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                        Bodega de donde se surte (Origen del inventario)
+                      </label>
+                      <select
+                        value={approvalWarehouseId || approvingReq.toWarehouseId || (warehouses[0]?.id || '')}
+                        onChange={(e) => setApprovalWarehouseId(e.target.value)}
+                        className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-xs"
+                      >
+                        {warehouses.map((w) => (
+                          <option key={w.id} value={w.id}>{w.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
                       <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">Notas de aprobación / razón de rechazo</label>
                       <textarea
                         value={approvalNotes}
                         onChange={(e) => setApprovalNotes(e.target.value)}
                         className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-xs"
                         rows={3}
-                        placeholder="Ej. Aprobado, enviar el lunes..."
+                        placeholder="Ej. Aprobado, surtir de Bodega Central..."
                       />
                     </div>
                     <div className="flex gap-3">

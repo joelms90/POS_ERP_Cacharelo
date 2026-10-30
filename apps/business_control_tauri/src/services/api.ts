@@ -1469,7 +1469,7 @@ export const api = {
   async createRequisition(data: {
     businessId: string;
     fromBranchId: string;
-    toWarehouseId: string;
+    toWarehouseId?: string | null;
     createdBy: string;
     notes?: string;
     items: Array<{ productId: string; quantityRequested: number }>;
@@ -1488,8 +1488,9 @@ export const api = {
   },
 
   async updateRequisitionStatus(id: string, data: {
-  status: 'pending' | 'pending_approval' | 'approved' | 'rejected' | 'completed';
+    status: 'pending' | 'pending_approval' | 'approved' | 'rejected' | 'completed' | 'standby';
     notes?: string;
+    warehouseId?: string;
   }): Promise<BranchRequisition> {
     return apiRequest<BranchRequisition>(`/requisitions/${id}/status`, {
       method: 'PATCH',

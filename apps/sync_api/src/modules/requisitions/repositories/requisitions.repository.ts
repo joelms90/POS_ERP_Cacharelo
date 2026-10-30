@@ -163,7 +163,7 @@ export class RequisitionsRepository {
     id?: string;
     businessId: string;
     fromBranchId: string;
-    toWarehouseId: string;
+    toWarehouseId?: string | null;
     createdBy: string;
     notes?: string;
     items: Array<{
@@ -204,7 +204,7 @@ export class RequisitionsRepository {
           id: data.id,
           businessId: data.businessId,
           fromBranchId: data.fromBranchId,
-          toWarehouseId: data.toWarehouseId,
+          toWarehouseId: data.toWarehouseId || null,
           createdBy: data.createdBy,
           status: 'pending',
           notes: data.notes || null,
@@ -254,28 +254,23 @@ export class RequisitionsRepository {
     notes?: string;
     items: Array<{ productId: string; quantityRequested: number }>;
   }) {
-    const [warehouse] = await this.db
-      .select({ id: schema.warehouses.id })
-      .from(schema.warehouses)
-      .where(eq(schema.warehouses.businessId, data.businessId))
-      .orderBy(asc(schema.warehouses.createdAt))
-      .limit(1);
-    if (!warehouse) throw new Error('No hay una bodega configurada para este negocio.');
-    return this.create({ ...data, toWarehouseId: warehouse.id });
+    return this.create({ ...data, toWarehouseId: null });
   }
 
   async updateStatus(
     id: string,
     status: 'pending' | 'pending_approval' | 'approved' | 'rejected' | 'completed' | 'standby',
     approvalNotes?: string,
+    warehouseId?: string,
   ) {
     return await this.db.transaction(async (tx) => {
-      // 1. Update status
+      // 1. Update status and optionally assign origin warehouse
       const [requisition] = await tx
         .update(schema.branchRequisitions)
         .set({
           status,
           ...(approvalNotes ? { notes: approvalNotes } : {}),
+          ...(warehouseId ? { toWarehouseId: warehouseId } : {}),
           updatedAt: new Date(),
         })
         .where(eq(schema.branchRequisitions.id, id))
@@ -285,13 +280,30 @@ export class RequisitionsRepository {
 
       // 2. If approved, create a pending stock transfer
       if (status === 'approved') {
+        let dispatchWarehouseId = warehouseId || requisition.toWarehouseId;
+        if (!dispatchWarehouseId) {
+          const [defaultWh] = await tx
+            .select({ id: schema.warehouses.id })
+            .from(schema.warehouses)
+            .where(eq(schema.warehouses.businessId, requisition.businessId))
+            .orderBy(asc(schema.warehouses.createdAt))
+            .limit(1);
+          if (defaultWh) {
+            dispatchWarehouseId = defaultWh.id;
+            await tx
+              .update(schema.branchRequisitions)
+              .set({ toWarehouseId: dispatchWarehouseId })
+              .where(eq(schema.branchRequisitions.id, id));
+          }
+        }
+
         // Fetch requisition items
         const items = await tx
           .select()
           .from(schema.branchRequisitionItems)
           .where(eq(schema.branchRequisitionItems.requisitionId, id));
 
-        if (items.length > 0) {
+        if (items.length > 0 && dispatchWarehouseId) {
           // Fetch product costs to log unitCost/totalCost
           const productIds = items.map(item => item.productId);
           const products = await tx
@@ -306,7 +318,7 @@ export class RequisitionsRepository {
             .insert(schema.stockTransfers)
             .values({
               businessId: requisition.businessId,
-              fromWarehouseId: requisition.toWarehouseId,
+              fromWarehouseId: dispatchWarehouseId,
               toBranchId: requisition.fromBranchId,
               status: 'pending',
               notes: `Aprobación de Requisición: ${requisition.notes || ''}. Notas de aprobación: ${approvalNotes || ''}`.trim(),

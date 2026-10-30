@@ -29,22 +29,11 @@ export class RequisitionsService {
       throw new BadRequestException('Debe especificar un negocio y sucursal de origen válidos.');
     }
 
-    if (dto.toWarehouseId) {
-      return this.requisitionsRepository.create({
-        id: dto.id,
-        businessId,
-        fromBranchId: branchId,
-        toWarehouseId: dto.toWarehouseId,
-        createdBy,
-        notes: dto.notes,
-        items: dto.items,
-      });
-    }
-
-    return this.requisitionsRepository.createForBranch({
+    return this.requisitionsRepository.create({
       id: dto.id,
       businessId,
       fromBranchId: branchId,
+      toWarehouseId: dto.toWarehouseId || null,
       createdBy,
       notes: dto.notes,
       items: dto.items,
@@ -119,6 +108,7 @@ export class RequisitionsService {
       id,
       updateStatusDto.status,
       updateStatusDto.notes,
+      updateStatusDto.warehouseId,
     );
 
     return updatedRequisition;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api, BranchRequisition } from '../services/api';
+import { api, BranchRequisition, Warehouse } from '../services/api';
 import { Heading } from '../components/atoms/Heading';
 import { Button } from '../components/atoms/Button';
 
@@ -9,6 +9,8 @@ interface RequisitionsApprovalPageProps {
 
 export const RequisitionsApprovalPage: React.FC<RequisitionsApprovalPageProps> = ({ businessId }) => {
   const [requisitions, setRequisitions] = useState<BranchRequisition[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedRequisition, setSelectedRequisition] = useState<BranchRequisition | null>(null);
@@ -18,8 +20,12 @@ export const RequisitionsApprovalPage: React.FC<RequisitionsApprovalPageProps> =
     try {
       setLoading(true);
       setError(null);
-      const data = await api.getPendingRequisitions(businessId);
-      setRequisitions(data);
+      const [reqData, whData] = await Promise.all([
+        api.getPendingRequisitions(businessId),
+        api.getWarehouses(businessId).catch(() => []),
+      ]);
+      setRequisitions(reqData);
+      setWarehouses(whData);
     } catch (err: any) {
       console.error(err);
       setError('Error al cargar requisiciones');
@@ -37,10 +43,12 @@ export const RequisitionsApprovalPage: React.FC<RequisitionsApprovalPageProps> =
       await api.updateRequisitionStatus(id, {
         status: 'approved',
         notes: approvalNotes || undefined,
+        warehouseId: selectedWarehouseId || selectedRequisition?.toWarehouseId || undefined,
       });
       setRequisitions(requisitions.filter((r) => r.id !== id));
       setSelectedRequisition(null);
       setApprovalNotes('');
+      setSelectedWarehouseId('');
     } catch (err) {
       alert('Error al aprobar la requisición');
     }
@@ -175,8 +183,16 @@ export const RequisitionsApprovalPage: React.FC<RequisitionsApprovalPageProps> =
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-text-secondary block mb-1">Bodega Destino</label>
-                <p className="text-sm text-text-primary">{selectedRequisition.toWarehouseName}</p>
+                <label className="text-xs font-semibold text-text-secondary block mb-1">Bodega que Surtirá (Origen)</label>
+                <select
+                  value={selectedWarehouseId || selectedRequisition.toWarehouseId || (warehouses[0]?.id || '')}
+                  onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                  className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-xs"
+                >
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
