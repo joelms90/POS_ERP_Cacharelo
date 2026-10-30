@@ -154,6 +154,22 @@ class MenuItem {
     this.imagePath = '',
     this.modifierGroups = const [],
   });
+
+  factory MenuItem.fromJson(Map<String, dynamic> json) => MenuItem(
+        id: json['id']?.toString() ?? '',
+        name: json['name']?.toString() ?? 'Producto',
+        price: double.tryParse(json['price']?.toString() ?? '') ?? 0.0,
+        category: json['category']?.toString() ?? 'Otros',
+        imagePath: json['imagePath']?.toString() ?? '',
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'price': price,
+        'category': category,
+        'imagePath': imagePath,
+      };
 }
 
 class OrderItem {
@@ -696,6 +712,7 @@ class AppState extends ChangeNotifier {
       await _loadReadyPickupOrders();
       cachedIngredients = await _secureStorageService.getCachedIngredients();
       cachedWarehouses = await _secureStorageService.getCachedWarehouses();
+      await _loadCachedMenu();
       await _loadPendingOrderSyncJobs();
       if (isTerminalConfigured) {
         await _loadPendingSaleSyncJobs();
@@ -1088,17 +1105,6 @@ class AppState extends ChangeNotifier {
         zone: 'Salón Principal',
         x: 0.45,
         y: 0.65,
-        state: TableState.occupied,
-        guests: 2,
-        items: [
-          OrderItem(
-            item: menu[0],
-            quantity: 2,
-            modifiers: ['Queso Extra'],
-            isSent: true,
-          ),
-          OrderItem(item: menu[4], quantity: 2, isSent: true),
-        ],
       ),
       TableModel(
         id: 6,
@@ -1107,18 +1113,6 @@ class AppState extends ChangeNotifier {
         zone: 'Salón Principal',
         x: 0.75,
         y: 0.65,
-        state: TableState.billing,
-        guests: 4,
-        items: [
-          OrderItem(item: menu[1], quantity: 2, isSent: true),
-          OrderItem(
-            item: menu[2],
-            quantity: 2,
-            modifiers: ['Bien Cocido'],
-            isSent: true,
-          ),
-          OrderItem(item: menu[5], quantity: 4, isSent: true),
-        ],
       ),
 
       // Terraza
@@ -1218,35 +1212,9 @@ class AppState extends ChangeNotifier {
             ),
           );
         } else {
-          TableState state = TableState.free;
-          int guests = 0;
-          List<OrderItem> items = [];
-          if (id == 5) {
-            state = TableState.occupied;
-            guests = 2;
-            items = [
-              OrderItem(
-                item: menu[0],
-                quantity: 2,
-                modifiers: ['Queso Extra'],
-                isSent: true,
-              ),
-              OrderItem(item: menu[4], quantity: 2, isSent: true),
-            ];
-          } else if (id == 6) {
-            state = TableState.billing;
-            guests = 4;
-            items = [
-              OrderItem(item: menu[1], quantity: 2, isSent: true),
-              OrderItem(
-                item: menu[2],
-                quantity: 2,
-                modifiers: ['Bien Cocido'],
-                isSent: true,
-              ),
-              OrderItem(item: menu[5], quantity: 4, isSent: true),
-            ];
-          }
+          const TableState state = TableState.free;
+          const int guests = 0;
+          final List<OrderItem> items = [];
           loadedTables.add(
             TableModel(
               id: id,
@@ -1470,6 +1438,15 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<void> _loadCachedMenu() async {
+    final cached = await _secureStorageService.getCachedMenu();
+    if (cached.isEmpty) return;
+    menu
+      ..clear()
+      ..addAll(cached.map(MenuItem.fromJson));
+    notifyListeners();
+  }
+
   Future<void> fetchMenuDynamic() async {
     if (!isTerminalConfigured) return;
     try {
@@ -1545,12 +1522,16 @@ class AppState extends ChangeNotifier {
         cachedIngredients = ingredients;
         await _secureStorageService.saveCachedIngredients(ingredients);
 
-        if (loadedMenu.isNotEmpty) {
-          menu.clear();
-          menu.addAll(loadedMenu);
-          isOnline = true;
-          notifyListeners();
-        }
+        menu
+          ..clear()
+          ..addAll(loadedMenu);
+        await _secureStorageService
+            .saveCachedMenu(loadedMenu.map((m) => m.toJson()).toList());
+        isOnline = true;
+        notifyListeners();
+      } else {
+        debugPrint(
+            'fetchMenuDynamic failed: categories ${catResponse.statusCode}, products ${prodResponse.statusCode}');
       }
     } catch (e) {
       debugPrint('Error fetching menu dynamically: $e');
@@ -2014,57 +1995,8 @@ class AppState extends ChangeNotifier {
     );
   }
 
-  // Predefined Menu Items
-  static const List<MenuItem> menu = [
-    MenuItem(
-      id: '1',
-      name: 'Lasagna Bolognesa',
-      price: 18.50,
-      category: 'Pastas',
-    ),
-    MenuItem(
-      id: '2',
-      name: 'Fettuccine Alfredo',
-      price: 16.00,
-      category: 'Pastas',
-    ),
-    MenuItem(
-      id: '3',
-      name: 'Hamburguesa Empire',
-      price: 14.50,
-      category: 'Hamburguesas',
-    ),
-    MenuItem(
-      id: '4',
-      name: 'Hamburguesa de Pollo',
-      price: 13.00,
-      category: 'Hamburguesas',
-    ),
-    MenuItem(
-      id: '5',
-      name: 'Tiramisú de la Casa',
-      price: 7.50,
-      category: 'Postres',
-    ),
-    MenuItem(
-      id: '6',
-      name: 'Volcán de Chocolate',
-      price: 8.50,
-      category: 'Postres',
-    ),
-    MenuItem(
-      id: '7',
-      name: 'Vino Tinto Copa',
-      price: 9.00,
-      category: 'Bebidas',
-    ),
-    MenuItem(
-      id: '8',
-      name: 'Limonada de Coco',
-      price: 5.50,
-      category: 'Bebidas',
-    ),
-  ];
+  // Menu loaded from the backend (cached locally for offline use).
+  static final List<MenuItem> menu = [];
 
   // Auth Operations (Query backend, fallback to offline local cache)
   Future<bool> login(String pin) async {

@@ -23,6 +23,7 @@ class SecureStorageService {
   static const String _pendingRequisitionsKey = 'pending_requisitions_list';
   static const String _cachedIngredientsKey = 'cached_ingredients_list';
   static const String _cachedWarehousesKey = 'cached_warehouses_list';
+  static const String _cachedMenuKey = 'cached_menu_list';
   static const String _localStationIdKey = 'local_station_id';
   static const String _lastPrintStationIdKey = 'last_print_station_id';
   static const String _receiveRemotePrintJobsKey = 'receive_remote_print_jobs';
@@ -531,6 +532,7 @@ class SecureStorageService {
     await _delete(_pendingRequisitionsKey);
     await _delete(_cachedIngredientsKey);
     await _delete(_cachedWarehousesKey);
+    await _delete(_cachedMenuKey);
     await _delete(_localStationIdKey);
     await _delete(_lastPrintStationIdKey);
     await _delete(_receiveRemotePrintJobsKey);
@@ -610,6 +612,22 @@ class SecureStorageService {
 
   Future<void> saveCachedIngredients(List<Map<String, dynamic>> list) async {
     await _write(_cachedIngredientsKey, jsonEncode(list));
+  }
+
+  Future<List<Map<String, dynamic>>> getCachedMenu() async {
+    final raw = await _read(_cachedMenuKey);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final List<dynamic> decoded = jsonDecode(raw);
+      return decoded.map((item) => Map<String, dynamic>.from(item)).toList();
+    } catch (e) {
+      debugPrint('Error reading cached menu: $e');
+      return [];
+    }
+  }
+
+  Future<void> saveCachedMenu(List<Map<String, dynamic>> list) async {
+    await _write(_cachedMenuKey, jsonEncode(list));
   }
 
   Future<List<Map<String, dynamic>>> getCachedWarehouses() async {
