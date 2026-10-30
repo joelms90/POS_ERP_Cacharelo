@@ -18,13 +18,34 @@ export class RequisitionsService {
   async createForOperator(dto: CreateRequisitionDto, actor: any) {
     if (!dto.items?.length) throw new BadRequestException('Agrega al menos un producto a la requisición.');
     const operator = this.getOperator(actor);
-    if (!operator.businessId || !operator.branchId) {
-      throw new ForbiddenException('El operador debe estar asignado a un negocio y sucursal.');
+    const roles = (Array.isArray(actor.roles) ? actor.roles : [actor.role || '']).map(normalizeOperationalRole);
+    const isOwnerOrAdmin = roles.includes('owner') || roles.includes('inventory_admin') || roles.includes('support_tech');
+
+    const businessId = (isOwnerOrAdmin && dto.businessId) ? dto.businessId : (operator.businessId || dto.businessId);
+    const branchId = operator.branchId || dto.fromBranchId;
+    const createdBy = operator.id || dto.createdBy;
+
+    if (!businessId || !branchId) {
+      throw new BadRequestException('Debe especificar un negocio y sucursal de origen válidos.');
     }
+
+    if (dto.toWarehouseId) {
+      return this.requisitionsRepository.create({
+        id: dto.id,
+        businessId,
+        fromBranchId: branchId,
+        toWarehouseId: dto.toWarehouseId,
+        createdBy,
+        notes: dto.notes,
+        items: dto.items,
+      });
+    }
+
     return this.requisitionsRepository.createForBranch({
-      businessId: operator.businessId,
-      fromBranchId: operator.branchId,
-      createdBy: operator.id,
+      id: dto.id,
+      businessId,
+      fromBranchId: branchId,
+      createdBy,
       notes: dto.notes,
       items: dto.items,
     });

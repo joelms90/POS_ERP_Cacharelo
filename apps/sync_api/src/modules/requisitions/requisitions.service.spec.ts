@@ -77,6 +77,30 @@ describe('RequisitionsService', () => {
       await expect(service.findMine(actor, 'pending')).resolves.toEqual([{ id: 'req-1', createdBy: 'user-1' }]);
       expect(repository.findByRequester).toHaveBeenCalledWith('bus-1', 'branch-1', 'user-1', 'pending');
     });
+
+    it('allows owner or admin to create requisition with explicit fromBranchId and toWarehouseId', async () => {
+      const ownerActor = { sub: 'owner-1', roles: ['owner'], businessId: 'bus-1', branchId: null };
+      const dto = {
+        businessId: 'bus-1',
+        fromBranchId: 'branch-99',
+        toWarehouseId: 'wh-88',
+        createdBy: 'owner-1',
+        items: [{ productId: 'prod-1', quantityRequested: 5 }],
+      };
+      mockRequisitionsRepository.create.mockResolvedValue({ id: 'req-99', ...dto });
+
+      const res = await service.createForOperator(dto, ownerActor);
+      expect(res).toEqual({ id: 'req-99', ...dto });
+      expect(repository.create).toHaveBeenCalledWith({
+        id: undefined,
+        businessId: 'bus-1',
+        fromBranchId: 'branch-99',
+        toWarehouseId: 'wh-88',
+        createdBy: 'owner-1',
+        notes: undefined,
+        items: dto.items,
+      });
+    });
   });
 
   describe('findByBranch', () => {

@@ -26,6 +26,14 @@ export class CreateRequisitionDto {
   @IsOptional()
   fromBranchId?: string;
 
+  @IsUUID()
+  @IsOptional()
+  toWarehouseId?: string;
+
+  @IsUUID()
+  @IsOptional()
+  createdBy?: string;
+
   @IsString()
   @IsOptional()
   notes?: string;

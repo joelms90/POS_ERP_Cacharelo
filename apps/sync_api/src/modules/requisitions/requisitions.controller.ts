@@ -13,7 +13,7 @@ export class RequisitionsController {
   constructor(private readonly requisitionsService: RequisitionsService) {}
 
   @Post()
-  @Roles(BRANCH_OPERATOR_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE)
+  @Roles(BRANCH_OPERATOR_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE, OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE)
   async create(@Body() createRequisitionDto: CreateRequisitionDto, @Req() req: any) {
     return this.requisitionsService.createForOperator(createRequisitionDto, req.user);
   }
