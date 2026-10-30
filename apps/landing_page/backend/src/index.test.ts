@@ -128,7 +128,7 @@ describe('submitInquiry Google Cloud Function', () => {
       body: {
         name: 'Michael Corleone',
         email: 'michael@corleone.com',
-        phone: '+525592449939',
+        phone: '+525574219566',
         subject: 'Business Inquiry',
         message: 'Let us make a deal.',
       },
@@ -145,7 +145,7 @@ describe('submitInquiry Google Cloud Function', () => {
       expect.objectContaining({
         name: 'Michael Corleone',
         email: 'michael@corleone.com',
-        phone: '+525592449939',
+        phone: '+525574219566',
         subject: 'Business Inquiry',
         message: 'Let us make a deal.',
         inquiryType: 'general',

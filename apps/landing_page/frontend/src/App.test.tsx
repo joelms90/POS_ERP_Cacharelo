@@ -15,12 +15,11 @@ describe('Grupo Cacharelo Landing Page Rendering', () => {
     expect(heroTagline).toBeInTheDocument();
   });
 
-  it('renders the four brands cards', () => {
+  it('renders the three brands cards', () => {
     render(<App />);
     expect(screen.getByText('Pastes y Empanadas')).toBeInTheDocument();
-    expect(screen.getByText('Las Hamburguesas')).toBeInTheDocument();
-    expect(screen.getAllByText('El Sabor de Antaño')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('La Excelencia')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Tortas Cacharelo')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Cafeterías')[0]).toBeInTheDocument();
   });
 
   it('expands and collapses a brand card on click', () => {
@@ -43,9 +42,8 @@ describe('Grupo Cacharelo Landing Page Rendering', () => {
     render(<App />);
     expect(screen.getByRole('button', { name: /todos/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /pastes/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /hamburguesas/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /el sabor de antaño/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /la excelencia/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /tortas cacharelo/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /cafeterías/i })).toBeInTheDocument();
   });
 
   it('renders the contact form and contact options', () => {

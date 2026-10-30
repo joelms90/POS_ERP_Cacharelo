@@ -6,7 +6,7 @@ import { locationsData } from '../../data/locations';
 import type { Location } from '../../data/locations';
 
 export const MapTabber: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'all' | 'pastes' | 'hamburguesas' | 'antano' | 'excelencia'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'pastes' | 'antano' | 'excelencia'>('all');
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
 
   const filteredLocations = useMemo(() => {
@@ -16,7 +16,7 @@ export const MapTabber: React.FC = () => {
     return locationsData.filter((loc) => loc.brands.includes(activeTab));
   }, [activeTab]);
 
-  const handleTabChange = (tab: 'all' | 'pastes' | 'hamburguesas' | 'antano' | 'excelencia') => {
+  const handleTabChange = (tab: 'all' | 'pastes' | 'antano' | 'excelencia') => {
     setActiveTab(tab);
     setSelectedLocation(null);
   };
@@ -61,22 +61,16 @@ export const MapTabber: React.FC = () => {
             label="Pastes"
           />
           <TabItem
-            active={activeTab === 'hamburguesas'}
-            onClick={() => handleTabChange('hamburguesas')}
-            icon="lunch_dining"
-            label="Hamburguesas"
-          />
-          <TabItem
             active={activeTab === 'antano'}
             onClick={() => handleTabChange('antano')}
             icon="restaurant"
-            label="El Sabor de Antaño"
+            label="Tortas Cacharelo"
           />
           <TabItem
             active={activeTab === 'excelencia'}
             onClick={() => handleTabChange('excelencia')}
             icon="local_cafe"
-            label="La Excelencia"
+            label="Cafeterías"
           />
         </div>
 
@@ -88,6 +82,8 @@ export const MapTabber: React.FC = () => {
               locations={filteredLocations}
               selectedLocation={selectedLocation}
               onSelectLocation={handleSelectLocation}
+              isShowingAll={activeTab === 'all'}
+              activeFilter={activeTab}
             />
           </div>
 

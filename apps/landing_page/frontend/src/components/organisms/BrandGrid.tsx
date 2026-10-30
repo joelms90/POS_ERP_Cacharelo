@@ -3,12 +3,10 @@ import { Typography } from '../atoms/Typography';
 import { BrandCard } from '../molecules/BrandCard';
 
 import pastesLogo from '../../assets/logos/pastes-logo.png';
-import hamburguesasLogo from '../../assets/logos/hamburguesas-logo.png';
 import grupoCachareloLogo from '../../assets/logos/grupo-cacharelo-logo.png';
 import coffeeLogo from '../../assets/logos/cacharelo-cofee-gold-logo.png';
 
 import pastesExpanded from '../../assets/pastes_expanded.png';
-import burgerExpanded from '../../assets/burger_expanded.png';
 import antojitosExpanded from '../../assets/antojitos_expanded.png';
 import cafeteriaExpanded from '../../assets/cafeteria_expanded.png';
 
@@ -26,18 +24,9 @@ export const BrandGrid: React.FC = () => {
       pdfMenuUrl: '/menus/menu-pastes.pdf',
     },
     {
-      id: 'hamburguesas',
-      name: 'Las Hamburguesas',
-      description: 'Del Imperio',
-      logoUrl: hamburguesasLogo,
-      expandedImage: burgerExpanded,
-      specialties: ['Doble Bacon Burger', 'Cacharelo Imperial', 'Papas con Queso', 'Aros de Cebolla'],
-      pdfMenuUrl: '/menus/menu-hamburguesas.pdf',
-    },
-    {
       id: 'antano',
-      name: 'El Sabor de Antaño',
-      description: 'Xastipam',
+      name: 'Tortas Cacharelo',
+      description: 'De antojo',
       logoUrl: grupoCachareloLogo,
       expandedImage: antojitosExpanded,
       specialties: ['Tacos de Cochinita', 'Sopes Tradicionales', 'Flautas de Pollo', 'Pozole Rojo'],
@@ -45,8 +34,8 @@ export const BrandGrid: React.FC = () => {
     },
     {
       id: 'excelencia',
-      name: 'La Excelencia',
-      description: 'Multimarca',
+      name: 'Cafeterías',
+      description: 'La Excelencia',
       logoUrl: coffeeLogo,
       expandedImage: cafeteriaExpanded,
       specialties: ['Café Latte Art', 'Pastel de Chocolate Belga', 'Croissants Rellenos', 'Espresso Macchiato'],
@@ -76,11 +65,11 @@ export const BrandGrid: React.FC = () => {
     <section className="w-full py-24 px-margin-mobile md:px-margin-desktop bg-[#0B0B0C]" id="marcas">
       <div className="max-w-container-max mx-auto flex flex-col items-center">
         <Typography variant="h2" className="text-[#d4b038]  mb-16 text-center font-spec-hero">
-          NUESTRAS CUATRO MARCAS
+          NUESTRAS TRES MARCAS
         </Typography>
-        
-        {/* Brand Grid: stays stable at 4 columns on desktop, 2 on tablet */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter w-full">
+
+        {/* Brand Grid: stays stable at 3 columns on desktop, 2 on tablet */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-gutter w-full">
           {brands.map((brand) => (
             <BrandCard
               key={brand.id}

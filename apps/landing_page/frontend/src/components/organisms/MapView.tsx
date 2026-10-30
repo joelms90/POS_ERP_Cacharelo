@@ -19,6 +19,8 @@ interface MapViewProps {
   locations: Location[];
   selectedLocation: Location | null;
   onSelectLocation: (location: Location) => void;
+  isShowingAll?: boolean;
+  activeFilter?: string;
 }
 
 // Controller component to dynamically change map view center and zoom
@@ -34,28 +36,72 @@ export const MapView: React.FC<MapViewProps> = ({
   locations,
   selectedLocation,
   onSelectLocation,
+  isShowingAll = false,
+  activeFilter = 'all',
 }) => {
-  // Default map center (CDMX coordinates)
-  const defaultCenter: [number, number] = [19.4326, -99.1620];
-  const mapCenter: [number, number] = selectedLocation
-    ? [selectedLocation.latitude, selectedLocation.longitude]
-    : defaultCenter;
-  
-  const mapZoom = selectedLocation ? 16 : 10;
+  // Calculate center based on filtered locations
+  const calculateCenter = (): [number, number] => {
+    if (selectedLocation) {
+      return [selectedLocation.latitude, selectedLocation.longitude];
+    }
+
+    if (locations.length === 0) {
+      return [18.7, -97.0]; // Default center between CDMX and Veracruz
+    }
+
+    // Calculate average position of all filtered locations
+    const avgLat = locations.reduce((sum, loc) => sum + loc.latitude, 0) / locations.length;
+    const avgLng = locations.reduce((sum, loc) => sum + loc.longitude, 0) / locations.length;
+
+    return [avgLat, avgLng];
+  };
+
+  const mapCenter = calculateCenter();
+
+  // Determine zoom level:
+  // - Single selected location: zoom 16 (detailed view)
+  // - All locations (TODOS): zoom 6 (wide view to see CDMX and Veracruz)
+  // - Cafeterías (excelencia): zoom 6 (locations spread from CDMX to Veracruz)
+  // - Other filtered brands (Pastes, Tortas): zoom 10 (4 levels in from default 6)
+  const mapZoom = selectedLocation ? 16 : (isShowingAll || activeFilter === 'excelencia') ? 6 : 10;
+
+  // Get CARTO API key from environment variable
+  const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY || '';
+
+  // Use Dark Matter theme without labels, then add labels separately for better control
+  const baseMapUrl = cartoApiKey
+    ? `https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key=${cartoApiKey}`
+    : "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png";
+
+  const labelsUrl = cartoApiKey
+    ? `https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png?key=${cartoApiKey}`
+    : "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png";
 
   return (
     <div className="w-full h-full min-h-[300px] md:min-h-[450px] relative z-10">
+      <style>{`
+        .map-labels-white {
+          filter: brightness(2.5) contrast(1.3);
+          mix-blend-mode: normal;
+        }
+      `}</style>
       <MapContainer
-        center={defaultCenter}
-        zoom={12}
+        center={[18.7, -97.0]}
+        zoom={6}
         className="w-full h-full border border-mafia-bronze rounded-lg overflow-hidden"
         style={{ height: '100%', width: '100%', minHeight: '350px' }}
         scrollWheelZoom={false}
       >
-        {/* Dark-themed tile layer CartoDB Dark Matter */}
+        {/* CARTO base map (dark theme without labels) */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url={baseMapUrl}
+        />
+
+        {/* Labels overlay with white text for better readability */}
+        <TileLayer
+          url={labelsUrl}
+          className="map-labels-white"
         />
 
         <MapController center={mapCenter} zoom={mapZoom} />

@@ -120,7 +120,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, type }) =
                   2. PROPIEDAD INTELECTUAL
                 </Typography>
                 <Typography variant="body-md" className="text-sm">
-                  Todos los contenidos de este sitio, incluyendo de forma enunciativa pero no limitativa los textos, marcas comerciales (Pastes y Empanadas, Las Hamburguesas, El Sabor de Antaño - Xastipam, La Excelencia), logotipos, gráficos, interfaces y código de programación son propiedad exclusiva de Grupo Cacharelo y están protegidos por las leyes internacionales de propiedad intelectual. Queda estrictamente prohibida su copia, distribución o reproducción sin autorización escrita.
+                  Todos los contenidos de este sitio, incluyendo de forma enunciativa pero no limitativa los textos, marcas comerciales (Pastes y Empanadas, Tortas Cacharelo, Cafeterías La Excelencia), logotipos, gráficos, interfaces y código de programación son propiedad exclusiva de Grupo Cacharelo y están protegidos por las leyes internacionales de propiedad intelectual. Queda estrictamente prohibida su copia, distribución o reproducción sin autorización escrita.
                 </Typography>
               </div>
 

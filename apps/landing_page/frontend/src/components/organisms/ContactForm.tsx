@@ -135,7 +135,7 @@ export const ContactForm: React.FC = () => {
           </div>
           <div className="flex flex-col sm:flex-row gap-6 mt-2 w-full justify-center">
             <a
-              href="https://wa.me/525592449939"
+              href="https://wa.me/525574219566"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/30 px-8 py-3 rounded-[4px] font-sans font-semibold text-sm hover:bg-[#25D366]/20 transition-all duration-300 w-full sm:w-auto"
@@ -330,7 +330,7 @@ export const ContactForm: React.FC = () => {
 
       {/* Floating WhatsApp Button */}
       <a
-        href="https://wa.me/525592449939"
+        href="https://wa.me/525574219566"
         target="_blank"
         rel="noopener noreferrer"
         className="fixed bottom-6 right-6 w-16 h-16 rounded-full border border-primary-container bg-[#121214] flex items-center justify-center text-primary-container hover:bg-primary-container hover:text-on-primary-container transition-all duration-300 shadow-glow-gold z-40 active:scale-95"

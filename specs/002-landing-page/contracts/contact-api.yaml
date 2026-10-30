@@ -67,7 +67,7 @@ components:
         phone:
           type: string
           maxLength: 20
-          example: "+525592449939"
+          example: "+525574219566"
         subject:
           type: string
           maxLength: 150

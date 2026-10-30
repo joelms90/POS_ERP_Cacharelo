@@ -204,9 +204,23 @@
     "longitude": -99.1414925,
     "category": "transit",
     "is24Hours": false,
-    "brands": ["pastes", "hamburguesas", "antano", "excelencia"],
-    "workingHours": "CAFETERIA CACHARELO Sala 2 - 24 HORAS; PASTES CACHARELO Sala 1 y 2 - 24 HORAS; ISLA PASTES CACHARELO Sala 3 - 24 HORAS; HAMBURGUESAS MR CACHARELO Sala 2 - 6 AM a 10 PM; Q TORTAS CACHARELO Sala 2 Puerta Principal - 6 AM a 10 PM",
+    "brands": ["pastes", "antano", "excelencia"],
+    "workingHours": "CAFETERIA CACHARELO Sala 2 - 24 HORAS; PASTES CACHARELO Sala 1 y 2 - 24 HORAS; ISLA PASTES CACHARELO Sala 3 - 24 HORAS; Q TORTAS CACHARELO Sala 2 Puerta Principal - 6 AM a 10 PM",
     "workingDays": "Lunes a Domingo",
     "mapsUrl": "https://www.google.com/maps/place/Central+de+Autobuses+del+Sur+Terminal+Taxque%C3%B1a/@19.3424137,-99.1414925,17z/data=!4m6!3m5!1s0x85d1ff52b6d36f5f:0xfd9d7d1de2a2d94b!8m2!3d19.3425214!4d-99.1389545!16s%2Fg%2F11g2260ks9?entry=ttu&g_ep=EgoyMDI2MDYyMi4wIKXMDSoASAFQAw%3D%3D"
+  },
+  {
+    "id": "jaltipan",
+    "name": "Cafetería Cacharelo Jaltipan",
+    "address": "Av. Morelos # 312, Col. Centro, Jaltipan de Morelos, Veracruz, C.P. 96200. Entre Leandro Valle y 16 de Septiembre, Al lado de Zapatería 3 Hermanos",
+    "phone": "55 7421 9566",
+    "latitude": 17.9635,
+    "longitude": -94.7389,
+    "category": "city",
+    "is24Hours": false,
+    "brands": ["excelencia"],
+    "workingHours": "Lunes a Domingo",
+    "workingDays": "Lunes a Domingo",
+    "mapsUrl": "NONE"
   }
 ]
