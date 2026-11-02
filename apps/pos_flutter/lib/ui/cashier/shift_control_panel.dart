@@ -1010,19 +1010,41 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
                                 ),
                               ),
                               Text(
-                                '${difference >= 0 ? '+' : ''}\$${difference.toStringAsFixed(2)} ${difference.abs() < 0.01 ? '(Cuadrado)' : difference > 0 ? '(Sobrante)' : '(Faltante)'}',
+                                () {
+                                  final isNegativeExpected = expectedCash < -0.01;
+                                  final diffStr = '${difference >= 0 ? '+' : ''}\$${difference.toStringAsFixed(2)}';
+                                  if (isNegativeExpected) {
+                                    return '$diffStr (Requiere Conciliación)';
+                                  }
+                                  if (difference.abs() < 0.01) {
+                                    return '\$0.00 (Cuadrado)';
+                                  }
+                                  return '$diffStr ${difference > 0 ? '(Sobrante)' : '(Faltante)'}';
+                                }(),
                                 style: TextStyle(
-                                  color: difference.abs() < 0.01
-                                      ? EmpireColors.successGreen
-                                      : difference > 0
-                                          ? Colors.blueAccent
-                                          : EmpireColors.errorRed,
+                                  color: expectedCash < -0.01
+                                      ? Colors.amber
+                                      : difference.abs() < 0.01
+                                          ? EmpireColors.successGreen
+                                          : difference > 0
+                                              ? Colors.blueAccent
+                                              : EmpireColors.errorRed,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                 ),
                               ),
                             ],
                           ),
+                          if (expectedCash < -0.01) ...[
+                            const SizedBox(height: 6),
+                            const Text(
+                              '⚠️ Saldo teórico negativo. Los retiros registrados superan los fondos disponibles.',
+                              style: TextStyle(
+                                color: Colors.amber,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

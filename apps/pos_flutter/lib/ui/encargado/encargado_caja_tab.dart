@@ -241,12 +241,15 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
       buffer.writeln(widget.state.formatRow('Efectivo contado:',
           '\$${_money(summary['actualCash']).toStringAsFixed(2)}'));
       buffer.writeln(divider);
+      final expected = _money(summary['expectedCash']);
       final diff = _money(summary['cashDifference']);
-      final diffLabel = diff.abs() < 0.01
-          ? '(\$0.00 Cuadrado)'
-          : diff > 0
-              ? '(+\$${diff.toStringAsFixed(2)} Sobrante)'
-              : '(-\$${diff.abs().toStringAsFixed(2)} Faltante)';
+      final diffLabel = expected < -0.01
+          ? '(+\$${diff.toStringAsFixed(2)} Requiere Conciliación)'
+          : diff.abs() < 0.01
+              ? '(\$0.00 Cuadrado)'
+              : diff > 0
+                  ? '(+\$${diff.toStringAsFixed(2)} Sobrante)'
+                  : '(-\$${diff.abs().toStringAsFixed(2)} Faltante)';
       buffer.writeln(widget.state.formatRow('DIFERENCIA:', diffLabel));
       buffer.writeln(divider);
     }
@@ -730,19 +733,41 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
                                       color: EmpireColors.textPrimary,
                                       fontWeight: FontWeight.bold)),
                               Text(
-                                '${difference >= 0 ? '+' : ''}\$${difference.toStringAsFixed(2)} ${difference.abs() < 0.01 ? '(Cuadrado)' : difference > 0 ? '(Sobrante)' : '(Faltante)'}',
+                                () {
+                                  final isNegativeExpected = expectedCash < -0.01;
+                                  final diffStr = '${difference >= 0 ? '+' : ''}\$${difference.toStringAsFixed(2)}';
+                                  if (isNegativeExpected) {
+                                    return '$diffStr (Requiere Conciliación)';
+                                  }
+                                  if (difference.abs() < 0.01) {
+                                    return '\$0.00 (Cuadrado)';
+                                  }
+                                  return '$diffStr ${difference > 0 ? '(Sobrante)' : '(Faltante)'}';
+                                }(),
                                 style: TextStyle(
-                                  color: difference.abs() < 0.01
-                                      ? EmpireColors.successGreen
-                                      : difference > 0
-                                          ? Colors.blueAccent
-                                          : EmpireColors.errorRed,
+                                  color: expectedCash < -0.01
+                                      ? Colors.amber
+                                      : difference.abs() < 0.01
+                                          ? EmpireColors.successGreen
+                                          : difference > 0
+                                              ? Colors.blueAccent
+                                              : EmpireColors.errorRed,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                 ),
                               ),
                             ],
                           ),
+                          if (expectedCash < -0.01) ...[
+                            const SizedBox(height: 6),
+                            const Text(
+                              '⚠️ Saldo teórico negativo. Los retiros registrados superan los fondos disponibles.',
+                              style: TextStyle(
+                                color: Colors.amber,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1042,19 +1067,41 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
                                       color: EmpireColors.textPrimary,
                                       fontWeight: FontWeight.bold)),
                               Text(
-                                '${difference >= 0 ? '+' : ''}\$${difference.toStringAsFixed(2)} ${difference.abs() < 0.01 ? '(Cuadrado)' : difference > 0 ? '(Sobrante)' : '(Faltante)'}',
+                                () {
+                                  final isNegativeExpected = expectedCash < -0.01;
+                                  final diffStr = '${difference >= 0 ? '+' : ''}\$${difference.toStringAsFixed(2)}';
+                                  if (isNegativeExpected) {
+                                    return '$diffStr (Requiere Conciliación)';
+                                  }
+                                  if (difference.abs() < 0.01) {
+                                    return '\$0.00 (Cuadrado)';
+                                  }
+                                  return '$diffStr ${difference > 0 ? '(Sobrante)' : '(Faltante)'}';
+                                }(),
                                 style: TextStyle(
-                                  color: difference.abs() < 0.01
-                                      ? EmpireColors.successGreen
-                                      : difference > 0
-                                          ? Colors.blueAccent
-                                          : EmpireColors.errorRed,
+                                  color: expectedCash < -0.01
+                                      ? Colors.amber
+                                      : difference.abs() < 0.01
+                                          ? EmpireColors.successGreen
+                                          : difference > 0
+                                              ? Colors.blueAccent
+                                              : EmpireColors.errorRed,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                 ),
                               ),
                             ],
                           ),
+                          if (expectedCash < -0.01) ...[
+                            const SizedBox(height: 6),
+                            const Text(
+                              '⚠️ Saldo teórico negativo. Los retiros registrados superan los fondos disponibles.',
+                              style: TextStyle(
+                                color: Colors.amber,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

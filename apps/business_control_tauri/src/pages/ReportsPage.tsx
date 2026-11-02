@@ -282,6 +282,59 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
   };
 
+  const reconcileCash = (expected: number, counted: number) => {
+    // Usar centavos enteros para evitar errores de precisión de punto flotante
+    const diffCents = Math.round((counted - expected) * 100);
+    const difference = diffCents / 100;
+    const isExpectedNegative = Math.round(expected * 100) < 0;
+
+    if (isExpectedNegative) {
+      return {
+        status: 'REQUIRES_RECONCILIATION' as const,
+        difference,
+        expected,
+        counted,
+        title: 'Requiere Conciliación',
+        badgeText: `DIFERENCIA POR CONCILIAR: ${difference >= 0 ? '+' : ''}${formatCurrency(difference)}`,
+        message: 'Los retiros registrados superan los fondos disponibles. La diferencia no se clasifica como sobrante hasta conciliar los movimientos.',
+      };
+    }
+
+    if (diffCents === 0) {
+      return {
+        status: 'BALANCED' as const,
+        difference: 0,
+        expected,
+        counted,
+        title: 'Cuadrado',
+        badgeText: 'DIFERENCIA: $0.00 (Cuadrado)',
+        message: 'El arqueo físico coincide exactamente con el sistema.',
+      };
+    }
+
+    if (diffCents > 0) {
+      return {
+        status: 'SURPLUS' as const,
+        difference,
+        expected,
+        counted,
+        title: 'Sobrante',
+        badgeText: `SOBRANTE: +${formatCurrency(difference)}`,
+        message: `Hay un sobrante físico de ${formatCurrency(difference)} frente a las ventas esperadas.`,
+      };
+    }
+
+    return {
+      status: 'SHORTAGE' as const,
+      difference,
+      expected,
+      counted,
+      title: 'Faltante',
+      badgeText: `FALTANTE: -${formatCurrency(Math.abs(difference))}`,
+      message: `Hay una discrepancia de ${formatCurrency(Math.abs(difference))} frente a las ventas esperadas.`,
+    };
+  };
+
   if (
     (activeReportTab === 'sales' && isLoading && !reportData) || 
     (activeReportTab === 'salesByProduct' && isProductSalesLoading && productSales.length === 0) ||
@@ -694,16 +747,28 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
 
   const renderCashShiftsTab = () => {
     const exportShiftsToCSV = () => {
-      const headers = ['Operador', 'Sucursal', 'Fondo Inicial', 'Fondo Final Entregado', 'Estado', 'Fecha Apertura', 'Fecha Cierre'];
-      const rows = cashShifts.map(item => [
-        item.cashierName,
-        item.branchName,
-        Number(item.initialFloat).toFixed(2),
-        item.closedAt ? Number(item.cashDrawerAmount).toFixed(2) : 'Activo (Sin Cierre)',
-        item.status === 'open' ? 'Abierto' : 'Cerrado',
-        new Date(item.openedAt).toLocaleString('es-MX'),
-        item.closedAt ? new Date(item.closedAt).toLocaleString('es-MX') : '-'
-      ]);
+      const headers = ['Operador', 'Sucursal', 'Fondo Inicial', 'Fondo Final Entregado', 'Estado', 'Resultado Arqueo', 'Fecha Apertura', 'Fecha Cierre'];
+      const rows = cashShifts.map(item => {
+        const snap = item.closeSnapshot;
+        const exp = snap?.summary?.expectedCash ?? snap?.expectedCash;
+        const actual = item.closedAt ? Number(item.cashDrawerAmount) : null;
+        let arqueoStatus = '-';
+        if (actual !== null && exp !== undefined && exp !== null) {
+          const rec = reconcileCash(Number(exp), actual);
+          arqueoStatus = rec.title;
+        }
+
+        return [
+          item.cashierName,
+          item.branchName,
+          Number(item.initialFloat).toFixed(2),
+          item.closedAt ? Number(item.cashDrawerAmount).toFixed(2) : 'Activo (Sin Cierre)',
+          item.status === 'open' ? 'Abierto' : 'Cerrado',
+          arqueoStatus,
+          new Date(item.openedAt).toLocaleString('es-MX'),
+          item.closedAt ? new Date(item.closedAt).toLocaleString('es-MX') : '-'
+        ];
+      });
       
       const csvContent = [
         headers.join(','),
@@ -745,6 +810,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                 cashShifts.map((shift) => {
                   const isSelected = selectedShiftId === shift.id;
                   const isOpen = shift.status === 'open';
+                  const isRequiresRecon = !isOpen && ((shift.closeSnapshot?.summary?.expectedCash ?? shift.closeSnapshot?.expectedCash ?? 0) < 0);
                   const dateStr = new Date(shift.openedAt).toLocaleDateString('es-MX', {
                     day: '2-digit',
                     month: 'short',
@@ -764,13 +830,20 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                     >
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-bold text-text-primary">{shift.cashierName}</span>
-                        <span className={`px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider ${
-                          isOpen
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25'
-                            : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/25'
-                        }`}>
-                          {isOpen ? 'Caja Activa (X)' : 'Cerrado (Z)'}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {isRequiresRecon && (
+                            <span className="px-1.5 py-0.5 text-[8.5px] font-bold rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
+                              Por Conciliar
+                            </span>
+                          )}
+                          <span className={`px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider ${
+                            isOpen
+                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25'
+                              : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/25'
+                          }`}>
+                            {isOpen ? 'Caja Activa (X)' : 'Cerrado (Z)'}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="flex justify-between text-xs text-text-secondary">
@@ -813,7 +886,6 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
             const cardSales = selectedShiftAudit.salesSummary?.cardSales ?? selectedShiftAudit.summary?.cardSales ?? 0;
             const totalSales = selectedShiftAudit.salesSummary?.totalSales ?? selectedShiftAudit.summary?.totalSales ?? (cashSales + cardSales);
             const expectedCash = selectedShiftAudit.expectedCash ?? selectedShiftAudit.summary?.expectedCash ?? 0;
-            const discrepancy = selectedShiftAudit.discrepancy ?? selectedShiftAudit.summary?.cashDifference ?? 0;
             const txs = selectedShiftAudit.transactions || selectedShiftAudit.cashMovements || [];
 
             return (
@@ -861,8 +933,17 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                   )}
 
                   <div className="flex justify-between font-bold text-text-primary border-t border-aged-bronze/15 pt-2 mt-1">
-                    <span>(=) Efectivo Esperado en Caja:</span>
-                    <span className="font-mono">{formatCurrency(expectedCash)}</span>
+                    <span className="flex items-center gap-1.5">
+                      (=) Efectivo Esperado en Caja:
+                      {expectedCash < 0 && (
+                        <span className="text-[9.5px] font-normal px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          Saldo negativo
+                        </span>
+                      )}
+                    </span>
+                    <span className={`font-mono ${expectedCash < 0 ? 'text-amber-400 font-extrabold' : ''}`}>
+                      {formatCurrency(expectedCash)}
+                    </span>
                   </div>
                   <div className="flex justify-between font-bold text-text-primary">
                     <span>(=) Efectivo Físico Entregado:</span>
@@ -872,29 +953,80 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                   </div>
                 </div>
 
-                {shiftInfo.status === 'closed' ? (
-                  <div className={`p-4 rounded-lg border text-center flex flex-col gap-1 ${
-                    discrepancy === 0
-                      ? 'bg-successGreen/5 border-successGreen/30 text-successGreen'
-                      : discrepancy > 0
-                      ? 'bg-successGreen/5 border-successGreen/30 text-successGreen'
-                      : 'bg-red-500/5 border-red-500/30 text-red-400'
-                  }`}>
-                    <span className="text-[10px] uppercase font-bold tracking-wider opacity-75">Resultado del Arqueo</span>
-                    <span className="text-xl font-extrabold font-mono">
-                      {discrepancy === 0 
-                        ? 'DIFERENCIA: $0.00 (Cuadrado)' 
-                        : `${discrepancy > 0 ? 'SOBRANTE' : 'FALTANTE'}: ${formatCurrency(Math.abs(discrepancy))}`}
-                    </span>
-                    <span className="text-[10px] opacity-75">
-                      {discrepancy === 0 
-                        ? 'El arqueo físico coincide exactamente con el sistema.' 
-                        : `Hay una discrepancia de ${formatCurrency(Math.abs(discrepancy))} frente a las ventas esperadas.`}
-                    </span>
-                  </div>
-                ) : (
+                {shiftInfo.status === 'closed' ? (() => {
+                  const rec = reconcileCash(expectedCash, cashDrawerAmount);
+
+                  if (rec.status === 'REQUIRES_RECONCILIATION') {
+                    return (
+                      <div className="p-4 rounded-lg border border-amber-500/40 bg-amber-500/10 text-center flex flex-col gap-2 shadow-md">
+                        <div className="flex items-center justify-center gap-1.5 text-amber-400">
+                          <span className="text-sm">⚠️</span>
+                          <span className="text-[10.5px] uppercase font-bold tracking-wider">
+                            Resultado del Arqueo: Requiere Conciliación
+                          </span>
+                        </div>
+                        <div className="bg-charcoal/50 p-2.5 rounded border border-amber-500/20 flex flex-col gap-1 text-left text-[11px]">
+                          <div className="flex justify-between text-text-secondary">
+                            <span>Efectivo esperado:</span>
+                            <span className="font-mono text-amber-400 font-bold">{formatCurrency(expectedCash)}</span>
+                          </div>
+                          <div className="flex justify-between text-text-secondary">
+                            <span>Efectivo contado:</span>
+                            <span className="font-mono text-champagne-gold font-bold">{formatCurrency(cashDrawerAmount)}</span>
+                          </div>
+                          <div className="flex justify-between font-bold border-t border-amber-500/20 pt-1 mt-0.5 text-amber-300">
+                            <span>Diferencia por conciliar:</span>
+                            <span className="font-mono font-extrabold text-sm">
+                              {rec.difference >= 0 ? '+' : ''}{formatCurrency(rec.difference)}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-[10.5px] text-amber-200/90 leading-tight text-center">
+                          {rec.message}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  if (rec.status === 'BALANCED') {
+                    return (
+                      <div className="p-4 rounded-lg border border-successGreen/30 bg-successGreen/5 text-successGreen text-center flex flex-col gap-1 shadow-md">
+                        <span className="text-[10px] uppercase font-bold tracking-wider opacity-75">Resultado del Arqueo</span>
+                        <span className="text-xl font-extrabold font-mono">{rec.badgeText}</span>
+                        <span className="text-[10px] opacity-75">{rec.message}</span>
+                      </div>
+                    );
+                  }
+
+                  if (rec.status === 'SURPLUS') {
+                    return (
+                      <div className="p-4 rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-400 text-center flex flex-col gap-1 shadow-md">
+                        <span className="text-[10px] uppercase font-bold tracking-wider opacity-75">Resultado del Arqueo</span>
+                        <span className="text-xl font-extrabold font-mono text-blue-300">
+                          {rec.badgeText}
+                        </span>
+                        <span className="text-[10px] text-blue-200/80">{rec.message}</span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="p-4 rounded-lg border border-red-500/30 bg-red-500/10 text-red-400 text-center flex flex-col gap-1 shadow-md">
+                      <span className="text-[10px] uppercase font-bold tracking-wider opacity-75">Resultado del Arqueo</span>
+                      <span className="text-xl font-extrabold font-mono text-red-300">
+                        {rec.badgeText}
+                      </span>
+                      <span className="text-[10px] text-red-200/80">{rec.message}</span>
+                    </div>
+                  );
+                })() : (
                   <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 text-amber-400 text-center text-[11px] leading-relaxed">
                     ⚠️ <strong>Caja en operación</strong>. Se está auditando el corte parcial (Corte X). El resultado del arqueo final y discrepancias se mostrará cuando el cajero realice el Corte Z en su terminal.
+                    {expectedCash < 0 && (
+                      <div className="mt-2 pt-2 border-t border-amber-500/20 text-[10.5px] text-amber-300 font-medium">
+                        Aviso: Los retiros registrados superan el saldo disponible en caja (saldo teórico: {formatCurrency(expectedCash)}).
+                      </div>
+                    )}
                   </div>
                 )}
 

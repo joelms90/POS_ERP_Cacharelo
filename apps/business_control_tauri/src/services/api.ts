@@ -1758,6 +1758,7 @@ export interface CashShiftHeader {
   status: 'open' | 'closed';
   openedAt: string;
   closedAt: string | null;
+  closeSnapshot?: any;
 }
 
 export interface CashShiftAuditReport {
