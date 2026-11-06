@@ -47,7 +47,7 @@ export const HorizontalDenseLayout: React.FC<HorizontalDenseLayoutProps> = ({ se
                 return (
                   <div
                     key={dish.id}
-                    className="flex-1 min-h-[110px] flex items-center gap-3.5 p-3 rounded-xl bg-white/60 border border-[#C8A265]/30 hover:border-[#C8A265]/60 transition-all shadow-xs group"
+                    className="flex-1 min-h-[110px] flex items-center gap-3.5 pl-3 pr-4 py-3 rounded-xl bg-white/60 border border-[#C8A265]/30 hover:border-[#C8A265]/60 transition-all shadow-xs group"
                   >
                     {/* Generous Dish Thumbnail (80-96px) */}
                     {dishHasImg ? (
@@ -61,21 +61,27 @@ export const HorizontalDenseLayout: React.FC<HorizontalDenseLayoutProps> = ({ se
                     )}
 
                     {/* Dish Typography & Pricing Block */}
-                    <div className="flex-1 min-w-0 flex flex-col justify-center">
-                      <div className="flex items-baseline justify-between gap-1.5 w-full">
+                    <div className="flex-1 min-w-0 flex flex-col justify-center pr-2">
+                      <div className="flex items-start justify-between gap-3 w-full mb-1">
                         <h4
-                          className="text-sm sm:text-base font-bold font-cormorant tracking-[0.05em] uppercase leading-tight truncate"
-                          style={{ color: CHARCOAL }}
-                          title={dish.name}
+                          className="text-[15px] font-bold font-cormorant tracking-[0.05em] uppercase leading-[1.2] flex-1 min-w-0"
+                          style={{
+                            color: CHARCOAL,
+                            wordBreak: 'break-word',
+                            hyphens: 'auto',
+                            maxWidth: '65%'
+                          }}
                         >
                           {dish.name}
                         </h4>
 
-                        <div className="flex-1 border-b border-dotted border-[#C8A265]/40 mx-1.5 mb-1 min-w-[8px]" />
-
                         {formatPrice(dish.price) && (
                           <span
-                            className="text-sm sm:text-base font-bold font-cormorant tracking-wide shrink-0 text-[#C8A265]"
+                            className="text-[15px] font-bold font-cormorant tracking-wide shrink-0 whitespace-nowrap pt-0.5 pr-2"
+                            style={{
+                              color: '#C8A265',
+                              fontVariantNumeric: 'lining-nums'
+                            }}
                           >
                             {formatPrice(dish.price)}
                           </span>
@@ -84,7 +90,7 @@ export const HorizontalDenseLayout: React.FC<HorizontalDenseLayoutProps> = ({ se
 
                       {dish.description && (
                         <p
-                          className="text-[10.5px] sm:text-[11px] font-montserrat leading-relaxed opacity-85 mt-1 line-clamp-3"
+                          className="text-[11px] font-montserrat leading-relaxed opacity-85 mt-1 line-clamp-3"
                           style={{ color: CHARCOAL }}
                         >
                           {dish.description}
@@ -142,18 +148,23 @@ export const HorizontalDenseLayout: React.FC<HorizontalDenseLayoutProps> = ({ se
         {columns.map((colDishes, colIdx) => (
           <div key={colIdx} className="h-full flex flex-col justify-between py-1">
             {colDishes.map((dish) => (
-              <div key={dish.id} className="group flex flex-col py-0.5">
-                <div className="flex items-baseline justify-between gap-1">
+              <div key={dish.id} className="group flex flex-col py-0.5 pr-2">
+                <div className="flex items-baseline justify-between gap-2">
                   <h4
-                    className="text-xs sm:text-sm font-bold font-cormorant tracking-[0.05em] uppercase leading-tight"
-                    style={{ color: CHARCOAL }}
+                    className="text-[13px] font-bold font-cormorant tracking-[0.05em] uppercase leading-tight flex-shrink"
+                    style={{
+                      color: CHARCOAL,
+                      wordBreak: 'break-word',
+                      hyphens: 'auto',
+                      maxWidth: '65%'
+                    }}
                   >
                     {dish.name}
                   </h4>
                   <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[6px]" />
                   {formatPrice(dish.price) && (
                     <span
-                      className="text-xs font-bold font-cormorant tracking-wide shrink-0 text-[#C8A265]"
+                      className="text-[13px] font-bold font-cormorant tracking-wide shrink-0 text-[#C8A265] pr-1"
                     >
                       {formatPrice(dish.price)}
                     </span>

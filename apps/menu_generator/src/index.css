@@ -11,11 +11,26 @@
 }
 
 /* Custom font utilities */
-.font-cormorant { font-family: 'Cormorant Garamond', Georgia, serif; }
-.font-playfair { font-family: 'Playfair Display', Georgia, serif; }
-.font-cinzel { font-family: 'Cinzel', Georgia, serif; }
-.font-baskerville { font-family: 'Libre Baskerville', Georgia, serif; }
-.font-montserrat { font-family: 'Montserrat', sans-serif; }
+.font-cormorant {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.font-playfair {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.font-cinzel {
+  font-family: 'Cinzel', Georgia, serif;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.font-baskerville {
+  font-family: 'Libre Baskerville', Georgia, serif;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.font-montserrat {
+  font-family: 'Montserrat', sans-serif;
+  font-variant-numeric: lining-nums tabular-nums;
+}
 .font-script { font-family: 'Great Vibes', 'Pinyon Script', 'Alex Brush', cursive; }
 .font-pinyon { font-family: 'Pinyon Script', cursive; }
 .font-brush { font-family: 'Alex Brush', cursive; }
@@ -39,6 +54,13 @@
 /* Print Rules for Edge-to-Edge Digital & Physical PDF Output */
 @page {
   size: 8.5in 11in; /* Carta: 215.9 x 279.4 mm */
+  margin: 0 !important;
+}
+
+/* Override page size for horizontal 16:9 layout */
+body[data-orientation="horizontal"] @page,
+.horizontal-layout @page {
+  size: 297mm 167mm landscape; /* 16:9 widescreen landscape */
   margin: 0 !important;
 }
 
@@ -130,6 +152,42 @@
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     overflow: hidden !important;
+  }
+
+  /* Horizontal 16:9 Layout Print Dimensions */
+  body[data-orientation="horizontal"] .menu-page-container,
+  .horizontal-layout .menu-page-container {
+    width: 297mm !important;
+    height: 167mm !important;
+    min-width: 297mm !important;
+    min-height: 167mm !important;
+    max-width: 297mm !important;
+    max-height: 167mm !important;
+  }
+
+  body[data-orientation="horizontal"] .menu-page,
+  .horizontal-layout .menu-page {
+    width: 297mm !important;
+    height: 167mm !important;
+    min-width: 297mm !important;
+    min-height: 167mm !important;
+    max-width: 297mm !important;
+    max-height: 167mm !important;
+  }
+
+  /* Fix text overflow issues in horizontal print mode */
+  body[data-orientation="horizontal"] h2,
+  body[data-orientation="horizontal"] h3,
+  body[data-orientation="horizontal"] h4 {
+    word-break: break-word !important;
+    hyphens: auto !important;
+    overflow-wrap: break-word !important;
+  }
+
+  /* Ensure cards don't overflow and maintain proper box model */
+  body[data-orientation="horizontal"] .menu-page > div,
+  body[data-orientation="horizontal"] .menu-page > main > div {
+    box-sizing: border-box !important;
   }
 
   /* Dynamic A4 format override when container has data-page-size="a4" */

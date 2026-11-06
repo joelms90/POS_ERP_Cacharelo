@@ -89,7 +89,7 @@ export const HorizontalMenuPageRenderer: React.FC<HorizontalMenuPageRendererProp
         <div className="flex items-center gap-3">
           {restaurant.logo ? (
             <img
-              src={restaurant.logo}
+              src={restaurant.logo.normalize('NFC').split('/').map(p => p ? encodeURIComponent(p) : p).join('/')}
               alt={restaurant.name}
               className="h-9 w-auto object-contain"
             />
@@ -110,10 +110,14 @@ export const HorizontalMenuPageRenderer: React.FC<HorizontalMenuPageRendererProp
         </div>
 
         {/* Center: Category Title & Subtitle */}
-        <div className="flex flex-col items-center text-center">
+        <div className="flex flex-col items-center text-center max-w-[50%]">
           <h2
-            className="text-2xl sm:text-3xl font-bold font-cormorant tracking-[0.14em] uppercase leading-none"
-            style={{ color: CHARCOAL }}
+            className="text-[26px] font-bold font-cormorant tracking-[0.14em] uppercase leading-none"
+            style={{
+              color: CHARCOAL,
+              wordBreak: 'break-word',
+              hyphens: 'auto'
+            }}
           >
             {section.name}
           </h2>

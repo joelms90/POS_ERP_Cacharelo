@@ -160,6 +160,17 @@ export function App() {
     }
   }, [catalog]);
 
+  // Set data-orientation attribute on body for print CSS detection
+  useEffect(() => {
+    try {
+      if (typeof document !== 'undefined') {
+        document.body.setAttribute('data-orientation', orientation);
+      }
+    } catch (e) {
+      console.warn('Could not set data-orientation attribute', e);
+    }
+  }, [orientation]);
+
   // Hot-reload when defaultMenu.ts is modified in code during development
   useEffect(() => {
     try {
