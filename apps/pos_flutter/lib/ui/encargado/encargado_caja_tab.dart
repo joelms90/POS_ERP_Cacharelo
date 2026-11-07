@@ -1633,95 +1633,108 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
   }
 
   Widget _buildTopBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: const BoxDecoration(
-        color: EmpireColors.onyxSurface,
-        border: Border(
-          bottom: BorderSide(color: EmpireColors.agedBronzeDark, width: 1),
-        ),
-      ),
-      child: Row(
-        children: [
-          // Sub-navigation selector
-          Container(
-            decoration: BoxDecoration(
-              color: EmpireColors.charcoalSurface,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: EmpireColors.agedBronzeDark),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildSegmentButton(
-                  index: 0,
-                  icon: Icons.savings_outlined,
-                  label: 'Control de Caja & Cortes',
-                ),
-                _buildSegmentButton(
-                  index: 1,
-                  icon: Icons.receipt_long,
-                  label: 'Órdenes Cobradas (${_tickets.length})',
-                ),
-              ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 850;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: const BoxDecoration(
+            color: EmpireColors.onyxSurface,
+            border: Border(
+              bottom: BorderSide(color: EmpireColors.agedBronzeDark, width: 1),
             ),
           ),
-          const Spacer(),
-          // Shift status indicator
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: widget.state.isShiftOpen
-                  ? EmpireColors.successGreen.withValues(alpha: 0.15)
-                  : EmpireColors.errorRed.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: widget.state.isShiftOpen
-                    ? EmpireColors.successGreen
-                    : EmpireColors.errorRed,
-                width: 1,
+          child: Row(
+            children: [
+              // Sub-navigation selector
+              Container(
+                decoration: BoxDecoration(
+                  color: EmpireColors.charcoalSurface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: EmpireColors.agedBronzeDark),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildSegmentButton(
+                      index: 0,
+                      icon: Icons.savings_outlined,
+                      label: isCompact
+                          ? 'Caja & Cortes'
+                          : 'Control de Caja & Cortes',
+                    ),
+                    _buildSegmentButton(
+                      index: 1,
+                      icon: Icons.receipt_long,
+                      label: isCompact
+                          ? 'Cobradas (${_tickets.length})'
+                          : 'Órdenes Cobradas (${_tickets.length})',
+                    ),
+                  ],
+                ),
               ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
+              const Spacer(),
+              // Shift status indicator
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: widget.state.isShiftOpen
+                      ? EmpireColors.successGreen.withValues(alpha: 0.15)
+                      : EmpireColors.errorRed.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
                     color: widget.state.isShiftOpen
                         ? EmpireColors.successGreen
                         : EmpireColors.errorRed,
-                    shape: BoxShape.circle,
+                    width: 1,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  widget.state.isShiftOpen
-                      ? 'Turno Activo (Caja Abierta)'
-                      : 'Caja Cerrada',
-                  style: TextStyle(
-                    color: widget.state.isShiftOpen
-                        ? EmpireColors.successGreen
-                        : EmpireColors.errorRed,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: widget.state.isShiftOpen
+                            ? EmpireColors.successGreen
+                            : EmpireColors.errorRed,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      widget.state.isShiftOpen
+                          ? (isCompact
+                              ? 'Abierta'
+                              : 'Turno Activo (Caja Abierta)')
+                          : 'Caja Cerrada',
+                      style: TextStyle(
+                        color: widget.state.isShiftOpen
+                            ? EmpireColors.successGreen
+                            : EmpireColors.errorRed,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 12),
+              IconButton(
+                tooltip: 'Actualizar',
+                icon:
+                    const Icon(Icons.refresh, color: EmpireColors.champagneGold),
+                onPressed: () {
+                  widget.state.checkActiveShift();
+                  _loadTickets();
+                },
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          IconButton(
-            tooltip: 'Actualizar',
-            icon: const Icon(Icons.refresh, color: EmpireColors.champagneGold),
-            onPressed: () {
-              widget.state.checkActiveShift();
-              _loadTickets();
-            },
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

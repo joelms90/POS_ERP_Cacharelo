@@ -27,6 +27,7 @@ class SecureStorageService {
   static const String _localStationIdKey = 'local_station_id';
   static const String _lastPrintStationIdKey = 'last_print_station_id';
   static const String _receiveRemotePrintJobsKey = 'receive_remote_print_jobs';
+  static const String _activeShiftKey = 'cached_active_shift';
 
   SecureStorageService({FlutterSecureStorage? secureStorage})
       : _secureStorage = secureStorage ?? const FlutterSecureStorage() {
@@ -596,6 +597,44 @@ class SecureStorageService {
 
   Future<void> clearJwtToken() async {
     await _delete('jwt_access_token');
+  }
+
+  // Active shift caching for persistence across session logout / offline
+  Future<void> saveActiveShift({
+    required String shiftId,
+    required String branchId,
+    required String cashierId,
+    required double initialFloat,
+    required double cashDrawerAmount,
+  }) async {
+    final data = {
+      'shiftId': shiftId,
+      'branchId': branchId,
+      'cashierId': cashierId,
+      'initialFloat': initialFloat,
+      'cashDrawerAmount': cashDrawerAmount,
+      'isOpen': true,
+      'savedAt': DateTime.now().toIso8601String(),
+    };
+    await _write(_activeShiftKey, jsonEncode(data));
+  }
+
+  Future<Map<String, dynamic>?> getActiveShift() async {
+    final raw = await _read(_activeShiftKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+    } catch (e) {
+      debugPrint('Error reading cached active shift: $e');
+    }
+    return null;
+  }
+
+  Future<void> clearActiveShift() async {
+    await _delete(_activeShiftKey);
   }
 
   Future<List<Map<String, dynamic>>> getCachedIngredients() async {

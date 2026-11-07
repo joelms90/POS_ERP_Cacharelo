@@ -433,6 +433,10 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!widget.state.completeLoginWithRole(selectedRole)) {
           return;
         }
+        if (selectedRole == UserRole.branchOperator ||
+            selectedRole == UserRole.cashier) {
+          await widget.state.checkActiveShift();
+        }
       }
 
       _navigateForCurrentRole();

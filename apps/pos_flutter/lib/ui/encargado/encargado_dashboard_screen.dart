@@ -27,7 +27,8 @@ class EncargadoDashboardScreen extends StatefulWidget {
 }
 
 class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
+  late bool _lastShiftOpen;
   int _activeOrdersCount = 0;
   int _summaryRefreshToken = 0;
   int _lastSalesSummaryRevision = 0;
@@ -36,6 +37,9 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _lastShiftOpen = widget.state.isShiftOpen;
+    _selectedIndex =
+        (!widget.state.isShiftOpen && !widget.showFullFeatures) ? 4 : 0;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.state.checkActiveShift();
     });
@@ -48,8 +52,48 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
     super.dispose();
   }
 
+  void _showShiftLockedNotice() {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: EmpireColors.warningOrange,
+        content: Row(
+          children: [
+            Icon(Icons.lock_clock_outlined, color: Colors.white, size: 20),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Debe aperturar su turno en Caja con el fondo inicial para operar la sucursal.',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
+
   void _onStateChanged() {
     if (!mounted) return;
+    final shiftChanged = widget.state.isShiftOpen != _lastShiftOpen;
+    if (shiftChanged) {
+      _lastShiftOpen = widget.state.isShiftOpen;
+      if (widget.state.isShiftOpen) {
+        if (_selectedIndex == 4) {
+          _selectedIndex = 0;
+        }
+      } else {
+        if (!widget.showFullFeatures) {
+          _selectedIndex = 4;
+        }
+      }
+    }
+
     final count = widget.state.tables
         .where((t) =>
             t.zone == 'Para Llevar' &&
@@ -57,7 +101,7 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
         .length;
     final reportChanged =
         widget.state.salesSummaryRevision != _lastSalesSummaryRevision;
-    if (count != _activeOrdersCount || reportChanged) {
+    if (count != _activeOrdersCount || reportChanged || shiftChanged) {
       setState(() {
         _activeOrdersCount = count;
         if (reportChanged) {
@@ -71,6 +115,10 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
   }
 
   void _editOrder(int tableId) {
+    if (!widget.state.isShiftOpen) {
+      _showShiftLockedNotice();
+      return;
+    }
     widget.state.beginEditingOrder(tableId);
     if (_selectedIndex != 0) {
       setState(() => _selectedIndex = 0);
@@ -427,17 +475,28 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
 
   Widget _buildNavItem(int index, IconData icon, String label,
       {int badge = 0}) {
+    final isLocked = !widget.state.isShiftOpen && index != 4;
     final isSelected = _selectedIndex == index;
+
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() {
-          _selectedIndex = index;
-          // EncargadoCajaTab loads tickets & shift in initState. Recreate it whenever
-          // the operator opens Caja so completed payments and shift updates are reflected.
-          if (index == 4 && !widget.showFullFeatures) {
-            _summaryRefreshToken++;
+        onTap: () {
+          if (isLocked) {
+            _showShiftLockedNotice();
+            if (_selectedIndex != 4 && !widget.showFullFeatures) {
+              setState(() => _selectedIndex = 4);
+            }
+            return;
           }
-        }),
+          setState(() {
+            _selectedIndex = index;
+            // EncargadoCajaTab loads tickets & shift in initState. Recreate it whenever
+            // the operator opens Caja so completed payments and shift updates are reflected.
+            if (index == 4 && !widget.showFullFeatures) {
+              _summaryRefreshToken++;
+            }
+          });
+        },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           color: isSelected
@@ -447,15 +506,39 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Stack(
+                clipBehavior: Clip.none,
                 children: [
                   Icon(
                     icon,
                     color: isSelected
                         ? EmpireColors.champagneGold
-                        : EmpireColors.textSecondary,
+                        : isLocked
+                            ? EmpireColors.textSecondary.withValues(alpha: 0.35)
+                            : EmpireColors.textSecondary,
                     size: 22,
                   ),
-                  if (badge > 0)
+                  if (isLocked)
+                    Positioned(
+                      top: -3,
+                      right: -7,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: EmpireColors.onyxSurface,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: EmpireColors.agedBronzeDark,
+                            width: 1,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.lock,
+                          size: 10,
+                          color: EmpireColors.warningOrange,
+                        ),
+                      ),
+                    )
+                  else if (badge > 0)
                     Positioned(
                       top: -4,
                       right: -10,
@@ -475,6 +558,26 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
                         ),
                       ),
                     ),
+                  if (index == 4 && !widget.state.isShiftOpen)
+                    Positioned(
+                      top: -4,
+                      right: -10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: EmpireColors.warningOrange,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'Abrir',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 4),
@@ -483,7 +586,9 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
                 style: TextStyle(
                   color: isSelected
                       ? EmpireColors.champagneGold
-                      : EmpireColors.textSecondary,
+                      : isLocked
+                          ? EmpireColors.textSecondary.withValues(alpha: 0.4)
+                          : EmpireColors.textSecondary,
                   fontSize: 11,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),

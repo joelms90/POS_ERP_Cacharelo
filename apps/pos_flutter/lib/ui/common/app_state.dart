@@ -874,6 +874,7 @@ class AppState extends ChangeNotifier {
     lastPrintStationPublishMessage = null;
     localStationId = null;
 
+    await _secureStorageService.clearActiveShift();
     await _secureStorageService.clearLocalBranchData();
     localStationId = await _secureStorageService.getOrCreateLocalStationId();
     notifyListeners();
@@ -1043,6 +1044,18 @@ class AppState extends ChangeNotifier {
         debugPrint(
           'syncAllData: sync failed with error: $e',
         );
+        success = false;
+      }
+    } else if (currentUserRole == UserRole.branchOperator) {
+      try {
+        await fetchTablesDynamic();
+        await syncActiveOrders();
+        await syncTableStates();
+        await checkActiveShift();
+        final operatorTxSync = await syncOfflineTransactions();
+        if (!operatorTxSync) success = false;
+      } catch (e) {
+        debugPrint('syncAllData: branchOperator sync failed with error: $e');
         success = false;
       }
     } else if (currentUserRole == UserRole.kitchen) {
@@ -2079,6 +2092,10 @@ class AppState extends ChangeNotifier {
           }
 
           completeLoginWithRole(roles.first);
+          if (roles.first == UserRole.branchOperator ||
+              roles.first == UserRole.cashier) {
+            await checkActiveShift();
+          }
           notifyListeners();
           return true;
         }
@@ -2117,6 +2134,10 @@ class AppState extends ChangeNotifier {
         }
 
         completeLoginWithRole(roles.first);
+        if (roles.first == UserRole.branchOperator ||
+            roles.first == UserRole.cashier) {
+          await checkActiveShift();
+        }
         notifyListeners();
         return true;
       }
@@ -2189,6 +2210,10 @@ class AppState extends ChangeNotifier {
     currentUserName = "";
     selectedTable = null;
     currentJwtToken = null;
+    isShiftOpen = false;
+    activeShiftId = null;
+    initialFloat = 0.0;
+    cashDrawerAmount = 0.0;
     _secureStorageService.clearJwtToken();
     _stopPrintStationLifecycle();
     disconnectWebSocket();
@@ -2212,7 +2237,7 @@ class AppState extends ChangeNotifier {
           .get(Uri.parse(
               '$baseUrl/cash-shifts/active?branchId=$terminalBranchId&cashierId=$currentUserId'),
               headers: await _operatorHeaders())
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
@@ -2222,13 +2247,39 @@ class AppState extends ChangeNotifier {
         cashDrawerAmount =
             double.tryParse(data['cashDrawerAmount']?.toString() ?? '') ?? 0.0;
         isShiftOpen = data['status'] == 'open';
-      } else {
+
+        if (isShiftOpen && activeShiftId != null) {
+          await _secureStorageService.saveActiveShift(
+            shiftId: activeShiftId!,
+            branchId: terminalBranchId!,
+            cashierId: currentUserId!,
+            initialFloat: initialFloat,
+            cashDrawerAmount: cashDrawerAmount,
+          );
+        } else {
+          await _secureStorageService.clearActiveShift();
+        }
+      } else if (response.statusCode == 404) {
         isShiftOpen = false;
         activeShiftId = null;
+        await _secureStorageService.clearActiveShift();
       }
       notifyListeners();
     } catch (e) {
-      debugPrint('Error checking active shift: $e');
+      debugPrint('Error checking active shift (fallback to cache): $e');
+      final cachedShift = await _secureStorageService.getActiveShift();
+      if (cachedShift != null &&
+          cachedShift['isOpen'] == true &&
+          cachedShift['branchId'] == terminalBranchId &&
+          cachedShift['cashierId'] == currentUserId) {
+        activeShiftId = cachedShift['shiftId']?.toString();
+        initialFloat =
+            double.tryParse(cachedShift['initialFloat']?.toString() ?? '') ?? 0.0;
+        cashDrawerAmount =
+            double.tryParse(cachedShift['cashDrawerAmount']?.toString() ?? '') ?? 0.0;
+        isShiftOpen = true;
+        notifyListeners();
+      }
     }
   }
 
@@ -2261,6 +2312,17 @@ class AppState extends ChangeNotifier {
         cashDrawerAmount = floatAmount;
         isShiftOpen = true;
         lastShiftError = null;
+        if (activeShiftId != null &&
+            terminalBranchId != null &&
+            currentUserId != null) {
+          await _secureStorageService.saveActiveShift(
+            shiftId: activeShiftId!,
+            branchId: terminalBranchId!,
+            cashierId: currentUserId!,
+            initialFloat: initialFloat,
+            cashDrawerAmount: cashDrawerAmount,
+          );
+        }
         notifyListeners();
         return true;
       }
@@ -2416,6 +2478,7 @@ class AppState extends ChangeNotifier {
         initialFloat = 0.0;
         cashDrawerAmount = 0.0;
         lastShiftError = null;
+        await _secureStorageService.clearActiveShift();
         notifyListeners();
         return Map<String, dynamic>.from(
           data['report'] ?? data['reconciliation'] ?? {},

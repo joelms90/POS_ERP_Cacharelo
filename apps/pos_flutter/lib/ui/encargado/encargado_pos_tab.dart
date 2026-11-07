@@ -358,6 +358,45 @@ class _EncargadoPosTabState extends State<EncargadoPosTab> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.state.isShiftOpen) {
+      return Center(
+        child: Container(
+          margin: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(32),
+          constraints: const BoxConstraints(maxWidth: 440),
+          decoration: BoxDecoration(
+            color: EmpireColors.onyxSurface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: EmpireColors.agedBronzeDark),
+          ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.lock_clock_outlined,
+                  size: 56, color: EmpireColors.warningOrange),
+              SizedBox(height: 16),
+              Text(
+                'TURNO DE CAJA CERRADO',
+                style: TextStyle(
+                  color: EmpireColors.champagneGold,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Para registrar ventas y órdenes, debe aperturar su turno con el fondo inicial en la pestaña de Caja.',
+                textAlign: TextAlign.center,
+                style:
+                    TextStyle(color: EmpireColors.textSecondary, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Row(
       children: [
         Expanded(flex: 6, child: _buildCatalogPanel()),
