@@ -1221,8 +1221,8 @@ export const CACHARELO_MENU_PRESET: MenuCatalog = {
                 "name": "AMERICANO",
                 "description": "Extracción de café espresso con agua caliente.",
                 "prices": {
-                    "12 oz": 49,
-                    "16 oz": 69
+                    "12 oz": 40,
+                    "16 oz": 45
                 }
             },
             {

@@ -60,23 +60,28 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
 
                     {/* Dish Text Block (Right) */}
                     <div className="w-[64%] sm:w-[67%] flex flex-col justify-center pl-2">
-                      <div className="w-6 h-0 border-t-[1.5px] mb-1" style={{ borderColor: WARM_GOLD }} />
+                      <div className="w-6 h-0 border-t-[1.5px] mb-1.5" style={{ borderColor: WARM_GOLD }} />
 
-                      <div className="flex items-baseline justify-between gap-1.5">
+                      {/* Title and Price Row - Fixed alignment */}
+                      <div className="flex items-start justify-between gap-2 w-full mb-1">
                         <h4
-                          className="text-lg sm:text-xl md:text-2xl font-bold font-cormorant tracking-[0.08em] uppercase leading-tight"
-                          style={{ color: CHARCOAL }}
+                          className="text-lg sm:text-xl md:text-2xl font-bold font-cormorant tracking-[0.08em] uppercase leading-[1.2] flex-1 min-w-0"
+                          style={{
+                            color: CHARCOAL,
+                            wordBreak: 'break-word',
+                            hyphens: 'auto'
+                          }}
                         >
                           {dish.name}
                         </h4>
 
-                        {/* Dotted leader */}
-                        <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
-
                         {formatPrice(dish.price) && (
                           <span
-                            className="text-base sm:text-lg font-bold font-cormorant tracking-wide shrink-0"
-                            style={{ color: WARM_GOLD }}
+                            className="text-base sm:text-lg font-bold font-cormorant tracking-wide shrink-0 whitespace-nowrap pt-0.5"
+                            style={{
+                              color: WARM_GOLD,
+                              fontVariantNumeric: 'lining-nums'
+                            }}
                           >
                             {formatPrice(dish.price)}
                           </span>
@@ -85,7 +90,7 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
 
                       {dish.description && (
                         <p
-                          className="text-xs sm:text-[12.5px] font-montserrat leading-relaxed opacity-90 mt-0.5 mb-1 line-clamp-2"
+                          className="text-xs sm:text-[12.5px] font-montserrat leading-relaxed opacity-90 mt-1 mb-1 line-clamp-2"
                           style={{ color: CHARCOAL }}
                         >
                           {dish.description}
@@ -111,23 +116,28 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
                   <>
                     {/* Dish Text Block (Left) */}
                     <div className="w-[64%] sm:w-[67%] flex flex-col justify-center pr-2 text-left">
-                      <div className="w-6 h-0 border-t-[1.5px] mb-1" style={{ borderColor: WARM_GOLD }} />
+                      <div className="w-6 h-0 border-t-[1.5px] mb-1.5" style={{ borderColor: WARM_GOLD }} />
 
-                      <div className="flex items-baseline justify-between gap-1.5">
+                      {/* Title and Price Row - Fixed alignment */}
+                      <div className="flex items-start justify-between gap-2 w-full mb-1">
                         <h4
-                          className="text-lg sm:text-xl md:text-2xl font-bold font-cormorant tracking-[0.08em] uppercase leading-tight"
-                          style={{ color: CHARCOAL }}
+                          className="text-lg sm:text-xl md:text-2xl font-bold font-cormorant tracking-[0.08em] uppercase leading-[1.2] flex-1 min-w-0"
+                          style={{
+                            color: CHARCOAL,
+                            wordBreak: 'break-word',
+                            hyphens: 'auto'
+                          }}
                         >
                           {dish.name}
                         </h4>
 
-                        {/* Dotted leader */}
-                        <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
-
                         {formatPrice(dish.price) && (
                           <span
-                            className="text-base sm:text-lg font-bold font-cormorant tracking-wide shrink-0"
-                            style={{ color: WARM_GOLD }}
+                            className="text-base sm:text-lg font-bold font-cormorant tracking-wide shrink-0 whitespace-nowrap pt-0.5"
+                            style={{
+                              color: WARM_GOLD,
+                              fontVariantNumeric: 'lining-nums'
+                            }}
                           >
                             {formatPrice(dish.price)}
                           </span>
@@ -136,7 +146,7 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
 
                       {dish.description && (
                         <p
-                          className="text-xs sm:text-[12.5px] font-montserrat leading-relaxed opacity-90 mt-0.5 mb-1 line-clamp-2"
+                          className="text-xs sm:text-[12.5px] font-montserrat leading-relaxed opacity-90 mt-1 mb-1 line-clamp-2"
                           style={{ color: CHARCOAL }}
                         >
                           {dish.description}
@@ -196,19 +206,22 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
                 <div key={dish.id} className="group relative w-full">
                   <div className="flex items-baseline justify-between gap-2 w-full">
                     <h4
-                      className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight"
+                      className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight flex-shrink min-w-0 break-words"
                       style={{ color: CHARCOAL }}
                     >
                       {dish.name || 'Especialidad'}
                     </h4>
 
                     {/* Dotted leader */}
-                    <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-2 mb-1 min-w-[20px]" />
+                    <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-2 mb-1 min-w-[20px] flex-shrink-0" />
 
                     {formatPrice(dish.price) && (
                       <span
-                        className="text-sm sm:text-base font-cormorant font-bold tracking-wide shrink-0"
-                        style={{ color: WARM_GOLD }}
+                        className="text-sm sm:text-base font-cormorant font-bold tracking-wide shrink-0 whitespace-nowrap"
+                        style={{
+                          color: WARM_GOLD,
+                          fontVariantNumeric: 'lining-nums'
+                        }}
                       >
                         {formatPrice(dish.price)}
                       </span>
@@ -255,19 +268,22 @@ export const DenseListLayout: React.FC<DenseListLayoutProps> = ({ section, theme
           {dishes.map((dish) => (
             <div key={dish.id} className="flex items-baseline justify-between gap-1 w-full group py-0.5">
               <span
-                className="text-[13px] sm:text-[14px] font-cormorant font-bold uppercase tracking-[0.05em] leading-tight shrink-0"
+                className="text-[13px] sm:text-[14px] font-cormorant font-bold uppercase tracking-[0.05em] leading-tight flex-shrink min-w-0 break-words"
                 style={{ color: CHARCOAL }}
               >
                 {dish.name || 'Extra'}
               </span>
 
               {/* Dotted leader */}
-              <div className="flex-1 border-b border-dotted border-[#C8A265]/40 mx-2 mb-0.5 min-w-[12px]" />
+              <div className="flex-1 border-b border-dotted border-[#C8A265]/40 mx-2 mb-0.5 min-w-[12px] flex-shrink-0" />
 
               {formatPrice(dish.price) && (
                 <span
                   className="text-[12.5px] sm:text-[13.5px] font-cormorant font-bold tracking-wide shrink-0 whitespace-nowrap leading-none"
-                  style={{ color: WARM_GOLD }}
+                  style={{
+                    color: WARM_GOLD,
+                    fontVariantNumeric: 'lining-nums'
+                  }}
                 >
                   {formatPrice(dish.price)}
                 </span>

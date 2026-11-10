@@ -16,8 +16,14 @@ export const CoverPage: React.FC<CoverPageProps> = ({ cover, restaurant, theme }
   const isFloatingCard = cover.cardMode === 'floating-card';
   const overlayOpacity = cover.backgroundOverlayOpacity ?? 0.25;
   const blur = cover.backgroundBlur ?? 0;
-  const backgroundImage = cover.backgroundImage || '/backgrounds/cafe-interior-cover.png';
-  const logoSrc = restaurant.logo || '/branding/cacharelo-cofee-gold-logo.png';
+  const rawBackgroundImage = cover.backgroundImage || '/backgrounds/cafe-interior-cover.png';
+  const backgroundImage = rawBackgroundImage
+    ? rawBackgroundImage.normalize('NFC').split('/').map(p => p ? encodeURIComponent(p) : p).join('/')
+    : rawBackgroundImage;
+  const rawLogoSrc = restaurant.logo || '/branding/cacharelo-cofee-gold-logo.png';
+  const logoSrc = rawLogoSrc
+    ? rawLogoSrc.normalize('NFC').split('/').map(p => p ? encodeURIComponent(p) : p).join('/')
+    : rawLogoSrc;
   const categoriesSubline = cover.footer || 'DESAYUNOS  •  COMIDAS  •  CAFÉ  •  MOMENTOS';
   const tagline = cover.tagline || '"Aquí sabe mejor"';
 

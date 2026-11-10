@@ -14,11 +14,57 @@ export const DishImageRenderer: React.FC<DishImageRendererProps> = ({
   className = '',
   size = 'md'
 }) => {
-  const imgSrc = dish.imageProcessed || dish.image;
+  // Properly encode image URLs to handle spaces and special characters
+  const rawImgSrc = dish.imageProcessed || dish.image;
+  // Split path into parts, encode each filename component, keep slashes
+  const imgSrc = React.useMemo(() => {
+    if (!rawImgSrc) return rawImgSrc;
+    // Don't encode if already encoded
+    if (rawImgSrc.includes('%20')) return rawImgSrc;
+
+    // CRITICAL: Normalize Unicode to NFC form (macOS uses NFD, but browsers expect NFC)
+    // This fixes issues with characters like Ñ, é, etc.
+    const normalized = rawImgSrc.normalize('NFC');
+
+    const parts = normalized.split('/');
+    // Encode each path component separately, preserving slashes
+    return parts.map(part => {
+      // Don't encode empty parts or parts that are already encoded
+      if (!part || part.includes('%')) return part;
+      return encodeURIComponent(part);
+    }).join('/');
+  }, [rawImgSrc]);
+
   // Default to transparent / organic plate presentation unless user explicitly selects circle
   const mode = dish.imageMode || 'transparent';
   const transform = dish.imageTransform || { scale: 1, x: 0, y: 0, rotation: 0 };
   const backdrop = theme.dishBackdrop;
+
+  // Debug: Log image loading
+  React.useEffect(() => {
+    if (imgSrc) {
+      const normalized = rawImgSrc?.normalize('NFC');
+      console.debug(`DishImageRenderer loading: ${dish.name}`, {
+        rawImgSrc,
+        normalized,
+        finalImgSrc: imgSrc,
+        rawBytes: rawImgSrc?.split('').map(c => c.charCodeAt(0).toString(16)).join(' '),
+        normalizedBytes: normalized?.split('').map(c => c.charCodeAt(0).toString(16)).join(' ')
+      });
+    }
+  }, [imgSrc, dish.name, rawImgSrc]);
+
+  // Track image loading errors
+  const [imageError, setImageError] = React.useState(false);
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    console.error(`Failed to load image for ${dish.name}:`, {
+      src: e.currentTarget.src,
+      rawImgSrc,
+      imgSrc,
+      error: e
+    });
+    setImageError(true);
+  };
 
   // Sizing definitions with generous editorial presence
   const sizeClasses = {
@@ -30,7 +76,8 @@ export const DishImageRenderer: React.FC<DishImageRendererProps> = ({
     hero: 'w-72 h-72 sm:w-88 sm:h-88'
   }[size];
 
-  if (!imgSrc) {
+  // Show placeholder if no image or if image failed to load
+  if (!imgSrc || imageError) {
     return (
       <div className={`relative flex items-center justify-center ${sizeClasses} ${className}`}>
         <div
@@ -41,6 +88,11 @@ export const DishImageRenderer: React.FC<DishImageRendererProps> = ({
           <span className="text-[11px] font-montserrat uppercase tracking-widest text-[#2D2926] opacity-60">
             {dish.name}
           </span>
+          {imageError && (
+            <span className="text-[8px] font-montserrat text-red-500 opacity-50 mt-1">
+              Imagen no disponible
+            </span>
+          )}
         </div>
       </div>
     );
@@ -83,6 +135,7 @@ export const DishImageRenderer: React.FC<DishImageRendererProps> = ({
         <img
           src={imgSrc}
           alt={dish.name}
+          onError={handleImageError}
           className={`w-full h-full pointer-events-none transition-all duration-300 ${
             mode === 'circle'
               ? 'object-cover rounded-full shadow-md'

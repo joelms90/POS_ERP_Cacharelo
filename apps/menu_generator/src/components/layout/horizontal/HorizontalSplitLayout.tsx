@@ -106,17 +106,24 @@ export const HorizontalSplitLayout: React.FC<HorizontalSplitLayoutProps> = ({ se
                   </div>
                 )}
                 <div className="flex-1 min-w-0 flex flex-col">
-                  <div className="flex items-baseline justify-between gap-1">
+                  <div className="flex items-start justify-between gap-2 mb-1">
                     <h4
-                      className="text-base font-bold font-cormorant tracking-[0.06em] uppercase leading-tight truncate"
-                      style={{ color: CHARCOAL }}
+                      className="text-base font-bold font-cormorant tracking-[0.06em] uppercase leading-[1.2] flex-1 min-w-0"
+                      style={{
+                        color: CHARCOAL,
+                        wordBreak: 'break-word',
+                        hyphens: 'auto'
+                      }}
                     >
                       {dish.name}
                     </h4>
-                    <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[8px]" />
                     {formatPrice(dish.price) && (
                       <span
-                        className="text-sm font-bold font-cormorant tracking-wide shrink-0 text-[#C8A265]"
+                        className="text-sm font-bold font-cormorant tracking-wide shrink-0 whitespace-nowrap pt-0.5"
+                        style={{
+                          color: '#C8A265',
+                          fontVariantNumeric: 'lining-nums'
+                        }}
                       >
                         {formatPrice(dish.price)}
                       </span>
@@ -148,17 +155,24 @@ export const HorizontalSplitLayout: React.FC<HorizontalSplitLayoutProps> = ({ se
                   </div>
                 )}
                 <div className="flex-1 min-w-0 flex flex-col">
-                  <div className="flex items-baseline justify-between gap-1">
+                  <div className="flex items-start justify-between gap-2 mb-1">
                     <h4
-                      className="text-base font-bold font-cormorant tracking-[0.06em] uppercase leading-tight truncate"
-                      style={{ color: CHARCOAL }}
+                      className="text-base font-bold font-cormorant tracking-[0.06em] uppercase leading-[1.2] flex-1 min-w-0"
+                      style={{
+                        color: CHARCOAL,
+                        wordBreak: 'break-word',
+                        hyphens: 'auto'
+                      }}
                     >
                       {dish.name}
                     </h4>
-                    <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[8px]" />
                     {formatPrice(dish.price) && (
                       <span
-                        className="text-sm font-bold font-cormorant tracking-wide shrink-0 text-[#C8A265]"
+                        className="text-sm font-bold font-cormorant tracking-wide shrink-0 whitespace-nowrap pt-0.5"
+                        style={{
+                          color: '#C8A265',
+                          fontVariantNumeric: 'lining-nums'
+                        }}
                       >
                         {formatPrice(dish.price)}
                       </span>

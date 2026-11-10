@@ -224,7 +224,7 @@ export const MenuPageRenderer: React.FC<MenuPageRendererProps> = ({
         <div className="flex flex-col items-center justify-center shrink-0 pl-3">
           {restaurant.logo ? (
             <img
-              src={restaurant.logo}
+              src={restaurant.logo.normalize('NFC').split('/').map(p => p ? encodeURIComponent(p) : p).join('/')}
               alt={restaurant.name}
               className="h-20 sm:h-24 w-auto object-contain drop-shadow-xs"
             />

@@ -161,11 +161,19 @@ export const PagePreviewContainer: React.FC<PagePreviewContainerProps> = ({
       </div>
 
       {/* Off-screen unscaled render container for 1:1 crisp PDF & high-res export */}
+      {/* CRITICAL: min-width ensures Tailwind responsive classes (sm:, md:) apply correctly */}
       <div
         id="pdf-render-queue"
-        className="fixed -left-[99999px] top-0 pointer-events-none opacity-100 z-[-1] print:hidden"
+        className="fixed pointer-events-none print:hidden"
         style={{
-          width: `${widthPx}px`
+          width: `${widthPx}px`,
+          minWidth: `${widthPx}px`,
+          position: 'fixed',
+          top: '0',
+          left: '0',
+          opacity: 0,
+          zIndex: -9999,
+          pointerEvents: 'none'
         }}
         aria-hidden="true"
       >

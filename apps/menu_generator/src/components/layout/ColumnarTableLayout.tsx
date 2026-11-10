@@ -295,16 +295,16 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
         {columnDishes.map((dish) => (
           <div key={dish.id} className="group relative">
             {/* Top row: Name + dotted leader + prices */}
-            <div className="flex items-baseline justify-between gap-1.5">
+            <div className="flex items-baseline justify-between gap-1.5 w-full">
               <h4
-                className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight shrink-0"
+                className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight flex-shrink min-w-0 break-words"
                 style={{ color: CHARCOAL }}
               >
                 {dish.name || 'Especialidad'}
               </h4>
 
               {/* Dotted leader */}
-              <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
+              <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px] flex-shrink-0" />
 
               {/* Price Columns */}
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -385,16 +385,16 @@ export const ColumnarTableLayout: React.FC<ColumnarTableLayoutProps> = ({ sectio
       <div className="space-y-2 sm:space-y-2.5">
         {columnDishes.map((dish) => (
           <div key={dish.id} className="group relative">
-            <div className="flex items-baseline justify-between gap-1.5">
+            <div className="flex items-baseline justify-between gap-1.5 w-full">
               <h4
-                className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight shrink-0"
+                className="text-base sm:text-[17px] font-cormorant font-bold uppercase tracking-[0.08em] leading-tight flex-shrink min-w-0 break-words"
                 style={{ color: CHARCOAL }}
               >
                 {dish.name || 'Especialidad'}
               </h4>
 
               {/* Dotted leader */}
-              <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px]" />
+              <div className="flex-1 border-b border-dotted border-[#C8A265]/35 mx-1.5 mb-1 min-w-[12px] flex-shrink-0" />
 
               {/* Price */}
               {dish.price !== null && dish.price !== undefined && (

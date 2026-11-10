@@ -18,12 +18,18 @@ export const HorizontalCoverPage: React.FC<HorizontalCoverPageProps> = ({
 
   const overlayOpacity = cover.backgroundOverlayOpacity ?? 0.25;
   const blur = cover.backgroundBlur ?? 0;
-  const backgroundImage =
+  const rawBackgroundImage =
     cover.backgroundImageHorizontal ||
     (cover.backgroundImage && cover.backgroundImage.includes('Horizontal')
       ? cover.backgroundImage
       : '/backgrounds/Cacharelo_Horizontal.jpeg');
-  const logoSrc = restaurant.logo || '/branding/cacharelo-cofee-gold-logo.png';
+  const backgroundImage = rawBackgroundImage
+    ? rawBackgroundImage.normalize('NFC').split('/').map(p => p ? encodeURIComponent(p) : p).join('/')
+    : rawBackgroundImage;
+  const rawLogoSrc = restaurant.logo || '/branding/cacharelo-cofee-gold-logo.png';
+  const logoSrc = rawLogoSrc
+    ? rawLogoSrc.normalize('NFC').split('/').map(p => p ? encodeURIComponent(p) : p).join('/')
+    : rawLogoSrc;
   const categoriesSubline = cover.footer || 'DESAYUNOS  •  COMIDAS  •  CAFÉ  •  MOMENTOS';
   const tagline = cover.tagline || '"Aquí sabe mejor"';
 
