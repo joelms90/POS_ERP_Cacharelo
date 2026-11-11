@@ -10,9 +10,9 @@ test.describe('Admin Console E2E Navigation', () => {
     if (await passwordInput.isVisible({ timeout: 5000 }).catch(() => false)) {
       const emailInput = page.locator('input[type="email"]');
       if (await emailInput.isVisible()) {
-        await emailInput.fill('owner@cacharelo.com');
+        await emailInput.fill(process.env.E2E_ADMIN_EMAIL ?? 'owner@cacharelo.com');
       }
-      await passwordInput.fill('owner123');
+      await passwordInput.fill(process.env.E2E_ADMIN_PASSWORD ?? 'owner123');
       await page.locator('button[type="submit"]').click();
     }
 

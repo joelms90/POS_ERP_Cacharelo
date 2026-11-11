@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test:e2e": "playwright test",
+    "test:e2e:production": "BASE_URL=https://cacharelo-central.web.app playwright test e2e/navigation.spec.ts",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {

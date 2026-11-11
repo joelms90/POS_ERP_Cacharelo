@@ -19,7 +19,9 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: [
+  // A remote BASE_URL (for example, production) must never start local API/UI
+  // servers just to run browser checks against the deployed application.
+  webServer: process.env.BASE_URL ? undefined : [
     {
       command: 'cd ../sync_api && PORT=3000 NODE_ENV=development DATABASE_URL="postgres://pos_user:pos_password@localhost:5432/pos_dev" npm run dev',
       url: 'http://localhost:3000/api/health',

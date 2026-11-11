@@ -7,6 +7,10 @@
 ---
 
 ## Currently Active Sessions
+### Session: production-admin-e2e
+- **Scope**: Configure and run read-only Playwright navigation checks against the deployed Business Control admin site.
+- **Status**: ✅ Completed — production navigation test reached login, but `owner@cacharelo.com` with the supplied password was rejected by production.
+
 ### Session: fix-flutter-web-local-host
 - **Scope**: Fix Flutter web local Make target host binding/diagnostics for localhost:8081; Makefile only.
 - **Status**: 🔄 In progress

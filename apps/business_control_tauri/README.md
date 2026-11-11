@@ -76,6 +76,16 @@ Compila el ejecutable nativo (ej. `.app` para macOS, o `.msi`/`.exe` para Window
 pnpm tauri build
 ```
 
+### 5. Validar navegación en producción
+
+La prueba de producción sólo recorre flujos de lectura y navegación; los flujos
+que crean productos, órdenes de compra o movimientos de inventario se mantienen
+para entornos locales. Proporciona las credenciales mediante variables de entorno:
+
+```bash
+E2E_ADMIN_EMAIL='owner@cacharelo.com' E2E_ADMIN_PASSWORD='…' pnpm test:e2e:production
+```
+
 ---
 
 ## 🔒 Seguridad e Integración API
