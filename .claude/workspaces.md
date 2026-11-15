@@ -9,7 +9,7 @@
 ## Currently Active Sessions
 ### Session: production-admin-e2e
 - **Scope**: Expand staging Playwright coverage for transactional admin business flows, starting with requisitions and inventory movements.
-- **Status**: 🔄 In progress
+- **Status**: ✅ Completed — staging E2E covers required rejection reason/no transfer and approved requisition → shipment → receipt with stock-delta verification.
 
 ### Session: fix-flutter-web-local-host
 - **Scope**: Fix Flutter web local Make target host binding/diagnostics for localhost:8081; Makefile only.

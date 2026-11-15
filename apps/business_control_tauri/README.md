@@ -86,6 +86,19 @@ para entornos locales. Proporciona las credenciales mediante variables de entorn
 E2E_ADMIN_EMAIL='owner@cacharelo.com' E2E_ADMIN_PASSWORD='…' pnpm test:e2e:production
 ```
 
+### 6. Validar una requisición completa en staging
+
+Estos flujos crean requisiciones marcadas `E2E-STAGING-*`: uno valida rechazo
+con razón obligatoria y otro aprueba, envía y recibe un traspaso de `0.01`
+unidades. El segundo cambia inventario: úsalo sólo en staging o en un negocio
+de prueba.
+
+```bash
+E2E_ADMIN_EMAIL='owner@cacharelo.com' E2E_ADMIN_PASSWORD='…' pnpm test:e2e:staging
+```
+
+Para seleccionar un negocio concreto, añade `E2E_BUSINESS_ID='…'` al comando.
+
 ---
 
 ## 🔒 Seguridad e Integración API
