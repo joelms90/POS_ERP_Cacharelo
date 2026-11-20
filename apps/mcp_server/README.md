@@ -51,6 +51,13 @@ El servidor organiza sus herramientas en **7 dominios operativos**:
 | `get_active_orders` | `branchId` | Consulta cuentas abiertas o por cobrar en mesas con desglose. | *"¿Qué órdenes están abiertas en la sucursal Centro?"* |
 | `simulate_corte_caja` | `type` ('x' \| 'z'), `branchName?`, `cashierName?` | Arqueo parcial (Corte X) o corte de cierre de turno (Corte Z). | *"Genera un simulacro de Corte Z para el turno de la tarde"* |
 
+### Diagnóstico de Producción (`logs.tools.ts`)
+| Herramienta | Parámetros | Descripción | Ejemplo de consulta IA |
+| :--- | :--- | :--- | :--- |
+| `get_error_summary` | `date?`, `hours?`, `branchId?`, `source?`, `minLevel?` | Incidencias agrupadas por problema, con sucursales, versiones y stack de muestra. | *"¿Hubo problemas hoy en las sucursales?"* |
+| `search_logs` | `q?`, `fingerprint?`, `branchId?`, `hours?`, `limit?` | Entradas individuales, de la más reciente a la más antigua. | *"Muéstrame todas las fallas de sync/push de hoy"* |
+| `get_log_entry` | `id` | Entrada completa: stack, breadcrumbs y contexto. | *"Dame el detalle del log 5e84…"* |
+
 ### 4. Operación POS & Cocina (`pos.tools.ts`)
 | Herramienta | Parámetros | Descripción | Ejemplo de consulta IA |
 | :--- | :--- | :--- | :--- |

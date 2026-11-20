@@ -2,7 +2,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install kill-port kill-dev-ports db-up db-down db-status db-migrate db-seed db-rollback db-reset db-pull-prod db-sync-from-prod db-clean db-clean-prod db-clean-today db-clean-today-prod db-clean-old-history-prod db-clean-all-history-sales-prod db-proxy dev-backend dev-backend-local dev-backend-prod dev-frontend lint test okf-validate active-orders infra-init infra-plan infra-apply provision-infra infra-destroy backend-migrate backend-deploy backend-deploy-fast backend-status backend-logs landing-install landing-build landing-deploy landing-infra admin-install admin-dev admin-dev-prod admin-dev-local admin-test-e2e admin-test-e2e-ui admin-build admin-deploy admin-deploy-gcs flutter-web-build flutter-web-dev flutter-web-dev-prod flutter-web-dev-local flutter-macos-dev flutter-macos-dev-prod flutter-macos-dev-local flutter-macos-build-debug flutter-macos-2x-local flutter-macos-2x-prod flutter-web-serve flutter-web-deploy flutter-portal-deploy flutter-apk-build flutter-clean flutter-macos-build flutter-windows-build flutter-android-build flutter-desktop-releases flutter-all-releases flutter-release-info flutter-bump-version
+.PHONY: help install kill-port kill-dev-ports db-up db-down db-status db-migrate db-seed db-rollback db-reset db-pull-prod db-sync-from-prod db-clean db-clean-prod db-clean-today db-clean-today-prod db-clean-old-history-prod db-clean-all-history-sales-prod db-proxy dev-backend dev-backend-local dev-backend-prod dev-frontend lint test okf-validate active-orders infra-init infra-plan infra-apply provision-infra infra-destroy backend-migrate backend-deploy backend-deploy-fast backend-status backend-logs logs-today logs-summary logs-search logs-show landing-install landing-build landing-deploy landing-infra admin-install admin-dev admin-dev-prod admin-dev-local admin-test-e2e admin-test-e2e-ui admin-build admin-deploy admin-deploy-gcs flutter-web-build flutter-web-dev flutter-web-dev-prod flutter-web-dev-local flutter-macos-dev flutter-macos-dev-prod flutter-macos-dev-local flutter-macos-build-debug flutter-macos-2x-local flutter-macos-2x-prod flutter-web-serve flutter-web-deploy flutter-portal-deploy flutter-apk-build flutter-clean flutter-macos-build flutter-windows-build flutter-android-build flutter-desktop-releases flutter-all-releases flutter-release-info flutter-bump-version
 
 # Environment configuration (per-env values; see env/*.env)
 -include env/prod.env
@@ -70,6 +70,10 @@ help:
 	@echo "  backend-deploy       Deploy backend API to Cloud Run (with confirmation)"
 	@echo "  backend-deploy-fast  Deploy backend API without confirmation prompt"
 	@echo "  backend-status       Check deployment status and show service URL"
+	@echo "  logs-today           Production issues today, grouped (POS/Admin/API) [BRANCH= SOURCE=]"
+	@echo "  logs-summary         Issues for DATE=YYYY-MM-DD or HOURS=N"
+	@echo "  logs-search          Raw log entries (Q= FP= HOURS=)"
+	@echo "  logs-show            Full log entry ID=<id>"
 	@echo "  backend-logs         Show recent backend logs from Cloud Run"
 	@echo ""
 	@echo "Landing Page Targets:"
@@ -710,6 +714,22 @@ backend-logs:
 	@echo "For more logs, visit:"
 	@echo "https://console.cloud.google.com/run/detail/us-central1/pos-sync-api/logs?project=fresh-sensor-497515-d3"
 	@echo ""
+
+# ── Production diagnostics (app_logs: POS Flutter, Admin Web, API 5xx) ──
+# Requires POS_ADMIN_TOKEN. Optional: BRANCH=<branchId> SOURCE=pos_flutter|admin_web|sync_api
+LOGS_FILTERS = $(if $(BRANCH),--branch $(BRANCH)) $(if $(SOURCE),--source $(SOURCE)) $(if $(LEVEL),--min-level $(LEVEL))
+
+logs-today: ## Grouped production issues for today (America/Mexico_City)
+	@node scripts/prod-logs.mjs summary $(LOGS_FILTERS)
+
+logs-summary: ## Grouped issues for DATE=YYYY-MM-DD or HOURS=N
+	@node scripts/prod-logs.mjs summary $(if $(DATE),--date $(DATE)) $(if $(HOURS),--hours $(HOURS)) $(LOGS_FILTERS)
+
+logs-search: ## Raw entries: Q="texto" FP=<fingerprint> HOURS=24
+	@node scripts/prod-logs.mjs search $(if $(Q),--q "$(Q)") $(if $(FP),--fingerprint $(FP)) $(if $(HOURS),--hours $(HOURS)) $(if $(DATE),--date $(DATE)) $(LOGS_FILTERS)
+
+logs-show: ## Full entry (stack, breadcrumbs, context): ID=<logId>
+	@node scripts/prod-logs.mjs show $(ID)
 
 # Landing Page Targets
 landing-install:

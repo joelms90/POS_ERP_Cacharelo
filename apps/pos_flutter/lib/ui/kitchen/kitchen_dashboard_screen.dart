@@ -154,7 +154,10 @@ class _KitchenDashboardScreenState extends State<KitchenDashboardScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              AppVersionBadge(version: widget.state.appVersion),
+              AppVersionBadge(
+                version: widget.state.appVersion,
+                branchName: widget.state.terminalBranchName,
+              ),
               const SizedBox(width: 12),
               PopupMenuButton<String>(
                 icon: const Icon(

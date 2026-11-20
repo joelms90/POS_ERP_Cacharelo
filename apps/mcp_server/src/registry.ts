@@ -7,6 +7,7 @@ import { registerPosTools } from './tools/pos.tools.js';
 import { registerPurchasingTools } from './tools/purchasing.tools.js';
 import { registerProductionTools } from './tools/production.tools.js';
 import { registerSystemTools } from './tools/system.tools.js';
+import { registerLogsTools } from './tools/logs.tools.js';
 
 export function registerAllTools(server: McpServer, client: PosApiClient) {
   let toolCount = 0;
@@ -24,6 +25,7 @@ export function registerAllTools(server: McpServer, client: PosApiClient) {
   registerPosTools(server, client);
   registerPurchasingTools(server, client);
   registerProductionTools(server, client);
+  registerLogsTools(server, client);
   registerSystemTools(server, client, () => toolCount);
 
   // Restore

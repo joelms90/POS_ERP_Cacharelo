@@ -1,3 +1,4 @@
+import { APP_LOGS_TABLE_SQL } from '../src/modules/logs/app-logs.sql';
 import { Client } from 'pg';
 
 async function main() {
@@ -493,6 +494,11 @@ async function main() {
       ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "encrypted_pin" varchar(255);
     `);
     console.log('User encrypted_pin column ensured.');
+
+    // 20. Production diagnostic logs (POS Flutter, Admin Web, sync_api 5xx).
+    // LogsService also ensures this lazily, so deploy order does not matter.
+    await client.query(APP_LOGS_TABLE_SQL);
+    console.log('app_logs table ensured.');
 
     console.log('✅ Idempotent migrations executed successfully!');
   } catch (error) {

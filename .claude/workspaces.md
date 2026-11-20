@@ -2,11 +2,21 @@
 
 **Purpose**: Track which development sessions (terminals/developers/assistants) are working on which parts of the monorepo to prevent conflicts.
 
-**Last Updated**: 2026-09-18
+**Last Updated**: 2026-11-20
 
 ---
 
 ## Currently Active Sessions
+### Session: prod-logging
+- **Scope**: Production diagnostics. Adds the `app_logs` table and `/api/logs` intake, an API 5xx interceptor, Flutter `RemoteLogger` plus the logged HTTP wrapper, the admin web `remoteLogger` plus error boundary, `make logs-*`, MCP log tools, and `docs/prod-log-triage.md`.
+- **Branch**: `feat/prod-logging`
+- **Migration Status**: `app_logs` is added to `idempotent-deploy-migrations.ts` and is also auto-created at runtime. Not yet run in prod.
+- **Status**: ✅ Completed (not deployed)
+
+### Session: 017-sucursal-version
+- **Scope**: Plan and implement the POS display of the configured sucursal next to the application version; POS client only.
+- **Status**: ✅ Completed (not deployed)
+
 ### Session: production-admin-e2e
 - **Scope**: Fix staging requisitions with no selected warehouse returning HTTP 500; align the idempotent DB migration with the nullable application contract.
 - **Migration Status**: ✅ Completed — staging E2E verified requisitions without an origin warehouse after `make backend-migrate`.

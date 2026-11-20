@@ -20,6 +20,7 @@ import { TicketSettingsModule } from './modules/ticket-settings/ticket-settings.
 import { PurchaseOrdersModule } from './modules/purchase-orders/purchase-orders.module';
 import { RequisitionsModule } from './modules/requisitions/requisitions.module';
 import { PrintingModule } from './modules/printing/printing.module';
+import { LogsModule } from './modules/logs/logs.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { PrintingModule } from './modules/printing/printing.module';
     PurchaseOrdersModule,
     RequisitionsModule,
     PrintingModule,
+    LogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

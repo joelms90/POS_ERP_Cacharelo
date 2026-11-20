@@ -1,5 +1,16 @@
 # Session Handoff
 
+## Latest Session — Production Logging (2026-11-20, Claude Code)
+- **Branch:** `feat/prod-logging` (committed locally, **not pushed, not deployed**)
+- **What:** Errors from the POS Flutter app, the admin web and API 5xx are now stored in a single `app_logs` table, tagged by sucursal, user, device and version. Agents triage them with `make logs-today` (or the MCP tools `get_error_summary`, `search_logs`, `get_log_entry`). Playbook: [`docs/prod-log-triage.md`](./docs/prod-log-triage.md). Claude skill: `/triage-prod-logs`.
+- **Key files:** `apps/sync_api/src/modules/logs/*`, `apps/pos_flutter/lib/services/{remote_logger,logged_http}.dart`, `apps/business_control_tauri/src/services/remoteLogger.ts`, `apps/business_control_tauri/src/components/templates/AppErrorBoundary.tsx`, `scripts/prod-logs.mjs`, `apps/mcp_server/src/tools/logs.tools.ts`.
+- **Verified:** backend jest 179/179; Flutter `remote_logger_test` 5/5; full Flutter suite 36 pass / 15 fail (the same 15 fail on baseline `main`); admin `tsc` + `vite build`. End-to-end against a local API + Postgres: ingest, 5xx capture, grouping, redaction, CLI and MCP all worked.
+- **To ship:** `make backend-migrate` (optional; the table is also created on first use), then `make backend-deploy`, `make admin-deploy`, and `make flutter-web-deploy` / new APK. Branches only start sending logs once they run the new POS build.
+- **⚠️ Security finding (not fixed):** Cloud Run `pos-sync-api` has neither `ADMIN_PASSWORD` nor `JWT_SECRET` set, so the code falls back to `admin123` and `dev_jwt_secret_key`. That makes every admin endpoint (now including logs) readable by anyone who knows the defaults, and lets anyone forge JWTs. Set both via Secret Manager (`--set-secrets`). Rotating `JWT_SECRET` logs everyone out; update `POS_ADMIN_TOKEN` and the MCP server config afterwards.
+- **Minor bug seen during testing:** `GET /api/branches/<invalid-uuid>` returns 500 instead of 400.
+
+---
+
 ## 1. Header & Metadata
 - **Project Name:** POS-ERP (Cacharelo Monorepo)
 - **Repository Path:** `/Users/joelmorales/web/POS-ERP`

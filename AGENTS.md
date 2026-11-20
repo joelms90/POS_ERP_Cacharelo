@@ -1,7 +1,7 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read:
-specs/013-unify-roles/plan.md
+specs/017-sucursal-version/plan.md
 <!-- SPECKIT END -->
 
 # Multi-Session Workspace Coordination
@@ -58,6 +58,12 @@ This monorepo supports autonomous parallel development using **`agy`**, **`codex
 - `make team-status` - Check status of active AI workers and logs
 - `make check-all` - Run PDCA verification gate across all apps (backend, admin, pos)
 - `make team-clean` - Safely terminate background workers and remove worktrees
+
+## Production Issue Triage (any agent)
+
+Errors from the POS Flutter app, the admin web (cacharelo-central.web.app) and API 5xx are stored per sucursal in `app_logs`.
+To answer "were there issues today?": `export POS_ADMIN_TOKEN=...` then run `make logs-today`, and follow [`docs/prod-log-triage.md`](docs/prod-log-triage.md).
+MCP equivalents: `get_error_summary`, `search_logs` and `get_log_entry` in `apps/mcp_server`.
 
 ## App Boundaries
 

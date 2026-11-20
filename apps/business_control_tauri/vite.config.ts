@@ -10,6 +10,11 @@ const defaultPort = process.env.PORT ? parseInt(process.env.PORT, 10) : 1420;
 export default defineConfig(async () => ({
   plugins: [react(), tailwindcss()],
 
+  // Identifies the deployed admin build in production logs (app_logs.app_version).
+  define: {
+    __APP_BUILD_ID__: JSON.stringify(`web-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}`),
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
