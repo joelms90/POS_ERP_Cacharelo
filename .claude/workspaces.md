@@ -14,8 +14,8 @@
 - **Status**: ✅ Completed (not deployed)
 
 ### Session: 017-sucursal-version
-- **Scope**: Specify the POS display of the configured sucursal next to the application version; no implementation in this session.
-- **Status**: ✅ Specification complete
+- **Scope**: Plan and implement the POS display of the configured sucursal next to the application version; POS client only.
+- **Status**: 🔄 In progress
 
 ### Session: production-admin-e2e
 - **Scope**: Fix staging requisitions with no selected warehouse returning HTTP 500; align the idempotent DB migration with the nullable application contract.

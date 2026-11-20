@@ -1,7 +1,7 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read:
-specs/013-unify-roles/plan.md
+specs/017-sucursal-version/plan.md
 <!-- SPECKIT END -->
 
 # Multi-Session Workspace Coordination
