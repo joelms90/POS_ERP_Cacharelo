@@ -644,7 +644,10 @@ class _WaiterOrderingScreenState extends State<WaiterOrderingScreen> {
 
               const SizedBox(width: 10),
 
-              AppVersionBadge(version: widget.state.appVersion),
+              AppVersionBadge(
+                version: widget.state.appVersion,
+                branchName: widget.state.terminalBranchName,
+              ),
 
               const SizedBox(width: 12),
 
