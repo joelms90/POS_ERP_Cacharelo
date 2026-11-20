@@ -8,8 +8,9 @@
 
 ## Currently Active Sessions
 ### Session: production-admin-e2e
-- **Scope**: Expand staging Playwright coverage for transactional admin business flows, starting with requisitions and inventory movements.
-- **Status**: ✅ Completed — staging E2E covers required rejection reason/no transfer and approved requisition → shipment → receipt with stock-delta verification.
+- **Scope**: Fix staging requisitions with no selected warehouse returning HTTP 500; align the idempotent DB migration with the nullable application contract.
+- **Migration Status**: Awaiting coordination window — `branch_requisitions.to_warehouse_id` will drop `NOT NULL` via `make backend-migrate`.
+- **Status**: 🔄 In progress
 
 ### Session: fix-flutter-web-local-host
 - **Scope**: Fix Flutter web local Make target host binding/diagnostics for localhost:8081; Makefile only.

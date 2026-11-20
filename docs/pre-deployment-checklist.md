@@ -25,6 +25,7 @@ This idempotently creates/alters everything below (safe to run multiple times):
 | `branch_stock_thresholds` | per-branch min/max overrides |
 | `inventory_alerts` + `branch_id` nullable + global unique index | global vs branch alerts |
 | `business_inventory_settings` | auto-requisition / default warehouse |
+| `branch_requisitions.to_warehouse_id` | nullable: origin warehouse can be selected during approval/dispatch |
 | `recipes.waste_percent` | BOM waste % |
 | `warehouses.location_type` | `'warehouse' | 'transit'` |
 | `branch_products` | per-branch sellable catalog |

@@ -41,14 +41,12 @@ test.describe('Staging requisition rejection', () => {
     const token = await login(page);
     const businessId = process.env.E2E_BUSINESS_ID ?? await page.locator('header select').inputValue();
 
-    const [branches, products, warehouses] = await Promise.all([
+    const [branches, products] = await Promise.all([
       api<Entity[]>(token, `/branches?businessId=${businessId}`),
       api<Entity[]>(token, `/products?businessId=${businessId}`),
-      api<Entity[]>(token, `/warehouses?businessId=${businessId}`),
     ]);
     expect(branches.length).toBeGreaterThan(0);
     expect(products.length).toBeGreaterThan(0);
-    expect(warehouses.length).toBeGreaterThan(0);
 
     const tag = `E2E-STAGING-REJECT-${Date.now()}`;
     const requisition = await api<Requisition>(token, '/requisitions', {
@@ -56,7 +54,6 @@ test.describe('Staging requisition rejection', () => {
       body: JSON.stringify({
         businessId,
         fromBranchId: branches[0].id,
-        toWarehouseId: warehouses[0].id,
         notes: tag,
         items: [{ productId: products[0].id, quantityRequested: 0.01 }],
       }),

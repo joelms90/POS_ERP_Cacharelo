@@ -61,7 +61,7 @@ async function main() {
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
         "business_id" uuid NOT NULL,
         "from_branch_id" uuid NOT NULL,
-        "to_warehouse_id" uuid NOT NULL,
+        "to_warehouse_id" uuid,
         "status" varchar(20) DEFAULT 'pending_approval' NOT NULL,
         "notes" text,
         "created_by" uuid NOT NULL,
@@ -71,6 +71,14 @@ async function main() {
       );
     `);
     console.log('Table branch_requisitions ensured.');
+
+    // Requisitions can be created before an origin warehouse is chosen. This
+    // must match the nullable Drizzle schema and the admin/POS workflow.
+    await client.query(`
+      ALTER TABLE "branch_requisitions"
+      ALTER COLUMN "to_warehouse_id" DROP NOT NULL;
+    `);
+    console.log('branch_requisitions.to_warehouse_id made nullable.');
 
     // 4. branch_requisition_items
     await client.query(`
