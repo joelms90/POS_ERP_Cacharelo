@@ -7,6 +7,10 @@
 ---
 
 ## Currently Active Sessions
+### Session: 017-sucursal-version
+- **Scope**: Specify the POS display of the configured sucursal next to the application version; no implementation in this session.
+- **Status**: ✅ Specification complete
+
 ### Session: production-admin-e2e
 - **Scope**: Fix staging requisitions with no selected warehouse returning HTTP 500; align the idempotent DB migration with the nullable application contract.
 - **Migration Status**: ✅ Completed — staging E2E verified requisitions without an origin warehouse after `make backend-migrate`.
