@@ -11,6 +11,7 @@
 | 🖥️ **Admin Dashboard** | [`apps/business_control_tauri/src/services/api.ts`](./apps/business_control_tauri/src/services/api.ts) |
 | 📱 **POS App (Flutter)** | [`apps/pos_flutter/lib/ui/common/app_state.dart`](./apps/pos_flutter/lib/ui/common/app_state.dart) |
 | 🧪 **Local Testing** | [`docs/App local testing.md`](./docs/App%20local%20testing.md) |
+| 🩺 **Prod Issues / Logs** | [`docs/prod-log-triage.md`](./docs/prod-log-triage.md) (`make logs-today`, skill `/triage-prod-logs`) |
 | 🚀 **Deployments** | [`.claude/deployment-agent.md`](./.claude/deployment-agent.md) |
 | 🔄 **Session State** | [`HANDOFF.md`](./HANDOFF.md) / [`.claude/workspaces.md`](./.claude/workspaces.md) |
 

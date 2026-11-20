@@ -1,3 +1,5 @@
+import { remoteLogger } from './remoteLogger';
+
 export interface Employee {
   id: string;
   businessId?: string;
@@ -450,11 +452,24 @@ async function apiRequest<T>(
     headers.set('X-Admin-Token', token);
   }
 
-  const response = await fetch(`${baseUrl}${endpoint}`, {
-    ...options,
-    headers,
-    cache: 'no-store',
-  });
+  const method = (options.method || 'GET').toUpperCase();
+  const routePath = endpoint.split('?')[0];
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${endpoint}`, {
+      ...options,
+      headers,
+      cache: 'no-store',
+    });
+  } catch (networkError) {
+    remoteLogger.log('warn', `HTTP network failure ${method} ${routePath}`, {
+      route: endpoint,
+      httpMethod: method,
+      context: { kind: 'http_exception', error: String(networkError) },
+    });
+    throw networkError;
+  }
+  remoteLogger.breadcrumb(`${method} ${routePath} → ${response.status}`);
 
   if (!response.ok) {
     let errorMessage = `API Error: ${response.status} ${response.statusText}`;
@@ -473,6 +488,14 @@ async function apiRequest<T>(
     }
     if (hadStoredSession && response.status === 401) {
       expireAuthSession();
+    }
+    if (response.status !== 401 && response.status !== 404) {
+      remoteLogger.log(response.status >= 500 ? 'error' : 'warn', `HTTP ${response.status} ${method} ${routePath}`, {
+        route: endpoint,
+        httpMethod: method,
+        httpStatus: response.status,
+        context: { kind: 'http_response', serverMessage: errorMessage },
+      });
     }
     throw new Error(errorMessage);
   }
@@ -1183,15 +1206,7 @@ export const api = {
   },
 
   async logError(message: string, stack?: string): Promise<void> {
-    try {
-      await fetch(`${getApiBaseUrl()}/products/log-error`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, stack }),
-      });
-    } catch {
-      // ignore
-    }
+    remoteLogger.error(message, { stack: stack && stack !== 'no-stack' ? stack : undefined });
   },
 
   async uploadBulkFile(businessId: string, file: File): Promise<any> {

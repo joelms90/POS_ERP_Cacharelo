@@ -2,11 +2,17 @@
 
 **Purpose**: Track which development sessions (terminals/developers/assistants) are working on which parts of the monorepo to prevent conflicts.
 
-**Last Updated**: 2026-09-18
+**Last Updated**: 2026-11-20
 
 ---
 
 ## Currently Active Sessions
+### Session: prod-logging
+- **Scope**: Production diagnostics. Adds the `app_logs` table and `/api/logs` intake, an API 5xx interceptor, Flutter `RemoteLogger` plus the logged HTTP wrapper, the admin web `remoteLogger` plus error boundary, `make logs-*`, MCP log tools, and `docs/prod-log-triage.md`.
+- **Branch**: `feat/prod-logging`
+- **Migration Status**: `app_logs` is added to `idempotent-deploy-migrations.ts` and is also auto-created at runtime. Not yet run in prod.
+- **Status**: ✅ Completed (not deployed)
+
 ### Session: 017-sucursal-version
 - **Scope**: Specify the POS display of the configured sucursal next to the application version; no implementation in this session.
 - **Status**: ✅ Specification complete

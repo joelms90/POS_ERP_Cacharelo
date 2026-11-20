@@ -31,6 +31,7 @@ This idempotently creates/alters everything below (safe to run multiple times):
 | `branch_products` | per-branch sellable catalog |
 | `production_runs` | `destination_warehouse_id`, `status`, `actual_quantity_produced`, `started_at` (OP lifecycle) |
 | `users.role` | widened to `varchar(50)` for canonical operational roles such as `warehouse_purchasing_operator` |
+| `app_logs` | production diagnostics from POS Flutter, Admin Web and API 5xx (also auto-created lazily by `LogsService`; see `docs/prod-log-triage.md`) |
 
 > ⚠️ Note: the full Drizzle journal runner (`npm run migrate` / app-boot `runMigrations`) can
 > fail on pre-existing manually-created objects (e.g. `admin_business_access`). Prefer

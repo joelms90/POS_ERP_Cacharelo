@@ -25,6 +25,7 @@ import { InventoryDashboardPage } from './pages/InventoryDashboardPage';
 import { BranchCatalogPage } from './pages/BranchCatalogPage';
 import { WarehouseInventoryPage } from './pages/WarehouseInventoryPage';
 import { api } from './services/api';
+import { remoteLogger } from './services/remoteLogger';
 
 export type AdminTab = 'administrators' | 'personal' | 'inventory-dashboard' | 'branch-catalog' | 'warehouse-inventory' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers' | 'purchase-orders' | 'requisitions' | 'help' | 'reports' | 'tickets' | 'mesas' | 'ticket-settings' | 'pos-simulator';
 
@@ -62,6 +63,10 @@ function App() {
       // ignore storage errors (e.g. private mode)
     }
   }, [activeBusinessId]);
+
+  useEffect(() => {
+    remoteLogger.setScreen(activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     if (!allowedTabs.includes(activeTab)) {
