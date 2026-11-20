@@ -307,7 +307,10 @@ class _EncargadoDashboardScreenState extends State<EncargadoDashboardScreen> {
                 ),
               ),
               const SizedBox(width: 10),
-              AppVersionBadge(version: widget.state.appVersion),
+              AppVersionBadge(
+                version: widget.state.appVersion,
+                branchName: widget.state.terminalBranchName,
+              ),
             ],
           ),
           const Spacer(),

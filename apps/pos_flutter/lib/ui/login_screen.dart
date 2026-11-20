@@ -656,7 +656,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                             ),
                                       ),
                                       const SizedBox(height: 8),
-                                      AppVersionBadge(version: widget.state.appVersion),
+                                      AppVersionBadge(
+                                        version: widget.state.appVersion,
+                                        branchName: widget.state.terminalBranchName,
+                                      ),
                                       SizedBox(height: titleGap),
 
                                       // PIN Code indicators

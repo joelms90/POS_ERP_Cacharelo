@@ -321,7 +321,10 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
                 ),
               ),
               const SizedBox(width: 10),
-              AppVersionBadge(version: widget.state.appVersion),
+              AppVersionBadge(
+                version: widget.state.appVersion,
+                branchName: widget.state.terminalBranchName,
+              ),
               const SizedBox(width: 12),
 
               // --- SUB-GROUP 1: Section Navigation ---
