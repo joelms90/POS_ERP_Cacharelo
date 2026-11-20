@@ -9,8 +9,8 @@
 ## Currently Active Sessions
 ### Session: production-admin-e2e
 - **Scope**: Fix staging requisitions with no selected warehouse returning HTTP 500; align the idempotent DB migration with the nullable application contract.
-- **Migration Status**: Blocked — `make backend-migrate` was attempted on 2026-11-20 but Cloud SQL Proxy credentials require Google reauthentication (`invalid_grant` / `invalid_rapt`).
-- **Status**: ⏸️ Awaiting credential refresh, then rerun `make backend-migrate` and `pnpm test:e2e:staging`.
+- **Migration Status**: ✅ Completed — staging E2E verified requisitions without an origin warehouse after `make backend-migrate`.
+- **Status**: ✅ Completed
 
 ### Session: fix-flutter-web-local-host
 - **Scope**: Fix Flutter web local Make target host binding/diagnostics for localhost:8081; Makefile only.
