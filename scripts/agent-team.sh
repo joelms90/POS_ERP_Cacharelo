@@ -26,13 +26,48 @@ OPENCODE_BIN="$(which opencode || echo '/Users/joelmorales/.opencode/bin/opencod
 AGY_BIN="$(which agy || echo '/Users/joelmorales/.local/bin/agy')"
 
 SUPPORTED_AGENTS=("codex" "claude" "opencode" "agy")
+SUPPORTED_APPS=("backend" "admin" "pos")
+
+validate_apps() {
+    local apps_csv="$1"
+    local app
+    IFS=',' read -r -a requested_apps <<< "${apps_csv}"
+    for app in "${requested_apps[@]}"; do
+        case "${app}" in
+            backend|admin|pos) ;;
+            *)
+                echo -e "${RED}Error: Unsupported app '${app}'. Use backend, admin, pos, or a comma-separated list.${NC}"
+                exit 1
+                ;;
+        esac
+    done
+}
+
+require_simple_feature_name() {
+    local feature="$1"
+    if [[ ! "${feature}" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+        echo -e "${RED}Error: Feature names must use lowercase letters, numbers, and hyphens (for example: sucursal-version).${NC}"
+        exit 1
+    fi
+}
+
+require_clean_tracked_tree() {
+    if ! git diff --quiet || ! git diff --cached --quiet; then
+        echo -e "${RED}Error: Commit or stash tracked changes before starting a feature lifecycle.${NC}"
+        echo "Untracked files are allowed and will not be added automatically."
+        exit 1
+    fi
+}
 
 show_help() {
     echo -e "${BOLD}${CYAN}Empire POS-ERP Multi-Agent Team Orchestrator${NC}"
     echo "Usage: ./scripts/agent-team.sh [command] [args]"
     echo ""
     echo "Commands:"
-    echo "  setup <feature_name>               Create isolated git worktrees for backend, admin, and pos"
+    echo "  setup <work_prefix> [apps]         Create isolated worktrees (apps: backend,admin,pos)"
+    echo "  feature-start <name> [apps]        Create/switch feat/<name> and work/<name>/<app> worktrees"
+    echo "  feature-check [apps]               Check selected apps (defaults to all)"
+    echo "  feature-finish <name> [apps]       Check and merge selected work/<name>/<app> branches"
     echo "  dispatch <agent> <app> <prompt>    Dispatch a coding agent to an app in the background"
     echo "  status                             Show status of active agents, PIDs, and latest logs"
     echo "  logs <agent>                       Tail real-time logs for a specific agent"
@@ -46,6 +81,7 @@ show_help() {
 
 cmd_setup() {
     local feature="$1"
+    local apps_csv="${2:-backend,admin,pos}"
     if [ -z "$feature" ]; then
         echo -e "${RED}Error: Feature name required (e.g. ./scripts/agent-team.sh setup 015-resumen-sucursal)${NC}"
         exit 1
@@ -53,15 +89,24 @@ cmd_setup() {
 
     echo -e "${BOLD}${BLUE}==> Setting up isolated worktrees for feature: ${feature}${NC}"
     cd "${REPO_ROOT}"
+    validate_apps "${apps_csv}"
 
-    local apps=("backend" "admin" "pos")
+    local apps=()
+    IFS=',' read -r -a apps <<< "${apps_csv}"
 
     for app in "${apps[@]}"; do
         local branch="${feature}/${app}"
         local target_dir="${WORKTREE_BASE}/${app}"
 
         if [ -d "${target_dir}" ]; then
-            echo -e "${YELLOW}  • Worktree for ${app} already exists at ${target_dir}${NC}"
+            local existing_branch
+            existing_branch="$(git -C "${target_dir}" branch --show-current)"
+            if [ "${existing_branch}" != "${branch}" ]; then
+                echo -e "${RED}Error: ${target_dir} is already used by ${existing_branch}, not ${branch}.${NC}"
+                echo "Run 'make team-clean' only after confirming no other feature uses these worktrees."
+                exit 1
+            fi
+            echo -e "${YELLOW}  • Reusing worktree for ${app} at ${target_dir}${NC}"
         else
             if git show-ref --quiet "refs/heads/${branch}"; then
                 echo -e "  • Reusing existing branch ${branch} -> ${target_dir}"
@@ -81,6 +126,32 @@ cmd_setup() {
     done
 
     echo -e "${GREEN}✅ Worktrees ready in ${WORKTREE_BASE}/${NC}"
+}
+
+cmd_feature_start() {
+    local feature="$1"
+    local apps_csv="${2:-backend,admin,pos}"
+    require_simple_feature_name "${feature}"
+    validate_apps "${apps_csv}"
+    cd "${REPO_ROOT}"
+    require_clean_tracked_tree
+
+    local integration_branch="feat/${feature}"
+    local work_prefix="work/${feature}"
+
+    if [ "$(git branch --show-current)" != "${integration_branch}" ]; then
+        if git show-ref --verify --quiet "refs/heads/${integration_branch}"; then
+            git switch "${integration_branch}"
+        else
+            git switch -c "${integration_branch}"
+        fi
+    fi
+
+    echo -e "${GREEN}Integration branch: ${integration_branch}${NC}"
+    echo -e "${GREEN}Agent worktree prefix: ${work_prefix}${NC}"
+    cmd_setup "${work_prefix}" "${apps_csv}"
+    echo ""
+    echo "Next: declare the feature in .claude/workspaces.md, commit that declaration, then dispatch only the selected apps."
 }
 
 cmd_dispatch() {
@@ -181,9 +252,9 @@ cmd_status() {
             fi
 
             if kill -0 "${pid}" 2>/dev/null; then
-                echo -e "  [${agent^^}] App: ${BOLD}${app}${NC} | PID: ${pid} | Status: ${GREEN}${BOLD}RUNNING 🔄${NC}"
+                echo -e "  [$(printf '%s' "${agent}" | tr '[:lower:]' '[:upper:]')] App: ${BOLD}${app}${NC} | PID: ${pid} | Status: ${GREEN}${BOLD}RUNNING 🔄${NC}"
             else
-                echo -e "  [${agent^^}] App: ${BOLD}${app}${NC} | PID: ${pid} | Status: ${BLUE}${BOLD}FINISHED ✅${NC}"
+                echo -e "  [$(printf '%s' "${agent}" | tr '[:lower:]' '[:upper:]')] App: ${BOLD}${app}${NC} | PID: ${pid} | Status: ${BLUE}${BOLD}FINISHED ✅${NC}"
             fi
 
             if [ -f "${logfile}" ]; then
@@ -197,6 +268,55 @@ cmd_status() {
     if [ "$count" -eq 0 ]; then
         echo -e "  ${YELLOW}No background agents active.${NC}"
     fi
+}
+
+cmd_feature_check() {
+    local apps_csv="${1:-backend,admin,pos}"
+    validate_apps "${apps_csv}"
+    local apps=()
+    local app
+    IFS=',' read -r -a apps <<< "${apps_csv}"
+    for app in "${apps[@]}"; do
+        cmd_check "${app}"
+    done
+}
+
+cmd_feature_finish() {
+    local feature="$1"
+    local apps_csv="${2:-backend,admin,pos}"
+    require_simple_feature_name "${feature}"
+    validate_apps "${apps_csv}"
+    cd "${REPO_ROOT}"
+
+    local integration_branch="feat/${feature}"
+    if [ "$(git branch --show-current)" != "${integration_branch}"; then
+        echo -e "${RED}Error: feature-finish must run from ${integration_branch}.${NC}"
+        exit 1
+    fi
+
+    cmd_feature_check "${apps_csv}"
+
+    local apps=()
+    local app
+    IFS=',' read -r -a apps <<< "${apps_csv}"
+    for app in "${apps[@]}"; do
+        local branch="work/${feature}/${app}"
+        if ! git show-ref --verify --quiet "refs/heads/${branch}"; then
+            echo -e "${RED}Error: Expected agent branch ${branch} does not exist.${NC}"
+            exit 1
+        fi
+        local worktree_dir="${WORKTREE_BASE}/${app}"
+        if [ -d "${worktree_dir}" ] && [ "$(git -C "${worktree_dir}" branch --show-current)" = "${branch}" ] && [ -n "$(git -C "${worktree_dir}" status --porcelain)" ]; then
+            echo -e "${RED}Error: ${branch} has uncommitted work in ${worktree_dir}.${NC}"
+            echo "Ask the app agent to commit or discard its own changes before merging."
+            exit 1
+        fi
+        git merge --no-ff "${branch}" -m "merge(${app}): integrate ${branch}"
+    done
+
+    echo -e "${GREEN}✅ Selected app branches are merged into ${integration_branch}.${NC}"
+    echo "Review the combined diff, commit any shared docs/workspace update, push, then deploy explicitly."
+    echo "Worktrees remain intact until you intentionally run 'make team-clean'."
 }
 
 cmd_logs() {
@@ -346,7 +466,16 @@ cmd_clean() {
 
 case "$1" in
     setup)
-        cmd_setup "$2"
+        cmd_setup "$2" "$3"
+        ;;
+    feature-start)
+        cmd_feature_start "$2" "$3"
+        ;;
+    feature-check)
+        cmd_feature_check "$2"
+        ;;
+    feature-finish)
+        cmd_feature_finish "$2" "$3"
         ;;
     dispatch)
         cmd_dispatch "$2" "$3" "$4"

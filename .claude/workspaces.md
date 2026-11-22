@@ -10,7 +10,7 @@
 ### Session: feature-delivery-workflow
 - **Scope**: Add the reusable feature-delivery skill, safe feature lifecycle Make targets, and team-status portability fix. Shared tooling only; no app deployment.
 - **Branch**: `chore/feature-delivery-workflow`
-- **Status**: 🔄 In progress
+- **Status**: ✅ Completed (not deployed)
 
 ### Session: prod-logging
 - **Scope**: Production diagnostics. Adds the `app_logs` table and `/api/logs` intake, an API 5xx interceptor, Flutter `RemoteLogger` plus the logged HTTP wrapper, the admin web `remoteLogger` plus error boundary, `make logs-*`, MCP log tools, and `docs/prod-log-triage.md`.
