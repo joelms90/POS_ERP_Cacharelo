@@ -1116,7 +1116,7 @@ mcp-build:
 # -----------------------------------------------------------------------------
 # Multi-Agent Team Orchestration (agy + codex + opencode) & PDCA Quality Gates
 # -----------------------------------------------------------------------------
-.PHONY: check-backend check-admin check-pos check-all team-setup team-status team-clean team-check
+.PHONY: check-backend check-admin check-pos check-all team-setup team-status team-clean team-check feature-start feature-check feature-finish
 
 check-backend:
 	@./scripts/agent-team.sh check backend
@@ -1134,7 +1134,16 @@ team-status:
 	@./scripts/agent-team.sh status
 
 team-setup:
-	@./scripts/agent-team.sh setup $(FEATURE)
+	@./scripts/agent-team.sh setup $(FEATURE) $(APPS)
+
+feature-start:
+	@./scripts/agent-team.sh feature-start $(FEATURE) $(APPS)
+
+feature-check:
+	@./scripts/agent-team.sh feature-check $(APPS)
+
+feature-finish:
+	@./scripts/agent-team.sh feature-finish $(FEATURE) $(APPS)
 
 team-clean:
 	@./scripts/agent-team.sh clean
