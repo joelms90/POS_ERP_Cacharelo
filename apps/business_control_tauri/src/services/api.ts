@@ -81,6 +81,40 @@ export interface SystemHealth {
   activeSessionsCount: number;
 }
 
+export interface OwnerCopilotSource {
+  label: string;
+  href: string;
+}
+
+export interface OwnerCopilotToolRun {
+  tool: string;
+  status: 'running' | 'completed' | 'blocked' | 'failed';
+  summary: string;
+}
+
+export interface OwnerCopilotActionProposal {
+  title: string;
+  summary: string;
+  confirmationToken: string;
+  expiresAt: string;
+}
+
+export interface OwnerCopilotMessage {
+  id: string;
+  role: 'owner' | 'assistant';
+  content: string;
+  createdAt: string;
+  toolRuns?: OwnerCopilotToolRun[];
+  sources?: OwnerCopilotSource[];
+  actionProposal?: OwnerCopilotActionProposal;
+}
+
+export interface OwnerCopilotResponse {
+  conversationId: string;
+  message: OwnerCopilotMessage;
+  history?: OwnerCopilotMessage[];
+}
+
 export interface Inquiry {
   id: string;
   name: string;
@@ -622,6 +656,29 @@ export const api = {
       setAdminToken(data.token);
     }
     return data;
+  },
+
+  /** Owner-only gateway. Browser credentials are limited to the normal admin session. */
+  async askOwnerCopilot(payload: {
+    businessId: string;
+    branchId?: string;
+    conversationId?: string;
+    message: string;
+  }): Promise<OwnerCopilotResponse> {
+    return apiRequest<OwnerCopilotResponse>('/owner-copilot/chat', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async confirmOwnerCopilotAction(payload: {
+    conversationId: string;
+    confirmationToken: string;
+  }): Promise<OwnerCopilotResponse> {
+    return apiRequest<OwnerCopilotResponse>('/owner-copilot/confirm', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   },
 
   async getAdminUsers(businessId: string): Promise<AdminUser[]> {

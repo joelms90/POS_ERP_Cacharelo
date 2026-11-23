@@ -104,6 +104,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
  
           {/* Navigation Links */}
           <nav className="p-4 flex flex-col gap-1 flex-1 overflow-y-auto">
+            {canSee('copilot') && (
+            <button
+              onClick={() => handleTabClick('copilot')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
+                activeTab === 'copilot'
+                  ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
+                  : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-charcoal-surface/50'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3a7 7 0 00-7 7v3a4 4 0 004 4h1v3l3-3h2a6 6 0 006-6v-1a7 7 0 00-7-7zM9 10h.01M15 10h.01" /></svg>
+              <span className="text-xs">Copiloto</span>
+            </button>
+            )}
             {/* Group: Operaciones */}
             <div className="px-3 py-1.5 mt-1 select-none">
               <span className="text-[10px] font-bold text-aged-bronze uppercase tracking-widest">
