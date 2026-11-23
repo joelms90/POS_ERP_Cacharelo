@@ -313,7 +313,9 @@ class _PendingApprovalsViewState extends State<PendingApprovalsView> {
         ),
     ].whereType<Widget>().toList();
 
+    final rejectedOffline = widget.state.rejectedCashJobs;
     if (widget.compact &&
+        rejectedOffline.isEmpty &&
         _recountCortes.isEmpty &&
         _statusCortes.isEmpty &&
         _myPendingMovements.isEmpty) {
@@ -361,7 +363,52 @@ class _PendingApprovalsViewState extends State<PendingApprovalsView> {
                 style: const TextStyle(color: EmpireColors.errorRed),
               ),
             ),
+          if (rejectedOffline.isNotEmpty)
+            _rejectedOfflineBanner(rejectedOffline),
           ...sections,
+        ],
+      ),
+    );
+  }
+
+  /// D-5: operations saved without connection that the server rejected.
+  Widget _rejectedOfflineBanner(List<Map<String, dynamic>> jobs) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: EmpireColors.errorRed.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: EmpireColors.errorRed),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Operaciones sin conexión rechazadas por el servidor',
+            style: TextStyle(
+                color: EmpireColors.errorRed, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          ...jobs.map((job) {
+            final payload =
+                job['payload'] is Map ? job['payload'] as Map : const {};
+            final what = job['kind'] == 'close'
+                ? 'Corte Z'
+                : '${payload['type'] == 'cash-in' ? 'Ingreso' : 'Retiro'} de ${_fmt(payload['amount'])}';
+            return Text('• $what: ${job['error'] ?? ''}',
+                style: const TextStyle(color: EmpireColors.textPrimary));
+          }),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () async {
+                await widget.state.dismissRejectedCashJobs();
+                if (mounted) setState(() {});
+              },
+              child: const Text('ENTENDIDO'),
+            ),
+          ),
         ],
       ),
     );

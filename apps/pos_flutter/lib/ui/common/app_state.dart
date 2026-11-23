@@ -12,6 +12,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../services/secure_storage_service.dart';
+import '../../services/cash_offline_queue.dart';
 import '../../models/local_requisition.dart';
 import 'sync_socket_service.dart';
 
@@ -625,6 +626,14 @@ class AppState extends ChangeNotifier {
   /// Items of the branch inbox this operator can resolve (N1) right now.
   int pendingApprovalsCount = 0;
   String? lastApprovalError;
+  /// D-5: cash movements and Corte Z recorded without connection, sent in order.
+  late final CashOfflineQueue cashQueue = CashOfflineQueue(
+    load: () => _secureStorageService.getPendingCashJobs(),
+    save: (jobs) => _secureStorageService.savePendingCashJobs(jobs),
+  );
+  /// Last expected cash known from the server per shift (Corte X), used to
+  /// estimate the expected cash of an offline Corte Z.
+  final Map<String, double> _lastServerExpectedCash = {};
 
   // Offline & sync states
   bool isOnline = true;
@@ -725,6 +734,8 @@ class AppState extends ChangeNotifier {
       cachedWarehouses = await _secureStorageService.getCachedWarehouses();
       await _loadCachedMenu();
       await _loadPendingOrderSyncJobs();
+      await cashQueue.restore();
+      _updatePendingSyncCount();
       if (isTerminalConfigured) {
         await _loadPendingSaleSyncJobs();
         await syncOperators();
@@ -2258,6 +2269,13 @@ class AppState extends ChangeNotifier {
         cashDrawerAmount =
             double.tryParse(data['cashDrawerAmount']?.toString() ?? '') ?? 0.0;
         isShiftOpen = data['status'] == 'open';
+        // D-5: closed offline and still queued → keep it closed locally.
+        if (activeShiftId != null && cashQueue.hasPendingClose(activeShiftId!)) {
+          isShiftOpen = false;
+          activeShiftId = null;
+        } else if (activeShiftId != null) {
+          cashDrawerAmount += cashQueue.pendingCashEffect(activeShiftId!);
+        }
 
         if (isShiftOpen && activeShiftId != null) {
           await _secureStorageService.saveActiveShift(
@@ -2297,6 +2315,7 @@ class AppState extends ChangeNotifier {
   Future<bool> openShift(double floatAmount) async {
     lastShiftError = null;
     lastShiftErrorCode = null;
+    await _syncPendingCashJobs();
     if (!isTerminalConfigured ||
         terminalBranchId == null ||
         currentUserId == null) {
@@ -2359,79 +2378,44 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> addCashDrop(double amount,
-      {String reason = 'Ingreso de caja', String? category}) async {
-    lastShiftError = null;
-    if (activeShiftId == null) {
-      lastShiftError = 'No hay turno activo para registrar ingreso.';
-      return false;
-    }
-    try {
-      final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
-            headers: await _operatorHeaders(),
-            body: jsonEncode({
-              'type': 'cash-in',
-              'amount': amount.toStringAsFixed(2),
-              'reason': reason,
-              if (category != null) 'category': category,
-              'clientUuid': _newUuid(),
-            }),
-          )
-          .timeout(const Duration(seconds: 8));
-
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        lastMovementApprovalStatus =
-            data['transaction']?['approvalStatus']?.toString();
-        if (data['shift'] != null) {
-          cashDrawerAmount = double.tryParse(
-                  data['shift']['cashDrawerAmount']?.toString() ?? '') ??
-              (cashDrawerAmount + amount);
-        } else {
-          cashDrawerAmount += amount;
-        }
-        notifyListeners();
-        return true;
-      }
-      try {
-        final errorData = jsonDecode(response.body);
-        lastShiftError = errorData['message']?.toString() ??
-            'Error al registrar ingreso (${response.statusCode})';
-      } catch (_) {
-        lastShiftError = 'Error ${response.statusCode}: ${response.body}';
-      }
-      notifyListeners();
-      return false;
-    } catch (e) {
-      lastShiftError = 'Error de conexión: $e';
-      debugPrint('Error adding cash drop: $e');
-      notifyListeners();
-      return false;
-    }
+      {String reason = 'Ingreso de caja', String? category}) {
+    return _recordCashMovement('cash-in', amount, reason, category);
   }
 
   Future<bool> removeCashDrop(double amount,
-      {String reason = 'Retiro de caja', String? category}) async {
+      {String reason = 'Retiro de caja', String? category}) {
+    return _recordCashMovement('cash-out', amount, reason, category);
+  }
+
+  /// Records a cash-in/out. Online it goes straight to the server; without a
+  /// connection it is queued (D-5) and counted locally until it syncs.
+  Future<bool> _recordCashMovement(
+      String type, double amount, String reason, String? category) async {
     lastShiftError = null;
-    if (activeShiftId == null) {
-      lastShiftError = 'No hay turno activo para registrar retiro.';
+    final isIn = type == 'cash-in';
+    final shiftId = activeShiftId;
+    if (shiftId == null) {
+      lastShiftError = isIn
+          ? 'No hay turno activo para registrar ingreso.'
+          : 'No hay turno activo para registrar retiro.';
       return false;
     }
+    final clientUuid = _newUuid();
+    final payload = <String, dynamic>{
+      'type': type,
+      'amount': amount.toStringAsFixed(2),
+      'reason': reason,
+      if (category != null) 'category': category,
+      'clientUuid': clientUuid,
+      'occurredAt': DateTime.now().toUtc().toIso8601String(),
+    };
     try {
       final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
           .post(
-            Uri.parse('$baseUrl/cash-shifts/$activeShiftId/transactions'),
+            Uri.parse('$baseUrl/cash-shifts/$shiftId/transactions'),
             headers: await _operatorHeaders(),
-            body: jsonEncode({
-              'type': 'cash-out',
-              'amount': amount.toStringAsFixed(2),
-              'reason': reason,
-              if (category != null) 'category': category,
-              'clientUuid': _newUuid(),
-            }),
+            body: jsonEncode(payload),
           )
           .timeout(const Duration(seconds: 8));
 
@@ -2439,12 +2423,17 @@ class AppState extends ChangeNotifier {
         final Map<String, dynamic> data = jsonDecode(response.body);
         lastMovementApprovalStatus =
             data['transaction']?['approvalStatus']?.toString();
+        final signed = isIn ? amount : -amount;
         if (data['shift'] != null) {
           cashDrawerAmount = double.tryParse(
                   data['shift']['cashDrawerAmount']?.toString() ?? '') ??
-              max(0.0, cashDrawerAmount - amount);
+              max(0.0, cashDrawerAmount + signed);
         } else {
-          cashDrawerAmount = max(0.0, cashDrawerAmount - amount);
+          cashDrawerAmount = max(0.0, cashDrawerAmount + signed);
+        }
+        if (_lastServerExpectedCash.containsKey(shiftId)) {
+          _lastServerExpectedCash[shiftId] =
+              _lastServerExpectedCash[shiftId]! + signed;
         }
         notifyListeners();
         return true;
@@ -2452,17 +2441,38 @@ class AppState extends ChangeNotifier {
       try {
         final errorData = jsonDecode(response.body);
         lastShiftError = errorData['message']?.toString() ??
-            'Error al registrar retiro (${response.statusCode})';
+            'Error al registrar ${isIn ? 'ingreso' : 'retiro'} (${response.statusCode})';
       } catch (_) {
         lastShiftError = 'Error ${response.statusCode}: ${response.body}';
       }
       notifyListeners();
       return false;
     } catch (e) {
-      lastShiftError = 'Error de conexión: $e';
-      debugPrint('Error removing cash withdrawal: $e');
+      // No connection (or timeout): queue it; the server is idempotent by clientUuid.
+      debugPrint('Cash movement queued offline: $e');
+      await cashQueue.enqueue({
+        'kind': 'movement',
+        'clientUuid': clientUuid,
+        'shiftId': shiftId,
+        'userId': currentUserId,
+        'queuedAt': DateTime.now().toUtc().toIso8601String(),
+        'payload': payload,
+      });
+      cashDrawerAmount =
+          max(0.0, cashDrawerAmount + (isIn ? amount : -amount));
+      lastMovementApprovalStatus = 'pendiente_sync';
+      if (terminalBranchId != null && currentUserId != null) {
+        await _secureStorageService.saveActiveShift(
+          shiftId: shiftId,
+          branchId: terminalBranchId!,
+          cashierId: currentUserId!,
+          initialFloat: initialFloat,
+          cashDrawerAmount: cashDrawerAmount,
+        );
+      }
+      _updatePendingSyncCount();
       notifyListeners();
-      return false;
+      return true;
     }
   }
 
@@ -2472,23 +2482,32 @@ class AppState extends ChangeNotifier {
     String? closeNotes,
   }) async {
     lastShiftError = null;
-    if (activeShiftId == null) {
+    final shiftId = activeShiftId;
+    if (shiftId == null) {
       lastShiftError = 'No hay turno activo para cerrar.';
       return null;
     }
+    final clientUuid = _newUuid();
+    final body = <String, dynamic>{
+      'actualAmount': actualAmount.toStringAsFixed(2),
+      if (denominationCounts != null) 'denominationCounts': denominationCounts,
+      if (closeNotes != null && closeNotes.trim().isNotEmpty)
+        'closeNotes': closeNotes.trim(),
+      'clientUuid': clientUuid,
+    };
     try {
       final String baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      // Movements queued offline must reach the server before the Corte Z.
+      if (cashQueue.pendingCount > 0) await _syncPendingCashJobs();
+      if (cashQueue.jobs.any((job) =>
+          job['status'] == 'pending' && job['shiftId'] == shiftId)) {
+        throw const SocketException('Movimientos de caja pendientes de sincronizar');
+      }
       final response = await http
           .post(
-            Uri.parse('$baseUrl/cash-shifts/$activeShiftId/close'),
+            Uri.parse('$baseUrl/cash-shifts/$shiftId/close'),
             headers: await _operatorHeaders(),
-            body: jsonEncode({
-              'actualAmount': actualAmount.toStringAsFixed(2),
-              if (denominationCounts != null)
-                'denominationCounts': denominationCounts,
-              if (closeNotes != null && closeNotes.trim().isNotEmpty)
-                'closeNotes': closeNotes.trim(),
-            }),
+            body: jsonEncode(body),
           )
           .timeout(const Duration(seconds: 8));
 
@@ -2496,13 +2515,7 @@ class AppState extends ChangeNotifier {
         final Map<String, dynamic> data = jsonDecode(response.body);
         lastClosedShiftReviewStatus =
             data['shift']?['reviewStatus']?.toString();
-        isShiftOpen = false;
-        activeShiftId = null;
-        initialFloat = 0.0;
-        cashDrawerAmount = 0.0;
-        lastShiftError = null;
-        await _secureStorageService.clearActiveShift();
-        notifyListeners();
+        await _markShiftClosedLocally(shiftId);
         return Map<String, dynamic>.from(
           data['report'] ?? data['reconciliation'] ?? {},
         );
@@ -2517,11 +2530,174 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       return null;
     } catch (e) {
-      lastShiftError = 'Error de conexión: $e';
-      debugPrint('Error closing shift: $e');
+      // D-5: close offline. The server recalculates the expected cash when it syncs.
+      debugPrint('Corte Z queued offline: $e');
+      final serverExpected = _lastServerExpectedCash[shiftId];
+      final localExpected = serverExpected == null
+          ? null
+          : serverExpected + cashQueue.pendingCashEffect(shiftId);
+      final queuedMovements = cashQueue.jobs
+          .where((job) =>
+              job['kind'] == 'movement' &&
+              job['shiftId'] == shiftId &&
+              job['status'] == 'pending')
+          .map((job) => Map<String, dynamic>.from(job['payload'] as Map))
+          .toList();
+      final closedAt = DateTime.now().toUtc();
+      await cashQueue.enqueue({
+        'kind': 'close',
+        'clientUuid': clientUuid,
+        'shiftId': shiftId,
+        'userId': currentUserId,
+        'queuedAt': closedAt.toIso8601String(),
+        'payload': {
+          ...body,
+          'closedAt': closedAt.toIso8601String(),
+          'closedOffline': true,
+          if (localExpected != null)
+            'localExpectedCash': localExpected.toStringAsFixed(2),
+        },
+      });
+      final report = buildProvisionalCorteReport(
+        shiftId: shiftId,
+        cashierName: currentUserName,
+        branchName: terminalBranchName,
+        initialFloat: initialFloat,
+        actualAmount: actualAmount,
+        localExpectedCash: localExpected,
+        closedAt: closedAt,
+        queuedMovements: queuedMovements,
+        denominationCounts: denominationCounts,
+        closeNotes: closeNotes,
+      );
+      lastClosedShiftReviewStatus = 'pendiente_sync';
+      await _markShiftClosedLocally(shiftId);
+      _updatePendingSyncCount();
       notifyListeners();
-      return null;
+      return report;
     }
+  }
+
+  Future<void> _markShiftClosedLocally(String shiftId) async {
+    isShiftOpen = false;
+    activeShiftId = null;
+    initialFloat = 0.0;
+    cashDrawerAmount = 0.0;
+    lastShiftError = null;
+    _lastServerExpectedCash.remove(shiftId);
+    await _secureStorageService.clearActiveShift();
+    notifyListeners();
+  }
+
+  /// Provisional Corte Z shown and printed when the close was queued offline.
+  /// Expected cash is an estimate; the server recalculates it on sync (D-5).
+  static Map<String, dynamic> buildProvisionalCorteReport({
+    required String shiftId,
+    required String? cashierName,
+    required String? branchName,
+    required double initialFloat,
+    required double actualAmount,
+    required double? localExpectedCash,
+    required DateTime closedAt,
+    List<Map<String, dynamic>> queuedMovements = const [],
+    Map<String, num>? denominationCounts,
+    String? closeNotes,
+  }) {
+    return {
+      'provisional': true,
+      'shiftInfo': {
+        'id': shiftId,
+        'cashierName': cashierName,
+        'branchName': branchName,
+        'status': 'closed',
+        'closedAt': closedAt.toIso8601String(),
+      },
+      'summary': {
+        'initialFloat': initialFloat,
+        'expectedCash': localExpectedCash,
+        'actualCash': actualAmount,
+        'cashDifference': localExpectedCash == null
+            ? null
+            : ((actualAmount - localExpectedCash) * 100).round() / 100,
+      },
+      'cashMovements': queuedMovements
+          .map((movement) => {
+                ...movement,
+                'approvalStatus': 'pendiente_sync',
+              })
+          .toList(),
+      'denominationCounts': denominationCounts,
+      'closeNotes': closeNotes,
+    };
+  }
+
+  /// Sends queued cash jobs of the logged-in user, oldest first, after the
+  /// sales queue (OF-03). Returns true when nothing of theirs is left pending.
+  Future<bool> _syncPendingCashJobs() async {
+    if (!isTerminalConfigured || cashQueue.pendingCount == 0) return true;
+    if (_pendingSaleSyncJobs.isNotEmpty) return false;
+    final outcomes =
+        await cashQueue.flush(userId: currentUserId, send: _sendCashJob);
+    for (final outcome in outcomes) {
+      final shift = outcome.response?['shift'];
+      if (outcome.result == CashJobResult.sent &&
+          shift is Map &&
+          shift['status'] == 'closed') {
+        lastClosedShiftReviewStatus = shift['reviewStatus']?.toString();
+      }
+    }
+    _updatePendingSyncCount();
+    notifyListeners();
+    return !cashQueue.jobs.any((job) =>
+        job['status'] == 'pending' && job['userId'] == currentUserId);
+  }
+
+  Future<CashJobOutcome> _sendCashJob(Map<String, dynamic> job) async {
+    final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+    final path = job['kind'] == 'close'
+        ? '/cash-shifts/${job['shiftId']}/close'
+        : '/cash-shifts/${job['shiftId']}/transactions';
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl$path'),
+            headers: await _operatorHeaders(),
+            body: jsonEncode(job['payload']),
+          )
+          .timeout(const Duration(seconds: 8));
+      final code = response.statusCode;
+      if (code == 200 || code == 201) {
+        Map<String, dynamic>? data;
+        try {
+          data = Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+        } catch (_) {
+          data = null;
+        }
+        return CashJobOutcome(CashJobResult.sent, response: data);
+      }
+      if (code == 401 || code == 408 || code == 429 || code >= 500) {
+        return const CashJobOutcome(CashJobResult.retryLater);
+      }
+      return CashJobOutcome(
+        CashJobResult.rejected,
+        message: _apiErrorMessage(
+            response,
+            job['kind'] == 'close'
+                ? 'El Corte Z guardado sin conexión fue rechazado ($code).'
+                : 'El movimiento guardado sin conexión fue rechazado ($code).'),
+      );
+    } catch (_) {
+      return const CashJobOutcome(CashJobResult.retryLater);
+    }
+  }
+
+  /// Offline cash jobs rejected by the server, for the user to review.
+  List<Map<String, dynamic>> get rejectedCashJobs => cashQueue.rejected;
+
+  Future<void> dismissRejectedCashJobs() async {
+    await cashQueue.dismissRejected();
+    _updatePendingSyncCount();
+    notifyListeners();
   }
 
   Future<Map<String, dynamic>?> getCorteXReport(String shiftId) async {
@@ -2535,7 +2711,13 @@ class AppState extends ChangeNotifier {
           .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
-        return Map<String, dynamic>.from(jsonDecode(response.body));
+        final report = Map<String, dynamic>.from(jsonDecode(response.body));
+        final expected = report['summary'] is Map
+            ? double.tryParse(
+                report['summary']['expectedCash']?.toString() ?? '')
+            : null;
+        if (expected != null) _lastServerExpectedCash[shiftId] = expected;
+        return report;
       }
       return null;
     } catch (e) {
@@ -2584,6 +2766,8 @@ class AppState extends ChangeNotifier {
         return 'Aprobado';
       case 'aprobado_con_ajuste':
         return 'Aprobado con ajuste';
+      case 'pendiente_sync':
+        return 'Guardado sin conexión — se enviará al reconectar';
       default:
         return 'Sin revisión';
     }
@@ -2604,6 +2788,8 @@ class AppState extends ChangeNotifier {
         return 'Ajustado';
       case 'aprobado_historico':
         return 'Histórico';
+      case 'pendiente_sync':
+        return 'Sin sincronizar';
       default:
         return '';
     }
@@ -2614,6 +2800,7 @@ class AppState extends ChangeNotifier {
   Future<Map<String, List<Map<String, dynamic>>>?> fetchCashApprovals() async {
     lastApprovalError = null;
     if (!isTerminalConfigured) return null;
+    await _syncPendingCashJobs();
     try {
       final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
@@ -5093,8 +5280,9 @@ class AppState extends ChangeNotifier {
   }
 
   void _updatePendingSyncCount() {
-    pendingSyncCount =
-        _pendingSaleSyncJobs.length + _pendingOrderSyncJobs.length;
+    pendingSyncCount = _pendingSaleSyncJobs.length +
+        _pendingOrderSyncJobs.length +
+        cashQueue.pendingCount;
   }
 
   Future<void> _queueAndSyncSaleJob(Map<String, dynamic> job) async {
@@ -5241,7 +5429,8 @@ class AppState extends ChangeNotifier {
 
   Future<bool> _syncPendingSaleJobs() async {
     if (_pendingSaleSyncJobs.isEmpty) {
-      pendingSyncCount = 0;
+      _updatePendingSyncCount();
+      unawaited(_syncPendingCashJobs());
       return true;
     }
 
@@ -5262,6 +5451,7 @@ class AppState extends ChangeNotifier {
     }
 
     await _persistPendingSaleSyncJobs();
+    if (_pendingSaleSyncJobs.isEmpty) unawaited(_syncPendingCashJobs());
     return _pendingSaleSyncJobs.isEmpty;
   }
 
@@ -5302,7 +5492,8 @@ class AppState extends ChangeNotifier {
     final saleSync = await _syncPendingSaleJobs();
     final orderSync = await _syncPendingOrderJobs();
     final reqSync = await syncPendingRequisitions();
-    return saleSync && orderSync && reqSync;
+    final cashSync = saleSync ? await _syncPendingCashJobs() : false;
+    return saleSync && orderSync && reqSync && cashSync;
   }
 
   Future<Map<String, String>> _operatorHeaders() async {

@@ -137,6 +137,13 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
     const divider = '----------------------------------------';
     const doubleDivider = '========================================';
 
+    // Spec 019 D-5: closed without connection; expected cash is an estimate.
+    if (report['provisional'] == true) {
+      buffer.writeln(doubleDivider);
+      buffer.writeln('*** PROVISIONAL - SIN SINCRONIZAR ***');
+      buffer.writeln('El esperado se recalcula al reconectar.');
+    }
+
     final shiftId =
         (shiftInfo['id'] ?? widget.state.activeShiftId ?? '').toString();
     final folio =
@@ -386,7 +393,7 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
               backgroundColor: EmpireColors.successGreen,
               content: Text(
                 'Transacción de caja realizada: \$${amount.toStringAsFixed(2)}'
-                '${widget.state.lastMovementApprovalStatus == 'pendiente_n1' ? ' · pendiente de aprobación' : ''}',
+                '${widget.state.lastMovementApprovalStatus == 'pendiente_n1' ? ' · pendiente de aprobación' : widget.state.lastMovementApprovalStatus == 'pendiente_sync' ? ' · guardado sin conexión, se enviará al reconectar' : ''}',
               ),
             ),
           );
