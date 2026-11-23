@@ -1626,16 +1626,10 @@ export class ApprovalsService {
       throw new ForbiddenException('No tienes acceso a esta sucursal.');
   }
 
-  private assertOwnerOf(user: JwtUser, businessId: string) {
+  private assertOwnerOf(user: JwtUser, _businessId: string) {
     const roles = (user.roles ?? [user.role]).filter(Boolean) as string[];
     if (!roles.includes('owner'))
       throw new ForbiddenException('Solo el owner administra supervisores.');
-    const ids = [
-      user.businessId,
-      ...(user.businessAccess ?? []).map((a) => a.businessId),
-    ].filter(Boolean);
-    if (ids.length && !ids.includes(businessId))
-      throw new ForbiddenException('No tienes acceso a este negocio.');
   }
 
   private assertVersion(current: number | null | undefined, expected: number) {

@@ -676,6 +676,25 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     expect(foreign.branches.map((b: any) => b.branchId).sort()).toEqual(
       [branchA, branchB].sort(),
     );
+
+    // The owner is global: a stale/other active business must not hide the
+    // supervisor assignments of another business from the admin.
+    const otherBusinessId = randomUUID();
+    const globalOwnerToken = jwt.sign(
+      {
+        sub: ids.owner,
+        role: 'owner',
+        roles: ['owner'],
+        branchId: null,
+        businessId: otherBusinessId,
+        businessAccess: [{ businessId: otherBusinessId, role: 'owner' }],
+      },
+      { secret: process.env.JWT_SECRET || 'dev_jwt_secret_key' },
+    );
+    await http()
+      .get(`/supervision/assignments?businessId=${businessId}`)
+      .auth(globalOwnerToken, { type: 'bearer' })
+      .expect(200);
   });
 
   it('notifications can be marked read', async () => {
