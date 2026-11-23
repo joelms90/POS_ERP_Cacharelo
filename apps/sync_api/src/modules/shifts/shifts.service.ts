@@ -181,7 +181,7 @@ export class ShiftsService {
    * (spec 019, S-4). It counts towards expected cash immediately and waits for N1.
    */
   async createTransaction(shiftId: string, createTransactionDto: CreateTransactionDto, actor?: ShiftActor) {
-    const { type, amount, reason, category, clientUuid } = createTransactionDto;
+    const { type, amount, reason, category, clientUuid, occurredAt } = createTransactionDto;
 
     if (clientUuid) {
       const existing = await this.transactionsRepository.findByClientUuid(clientUuid);
@@ -224,7 +224,7 @@ export class ShiftsService {
           type,
           amount,
           reason,
-          createdAt: new Date(),
+          createdAt: this.movementTimestamp(occurredAt, shift.openedAt),
           createdBy: authorId,
           category: category ?? null,
           clientUuid: clientUuid ?? null,
@@ -691,6 +691,16 @@ export class ShiftsService {
       return this.db.transaction((tx) => work(tx as unknown as DbExecutor));
     }
     return work(this.db as unknown as DbExecutor);
+  }
+
+  /** Offline-synced movements keep their real time if it lies inside the shift (D-5). */
+  private movementTimestamp(occurredAt: string | undefined, openedAt: Date | string) {
+    const now = new Date();
+    if (!occurredAt) return now;
+    const at = new Date(occurredAt);
+    if (Number.isNaN(at.getTime())) return now;
+    if (at.getTime() < new Date(openedAt).getTime() || at.getTime() > now.getTime() + 60_000) return now;
+    return at > now ? now : at;
   }
 
   private parseMoney(value: unknown) {

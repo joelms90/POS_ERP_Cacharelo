@@ -1,4 +1,4 @@
-import { IsEnum, IsIn, IsNotEmpty, IsNumberString, IsOptional, IsString, Length, MaxLength } from 'class-validator';
+import { IsDateString, IsEnum, IsIn, IsNotEmpty, IsNumberString, IsOptional, IsString, Length, MaxLength } from 'class-validator';
 
 /** Structured categories (spec 019 MV-02); mirrors the labels already used by the POS dialogs. */
 export const CASH_IN_CATEGORIES = ['aporte_cambio', 'reposicion_fondo', 'correccion', 'otro_ingreso'] as const;
@@ -30,4 +30,12 @@ export class CreateTransactionDto {
   @IsString()
   @MaxLength(120)
   clientUuid?: string;
+
+  /**
+   * When the movement really happened (offline queue, D-5). Kept only if it
+   * falls inside the shift (opened ≤ occurredAt ≤ now); otherwise the server time is used.
+   */
+  @IsOptional()
+  @IsDateString()
+  occurredAt?: string;
 }

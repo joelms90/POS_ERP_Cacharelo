@@ -475,6 +475,19 @@ describe('ShiftsService', () => {
       expect(result.transaction).toBeDefined();
     });
 
+    it('D-5: keeps the real time of an offline movement when it lies inside the shift', async () => {
+      mockShiftsRepository.findById.mockResolvedValue(baseShift);
+      mockTransactionsRepository.findByShiftId.mockResolvedValue([]);
+      mockTransactionsRepository.create.mockImplementation(async (data) => ({ id: 'tx-1', ...data }));
+      mockShiftsRepository.update.mockResolvedValue(baseShift);
+      const inside = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      await service.createTransaction('shift-1', { type: 'cash-in', amount: '10.00', reason: 'Cambio', occurredAt: inside });
+      expect(mockTransactionsRepository.create.mock.calls[0][0].createdAt.toISOString()).toBe(inside);
+      const beforeOpen = new Date(Date.now() - 5 * 3600 * 1000).toISOString();
+      await service.createTransaction('shift-1', { type: 'cash-in', amount: '10.00', reason: 'Cambio', occurredAt: beforeOpen });
+      expect(mockTransactionsRepository.create.mock.calls[1][0].createdAt.toISOString()).not.toBe(beforeOpen);
+    });
+
     it('returns the existing entry when a movement is retried with the same clientUuid', async () => {
       mockTransactionsRepository.findByClientUuid.mockResolvedValueOnce({ id: 'tx-1', shiftId: 'shift-1' });
       mockShiftsRepository.findById.mockResolvedValue(baseShift);
