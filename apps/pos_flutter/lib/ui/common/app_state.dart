@@ -615,6 +615,17 @@ class AppState extends ChangeNotifier {
   String? activeShiftId;
   String? lastShiftError;
 
+  // Spec 019 — supervisor de sucursal (cash approval chain)
+  /// Machine-readable code of the last shift error, e.g. OPENING_BLOCKED_PENDING_CORTE.
+  String? lastShiftErrorCode;
+  /// Review status of the last Corte Z closed from this terminal (pendiente_n1, ...).
+  String? lastClosedShiftReviewStatus;
+  /// Approval status of the last cash movement recorded from this terminal.
+  String? lastMovementApprovalStatus;
+  /// Items of the branch inbox this operator can resolve (N1) right now.
+  int pendingApprovalsCount = 0;
+  String? lastApprovalError;
+
   // Offline & sync states
   bool isOnline = true;
   SyncSocketService? _socketService;
@@ -2285,6 +2296,7 @@ class AppState extends ChangeNotifier {
 
   Future<bool> openShift(double floatAmount) async {
     lastShiftError = null;
+    lastShiftErrorCode = null;
     if (!isTerminalConfigured ||
         terminalBranchId == null ||
         currentUserId == null) {
@@ -2331,6 +2343,7 @@ class AppState extends ChangeNotifier {
         final errorData = jsonDecode(response.body);
         lastShiftError = errorData['message']?.toString() ??
             'Error al abrir turno (${response.statusCode})';
+        lastShiftErrorCode = errorData['code']?.toString();
       } catch (_) {
         lastShiftError = 'Error ${response.statusCode}: ${response.body}';
       }
@@ -2346,7 +2359,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> addCashDrop(double amount,
-      {String reason = 'Ingreso de caja'}) async {
+      {String reason = 'Ingreso de caja', String? category}) async {
     lastShiftError = null;
     if (activeShiftId == null) {
       lastShiftError = 'No hay turno activo para registrar ingreso.';
@@ -2362,12 +2375,16 @@ class AppState extends ChangeNotifier {
               'type': 'cash-in',
               'amount': amount.toStringAsFixed(2),
               'reason': reason,
+              if (category != null) 'category': category,
+              'clientUuid': _newUuid(),
             }),
           )
           .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
+        lastMovementApprovalStatus =
+            data['transaction']?['approvalStatus']?.toString();
         if (data['shift'] != null) {
           cashDrawerAmount = double.tryParse(
                   data['shift']['cashDrawerAmount']?.toString() ?? '') ??
@@ -2396,7 +2413,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> removeCashDrop(double amount,
-      {String reason = 'Retiro de caja'}) async {
+      {String reason = 'Retiro de caja', String? category}) async {
     lastShiftError = null;
     if (activeShiftId == null) {
       lastShiftError = 'No hay turno activo para registrar retiro.';
@@ -2412,12 +2429,16 @@ class AppState extends ChangeNotifier {
               'type': 'cash-out',
               'amount': amount.toStringAsFixed(2),
               'reason': reason,
+              if (category != null) 'category': category,
+              'clientUuid': _newUuid(),
             }),
           )
           .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
+        lastMovementApprovalStatus =
+            data['transaction']?['approvalStatus']?.toString();
         if (data['shift'] != null) {
           cashDrawerAmount = double.tryParse(
                   data['shift']['cashDrawerAmount']?.toString() ?? '') ??
@@ -2473,6 +2494,8 @@ class AppState extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
+        lastClosedShiftReviewStatus =
+            data['shift']?['reviewStatus']?.toString();
         isShiftOpen = false;
         activeShiftId = null;
         initialFloat = 0.0;
@@ -2524,6 +2547,190 @@ class AppState extends ChangeNotifier {
   /// Backward-compatible alias for callers that need the current shift audit.
   Future<Map<String, dynamic>?> getCashShiftAuditReport(String shiftId) {
     return getCorteXReport(shiftId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Spec 019 — cash approval chain (Corte Z N1 + cash movements) for the POS.
+  // The server decides who may act; these calls never approve locally.
+  // ---------------------------------------------------------------------------
+
+  /// Structured category code for the labels used by the cash-drop dialogs.
+  static String? cashCategoryCode(String label) {
+    const codes = {
+      'Aporte de cambio': 'aporte_cambio',
+      'Reposición de fondo de caja': 'reposicion_fondo',
+      'Corrección de movimiento': 'correccion',
+      'Otro ingreso': 'otro_ingreso',
+      'Gasto operativo': 'gasto_operativo',
+      'Entrega a encargado / Retiro parcial': 'entrega_encargado',
+      'Transferencia a otra caja': 'transferencia_caja',
+      'Otro retiro': 'otro_egreso',
+    };
+    return codes[label];
+  }
+
+  /// Human label for a Corte Z review status.
+  static String shiftReviewLabel(String? status) {
+    switch (status) {
+      case 'pendiente_n1':
+        return 'Pendiente de aprobación (nivel 1)';
+      case 'rechazado_n1':
+        return 'Rechazado — recontar';
+      case 'pendiente_n2':
+        return 'Pendiente de supervisor (nivel 2)';
+      case 'rechazado_n2':
+        return 'Rechazado por supervisor — recontar';
+      case 'aprobado':
+        return 'Aprobado';
+      case 'aprobado_con_ajuste':
+        return 'Aprobado con ajuste';
+      default:
+        return 'Sin revisión';
+    }
+  }
+
+  /// Human label for a cash movement approval status.
+  static String movementStatusLabel(String? status) {
+    switch (status) {
+      case 'pendiente_n1':
+        return 'Pendiente';
+      case 'aprobado':
+        return 'Aprobado';
+      case 'rechazado':
+        return 'Rechazado';
+      case 'cancelado':
+        return 'Cancelado';
+      case 'ajustado':
+        return 'Ajustado';
+      case 'aprobado_historico':
+        return 'Histórico';
+      default:
+        return '';
+    }
+  }
+
+  /// Branch inbox: Corte Z and cash movements of this terminal's branch.
+  /// Each item carries `canAct` (computed by the server for this operator).
+  Future<Map<String, List<Map<String, dynamic>>>?> fetchCashApprovals() async {
+    lastApprovalError = null;
+    if (!isTerminalConfigured) return null;
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .get(Uri.parse('$baseUrl/supervision/approvals'),
+              headers: await _operatorHeaders())
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) {
+        lastApprovalError = _apiErrorMessage(response,
+            'No se pudieron cargar las aprobaciones (${response.statusCode}).');
+        notifyListeners();
+        return null;
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      List<Map<String, dynamic>> asList(dynamic value) => value is List
+          ? value.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+          : <Map<String, dynamic>>[];
+      final result = {
+        'cortes': asList(data['cortes']),
+        'movements': asList(data['movements']),
+      };
+      pendingApprovalsCount = [
+        ...result['cortes']!,
+        ...result['movements']!,
+      ].where((item) => item['canAct'] == true).length;
+      notifyListeners();
+      return result;
+    } catch (e) {
+      lastApprovalError = 'Sin conexión: las aprobaciones requieren internet.';
+      notifyListeners();
+      return null;
+    }
+  }
+
+  /// Approve or reject a Corte Z (`kind: corte`) or a cash movement
+  /// (`kind: movement`). A rejection requires a reason.
+  Future<bool> resolveCashApproval({
+    required String kind,
+    required String id,
+    required int version,
+    required bool approve,
+    String? reason,
+  }) async {
+    lastApprovalError = null;
+    final path = kind == 'corte' ? 'cash-shifts' : 'cash-movements';
+    final action = approve ? 'approve' : 'reject';
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/supervision/$path/$id/$action'),
+            headers: await _operatorHeaders(),
+            body: jsonEncode({
+              'version': version,
+              if (reason != null && reason.trim().isNotEmpty)
+                'reason': reason.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
+      }
+      lastApprovalError = _apiErrorMessage(
+          response, 'No se pudo registrar la decisión (${response.statusCode}).');
+      notifyListeners();
+      return false;
+    } catch (e) {
+      lastApprovalError = 'Sin conexión: las aprobaciones requieren internet.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// New physical count after a Corte Z rejection.
+  Future<bool> recountShift(
+    String shiftId,
+    double actualAmount, {
+    Map<String, num>? denominationCounts,
+    String? notes,
+  }) async {
+    lastApprovalError = null;
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/cash-shifts/$shiftId/recount'),
+            headers: await _operatorHeaders(),
+            body: jsonEncode({
+              'actualAmount': actualAmount.toStringAsFixed(2),
+              if (denominationCounts != null)
+                'denominationCounts': denominationCounts,
+              if (notes != null && notes.trim().isNotEmpty)
+                'notes': notes.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) return true;
+      lastApprovalError = _apiErrorMessage(
+          response, 'No se pudo registrar el reconteo (${response.statusCode}).');
+      notifyListeners();
+      return false;
+    } catch (e) {
+      lastApprovalError = 'Sin conexión: el reconteo requiere internet.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  String _apiErrorMessage(http.Response response, String fallback) {
+    try {
+      final data = jsonDecode(response.body);
+      final message = data is Map ? data['message'] : null;
+      if (message is List && message.isNotEmpty) return message.first.toString();
+      if (message is String && message.trim().isNotEmpty) return message;
+    } catch (_) {
+      // fall through
+    }
+    return fallback;
   }
 
   // Waiter Order submission

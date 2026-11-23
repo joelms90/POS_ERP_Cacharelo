@@ -69,12 +69,12 @@ Leyenda: `[ ]` pendiente · `[x]` hecho · `[~]` parcial / diferido (con nota)
 - [x] T208 `npx tsc --noEmit` + `vite build`; resumen.
 
 ## 3. POS Flutter (`apps/pos_flutter`)
-- [ ] T301 `app_state.dart`: movimientos con categoría estructurada y `clientUuid`; leer `approvalStatus` y `reviewStatus`.
-- [ ] T302 Pestaña Caja → sección **"Por aprobar"** para el OIS (cortes y movimientos de cajeros de su sucursal): aprobar / rechazar con motivo.
-- [ ] T303 Estados visibles para el cajero (chips en movimientos y en el resumen del Corte Z; aviso de corte rechazado con "Recontar").
-- [ ] T304 Manejo del 409 de apertura bloqueada (mensaje y acceso a "Por aprobar").
-- [ ] T305 `flutter test` + `flutter analyze` de los archivos tocados (sin fallos nuevos respecto a los 15 preexistentes).
-- [~] T306 Cola offline de movimientos y Corte Z offline (D-5): ver nota al cerrar la app.
+- [x] T301 `app_state.dart`: movimientos con categoría estructurada y `clientUuid`; leer `approvalStatus` y `reviewStatus`.
+- [x] T302 Pestaña Caja → sección **"Por aprobar"** para el OIS (cortes y movimientos de cajeros de su sucursal): aprobar / rechazar con motivo.
+- [x] T303 Estados visibles para el cajero (chips en movimientos y en el resumen del Corte Z; aviso de corte rechazado con "Recontar").
+- [x] T304 Manejo del 409 de apertura bloqueada (mensaje y acceso a "Por aprobar").
+- [x] T305 `flutter test` + `flutter analyze` de los archivos tocados (sin fallos nuevos respecto a los 15 preexistentes).
+- [~] T306 Cola offline de movimientos y Corte Z offline (D-5): **pendiente**. El backend ya es idempotente (`clientUuid` en movimientos y cierre, `closedOffline`, `localExpectedCash`); falta la cola local ordenada (ventas → movimientos → Corte Z) y el ticket provisional en el POS. Hoy el POS sigue en línea para caja, como antes.
 
 ## 4. Cierre
 - [ ] T401 Handoff en `docs/handoffs/019-supervisor-sucursal.md`, `.claude/workspaces.md` y marcas finales en este archivo.
