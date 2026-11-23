@@ -42,6 +42,8 @@ The focused command runs the backend safety suite and the admin production type/
 
 The MVP uses a deterministic local provider and needs no model key. Gemini is selected only when both `OWNER_COPILOT_PROVIDER=gemini` and `GEMINI_API_KEY` are set in the server process. The adapter uses Gemini only to classify a prompt into the server's tiny typed plan allowlist; it cannot call tools, see browser credentials, or bypass confirmations.
 
+For allowed read intents, Gemini also creates the Spanish summary only after the API has completed the typed read and supplied it a redacted, size-limited result. A request to change a price is recognized as a proposal and never changes a product automatically; the product and new amount must be collected and confirmed through a future typed executor.
+
 For production, create a dedicated Secret Manager secret such as `owner-copilot-gemini-api-key`, grant only the Cloud Run service account `secretAccessor`, and inject it as the `GEMINI_API_KEY` environment variable. Set `OWNER_COPILOT_PROVIDER=gemini` and `GEMINI_MODEL` as non-secret runtime configuration. Rotate the secret in Secret Manager, deploy a new revision, restrict the key in Google AI Studio, set billing/usage alerts, and never commit, log, return, or expose it through a `VITE_*` variable. This change does not create the secret, modify infrastructure, or deploy.
 
 Existing MCP read-tool names are used only as vocabulary for the server-owned allowlist. The Copiloto does not call MCP, does not inherit MCP's service identity, and does not expose MCP tools to the browser.

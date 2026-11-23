@@ -29,29 +29,33 @@ export class OwnerCopilotService {
     const plan = await this.provider.plan(input.prompt);
     if (plan.kind === 'write_proposal') {
       const confirmation = await this.createConfirmation(conversationId, actor, input.businessId, input.branchId, plan.actionType);
+      const isPriceChange = plan.actionType === 'update_product_price';
+      const proposalSummary = isPriceChange
+        ? 'Cambio de precio solicitado. Debes revisar el producto y el nuevo precio antes de confirmar.'
+        : 'Generar orden de compra desde alertas activas.';
       const answer = 'Preparé una propuesta de acción. Revísala y confírmala explícitamente antes de cualquier cambio.';
       await this.auditMessage(conversationId, 'assistant', answer);
       return {
         conversationId,
         correlationId,
         answer,
-        proposal: { actionType: plan.actionType, summary: 'Generar orden de compra desde alertas activas.' },
+        proposal: { actionType: plan.actionType, summary: proposalSummary },
         confirmation,
         message: {
           id: randomUUID(), role: 'assistant', content: answer, createdAt: new Date().toISOString(),
           actionProposal: {
-            title: 'Generar orden de compra', summary: 'Generar orden de compra desde alertas activas.',
+            title: isPriceChange ? 'Cambiar precio' : 'Generar orden de compra', summary: proposalSummary,
             confirmationToken: confirmation.token, expiresAt: confirmation.expiresAt,
           },
         },
       };
     }
     const result = await this.runReadTool(plan.tool, input.businessId, input.branchId, conversationId);
-    const answer = plan.tool === 'inventory_alerts' ? 'Estas son las alertas de inventario activas.' : 'Este es el resumen de ventas solicitado.';
+    const answer = await this.provider.summarize(input.prompt, plan.tool, redact(result));
     await this.auditMessage(conversationId, 'assistant', answer);
     const source = { label: plan.tool === 'inventory_alerts' ? 'Alertas de inventario' : 'Resumen de ventas', href: plan.tool === 'inventory_alerts' ? '/inventory/alerts' : '/reports/sales-dashboard' };
     return {
-      conversationId, correlationId, answer, tool: plan.tool, result, sources: [source],
+      conversationId, correlationId, provider: this.provider.name, tool: plan.tool, result, sources: [source],
       message: {
         id: randomUUID(), role: 'assistant', content: answer, createdAt: new Date().toISOString(),
         toolRuns: [{ tool: plan.tool, status: 'completed', summary: `Consulta permitida: ${source.label}` }], sources: [source],

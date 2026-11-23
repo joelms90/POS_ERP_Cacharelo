@@ -13,14 +13,14 @@ describe('GeminiOwnerCopilotProvider', () => {
 
   it('accepts only an allowlisted model plan and keeps the key in a server header', async () => {
     process.env.GEMINI_API_KEY = 'test-key-not-a-real-secret';
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ candidates: [{ content: { parts: [{ text: '{"kind":"read","tool":"inventory_alerts"}' }] } }] }),
-    });
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"kind":"read","tool":"inventory_alerts"}' }] } }] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'Hay dos alertas activas.' }] } }] }) });
     global.fetch = fetchMock;
     const provider = new GeminiOwnerCopilotProvider(new LocalDemoOwnerCopilotProvider());
 
     await expect(provider.plan('¿Qué falta en inventario?')).resolves.toEqual({ kind: 'read', tool: 'inventory_alerts' });
+    await expect(provider.summarize('¿Qué falta en inventario?', 'inventory_alerts', { total: 2 })).resolves.toBe('Hay dos alertas activas.');
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('generativelanguage.googleapis.com'), expect.objectContaining({
       headers: expect.objectContaining({ 'x-goog-api-key': 'test-key-not-a-real-secret' }),
     }));

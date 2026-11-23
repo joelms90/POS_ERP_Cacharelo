@@ -6645,9 +6645,9 @@
     "semantic_hash": ""
   },
   "apps/sync_api/src/modules/owner-copilot/local-demo.provider.ts": {
-    "mtime": 1795411737.6476715,
-    "seen": 1795411889.9436002,
-    "ast_hash": "fc3e78e729ccd8c11ab7b77ca1f3eaba",
+    "mtime": 1795413549.0247715,
+    "seen": 1795413625.453813,
+    "ast_hash": "78ff95c413466707d179a8bf844670ad",
     "semantic_hash": ""
   },
   "apps/sync_api/src/modules/owner-copilot/owner-copilot.authorization.spec.ts": {
@@ -6663,9 +6663,9 @@
     "semantic_hash": ""
   },
   "apps/sync_api/src/modules/owner-copilot/owner-copilot.evaluation.spec.ts": {
-    "mtime": 1795411737.73528,
-    "seen": 1795411889.943604,
-    "ast_hash": "12922e0603511d8d13ccd81970e38293",
+    "mtime": 1795413541.9312274,
+    "seen": 1795413625.453818,
+    "ast_hash": "6ee17da51239403856eeba543e990045",
     "semantic_hash": ""
   },
   "apps/sync_api/src/modules/owner-copilot/owner-copilot.module.ts": {
@@ -6681,21 +6681,21 @@
     "semantic_hash": ""
   },
   "apps/sync_api/src/modules/owner-copilot/owner-copilot.service.ts": {
-    "mtime": 1795411755.1357434,
-    "seen": 1795411889.943608,
-    "ast_hash": "0a04ab0dad17ca4f34811567d0faaf04",
+    "mtime": 1795413541.9075408,
+    "seen": 1795413625.453823,
+    "ast_hash": "2e4ea120e8cd605d8c38890c996ee6c4",
     "semantic_hash": ""
   },
   "apps/sync_api/src/modules/owner-copilot/owner-copilot.types.ts": {
-    "mtime": 1795411737.625892,
-    "seen": 1795411889.9436102,
-    "ast_hash": "80396f3b77b6ee7e4497c0228c8b30b8",
+    "mtime": 1795413541.8254304,
+    "seen": 1795413625.453825,
+    "ast_hash": "b41f8e2413eea5374cf2628d9dab2a79",
     "semantic_hash": ""
   },
   "docs/owner-business-copilot.md": {
-    "mtime": 1795411737.7946422,
-    "seen": 1795411889.943887,
-    "ast_hash": "be7f98ec88375601950cf75969194df3",
+    "mtime": 1795413584.7280369,
+    "seen": 1795413625.454131,
+    "ast_hash": "c0fd3baaedfa0b7f6ee279e43e7333f2",
     "semantic_hash": ""
   },
   "specs/018-owner-business-copilot/checklists/requirements.md": {
@@ -6747,15 +6747,15 @@
     "semantic_hash": ""
   },
   "apps/sync_api/src/modules/owner-copilot/gemini.provider.spec.ts": {
-    "mtime": 1795411789.9352968,
-    "seen": 1795411889.943597,
-    "ast_hash": "4f3be72ec81ab0ba607985f96fcc3b4d",
+    "mtime": 1795413598.8203595,
+    "seen": 1795413625.45381,
+    "ast_hash": "e90d2359016ec0a85066b708515b9309",
     "semantic_hash": ""
   },
   "apps/sync_api/src/modules/owner-copilot/gemini.provider.ts": {
-    "mtime": 1795411737.6695507,
-    "seen": 1795411889.943599,
-    "ast_hash": "bbe8ea9e294d4f66b4ce3553368e71fc",
+    "mtime": 1795413541.8847415,
+    "seen": 1795413625.453812,
+    "ast_hash": "45d4b8e696e43753b0a11208da64d72b",
     "semantic_hash": ""
   },
   "apps/business_control_tauri/pnpm-lock.yaml": {
