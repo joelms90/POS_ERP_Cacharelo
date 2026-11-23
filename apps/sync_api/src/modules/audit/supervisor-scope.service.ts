@@ -7,10 +7,7 @@ import {
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { DRIZZLE_CONNECTION } from '../../database/database.module';
 import * as schema from '../../database/schema';
-import {
-  assertBusinessAccess,
-  getUserBusinessIds,
-} from '../auth/business-access';
+import { assertBusinessAccess } from '../auth/business-access';
 import { BRANCH_SUPERVISOR_ROLE, OWNER_ROLE } from '../auth/roles';
 import {
   ApprovalActor,
@@ -88,26 +85,15 @@ export class SupervisorScopeService {
    */
   async visibleBranchIds(
     actor: ApprovalActor,
-    user: JwtUser | undefined,
+    _user: JwtUser | undefined,
   ): Promise<string[]> {
     const ids = new Set<string>(actor.assignedBranchIds);
     if (actor.branchId) ids.add(actor.branchId);
     if (actor.isOwner) {
-      const businessIds = getUserBusinessIds(user as any);
-      const rows = businessIds.length
-        ? await this.db
-            .select({ id: schema.branches.id })
-            .from(schema.branches)
-            .where(
-              and(
-                inArray(schema.branches.businessId, businessIds),
-                isNull(schema.branches.deletedAt),
-              ),
-            )
-        : await this.db
-            .select({ id: schema.branches.id })
-            .from(schema.branches)
-            .where(isNull(schema.branches.deletedAt));
+      const rows = await this.db
+        .select({ id: schema.branches.id })
+        .from(schema.branches)
+        .where(isNull(schema.branches.deletedAt));
       rows.forEach((row) => ids.add(row.id));
     }
     return Array.from(ids);

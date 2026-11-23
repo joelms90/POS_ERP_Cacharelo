@@ -615,12 +615,32 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       .expect(201);
   });
 
-  it('lists only the branches a supervisor can see', async () => {
+  it('lists only the branches a supervisor can see; the owner sees every branch', async () => {
     const res = await http()
       .get('/supervision/branches')
       .auth(as.supervisor(), { type: 'bearer' })
       .expect(200);
     expect(res.body.map((b: any) => b.id)).toEqual([branchA]);
+
+    const otherBusinessId = randomUUID();
+    const globalOwnerToken = jwt.sign(
+      {
+        sub: ids.owner,
+        role: 'owner',
+        roles: ['owner'],
+        branchId: null,
+        businessId: otherBusinessId,
+        businessAccess: [{ businessId: otherBusinessId, role: 'owner' }],
+      },
+      { secret: process.env.JWT_SECRET || 'dev_jwt_secret_key' },
+    );
+    const ownerRes = await http()
+      .get('/supervision/branches')
+      .auth(globalOwnerToken, { type: 'bearer' })
+      .expect(200);
+    expect(ownerRes.body.map((b: any) => b.id)).toEqual(
+      expect.arrayContaining([branchA, branchB]),
+    );
   });
 
   it('D-5: an offline queue syncs movements with their real time and an idempotent offline close', async () => {
