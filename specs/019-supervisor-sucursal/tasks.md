@@ -59,14 +59,14 @@ Leyenda: `[ ]` pendiente · `[x]` hecho · `[~]` parcial / diferido (con nota)
 - [x] T160 `npx tsc --noEmit`, `npx jest`, `npm run build`; resumen.
 
 ## 2. Admin web (`apps/business_control_tauri`)
-- [ ] T201 `services/api.ts`: tipos y métodos de supervisión y notificaciones.
-- [ ] T202 `roleTabs`: `branch_supervisor` + pestañas nuevas para owner; pestañas calculadas con la unión de `user.roles` (R-4).
-- [ ] T203 `ApprovalsPage`: bandeja de Cortes Z y movimientos (owner y supervisor).
-- [ ] T204 Detalle de Corte Z: esperado al cierre + ajustes posteriores = esperado ajustado; movimientos agrupados; aprobar / rechazar (motivo) / ajustar; **impacto mostrado antes de confirmar** rechazos y cancelaciones; cancelar / ajustar movimientos; desbloqueo (owner).
-- [ ] T205 `NotificationsPage` + campana con contador en el layout.
-- [ ] T206 Gestión de asignaciones de supervisores (owner) y consulta de adeudos y bitácora.
-- [ ] T207 `ReportsPage`: `reconcileCash` usa el `reconciliationStatus` del backend cuando está disponible; columna de revisión.
-- [ ] T208 `npx tsc --noEmit` + `vite build`; resumen.
+- [x] T201 `services/api.ts`: tipos y métodos de supervisión y notificaciones.
+- [x] T202 `roleTabs`: `branch_supervisor` + pestañas nuevas para owner; pestañas calculadas con la unión de `user.roles` (R-4).
+- [x] T203 `ApprovalsPage`: bandeja de Cortes Z y movimientos (owner y supervisor).
+- [x] T204 Detalle de Corte Z: esperado al cierre + ajustes posteriores = esperado ajustado; movimientos agrupados; aprobar / rechazar (motivo) / ajustar; **impacto mostrado antes de confirmar** rechazos y cancelaciones; cancelar / ajustar movimientos; desbloqueo (owner).
+- [x] T205 `NotificationsPage` + campana con contador en el layout.
+- [x] T206 Gestión de asignaciones de supervisores (owner) y consulta de adeudos y bitácora.
+- [x] T207 `ReportsPage`: `reconcileCash` usa el `reconciliationStatus` del backend cuando está disponible; columna de revisión.
+- [x] T208 `npx tsc --noEmit` + `vite build`; resumen.
 
 ## 3. POS Flutter (`apps/pos_flutter`)
 - [ ] T301 `app_state.dart`: movimientos con categoría estructurada y `clientUuid`; leer `approvalStatus` y `reviewStatus`.

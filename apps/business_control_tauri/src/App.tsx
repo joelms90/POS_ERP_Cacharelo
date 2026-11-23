@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { LoginPage } from './pages/LoginPage';
 import { AdminLayout } from './components/templates/AdminLayout';
@@ -24,19 +24,38 @@ import { MesasActivasPage } from './pages/MesasActivasPage';
 import { InventoryDashboardPage } from './pages/InventoryDashboardPage';
 import { BranchCatalogPage } from './pages/BranchCatalogPage';
 import { WarehouseInventoryPage } from './pages/WarehouseInventoryPage';
-import { api } from './services/api';
+import { api, SupervisionBranch } from './services/api';
+import { ApprovalsPage } from './pages/supervision/ApprovalsPage';
+import { NotificationsPage } from './pages/supervision/NotificationsPage';
+import { DebtsPage } from './pages/supervision/DebtsPage';
+import { AuditLogPage } from './pages/supervision/AuditLogPage';
+import { SupervisorsPage } from './pages/supervision/SupervisorsPage';
 import { remoteLogger } from './services/remoteLogger';
 
-export type AdminTab = 'administrators' | 'personal' | 'inventory-dashboard' | 'branch-catalog' | 'warehouse-inventory' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers' | 'purchase-orders' | 'requisitions' | 'help' | 'reports' | 'tickets' | 'mesas' | 'ticket-settings' | 'pos-simulator';
+export type AdminTab = 'administrators' | 'personal' | 'inventory-dashboard' | 'branch-catalog' | 'warehouse-inventory' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers' | 'purchase-orders' | 'requisitions' | 'help' | 'reports' | 'tickets' | 'mesas' | 'ticket-settings' | 'pos-simulator' | 'approvals' | 'notifications' | 'debts' | 'audit-log' | 'supervisors';
 
 export const roleTabs: Record<string, AdminTab[]> = {
-  owner: ['administrators', 'personal', 'branches', 'ticket-settings', 'pos-simulator', 'inventory-dashboard', 'branch-catalog', 'warehouse-inventory', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'transfers', 'purchase-orders', 'requisitions', 'reports', 'tickets', 'mesas', 'inquiries', 'help'],
+  owner: ['administrators', 'personal', 'branches', 'ticket-settings', 'pos-simulator', 'approvals', 'notifications', 'debts', 'audit-log', 'supervisors', 'inventory-dashboard', 'branch-catalog', 'warehouse-inventory', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'transfers', 'purchase-orders', 'requisitions', 'reports', 'tickets', 'mesas', 'inquiries', 'help'],
   inventory_admin: ['inventory-dashboard', 'branch-catalog', 'warehouse-inventory', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'purchase-orders', 'requisitions', 'help'],
   support_tech: ['tickets', 'mesas', 'personal', 'inventory-dashboard', 'branch-catalog', 'warehouse-inventory', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'purchase-orders', 'requisitions', 'help'],
   warehouse_purchasing_operator: ['inventory-dashboard', 'warehouse-inventory', 'receipts', 'warehouses', 'providers', 'transfers', 'purchase-orders', 'requisitions', 'help'],
   branch_operator: ['requisitions', 'help'],
   web_inquiries_viewer: ['inquiries'],
+  // Spec 019: approves Corte Z (N2) and supervises cash of assigned branches; sees their sales.
+  branch_supervisor: ['approvals', 'notifications', 'reports', 'debts', 'audit-log', 'help'],
 };
+
+/** Tabs for every role the user holds (spec 019 R-4), in first-seen order. */
+export function tabsForUser(user: { role?: string; roles?: string[] } | null | undefined): AdminTab[] {
+  const roles = user?.roles?.length ? user.roles : user?.role ? [user.role] : ['owner'];
+  const tabs: AdminTab[] = [];
+  for (const role of roles) {
+    for (const tab of roleTabs[role] ?? []) {
+      if (!tabs.includes(tab)) tabs.push(tab);
+    }
+  }
+  return tabs.length ? tabs : roleTabs.owner;
+}
 
 function App() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -50,8 +69,12 @@ function App() {
     }
   });
   const [globalError, setGlobalError] = useState<string | null>(null);
-  const allowedTabs = roleTabs[user?.role || 'owner'] || roleTabs.owner;
-  const allowedBusinessIds = user?.role === 'inventory_admin' || user?.role === 'support_tech' || user?.role === 'warehouse_purchasing_operator' || user?.role === 'branch_operator' || user?.role === 'web_inquiries_viewer'
+  const allowedTabs = useMemo(() => tabsForUser(user), [user]);
+  const isSupervisorOnly = Boolean(
+    (user?.roles ?? [user?.role]).includes('branch_supervisor') && !(user?.roles ?? [user?.role]).includes('owner'),
+  );
+  const [supervisorBranches, setSupervisorBranches] = useState<SupervisionBranch[] | null>(null);
+  const allowedBusinessIds = user?.role === 'inventory_admin' || user?.role === 'support_tech' || user?.role === 'warehouse_purchasing_operator' || user?.role === 'branch_operator' || user?.role === 'web_inquiries_viewer' || user?.role === 'branch_supervisor'
     ? (user.businessAccess?.map((access) => access.businessId) || (user.businessId ? [user.businessId] : []))
     : undefined;
 
@@ -67,6 +90,28 @@ function App() {
   useEffect(() => {
     remoteLogger.setScreen(activeTab);
   }, [activeTab]);
+
+  // Spec 019: a supervisor only sees reports of assigned branches.
+  useEffect(() => {
+    if (!isAuthenticated || !isSupervisorOnly) {
+      setSupervisorBranches(null);
+      return;
+    }
+    let cancelled = false;
+    api
+      .getSupervisionBranches()
+      .then((branches) => {
+        if (!cancelled) setSupervisorBranches(branches);
+      })
+      .catch(() => {
+        if (!cancelled) setSupervisorBranches([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isSupervisorOnly]);
+
+  const supervisorBusinessBranches = supervisorBranches?.filter((branch) => branch.businessId === activeBusinessId) ?? null;
 
   useEffect(() => {
     if (!allowedTabs.includes(activeTab)) {
@@ -150,7 +195,23 @@ function App() {
         {activeTab === 'purchase-orders' && user && <PurchaseOrdersPage businessId={activeBusinessId} userId={user.id} />}
         {activeTab === 'requisitions' && user && <RequisitionsPage businessId={activeBusinessId} userId={user.id} userRole={user.role} userRoles={user.roles} />}
         {activeTab === 'help' && <HelpPage />}
-        {activeTab === 'reports' && <ReportsPage businessId={activeBusinessId} />}
+        {activeTab === 'reports' && !isSupervisorOnly && <ReportsPage businessId={activeBusinessId} />}
+        {activeTab === 'reports' && isSupervisorOnly && supervisorBusinessBranches && (
+          supervisorBusinessBranches.length > 0 ? (
+            <ReportsPage
+              key={`${activeBusinessId}-${supervisorBusinessBranches.map((b) => b.id).join(',')}`}
+              businessId={activeBusinessId}
+              restrictedBranches={supervisorBusinessBranches}
+            />
+          ) : (
+            <div className="p-8 text-center text-text-secondary text-sm">No tienes sucursales asignadas en este negocio.</div>
+          )
+        )}
+        {activeTab === 'approvals' && user && <ApprovalsPage businessId={activeBusinessId} currentUserId={user.id} />}
+        {activeTab === 'notifications' && <NotificationsPage onNavigateTab={(tab) => setActiveTab(tab as AdminTab)} />}
+        {activeTab === 'debts' && <DebtsPage businessId={activeBusinessId} />}
+        {activeTab === 'audit-log' && <AuditLogPage businessId={activeBusinessId} />}
+        {activeTab === 'supervisors' && <SupervisorsPage businessId={activeBusinessId} />}
         {activeTab === 'tickets' && <TicketsPage businessId={activeBusinessId} />}
         {activeTab === 'mesas' && <MesasActivasPage businessId={activeBusinessId} onNavigateTab={(tab) => setActiveTab(tab as any)} />}
         {activeTab === 'ticket-settings' && <TicketSettingsPage businessId={activeBusinessId} />}

@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { api, SalesDashboardReport, ProductSalesReportLine, PaymentMethodSalesReportLine, CashShiftHeader, CashShiftAuditReport } from '../services/api';
+import { api, SalesDashboardReport, ProductSalesReportLine, PaymentMethodSalesReportLine, CashShiftHeader, CashShiftAuditReport, SHIFT_REVIEW_LABELS } from '../services/api';
 import { Heading } from '../components/atoms/Heading';
 import { Badge } from '../components/atoms/Badge';
 import { Autocomplete } from '../components/molecules/Autocomplete';
 
 interface ReportsPageProps {
   businessId: string;
+  /** Spec 019 (D-9/P-3): a supervisor only sees sales/cash of these branches. */
+  restrictedBranches?: Array<{ id: string; name: string }>;
 }
 
 type DateRangeType = 'today' | 'week' | 'month' | 'last30' | 'custom';
 
-export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
+export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId, restrictedBranches }) => {
+  const defaultBranchFilter = restrictedBranches?.[0]?.id ?? 'all';
   const [reportData, setReportData] = useState<SalesDashboardReport | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,12 +24,12 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
   // Payment Method report states
   const [paymentMethodSales, setPaymentMethodSales] = useState<PaymentMethodSalesReportLine[]>([]);
   const [isPaymentMethodSalesLoading, setIsPaymentMethodSalesLoading] = useState<boolean>(false);
-  const [paymentMethodFilterBranch, setPaymentMethodFilterBranch] = useState<string>('all');
+  const [paymentMethodFilterBranch, setPaymentMethodFilterBranch] = useState<string>(defaultBranchFilter);
 
   // Cash Shifts states
   const [cashShifts, setCashShifts] = useState<CashShiftHeader[]>([]);
   const [isCashShiftsLoading, setIsCashShiftsLoading] = useState<boolean>(false);
-  const [cashShiftsFilterBranch, setCashShiftsFilterBranch] = useState<string>('all');
+  const [cashShiftsFilterBranch, setCashShiftsFilterBranch] = useState<string>(defaultBranchFilter);
   const [selectedShiftId, setSelectedShiftId] = useState<string>('');
   const [selectedShiftAudit, setSelectedShiftAudit] = useState<CashShiftAuditReport | null>(null);
   const [isShiftAuditLoading, setIsShiftAuditLoading] = useState<boolean>(false);
@@ -34,14 +37,14 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
   // Product sales report states
   const [productSales, setProductSales] = useState<ProductSalesReportLine[]>([]);
   const [isProductSalesLoading, setIsProductSalesLoading] = useState<boolean>(false);
-  const [productFilterBranch, setProductFilterBranch] = useState<string>('all');
+  const [productFilterBranch, setProductFilterBranch] = useState<string>(defaultBranchFilter);
   const [productFilterCategory, setProductFilterCategory] = useState<string>('all');
   const [productSearchQuery, setProductSearchQuery] = useState<string>('');
 
   // Stock report states
   const [stockLevels, setStockLevels] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
-  const [branches, setBranches] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>(restrictedBranches ?? []);
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [isStockLoading, setIsStockLoading] = useState<boolean>(false);
@@ -62,7 +65,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
   const [endDate, setEndDate] = useState<string>('');
 
   // Sales dashboard branch filter
-  const [salesFilterBranch, setSalesFilterBranch] = useState<string>('all');
+  const [salesFilterBranch, setSalesFilterBranch] = useState<string>(defaultBranchFilter);
 
   // Set default dates depending on range type
   useEffect(() => {
@@ -145,6 +148,8 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
   }, [businessId, selectedAuditProductId]);
 
   useEffect(() => {
+    // Supervisors have no inventory access in phase 1 (spec 019); their branch list comes from props.
+    if (restrictedBranches) return;
     if (activeReportTab === 'stock' || activeReportTab === 'kardex' || activeReportTab === 'salesByProduct') {
       fetchStockData();
     }
@@ -750,7 +755,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
       const headers = ['Operador', 'Sucursal', 'Fondo Inicial', 'Fondo Final Entregado', 'Estado', 'Resultado Arqueo', 'Fecha Apertura', 'Fecha Cierre'];
       const rows = cashShifts.map(item => {
         const snap = item.closeSnapshot;
-        const exp = snap?.summary?.expectedCash ?? snap?.expectedCash;
+        const exp = item.adjustedExpected ?? snap?.summary?.expectedCash ?? snap?.expectedCash;
         const actual = item.closedAt ? Number(item.cashDrawerAmount) : null;
         let arqueoStatus = '-';
         if (actual !== null && exp !== undefined && exp !== null) {
@@ -810,7 +815,9 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                 cashShifts.map((shift) => {
                   const isSelected = selectedShiftId === shift.id;
                   const isOpen = shift.status === 'open';
-                  const isRequiresRecon = !isOpen && ((shift.closeSnapshot?.summary?.expectedCash ?? shift.closeSnapshot?.expectedCash ?? 0) < 0);
+                  const isRequiresRecon = !isOpen && (shift.reconciliationStatus
+                    ? shift.reconciliationStatus === 'REQUIRES_RECONCILIATION'
+                    : (shift.closeSnapshot?.summary?.expectedCash ?? shift.closeSnapshot?.expectedCash ?? 0) < 0);
                   const dateStr = new Date(shift.openedAt).toLocaleDateString('es-MX', {
                     day: '2-digit',
                     month: 'short',
@@ -831,6 +838,11 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-bold text-text-primary">{shift.cashierName}</span>
                         <div className="flex items-center gap-1.5">
+                          {shift.reviewStatus && shift.reviewStatus !== 'no_aplica' && (
+                            <span className="px-1.5 py-0.5 text-[8.5px] font-bold rounded bg-champagne-gold/10 text-champagne-gold border border-champagne-gold/30 uppercase tracking-wider">
+                              {SHIFT_REVIEW_LABELS[shift.reviewStatus]}
+                            </span>
+                          )}
                           {isRequiresRecon && (
                             <span className="px-1.5 py-0.5 text-[8.5px] font-bold rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
                               Por Conciliar
@@ -881,11 +893,16 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
           ) : selectedShiftAudit ? (() => {
             const shiftInfo = selectedShiftAudit.shiftInfo || ({} as any);
             const initialFloat = shiftInfo.initialFloat ?? selectedShiftAudit.summary?.initialFloat ?? 0;
-            const cashDrawerAmount = shiftInfo.cashDrawerAmount ?? selectedShiftAudit.summary?.actualCash ?? 0;
+            // Spec 019: official/adjusted figures from the server (close snapshot + post-close reversals).
+            const review = selectedShiftAudit.review ?? null;
+            const cashDrawerAmount =
+              review?.isOfficial && review.approvedAmount != null
+                ? review.approvedAmount
+                : shiftInfo.cashDrawerAmount ?? selectedShiftAudit.summary?.actualCash ?? 0;
             const cashSales = selectedShiftAudit.salesSummary?.cashSales ?? selectedShiftAudit.summary?.cashSales ?? 0;
             const cardSales = selectedShiftAudit.salesSummary?.cardSales ?? selectedShiftAudit.summary?.cardSales ?? 0;
             const totalSales = selectedShiftAudit.salesSummary?.totalSales ?? selectedShiftAudit.summary?.totalSales ?? (cashSales + cardSales);
-            const expectedCash = selectedShiftAudit.expectedCash ?? selectedShiftAudit.summary?.expectedCash ?? 0;
+            const expectedCash = review?.adjustedExpected ?? selectedShiftAudit.expectedCash ?? selectedShiftAudit.summary?.expectedCash ?? 0;
             const txs = selectedShiftAudit.transactions || selectedShiftAudit.cashMovements || [];
 
             return (
@@ -895,6 +912,15 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                     <span>{shiftInfo.cashierName || 'Operador'}</span>
                     <span className="text-champagne-gold font-mono">{shiftInfo.status === 'open' ? 'Turno Abierto' : 'Turno Cerrado'}</span>
                   </div>
+                  {review && review.reviewStatus !== 'no_aplica' && (
+                    <div className="text-[10.5px] text-champagne-gold">
+                      Revisión: <strong>{SHIFT_REVIEW_LABELS[review.reviewStatus]}</strong>
+                      {review.isOfficial ? ' · cifras oficiales' : ' · cifras provisionales'}
+                      {review.postCloseAdjustment !== 0 && (
+                        <> · ajustes posteriores al cierre: <strong className="font-mono">{formatCurrency(review.postCloseAdjustment)}</strong> (esperado al cierre {formatCurrency(review.expectedAtClose ?? 0)})</>
+                      )}
+                    </div>
+                  )}
                   <div className="text-text-secondary text-[10.5px]">
                     <div>Sucursal: <strong className="text-text-primary">{shiftInfo.branchName || 'Sucursal'}</strong></div>
                     {shiftInfo.openedAt && (
@@ -1113,7 +1139,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
                     }}
                     className="bg-transparent text-xs text-text-primary focus:outline-none px-1 cursor-pointer font-medium text-champagne-gold"
                   >
-                    <option value="all">Todas las Sucursales</option>
+                    {!restrictedBranches && <option value="all">Todas las Sucursales</option>}
                     {branches.map((b) => (
                       <option key={b.id} value={b.id} className="bg-onyx text-text-primary">{b.name}</option>
                     ))}
@@ -1283,6 +1309,9 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
         >
           Cortes de Caja
         </button>
+        {/* Spec 019: supervisors have no inventory reports in phase 1. */}
+        {!restrictedBranches && (
+          <>
         <button
           onClick={() => setActiveReportTab('stock')}
           className={`pb-3 text-xs lg:text-sm font-medium tracking-wide transition-all border-b-2 cursor-pointer whitespace-nowrap px-2 ${
@@ -1303,6 +1332,8 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ businessId }) => {
         >
           Kardex Visual
         </button>
+          </>
+        )}
       </div>
 
       {error && (

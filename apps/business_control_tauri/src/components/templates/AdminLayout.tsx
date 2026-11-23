@@ -58,6 +58,40 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
     setIsMobileMenuOpen(false);
   };
 
+  // Spec 019 D-6: notification and approval counters, refreshed over REST.
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
+  const showNotifications = allowedTabs.includes('notifications');
+  const showApprovals = allowedTabs.includes('approvals');
+  useEffect(() => {
+    if (!showNotifications && !showApprovals) return;
+    let cancelled = false;
+    const refresh = () => {
+      if (showNotifications) {
+        api.getNotificationsUnreadCount().then((c) => !cancelled && setUnreadNotifications(c.unread)).catch(() => undefined);
+      }
+      if (showApprovals) {
+        api.getApprovalsCount().then((c) => !cancelled && setPendingApprovals(c.total)).catch(() => undefined);
+      }
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 60000);
+    window.addEventListener('notifications:changed', refresh);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('notifications:changed', refresh);
+    };
+  }, [showNotifications, showApprovals, activeTab]);
+
+  const supervisionItems: Array<{ tab: AdminTab; label: string; icon: string; count?: number }> = [
+    { tab: 'approvals', label: 'Aprobaciones de caja', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', count: pendingApprovals },
+    { tab: 'notifications', label: 'Notificaciones', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9', count: unreadNotifications },
+    { tab: 'debts', label: 'Adeudos', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+    { tab: 'audit-log', label: 'Bitácora de caja', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
+    { tab: 'supervisors', label: 'Supervisores', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
+  ];
+
   const canSee = (tab: AdminTab) => allowedTabs.includes(tab);
   const businessOptions = [
     { value: 'd3b07384-d113-4a0e-a555-e5b12824bf01', label: 'Cafetería' },
@@ -104,6 +138,35 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
  
           {/* Navigation Links */}
           <nav className="p-4 flex flex-col gap-1 flex-1 overflow-y-auto">
+            {supervisionItems.some((item) => canSee(item.tab)) && (
+              <>
+                <div className="px-3 py-1.5 mt-1 select-none">
+                  <span className="text-[10px] font-bold text-aged-bronze uppercase tracking-widest">Supervisión</span>
+                </div>
+                {supervisionItems.filter((item) => canSee(item.tab)).map((item) => (
+                  <button
+                    key={item.tab}
+                    onClick={() => handleTabClick(item.tab)}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded border text-left transition-all duration-200 ${
+                      activeTab === item.tab
+                        ? 'bg-charcoal-surface border-champagne-gold/20 text-champagne-gold font-medium'
+                        : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-charcoal-surface/50'
+                    }`}
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+                    </svg>
+                    <span className="text-xs flex-1">{item.label}</span>
+                    {item.count ? (
+                      <span className="min-w-[1.25rem] px-1.5 py-0.5 rounded-full bg-champagne-gold text-obsidian text-[10px] font-bold text-center">
+                        {item.count > 99 ? '99+' : item.count}
+                      </span>
+                    ) : null}
+                  </button>
+                ))}
+              </>
+            )}
+
             {/* Group: Operaciones */}
             <div className="px-3 py-1.5 mt-1 select-none">
               <span className="text-[10px] font-bold text-aged-bronze uppercase tracking-widest">
@@ -543,6 +606,27 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
 
           {/* Right Status Actions */}
           <div className="flex items-center gap-3 lg:gap-6">
+            {showNotifications && (
+              <button
+                onClick={() => handleTabClick('notifications')}
+                className={`relative p-2 rounded-full border transition-all duration-300 ${
+                  activeTab === 'notifications'
+                    ? 'border-champagne-gold bg-charcoal-surface text-champagne-gold'
+                    : 'border-aged-bronze/30 hover:border-champagne-gold/50 bg-charcoal-surface/40 text-text-secondary hover:text-champagne-gold'
+                }`}
+                title="Notificaciones"
+                aria-label={`Notificaciones${unreadNotifications ? ` (${unreadNotifications} sin leer)` : ''}`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {unreadNotifications > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[1.1rem] px-1 rounded-full bg-error-red text-white text-[9px] font-bold text-center">
+                    {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                  </span>
+                )}
+              </button>
+            )}
             <button
               onClick={() => handleTabClick('help')}
               className={`p-2 rounded-full border transition-all duration-300 ${

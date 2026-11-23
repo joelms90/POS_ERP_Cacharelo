@@ -7,8 +7,8 @@ export interface Employee {
   name: string;
   email?: string;
   pin: string;
-  role: 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable' | 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer';
-  roles?: Array<'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable' | 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer'>;
+  role: 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable' | 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer' | 'branch_supervisor';
+  roles?: Array<'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable' | 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer' | 'branch_supervisor'>;
 }
 
 export interface AdminUser {
@@ -16,8 +16,8 @@ export interface AdminUser {
   businessId?: string;
   name: string;
   email: string;
-  role: 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer';
-  businessAccess: Array<{ businessId: string; role: 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer' }>;
+  role: 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer' | 'branch_supervisor';
+  businessAccess: Array<{ businessId: string; role: 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer' | 'branch_supervisor' }>;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -28,9 +28,9 @@ export interface AuthUser {
   branchId?: string;
   name: string;
   email?: string;
-  role: 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer' | 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable';
-  roles?: Array<'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer' | 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable'>;
-  businessAccess?: Array<{ businessId: string; role: 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer' }>;
+  role: 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer' | 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable' | 'branch_supervisor';
+  roles?: Array<'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer' | 'waiter' | 'cashier' | 'kitchen' | 'branch_operator' | 'warehouse_purchasing_operator' | 'encargado' | 'responsable' | 'branch_supervisor'>;
+  businessAccess?: Array<{ businessId: string; role: 'owner' | 'inventory_admin' | 'support_tech' | 'web_inquiries_viewer' | 'branch_supervisor' }>;
 }
 
 export interface Warehouse {
@@ -1397,6 +1397,113 @@ export const api = {
     return apiRequest<CashShiftAuditReport>(`/reports/cash-shifts/${id}/audit`);
   },
 
+  // ---- Spec 019: supervisión de caja ----
+  async getSupervisionBranches(): Promise<SupervisionBranch[]> {
+    return apiRequest<SupervisionBranch[]>('/supervision/branches');
+  },
+
+  async getApprovals(params: { type?: 'corte_z' | 'cash_movement'; status?: string; branchId?: string; from?: string; to?: string; actionable?: boolean } = {}): Promise<ApprovalsInbox> {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== '' && value !== false) query.set(key, String(value));
+    });
+    const qs = query.toString();
+    return apiRequest<ApprovalsInbox>(`/supervision/approvals${qs ? `?${qs}` : ''}`);
+  },
+
+  async getApprovalsCount(): Promise<{ cortes: number; movements: number; total: number }> {
+    return apiRequest('/supervision/approvals/count');
+  },
+
+  async getSupervisionShiftDetail(id: string): Promise<SupervisionShiftDetail> {
+    return apiRequest<SupervisionShiftDetail>(`/supervision/cash-shifts/${id}`);
+  },
+
+  async approveShift(id: string, body: { version: number; reason?: string }) {
+    return apiRequest(`/supervision/cash-shifts/${id}/approve`, { method: 'POST', body: JSON.stringify(body) });
+  },
+
+  async rejectShift(id: string, body: { version: number; reason: string }) {
+    return apiRequest(`/supervision/cash-shifts/${id}/reject`, { method: 'POST', body: JSON.stringify(body) });
+  },
+
+  async adjustShift(id: string, body: { version: number; reason: string; approvedAmount: string; denominationCounts?: Record<string, number> }) {
+    return apiRequest(`/supervision/cash-shifts/${id}/adjust`, { method: 'POST', body: JSON.stringify(body) });
+  },
+
+  async reopenShift(id: string, reason: string) {
+    return apiRequest(`/supervision/cash-shifts/${id}/reopen`, { method: 'POST', body: JSON.stringify({ reason }) });
+  },
+
+  async overrideOpenBlock(id: string, reason: string) {
+    return apiRequest(`/supervision/cash-shifts/${id}/override-open-block`, { method: 'POST', body: JSON.stringify({ reason }) });
+  },
+
+  async approveMovement(id: string, body: { version: number; reason?: string }) {
+    return apiRequest(`/supervision/cash-movements/${id}/approve`, { method: 'POST', body: JSON.stringify(body) });
+  },
+
+  async rejectMovement(id: string, body: { version: number; reason: string }) {
+    return apiRequest(`/supervision/cash-movements/${id}/reject`, { method: 'POST', body: JSON.stringify(body) });
+  },
+
+  async cancelMovement(id: string, body: { version: number; reason: string }) {
+    return apiRequest(`/supervision/cash-movements/${id}/cancel`, { method: 'POST', body: JSON.stringify(body) });
+  },
+
+  async adjustMovement(id: string, body: { version: number; reason: string; amount: string }) {
+    return apiRequest(`/supervision/cash-movements/${id}/adjust`, { method: 'POST', body: JSON.stringify(body) });
+  },
+
+  async getMovementImpact(id: string, action: 'reject' | 'cancel' | 'adjust', amount?: string): Promise<MovementImpact> {
+    const query = new URLSearchParams({ action });
+    if (amount) query.set('amount', amount);
+    return apiRequest<MovementImpact>(`/supervision/cash-movements/${id}/impact?${query.toString()}`);
+  },
+
+  async getCashierDebts(params: { branchId?: string; cashierId?: string; status?: string } = {}): Promise<CashierDebt[]> {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => { if (value) query.set(key, value); });
+    const qs = query.toString();
+    return apiRequest<CashierDebt[]>(`/supervision/debts${qs ? `?${qs}` : ''}`);
+  },
+
+  async getSupervisionAuditLog(params: { branchId?: string; entityType?: string; entityId?: string; action?: string; from?: string; to?: string } = {}): Promise<AuditLogEntry[]> {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => { if (value) query.set(key, value); });
+    const qs = query.toString();
+    return apiRequest<AuditLogEntry[]>(`/supervision/audit-log${qs ? `?${qs}` : ''}`);
+  },
+
+  async getSupervisorAssignments(businessId: string): Promise<SupervisorAssignment[]> {
+    return apiRequest<SupervisorAssignment[]>(`/supervision/assignments?businessId=${businessId}`);
+  },
+
+  async replaceSupervisorAssignments(userId: string, businessId: string, branchIds: string[]) {
+    return apiRequest(`/supervision/assignments/${userId}`, { method: 'PUT', body: JSON.stringify({ businessId, branchIds }) });
+  },
+
+  async getNotifications(params: { unread?: boolean; branchId?: string; type?: string; limit?: number; offset?: number } = {}): Promise<AppNotification[]> {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== '' && value !== false) query.set(key, String(value));
+    });
+    const qs = query.toString();
+    return apiRequest<AppNotification[]>(`/notifications${qs ? `?${qs}` : ''}`);
+  },
+
+  async getNotificationsUnreadCount(): Promise<{ unread: number; requiresAction: number }> {
+    return apiRequest('/notifications/unread-count');
+  },
+
+  async markNotificationRead(id: string) {
+    return apiRequest(`/notifications/${id}/read`, { method: 'POST' });
+  },
+
+  async markAllNotificationsRead(): Promise<{ updated: number }> {
+    return apiRequest('/notifications/read-all', { method: 'POST' });
+  },
+
   async getTicketsToday(businessId: string, branchId?: string): Promise<TicketsTodayReport> {
     const params = new URLSearchParams({ businessId });
     if (branchId) params.set('branchId', branchId);
@@ -1774,6 +1881,16 @@ export interface CashShiftHeader {
   openedAt: string;
   closedAt: string | null;
   closeSnapshot?: any;
+  // Spec 019 — server-side reconciliation over the cash ledger
+  branchId?: string;
+  reviewStatus?: ShiftReviewStatus;
+  approvedDifference?: string | number | null;
+  expectedAtClose?: number | null;
+  postCloseAdjustment?: number;
+  adjustedExpected?: number | null;
+  adjustedDifference?: number | null;
+  isOfficial?: boolean;
+  reconciliationStatus?: ReconciliationStatus | null;
 }
 
 export interface CashShiftAuditReport {
@@ -1818,9 +1935,27 @@ export interface CashShiftAuditReport {
     amount: number;
     reason: string;
     createdAt: string;
+    category?: string | null;
+    entryKind?: 'movimiento' | 'reverso' | 'ajuste';
+    approvalStatus?: MovementApprovalStatus;
   }>;
   expectedCash: number;
   discrepancy: number;
+  /** Spec 019: review state and ledger adjustments after the close. */
+  review?: {
+    reviewStatus: ShiftReviewStatus;
+    n1ResolverRole: string | null;
+    recountCount: number;
+    version: number;
+    approvedAmount: number | null;
+    postCloseEntries: Array<{ id: string; type: string; amount: number; entryKind: string; reason: string; createdAt: string; cashEffect: number }>;
+    expectedAtClose: number | null;
+    postCloseAdjustment: number;
+    adjustedExpected: number | null;
+    adjustedDifference: number | null;
+    isOfficial: boolean;
+    reconciliationStatus: ReconciliationStatus | null;
+  } | null;
 }
 
 export interface TicketItem {
@@ -1888,3 +2023,268 @@ export interface LiveOrder {
   items: LiveOrderItem[];
   payments: LiveOrderPayment[];
 }
+
+// ==========================================
+// Spec 019 — Supervisor de sucursal
+// ==========================================
+
+export type ShiftReviewStatus =
+  | 'no_aplica'
+  | 'pendiente_n1'
+  | 'rechazado_n1'
+  | 'pendiente_n2'
+  | 'rechazado_n2'
+  | 'aprobado'
+  | 'aprobado_con_ajuste';
+
+export type MovementApprovalStatus =
+  | 'aprobado_historico'
+  | 'pendiente_n1'
+  | 'aprobado'
+  | 'rechazado'
+  | 'cancelado'
+  | 'ajustado'
+  | 'no_aplica';
+
+export type ReconciliationStatus = 'BALANCED' | 'SURPLUS' | 'SHORTAGE' | 'REQUIRES_RECONCILIATION';
+
+export interface SupervisionBranch {
+  id: string;
+  name: string;
+  businessId: string;
+}
+
+export interface ShiftPermissions {
+  level: 'n1' | 'n2' | null;
+  canApprove: boolean;
+  canReject: boolean;
+  canAdjust: boolean;
+  canReopen: boolean;
+  canUnblockOpening: boolean;
+  canCorrectMovements: boolean;
+}
+
+export interface ApprovalCorteItem {
+  id: string;
+  branchId: string;
+  branchName: string;
+  cashierId: string;
+  cashierName: string | null;
+  closedBy: string | null;
+  closedAt: string | null;
+  reviewStatus: ShiftReviewStatus;
+  n1ResolverRole: string | null;
+  expectedCash: number | null;
+  counted: number;
+  cashDifference: number | null;
+  recountCount: number;
+  closedOffline: boolean;
+  openBlocking: boolean;
+  version: number;
+  level: 'n1' | 'n2' | null;
+  canAct: boolean;
+  permissions: ShiftPermissions;
+}
+
+export interface ApprovalMovementItem {
+  id: string;
+  shiftId: string;
+  branchId: string;
+  branchName: string;
+  type: 'cash-in' | 'cash-out';
+  amount: number;
+  category: string | null;
+  reason: string;
+  createdAt: string;
+  createdBy: string | null;
+  authorName: string | null;
+  approvalStatus: MovementApprovalStatus;
+  n1ResolverRole: string;
+  shiftStatus: string;
+  shiftReviewStatus: ShiftReviewStatus;
+  version: number;
+  canAct: boolean;
+  canCorrect: boolean;
+}
+
+export interface ApprovalsInbox {
+  cortes: ApprovalCorteItem[];
+  movements: ApprovalMovementItem[];
+}
+
+export interface LedgerMovement {
+  id: string;
+  type: 'cash-in' | 'cash-out';
+  amount: number;
+  reason: string;
+  createdAt: string;
+  category: string | null;
+  entryKind: 'movimiento' | 'reverso' | 'ajuste';
+  approvalStatus: MovementApprovalStatus;
+  reversesTransactionId: string | null;
+  replacesTransactionId: string | null;
+  createdBy: string | null;
+  version: number;
+  cashEffect: number;
+}
+
+export interface ShiftFigures {
+  expectedAtClose: number | null;
+  postCloseAdjustment: number;
+  postCloseEntries: Array<{ id: string; type: string; amount: number; entryKind: string; reason: string; createdAt: string; cashEffect: number }>;
+  adjustedExpected: number;
+  counted: number;
+  originalDifference: number | null;
+  adjustedDifference: number | null;
+  reconciliationStatus: ReconciliationStatus | null;
+  movementTotals: { grossIn: number; grossOut: number; reversals: number; net: number; pending: number };
+  pendingMovementsCount: number;
+  pendingMovementsAmount: number;
+}
+
+export interface AuditLogEntry {
+  id: number;
+  businessId: string;
+  branchId: string | null;
+  entityType: string;
+  entityId: string;
+  action: string;
+  approvalLevel: 'n1' | 'n2' | 'owner' | null;
+  actorId: string | null;
+  actorName: string | null;
+  actorRole: string | null;
+  reason: string | null;
+  before: any;
+  after: any;
+  source: string;
+  deviceId: string | null;
+  createdAt: string;
+}
+
+export interface SupervisionShiftDetail {
+  shift: {
+    id: string;
+    branchId: string;
+    branchName: string;
+    businessId: string;
+    cashierId: string;
+    cashierName: string | null;
+    status: 'open' | 'closed';
+    openedAt: string;
+    closedAt: string | null;
+    reviewStatus: ShiftReviewStatus;
+    n1ResolverRole: string | null;
+    closedBy: string | null;
+    closedByName: string | null;
+    operatorReviewedBy: string | null;
+    operatorReviewedByName: string | null;
+    operatorReviewedAt: string | null;
+    operatorNotes: string | null;
+    reviewedBy: string | null;
+    reviewedByName: string | null;
+    reviewedAt: string | null;
+    reviewNotes: string | null;
+    recountCount: number;
+    closedOffline: boolean;
+    localExpectedCash: number | null;
+    openBlockOverriddenAt: string | null;
+    openBlockOverrideReason: string | null;
+    approvedAmount: number | null;
+    approvedDifference: number | null;
+    version: number;
+  };
+  figures: ShiftFigures;
+  report: {
+    summary: {
+      initialFloat: number;
+      cashSales: number;
+      cardSales: number;
+      totalSales: number;
+      manualCashIn: number;
+      manualCashOut: number;
+      expectedCash: number;
+    };
+    cashMovements: LedgerMovement[];
+  };
+  approvalSnapshot: any;
+  permissions: ShiftPermissions;
+  history: AuditLogEntry[];
+}
+
+export interface MovementImpact {
+  movementId: string;
+  action: 'reject' | 'cancel' | 'adjust';
+  currentExpected: number;
+  resultingExpected: number;
+  currentDifference: number | null;
+  resultingDifference: number | null;
+  shiftClosed: boolean;
+  message: string;
+}
+
+export interface CashierDebt {
+  id: string;
+  branchId: string;
+  branchName: string;
+  shiftId: string;
+  cashierId: string;
+  cashierName: string;
+  amount: string;
+  status: 'vigente' | 'anulado';
+  generatedBy: string | null;
+  generatedAt: string;
+  voidedAt: string | null;
+}
+
+export interface SupervisorAssignment {
+  id: string;
+  name: string;
+  email: string | null;
+  branches: Array<{ branchId: string; branchName: string; createdAt: string }>;
+}
+
+export interface AppNotification {
+  id: string;
+  businessId: string;
+  branchId: string | null;
+  branchName: string | null;
+  type: string;
+  requiresAction: boolean;
+  entityType: 'cash_shift' | 'cash_transaction' | 'cashier_debt';
+  entityId: string;
+  title: string;
+  body: string | null;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export const SHIFT_REVIEW_LABELS: Record<ShiftReviewStatus, string> = {
+  no_aplica: 'Sin revisión',
+  pendiente_n1: 'Pendiente nivel 1',
+  rechazado_n1: 'Rechazado nivel 1 · recontar',
+  pendiente_n2: 'Pendiente nivel 2',
+  rechazado_n2: 'Rechazado nivel 2 · recontar',
+  aprobado: 'Aprobado',
+  aprobado_con_ajuste: 'Aprobado con ajuste',
+};
+
+export const MOVEMENT_STATUS_LABELS: Record<MovementApprovalStatus, string> = {
+  aprobado_historico: 'Histórico',
+  pendiente_n1: 'Pendiente',
+  aprobado: 'Aprobado',
+  rechazado: 'Rechazado',
+  cancelado: 'Cancelado',
+  ajustado: 'Ajustado',
+  no_aplica: '—',
+};
+
+export const CASH_CATEGORY_LABELS: Record<string, string> = {
+  aporte_cambio: 'Aporte de cambio',
+  reposicion_fondo: 'Reposición de fondo',
+  correccion: 'Corrección',
+  otro_ingreso: 'Otro ingreso',
+  gasto_operativo: 'Gasto operativo',
+  entrega_encargado: 'Entrega a encargado',
+  transferencia_caja: 'Transferencia a otra caja',
+  otro_egreso: 'Otro egreso',
+};
