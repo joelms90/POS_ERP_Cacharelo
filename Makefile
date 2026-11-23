@@ -772,7 +772,11 @@ admin-dev-local:
 
 # Owner Business Copilot MVP (run these in separate terminals)
 .PHONY: owner-copilot-backend owner-copilot-admin owner-copilot-test
-owner-copilot-backend: dev-backend-local
+owner-copilot-backend:
+	@echo "Starting Owner Copilot backend with apps/sync_api/.env when present (migrations are skipped)..."
+	@cd apps/sync_api && \
+		if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
+		PORT=$(BACKEND_PORT) NODE_ENV=development ENABLE_GCP_INTEGRATIONS=false SKIP_MIGRATIONS=true DATABASE_URL="postgres://pos_user:pos_password@localhost:5432/pos_dev" npm run dev
 
 owner-copilot-admin: admin-dev-local
 

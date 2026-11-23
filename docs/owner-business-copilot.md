@@ -11,6 +11,16 @@ make owner-copilot-backend
 make owner-copilot-admin
 ```
 
+By default the Copiloto uses its deterministic local provider. To opt in to Gemini locally, copy `apps/sync_api/.env.example` to `apps/sync_api/.env`, then set:
+
+```dotenv
+OWNER_COPILOT_PROVIDER=gemini
+GEMINI_API_KEY=your-local-key
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+Keep this file outside Git. `make owner-copilot-backend` reads it in the backend process only and explicitly skips database migrations.
+
 Open the admin dashboard, sign in with a real owner account, and select **Copiloto**. Run focused checks with:
 
 ```bash
@@ -30,6 +40,8 @@ The focused command runs the backend safety suite and the admin production type/
 
 ## Production model provider
 
-The MVP uses a deterministic local provider and needs no model key. A production provider implementation must read `OWNER_COPILOT_PROVIDER_API_KEY` from a Secret Manager-backed server environment variable. Never commit its value or prefix it with `VITE_`.
+The MVP uses a deterministic local provider and needs no model key. Gemini is selected only when both `OWNER_COPILOT_PROVIDER=gemini` and `GEMINI_API_KEY` are set in the server process. The adapter uses Gemini only to classify a prompt into the server's tiny typed plan allowlist; it cannot call tools, see browser credentials, or bypass confirmations.
+
+For production, create a dedicated Secret Manager secret such as `owner-copilot-gemini-api-key`, grant only the Cloud Run service account `secretAccessor`, and inject it as the `GEMINI_API_KEY` environment variable. Set `OWNER_COPILOT_PROVIDER=gemini` and `GEMINI_MODEL` as non-secret runtime configuration. Rotate the secret in Secret Manager, deploy a new revision, restrict the key in Google AI Studio, set billing/usage alerts, and never commit, log, return, or expose it through a `VITE_*` variable. This change does not create the secret, modify infrastructure, or deploy.
 
 Existing MCP read-tool names are used only as vocabulary for the server-owned allowlist. The Copiloto does not call MCP, does not inherit MCP's service identity, and does not expose MCP tools to the browser.

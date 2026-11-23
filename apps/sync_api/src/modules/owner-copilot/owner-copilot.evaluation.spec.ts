@@ -9,7 +9,7 @@ const FIXTURES = [
 describe('OwnerCopilot deterministic evaluation fixture', () => {
   const provider = new LocalDemoOwnerCopilotProvider();
 
-  it.each(FIXTURES)('selects only the expected safe plan for $prompt', ({ prompt, expected }) => {
-    expect(provider.plan(prompt)).toEqual(expected);
+  it.each(FIXTURES)('selects only the expected safe plan for $prompt', async ({ prompt, expected }) => {
+    await expect(provider.plan(prompt)).resolves.toEqual(expected);
   });
 });

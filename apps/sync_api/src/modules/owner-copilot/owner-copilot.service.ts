@@ -5,8 +5,8 @@ import * as schema from '../../database/schema';
 import { ReportsService } from '../reports/reports.service';
 import { AlertsService } from '../inventory/alerts/alerts.service';
 import { isGlobalOwner } from '../auth/business-access';
-import { LocalDemoOwnerCopilotProvider } from './local-demo.provider';
-import { OWNER_COPILOT_READ_TOOLS, OwnerCopilotActor, OwnerCopilotReadTool, redact } from './owner-copilot.types';
+import { OWNER_COPILOT_PROVIDER, OWNER_COPILOT_READ_TOOLS, redact } from './owner-copilot.types';
+import type { OwnerCopilotActor, OwnerCopilotProvider, OwnerCopilotReadTool } from './owner-copilot.types';
 
 type Db = { insert: (table: unknown) => { values: (value: unknown) => { returning?: () => Promise<any[]>; then?: unknown } } };
 
@@ -16,7 +16,7 @@ export class OwnerCopilotService {
     @Inject(DRIZZLE_CONNECTION) private readonly db: Db,
     private readonly reports: ReportsService,
     private readonly alerts: AlertsService,
-    private readonly provider: LocalDemoOwnerCopilotProvider,
+    @Inject(OWNER_COPILOT_PROVIDER) private readonly provider: OwnerCopilotProvider,
   ) {}
 
   async chat(actor: OwnerCopilotActor, input: { prompt: string; businessId: string; branchId?: string; conversationId?: string }) {
@@ -26,7 +26,7 @@ export class OwnerCopilotService {
     const correlationId = randomUUID();
     await this.auditConversation(conversationId, actor, input.businessId, input.branchId, correlationId);
     await this.auditMessage(conversationId, 'user', input.prompt);
-    const plan = this.provider.plan(input.prompt);
+    const plan = await this.provider.plan(input.prompt);
     if (plan.kind === 'write_proposal') {
       const confirmation = await this.createConfirmation(conversationId, actor, input.businessId, input.branchId, plan.actionType);
       const answer = 'Preparé una propuesta de acción. Revísala y confírmala explícitamente antes de cualquier cambio.';
