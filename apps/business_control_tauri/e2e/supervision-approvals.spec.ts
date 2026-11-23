@@ -101,7 +101,7 @@ test.describe('Supervisión de caja (Admin web)', () => {
     seed = seedSupervision();
   });
 
-  test('supervisor aprueba el nivel 1 y el owner el nivel 2', async ({ page }) => {
+  test('el supervisor cierra el nivel único y el owner revisa el corte aprobado', async ({ page }) => {
     test.skip(IS_REMOTE, 'Requiere el backend y la base de datos locales.');
     test.setTimeout(120000);
 
@@ -138,67 +138,53 @@ test.describe('Supervisión de caja (Admin web)', () => {
     });
 
     await page.getByRole('button', { name: /Cortes Z/ }).click();
-    const n1Card = page
+    const corteCard = page
       .locator('button')
       .filter({ hasText: seed.branchName })
-      .filter({ hasText: 'Pendiente nivel 1' });
-    await expect(n1Card).toBeVisible({ timeout: 15000 });
-    await n1Card.click();
+      .filter({ hasText: 'Pendiente de aprobación' });
+    await expect(corteCard).toBeVisible({ timeout: 15000 });
+    await corteCard.click();
 
     const review = page.getByRole('dialog', { name: 'Revisión de Corte Z' });
     await expect(review.getByText('Esperado al cierre')).toBeVisible({
       timeout: 15000,
     });
-    await review.getByRole('button', { name: 'Aprobar (nivel 1)' }).click();
+    await review.getByRole('button', { name: 'Aprobar', exact: true }).click();
 
-    const n1Dialog = page.getByRole('dialog', {
-      name: 'Aprobar Corte Z (nivel 1)',
-    });
-    await expect(n1Dialog).toBeVisible();
-    await n1Dialog.getByRole('button', { name: 'Aprobar', exact: true }).click();
-    await expect(n1Dialog).not.toBeVisible({ timeout: 15000 });
-    await expect(review.getByText('Pendiente nivel 2', { exact: true })).toBeVisible({
-      timeout: 15000,
-    });
-    await review.getByRole('button', { name: 'Cerrar' }).click();
-
-    await page.getByRole('button', { name: 'Cerrar Sesión' }).click();
-    await loginAs(page, seed.ownerEmail, seed.ownerPassword);
-    await openApprovals(page);
-
-    const n2Card = page
-      .locator('button')
-      .filter({ hasText: seed.branchName })
-      .filter({ hasText: 'Pendiente nivel 2' });
-    await expect(n2Card).toBeVisible({ timeout: 15000 });
-    await n2Card.click();
-
-    const ownerReview = page.getByRole('dialog', { name: 'Revisión de Corte Z' });
-    await expect(ownerReview.getByText('Esperado al cierre')).toBeVisible({
-      timeout: 15000,
-    });
-    await ownerReview.getByRole('button', { name: 'Aprobar (nivel 2)' }).click();
-
-    const n2Dialog = page.getByRole('dialog', {
-      name: 'Aprobar Corte Z (nivel 2)',
-    });
-    await expect(n2Dialog).toBeVisible();
-    await n2Dialog.getByRole('button', { name: 'Aprobar', exact: true }).click();
-    await expect(n2Dialog).not.toBeVisible({ timeout: 15000 });
+    const approveDialog = page.getByRole('dialog', { name: 'Aprobar Corte Z' });
+    await expect(approveDialog).toBeVisible();
+    await approveDialog.getByRole('button', { name: 'Aprobar', exact: true }).click();
+    await expect(approveDialog).not.toBeVisible({ timeout: 15000 });
     await expect(
-      ownerReview.getByText('Aprobado', { exact: true }).first(),
+      review.getByText('Aprobado', { exact: true }).first(),
     ).toBeVisible({ timeout: 15000 });
+    await review.getByRole('button', { name: 'Cerrar' }).click();
 
     const token = await page.evaluate(
       () => localStorage.getItem('BC-Access-Token') ?? '',
     );
     const detail = await approvedShiftDetail(token, seed.shiftId);
     expect(detail.shift.reviewStatus).toBe('aprobado');
-    expect(detail.shift.operatorReviewedBy).toBe(seed.supervisorId);
-    expect(detail.shift.reviewedBy).toBe(seed.ownerId);
+    expect(detail.shift.operatorReviewedBy).toBeNull();
+    expect(detail.shift.reviewedBy).toBe(seed.supervisorId);
     expect(
       detail.report.cashMovements.find((movement) => movement.id === seed.movementId)
         ?.approvalStatus,
     ).toBe('aprobado');
+
+    await page.getByRole('button', { name: 'Cerrar Sesión' }).click();
+    await loginAs(page, seed.ownerEmail, seed.ownerPassword);
+    await openApprovals(page);
+    await page.getByLabel('Estado').selectOption('final');
+    const approvedCard = page
+      .locator('button')
+      .filter({ hasText: seed.branchName })
+      .filter({ hasText: 'Aprobado' });
+    await expect(approvedCard).toBeVisible({ timeout: 15000 });
+    await approvedCard.click();
+    const ownerReview = page.getByRole('dialog', { name: 'Revisión de Corte Z' });
+    await expect(ownerReview.getByText('Esperado al cierre')).toBeVisible({
+      timeout: 15000,
+    });
   });
 });

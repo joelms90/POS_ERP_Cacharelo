@@ -105,12 +105,13 @@ describe('cash approval rules', () => {
       );
     });
 
-    it('S-6: supervisor and owner do not replace the OIS on cashier items', () => {
+    it('lets the assigned supervisor or owner resolve cashier items at the single level', () => {
+      expect(() => assertCanResolveN1(supervisor, cashierItem)).not.toThrow();
+      expect(() => assertCanResolveN1(owner, cashierItem)).not.toThrow();
       expectRule(
-        () => assertCanResolveN1(supervisor, cashierItem),
+        () => assertCanResolveN1(unassignedSupervisor, cashierItem),
         'forbidden',
       );
-      expectRule(() => assertCanResolveN1(owner, cashierItem), 'forbidden');
     });
 
     it('nobody resolves their own item', () => {
@@ -120,10 +121,11 @@ describe('cash approval rules', () => {
       );
     });
 
-    it('S-3: the assigned supervisor or the owner resolves N1 of OIS items; another OIS cannot', () => {
+    it('lets the branch OIS, assigned supervisor or owner resolve OIS items', () => {
+      expect(() => assertCanResolveN1(otherOis, oisItem)).not.toThrow();
       expect(() => assertCanResolveN1(supervisor, oisItem)).not.toThrow();
       expect(() => assertCanResolveN1(owner, oisItem)).not.toThrow();
-      expectRule(() => assertCanResolveN1(otherOis, oisItem), 'forbidden');
+      expectRule(() => assertCanResolveN1(foreignOis, oisItem), 'forbidden');
       expectRule(
         () => assertCanResolveN1(unassignedSupervisor, oisItem),
         'forbidden',
@@ -200,7 +202,8 @@ describe('cash approval rules', () => {
 
   describe('Corte Z state machine', () => {
     it.each([
-      ['pendiente_n1', 'approve_n1', 'pendiente_n2'],
+      ['pendiente_n1', 'approve_n1', 'aprobado'],
+      ['pendiente_n1', 'adjust_n1', 'aprobado_con_ajuste'],
       ['pendiente_n1', 'reject_n1', 'rechazado_n1'],
       ['rechazado_n1', 'recount', 'pendiente_n1'],
       ['pendiente_n2', 'approve_n2', 'aprobado'],
@@ -208,8 +211,8 @@ describe('cash approval rules', () => {
       ['pendiente_n2', 'reject_n2', 'rechazado_n2'],
       ['rechazado_n2', 'recount', 'pendiente_n2'], // S-5: straight back to N2
       ['rechazado_n2', 'adjust_n2', 'aprobado_con_ajuste'],
-      ['aprobado', 'reopen', 'pendiente_n2'],
-      ['aprobado_con_ajuste', 'reopen', 'pendiente_n2'],
+      ['aprobado', 'reopen', 'pendiente_n1'],
+      ['aprobado_con_ajuste', 'reopen', 'pendiente_n1'],
     ] as const)('%s --%s--> %s', (from, action, to) => {
       expect(nextShiftStatus(from, action)).toBe(to);
     });

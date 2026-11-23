@@ -103,20 +103,18 @@ export const ShiftReviewPanel: React.FC<{
   const impactFor = (kind: ShiftAction): React.ReactNode => {
     switch (kind) {
       case 'approve':
-        return level === 'n1' ? (
-          <span>El Corte Z pasará a <strong>nivel 2</strong> (supervisor u owner). Si bloqueaba la apertura de caja, la sucursal podrá abrir el siguiente turno.</span>
-        ) : (
+        return (
           <div className="flex flex-col gap-1">
-            <span>Aprobación final. Las cifras quedan congeladas como oficiales.</span>
+            <span>Aprobación final. Las cifras quedan congeladas como oficiales y la sucursal puede abrir el siguiente turno.</span>
             <span>Diferencia final: <strong className={differenceClass(adjustedDiff)}>{formatCurrency(adjustedDiff)}</strong></span>
             {adjustedDiff < 0 && <span className="text-error-red">Se registrará un adeudo de {formatCurrency(-adjustedDiff)} a nombre del cajero.</span>}
           </div>
         );
       case 'reject':
         return level === 'n1' ? (
-          <span>Quien hizo el Corte Z deberá <strong>recontar</strong>; el reconteo vuelve al nivel 1. La apertura del siguiente turno sigue bloqueada mientras tanto.</span>
+          <span>Quien hizo el Corte Z deberá <strong>recontar</strong>; el reconteo vuelve a revisión. La apertura del siguiente turno sigue bloqueada mientras tanto.</span>
         ) : (
-          <span>El cajero u operador deberá registrar un <strong>nuevo conteo</strong>, que regresa directo al nivel 2. El turno no se reabre.</span>
+          <span>El cajero u operador deberá registrar un <strong>nuevo conteo</strong>, que regresa directo a la revisión final. El turno no se reabre.</span>
         );
       case 'adjust':
         return (
@@ -131,9 +129,9 @@ export const ShiftReviewPanel: React.FC<{
           </div>
         );
       case 'reopen':
-        return <span>El corte vuelve a <strong>pendiente de nivel 2</strong>; si había un adeudo, se anula y se volverá a calcular al aprobar.</span>;
+        return <span>El corte vuelve a <strong>pendiente de aprobación</strong>; si había un adeudo, se anula y se volverá a calcular al aprobar.</span>;
       case 'unblock':
-        return <span>La sucursal podrá abrir un turno nuevo. Este Corte Z <strong>sigue pendiente de nivel 1</strong>; no se aprueba.</span>;
+        return <span>La sucursal podrá abrir un turno nuevo. Este Corte Z <strong>sigue pendiente de aprobación</strong>; no se aprueba.</span>;
       default:
         return null;
     }
@@ -154,12 +152,12 @@ export const ShiftReviewPanel: React.FC<{
           </span>
           {shift.operatorReviewedByName && (
             <span className="text-xs text-text-secondary">
-              Nivel 1: {shift.operatorReviewedByName} ({formatDateTime(shift.operatorReviewedAt)}){shift.operatorNotes ? ` — “${shift.operatorNotes}”` : ''}
+              Revisión: {shift.operatorReviewedByName} ({formatDateTime(shift.operatorReviewedAt)}){shift.operatorNotes ? ` — “${shift.operatorNotes}”` : ''}
             </span>
           )}
           {shift.reviewedByName && (
             <span className="text-xs text-text-secondary">
-              Nivel 2: {shift.reviewedByName} ({formatDateTime(shift.reviewedAt)}){shift.reviewNotes ? ` — “${shift.reviewNotes}”` : ''}
+              Revisión final: {shift.reviewedByName} ({formatDateTime(shift.reviewedAt)}){shift.reviewNotes ? ` — “${shift.reviewNotes}”` : ''}
             </span>
           )}
           {shift.openBlockOverriddenAt && (
@@ -225,7 +223,7 @@ export const ShiftReviewPanel: React.FC<{
       </div>
 
       <div className="flex flex-wrap gap-2 border-t border-aged-bronze/30 pt-4">
-        {permissions.canApprove && <Button size="sm" onClick={() => setAction('approve')}>Aprobar {level === 'n1' ? '(nivel 1)' : '(nivel 2)'}</Button>}
+        {permissions.canApprove && <Button size="sm" onClick={() => setAction('approve')}>Aprobar{level === 'n2' ? ' (nivel 2)' : ''}</Button>}
         {permissions.canReject && <Button size="sm" variant="danger" onClick={() => setAction('reject')}>Rechazar</Button>}
         {permissions.canAdjust && <Button size="sm" variant="secondary" onClick={() => setAction('adjust')}>Aprobar con ajuste</Button>}
         {permissions.canReopen && <Button size="sm" variant="secondary" onClick={() => setAction('reopen')}>Reabrir (owner)</Button>}
@@ -233,7 +231,7 @@ export const ShiftReviewPanel: React.FC<{
         {!permissions.canApprove && !permissions.canAdjust && !permissions.canReopen && !permissions.canUnblockOpening && (
           <span className="text-xs text-text-secondary">
             {level === 'n1'
-              ? 'Este corte espera el nivel 1 (operador de sucursal, o el supervisor si lo cerró el operador).'
+              ? 'Este corte espera aprobación (operador de sucursal, supervisor u owner).'
               : level === 'n2'
                 ? 'Este corte espera el nivel 2 de otra persona (supervisor asignado u owner).'
                 : 'Sin acciones disponibles.'}
@@ -261,7 +259,7 @@ export const ShiftReviewPanel: React.FC<{
         <ConfirmActionDialog
           title={
             action === 'approve'
-              ? `Aprobar Corte Z (${level === 'n1' ? 'nivel 1' : 'nivel 2'})`
+              ? `Aprobar Corte Z${level === 'n2' ? ' (nivel 2)' : ''}`
               : action === 'reject'
                 ? 'Rechazar Corte Z'
                 : action === 'adjust'

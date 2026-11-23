@@ -39,6 +39,7 @@ export type N1ResolverRole =
 
 export type ShiftAction =
   | 'approve_n1'
+  | 'adjust_n1'
   | 'reject_n1'
   | 'recount'
   | 'approve_n2'
@@ -116,18 +117,16 @@ export function isSupervisorOf(
 }
 
 /**
- * N1 for a Corte Z or a cash movement.
+ * Single review level for a Corte Z or a cash movement.
+ * - The branch OIS, the assigned supervisor or the owner may resolve it.
  * - Nobody resolves their own item.
- * - S-6: neither the supervisor nor the owner replaces the OIS…
- * - …except S-3: when the OIS is the author, the assigned supervisor (or the
- *   owner acting as supervisor) resolves N1.
  */
 export function assertCanResolveN1(
   actor: ApprovalActor,
   item: {
     branchId: string;
     authorId: string | null;
-    n1ResolverRole: string | null;
+    n1ResolverRole?: string | null;
   },
 ): void {
   if (item.authorId && item.authorId === actor.id) {
@@ -136,26 +135,17 @@ export function assertCanResolveN1(
       'No puedes aprobar ni rechazar lo que tú registraste.',
     );
   }
-  const resolver = (item.n1ResolverRole ??
-    BRANCH_OPERATOR_ROLE) as N1ResolverRole;
-  if (resolver === BRANCH_SUPERVISOR_ROLE) {
-    if (!isSupervisorOf(actor, item.branchId) && !actor.isOwner) {
-      throw new ApprovalRuleError(
-        'forbidden',
-        'El nivel 1 de lo registrado por el operador de sucursal lo resuelve el supervisor asignado o el owner.',
-      );
-    }
+  if (actor.isOwner || isSupervisorOf(actor, item.branchId)) return;
+  if (
+    hasRole(actor.roles, BRANCH_OPERATOR_ROLE) &&
+    actor.branchId === item.branchId
+  ) {
     return;
   }
-  if (
-    !hasRole(actor.roles, BRANCH_OPERATOR_ROLE) ||
-    actor.branchId !== item.branchId
-  ) {
-    throw new ApprovalRuleError(
-      'forbidden',
-      'El nivel 1 lo resuelve el operador de esa sucursal; el supervisor y el owner no lo sustituyen.',
-    );
-  }
+  throw new ApprovalRuleError(
+    'forbidden',
+    'Solo el operador de la sucursal, el supervisor asignado o el owner pueden resolver este corte o movimiento.',
+  );
 }
 
 /** N2 of a Corte Z: assigned supervisor or owner, never the author; C-1 configurable. */
@@ -209,17 +199,19 @@ const SHIFT_TRANSITIONS: Record<
   ShiftAction,
   Partial<Record<ShiftReviewStatus, ShiftReviewStatus>>
 > = {
-  approve_n1: { pendiente_n1: 'pendiente_n2' },
+  // Single-level review: the first approval is final.
+  approve_n1: { pendiente_n1: 'aprobado' },
+  adjust_n1: { pendiente_n1: 'aprobado_con_ajuste' },
   reject_n1: { pendiente_n1: 'rechazado_n1' },
-  // S-5: a recount after an N2 rejection goes straight back to N2.
   recount: { rechazado_n1: 'pendiente_n1', rechazado_n2: 'pendiente_n2' },
+  // Legacy cortes that were already in N2 before the single-level rollout.
   approve_n2: { pendiente_n2: 'aprobado' },
   adjust_n2: {
     pendiente_n2: 'aprobado_con_ajuste',
     rechazado_n2: 'aprobado_con_ajuste',
   },
   reject_n2: { pendiente_n2: 'rechazado_n2' },
-  reopen: { aprobado: 'pendiente_n2', aprobado_con_ajuste: 'pendiente_n2' },
+  reopen: { aprobado: 'pendiente_n1', aprobado_con_ajuste: 'pendiente_n1' },
 };
 
 export function nextShiftStatus(
@@ -239,7 +231,8 @@ export function nextShiftStatus(
 export function shiftActionLevel(
   action: ShiftAction,
 ): 'n1' | 'n2' | 'owner' | null {
-  if (action === 'approve_n1' || action === 'reject_n1') return 'n1';
+  if (action === 'approve_n1' || action === 'adjust_n1' || action === 'reject_n1')
+    return 'n1';
   if (
     action === 'approve_n2' ||
     action === 'adjust_n2' ||

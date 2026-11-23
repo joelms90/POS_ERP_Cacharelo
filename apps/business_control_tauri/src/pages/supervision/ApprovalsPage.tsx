@@ -85,7 +85,7 @@ export const ApprovalsPage: React.FC = () => {
         <div>
           <Heading level={2} className="!text-lg sm:!text-2xl">Aprobaciones de caja</Heading>
           <p className="text-xs text-text-secondary mt-1">
-            Cortes Z (nivel 1: operador de sucursal · nivel 2: supervisor u owner) e ingresos/egresos de caja.
+            Cortes Z con una sola aprobación (operador de sucursal, supervisor u owner) e ingresos/egresos de caja.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -274,7 +274,7 @@ export const MovementActionDialog: React.FC<{
         {item.type === 'cash-in' ? 'Ingreso' : 'Egreso'} de <strong>{formatCurrency(item.amount)}</strong>
         {item.category ? ` · ${CASH_CATEGORY_LABELS[item.category] ?? item.category}` : ''} — {item.reason}
       </span>
-      {action === 'approve' && <span className="text-text-secondary">El movimiento ya cuenta en caja; aprobarlo lo valida. Es la aprobación final (nivel 1).</span>}
+      {action === 'approve' && <span className="text-text-secondary">El movimiento ya cuenta en caja; aprobarlo lo valida. Es la aprobación final.</span>}
       {action !== 'approve' && impact && (
         <>
           <span className="text-text-secondary">

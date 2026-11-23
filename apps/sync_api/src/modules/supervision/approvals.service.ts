@@ -124,45 +124,6 @@ export class ApprovalsService {
     this.assertVersion(shift.version, dto.version);
 
     return this.db.transaction(async (tx) => {
-      if (level === 'n1') {
-        const updated = await this.casShift(tx, shift, {
-          reviewStatus: next,
-          operatorReviewedBy: actor.id,
-          operatorReviewedAt: new Date(),
-          operatorNotes: dto.reason?.trim() || null,
-        });
-        await this.recordShift(
-          tx,
-          shift,
-          branch.businessId,
-          actor,
-          user,
-          'corte_z_aprobado',
-          'n1',
-          dto.reason,
-          source,
-          {
-            before: { reviewStatus: shift.reviewStatus },
-            after: { reviewStatus: next },
-          },
-        );
-        await this.notifications.resolveActionFor(tx, 'cash_shift', shift.id);
-        await this.notifications.notify(tx, {
-          businessId: branch.businessId,
-          branchId: shift.branchId,
-          recipients: (
-            await this.n2Recipients(shift.branchId, branch.businessId)
-          ).filter((id) => id !== actor.id),
-          type: 'aprobacion_pendiente',
-          requiresAction: true,
-          entityType: 'cash_shift',
-          entityId: shift.id,
-          title: `Corte Z por aprobar (nivel 2) · ${branch.name}`,
-          body: `Aprobado en nivel 1. Diferencia: $${money(shift.closeSnapshot && (shift.closeSnapshot as any).summary?.cashDifference).toFixed(2)}`,
-        });
-        return updated;
-      }
-
       const figures = await this.adjustedFigures(shift);
       const approvedDifference = figures.adjustedDifference ?? 0;
       const updated = await this.casShift(tx, shift, {
@@ -185,7 +146,7 @@ export class ApprovalsService {
         actor,
         user,
         'corte_z_aprobado',
-        'n2',
+        level,
         dto.reason,
         source,
         {
@@ -285,7 +246,7 @@ export class ApprovalsService {
         requiresAction: true,
         entityType: 'cash_shift',
         entityId: shift.id,
-        title: `Corte Z rechazado (${level === 'n1' ? 'nivel 1' : 'nivel 2'}) — recontar · ${branch.name}`,
+        title: `Corte Z rechazado${level === 'n2' ? ' (nivel 2)' : ''} — recontar · ${branch.name}`,
         body: reason,
       });
       return updated;
@@ -303,13 +264,19 @@ export class ApprovalsService {
       shiftId,
       user,
     );
-    if (!['pendiente_n2', 'rechazado_n2'].includes(shift.reviewStatus)) {
+    const level = this.levelFor(shift.reviewStatus);
+    if (level === 'n1' && shift.reviewStatus !== 'pendiente_n1') {
       throw new ConflictException(
-        'Solo se puede aprobar con ajuste un Corte Z en nivel 2.',
+        'El Corte Z rechazado debe recontarse antes de aprobarlo con ajuste.',
       );
     }
-    guard(() => assertCanResolveN2(actor, this.n2Context(shift)));
-    const next = guard(() => nextShiftStatus(shift.reviewStatus, 'adjust_n2'));
+    this.authorizeShiftLevel(actor, shift, level);
+    const next = guard(() =>
+      nextShiftStatus(
+        shift.reviewStatus,
+        level === 'n1' ? 'adjust_n1' : 'adjust_n2',
+      ),
+    );
     const movements = await this.transactions.findByShiftId(shift.id);
     guard(() => assertNoPendingMovements(movements));
     this.assertVersion(shift.version, dto.version);
@@ -340,7 +307,7 @@ export class ApprovalsService {
         actor,
         user,
         'corte_z_ajustado',
-        'n2',
+        level,
         reason,
         source,
         {
@@ -381,8 +348,12 @@ export class ApprovalsService {
     return this.db.transaction(async (tx) => {
       const updated = await this.casShift(tx, shift, {
         reviewStatus: next,
+        operatorReviewedBy: null,
+        operatorReviewedAt: null,
+        operatorNotes: null,
         reviewedBy: null,
         reviewedAt: null,
+        reviewNotes: null,
         approvedAmount: null,
         approvedDifference: null,
         approvalSnapshot: null,
@@ -515,7 +486,7 @@ export class ApprovalsService {
         entityType: 'cash_shift',
         entityId: shift.id,
         title: `Apertura de caja desbloqueada por el owner · ${branch.name}`,
-        body: `${reason}. El Corte Z anterior sigue pendiente de nivel 1.`,
+        body: `${reason}. El Corte Z anterior sigue pendiente de aprobación.`,
       });
       return updated;
     });
@@ -1516,8 +1487,10 @@ export class ApprovalsService {
         canLevel &&
         ['pendiente_n1', 'pendiente_n2'].includes(shift.reviewStatus),
       canAdjust:
-        level === 'n2' &&
-        can(() => assertCanResolveN2(actor, this.n2Context(shift))),
+        canLevel &&
+        (level === 'n1'
+          ? shift.reviewStatus === 'pendiente_n1'
+          : ['pendiente_n2', 'rechazado_n2'].includes(shift.reviewStatus)),
       canReopen:
         actor.isOwner &&
         ['aprobado', 'aprobado_con_ajuste'].includes(shift.reviewStatus),
@@ -1763,25 +1736,17 @@ export class ApprovalsService {
       action,
       approvalLevel: level,
       actorId: actor.id,
-      actorRole:
-        level === 'owner' || (level === 'n2' && actor.isOwner)
-          ? 'owner'
-          : level === 'n2'
-            ? BRANCH_SUPERVISOR_ROLE
-            : (shift.n1ResolverRole ?? BRANCH_OPERATOR_ROLE),
+      actorRole: actor.isOwner
+        ? 'owner'
+        : actor.roles.includes(BRANCH_SUPERVISOR_ROLE)
+          ? BRANCH_SUPERVISOR_ROLE
+          : BRANCH_OPERATOR_ROLE,
       reason: reason?.trim() || null,
       before: values.before,
       after: values.after,
       source,
       deviceId: this.deviceId(user),
     });
-  }
-
-  private async n2Recipients(branchId: string, businessId: string) {
-    return [
-      ...(await this.scope.supervisorsOf(branchId)),
-      ...(await this.scope.ownersOf(businessId)),
-    ];
   }
 
   private async userNames(ids: Array<string | null | undefined>) {
