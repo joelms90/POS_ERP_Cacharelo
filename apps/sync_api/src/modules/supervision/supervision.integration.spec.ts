@@ -516,7 +516,7 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
 
   // --- OIS-authored corte: S-3, C-1 and the opening block (D-4, C-2, P-2) ----------------------
 
-  it('S-3: a corte closed by the OIS is resolved at N1 by the supervisor; C-1: the same supervisor cannot do N2', async () => {
+  it('S-3: a corte closed by the OIS is resolved at N1 by the supervisor; C-1: the same supervisor may adjust N2', async () => {
     process.env.CASH_APPROVALS_ENFORCE_OPEN_BLOCK = 'true';
     const opened = await http()
       .post('/cash-shifts')
@@ -560,20 +560,19 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       .send({ version: row.version })
       .expect(200);
     expect(n1.body.reviewStatus).toBe('pendiente_n2');
-    await http()
-      .post(`/supervision/cash-shifts/${state.shiftB}/approve`)
-      .auth(as.supervisor(), { type: 'bearer' })
-      .send({ version: n1.body.version })
-      .expect(403);
     const n2 = await http()
-      .post(`/supervision/cash-shifts/${state.shiftB}/approve`)
-      .auth(as.supervisor2(), { type: 'bearer' })
-      .send({ version: n1.body.version })
+      .post(`/supervision/cash-shifts/${state.shiftB}/adjust`)
+      .auth(as.supervisor(), { type: 'bearer' })
+      .send({
+        version: n1.body.version,
+        reason: 'Ajuste del supervisor (C-1 confirmada)',
+        approvedAmount: '500.00',
+      })
       .expect(200);
-    expect(n2.body.reviewStatus).toBe('aprobado');
+    expect(n2.body.reviewStatus).toBe('aprobado_con_ajuste');
     row = await shiftRow(state.shiftB);
     expect(row.operator_reviewed_by).toBe(ids.supervisor);
-    expect(row.reviewed_by).toBe(ids.supervisor2);
+    expect(row.reviewed_by).toBe(ids.supervisor);
   });
 
   it('P-2: the owner unblocks the opening without approving the pending corte', async () => {

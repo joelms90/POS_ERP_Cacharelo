@@ -2,7 +2,7 @@
 
 **Feature Branch**: `019-supervisor-sucursal`
 **Created**: 2026-11-22 · **Updated**: 2026-11-22 (segunda ronda de decisiones del dueño)
-**Status**: Propuesta (NO implementado). D-1 a D-11 y P-1 a P-3 resueltos. Supuestos S-1 a S-6 resueltos (decisión final 2026-11-22). Solo quedan C-1 y C-2, consecuencias de S-3, por confirmar (§15.2).
+**Status**: Propuesta (NO implementado). D-1 a D-11 y P-1 a P-3 resueltos. Supuestos S-1 a S-6 resueltos (decisión final 2026-11-22). C-1 resuelta 2026-11-23; queda C-2 por confirmar (§15.2).
 **Input**: [brief.md](brief.md) — pedido del dueño: rol "supervisor de sucursal"; lo primero que debe tener es (1) **aprobar cortes Z** y (2) **aprobar ingresos y egresos de caja**.
 
 ---
@@ -67,7 +67,7 @@ Umbrales configurables, tratamiento de turnos auto-cerrados >24 h (D-11), notifi
                 │             ▼
                 │        rechazado_n1 ── reconteo del cajero/OIS ──▶ pendiente_n1
                 ▼
-        pendiente_n2   N2 = supervisor asignado u owner (persona distinta de N1, C-1)
+        pendiente_n2   N2 = supervisor asignado u owner (puede ser quien hizo N1, C-1)
         aprueba │    ajusta │      │ rechaza
                 ▼           ▼      ▼
             aprobado   aprobado_   rechazado_n2
@@ -83,7 +83,7 @@ Reglas:
 - **CZ-04** **(S-5)** Tras un rechazo de N2, el cajero u OIS registra un nuevo conteo que va **directo a N2** (`pendiente_n2`), **sin volver al OIS**. El supervisor también puede resolver con un ajuste (→ `aprobado_con_ajuste`).
 - **CZ-05** Ningún rechazo reabre el turno (el efectivo ya salió y puede haber otro turno abierto). El `close_snapshot` original **nunca se sobrescribe**; los reconteos y ajustes quedan como versiones en la bitácora.
 - **CZ-06** Un nivel no puede aprobar un corte mientras haya movimientos del mismo turno pendientes de N1 o N2.
-- **CZ-07** Nadie aprueba su propio corte (`closed_by == actor` → 403). Esto extiende BR-ROLE-003. Propuesta C-1: **N1 y N2 deben ser personas distintas**. En un corte del OIS donde el supervisor hizo N1, el N2 lo hace el owner u otro supervisor asignado.
+- **CZ-07** Nadie aprueba su propio corte (`closed_by == actor` → 403). Esto extiende BR-ROLE-003. C-1 (confirmada 2026-11-23): **el mismo supervisor que hizo N1 puede resolver N2** (aprobar o ajustar) sin esperar al owner; cada acción queda en la bitácora para que el owner audite después. La única prohibición es aprobar el corte propio.
 - **CZ-08** **Sin sustitución (S-6)**: ni el supervisor ni el owner aprueban N1 en lugar del OIS cuando el autor es un cajero; solo actúan después, en N2. **Única excepción (S-3)**: si el autor es el OIS, el N1 lo hace el supervisor asignado (el owner no). Desbloquear la apertura (CZ-10b) **no** es aprobar.
 - **CZ-09** Concurrencia: cada acción exige la `version` vigente; si otra persona actuó antes, el servidor responde 409.
 - **CZ-10** **Bloqueo de apertura (D-4)**: no se puede abrir un turno nuevo en la sucursal mientras su último Corte Z esté en `pendiente_n1` o `rechazado_n1`. Cuando N1 lo aprueba, la sucursal puede abrir aunque N2 no esté resuelto. Consecuencia de S-3 (C-2, por confirmar): un corte cerrado por el OIS bloquea hasta que **el supervisor** apruebe su N1; si el supervisor no está disponible, aplica el desbloqueo del owner (CZ-10b).
@@ -238,7 +238,7 @@ Acciones: `corte_z_cerrado`, `corte_z_aprobado`, `corte_z_rechazado`, `corte_z_r
 | N1: aprobar/rechazar Corte Z **de un cajero** | ❌ | 🔸 | ❌ (S-6) | ❌ (S-6) |
 | N1: aprobar/rechazar movimiento **de un cajero** | ❌ | 🔸 | ❌ (S-6) | ❌ (S-6) |
 | N1: aprobar/rechazar Corte Z o movimiento **del OIS** (S-3) | ❌ | ❌ (propio) | 🔹 | ❌ |
-| N2: aprobar/rechazar/ajustar Corte Z | ❌ | ❌ | 🔹 (no si hizo N1, C-1) | ✅ (S-2: único admin) |
+| N2: aprobar/rechazar/ajustar Corte Z | ❌ | ❌ | 🔹 (también si hizo N1; el owner audita) | ✅ (S-2: único admin) |
 | Cancelar o ajustar un movimiento con asiento de reverso (antes de aprobar el corte) | ❌ | ❌ | 🔹 | ✅ |
 | Reabrir un Corte Z aprobado | ❌ | ❌ | ❌ | ✅ con motivo |
 | Desbloquear apertura de turno en emergencia (P-2) | ❌ | ❌ | ❌ | ✅ con motivo |
@@ -397,13 +397,13 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 | **S-5** | ¿Por dónde pasa el reconteo tras un rechazo de N2? | ✅ RESUELTA (opción 2) | **Directo a N2** (`pendiente_n2`, antes llamado `pendiente_supervisor`), sin volver al OIS. El supervisor también puede ajustar. |
 | **S-6** | ¿Supervisor/owner sustituyen al OIS en N1? | ✅ RESUELTA | **No.** Única excepción: S-3 (si el autor es el OIS, el N1 lo hace el supervisor). |
 
-**Consecuencias de S-3 por confirmar** (propuestas, no reglas del dueño):
+**Consecuencias de S-3:**
 
-> Implementación (2026-11-22): C-1 y C-2 están implementadas con las propuestas por defecto como constantes en `apps/sync_api/src/modules/supervision/cash-approval.config.ts` (`n2MustDifferFromN1`, `oisCloseBlocksOpeningUntilN1`). Siguen **por confirmar** por el dueño; cambiarlas no requiere migración.
+> Implementación: C-1 y C-2 son constantes en `apps/sync_api/src/modules/supervision/cash-approval.config.ts` (`n2MustDifferFromN1`, `oisCloseBlocksOpeningUntilN1`). Cambiarlas no requiere migración.
 
-| # | Punto | Propuesta |
+| # | Punto | Decisión |
 |---|---|---|
-| **C-1** | En un corte del OIS, el supervisor hace N1. ¿Puede la misma persona hacer también N2? | **No**: N1 y N2 deben ser personas distintas. El N2 lo hace el owner u otro supervisor asignado a la sucursal. |
+| **C-1** | En un corte del OIS, el supervisor hace N1. ¿Puede la misma persona hacer también N2? | ✅ **Sí** (dueño, 2026-11-23): el mismo supervisor puede aprobar o ajustar N2 sin esperar al owner. Queda en la bitácora para auditoría posterior. Aprobar el corte propio sigue prohibido. |
 | **C-2** | Con D-4, un corte del OIS bloquea la apertura hasta su N1, que ahora hace el supervisor (puede estar en otra sucursal). | Se aplica igual: bloquea hasta que el supervisor apruebe el N1, con el desbloqueo de emergencia del owner (CZ-10b) como salida. Alternativa: que los cortes del OIS no bloqueen. |
 
 ### 15.3 Detalles (3.ª ronda)

@@ -157,7 +157,7 @@ export function assertCanResolveN1(
   }
 }
 
-/** N2 of a Corte Z: assigned supervisor or owner, never the author, and (C-1) not the N1 approver. */
+/** N2 of a Corte Z: assigned supervisor or owner, never the author; C-1 configurable. */
 export function assertCanResolveN2(
   actor: ApprovalActor,
   shift: {

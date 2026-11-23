@@ -14,7 +14,7 @@ Add the `branch_supervisor` role and, first, the approval of cash: Corte Z (two 
 
 | Item | Rule |
 |---|---|
-| Corte Z | N1 = OIS (`branch_operator`) of the branch; if the OIS closed it, N1 = assigned supervisor (S-3). N2 = assigned supervisor or owner (S-2), a different person from N1 (C-1). |
+| Corte Z | N1 = OIS (`branch_operator`) of the branch; if the OIS closed it, N1 = assigned supervisor (S-3). N2 = assigned supervisor or owner (S-2). C-1 confirmed (2026-11-23): the same supervisor may resolve N2 (approve or adjust) and the owner audits the log afterwards; approving one's own corte is still forbidden. |
 | Rejection | N1 rejection → the corte author recounts → back to N1. N2 rejection → cashier/OIS recounts → straight back to N2 (S-5), or the supervisor approves with an adjustment. |
 | Cash-in / cash-out | Counts in cash from the moment it is recorded; approved only at N1 (S-1). Supervisor/owner can cancel or adjust until the corte has final approval. |
 | Ledger (S-4) | `cash_transactions` is append-only. Reject/cancel insert a reversal entry dated now and attributed to the original shift; adjust = reversal + `ajuste` entry. `close_snapshot` is never rewritten; post-close entries are shown apart, and figures are frozen in `approval_snapshot` at N2. |
@@ -24,7 +24,7 @@ Add the `branch_supervisor` role and, first, the approval of cash: Corte Z (two 
 | Notifications (D-6) | Persistent, read over REST (`/notifications`). No push. |
 | Supervisor scope (D-1, D-9, P-3) | Several assigned branches; sees cash and sales reports of those branches only; no inventory reports. |
 
-C-1 and C-2 are constants in `apps/sync_api/src/modules/supervision/cash-approval.config.ts` and are still **to be confirmed by the owner**.
+C-1 and C-2 are constants in `apps/sync_api/src/modules/supervision/cash-approval.config.ts`. C-1 is confirmed (same supervisor may resolve N2; owner audits later); C-2 is still **to be confirmed by the owner**.
 
 ## 3. What was built
 
@@ -55,7 +55,7 @@ C-1 and C-2 are constants in `apps/sync_api/src/modules/supervision/cash-approva
 ## 6. Next steps (owner)
 
 1. Review the branch and merge locally (`git log main..019-supervisor-sucursal`).
-2. Confirm C-1 and C-2 (spec §15.2), or change the constants.
+2. C-1 is confirmed (same supervisor may resolve N2; owner audits later). Confirm C-2 (spec §15.2), or change the constant.
 3. Decide on the offline queue (T306) before rollout to sucursales with poor connectivity.
 4. Deploy only with approval, following `docs/pre-deployment-checklist.md`:
    - migration (step 21);

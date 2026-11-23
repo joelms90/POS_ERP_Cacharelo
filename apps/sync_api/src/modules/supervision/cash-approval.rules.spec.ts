@@ -158,21 +158,33 @@ describe('cash approval rules', () => {
       );
     });
 
-    it('C-1: N2 must differ from the N1 approver (configurable)', () => {
+    it('C-1: N2 may be resolved by the N1 approver (configurable)', () => {
       const oisShift = {
         branchId: 'b1',
         closedBy: 'ois-1',
         operatorReviewedBy: 'sup-1',
       };
-      expectRule(() => assertCanResolveN2(supervisor, oisShift), 'forbidden');
-      expect(() => assertCanResolveN2(otherSupervisor, oisShift)).not.toThrow();
-      expect(() => assertCanResolveN2(owner, oisShift)).not.toThrow();
+      const mustDiffer = {
+        n2MustDifferFromN1: true,
+        oisCloseBlocksOpeningUntilN1: true,
+      };
+      expectRule(
+        () => assertCanResolveN2(supervisor, oisShift, mustDiffer),
+        'forbidden',
+      );
+      expect(() =>
+        assertCanResolveN2(otherSupervisor, oisShift, mustDiffer),
+      ).not.toThrow();
+      expect(() =>
+        assertCanResolveN2(owner, oisShift, mustDiffer),
+      ).not.toThrow();
       expect(() =>
         assertCanResolveN2(supervisor, oisShift, {
+          ...mustDiffer,
           n2MustDifferFromN1: false,
-          oisCloseBlocksOpeningUntilN1: true,
         }),
       ).not.toThrow();
+      expect(() => assertCanResolveN2(supervisor, oisShift)).not.toThrow();
     });
   });
 
