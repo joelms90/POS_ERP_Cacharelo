@@ -1,5 +1,18 @@
 ---
 type: "workflow"
+flow: "replenishment-to-receipt"
+actors: [branch-operator, warehouse-operator, admin-approver]
+endpoints: [requisitions, inventory, warehouses, branch-catalog]
+seeds: [RequisitionsController, RequisitionsService, InventoryController, InventoryService, LedgerService]
+tables: [branch_requisitions, branch_requisition_items, branch_stock_thresholds, stock_transfers, stock_transfer_items, inventory_receipts, stock_ledger, stock_levels]
+rules: [BR-REQ-001, BR-TRN-001, BR-TRN-002, BR-TRN-003, BR-INV-001, BR-INV-002, BR-ROLE-003]
+screens:
+  - "apps/pos_flutter/lib/ui/requisitions/create_requisition.dart"
+  - "apps/pos_flutter/lib/ui/warehouse/warehouse_dashboard_screen.dart"
+  - "apps/business_control_tauri/src/pages/RequisitionsPage.tsx"
+  - "apps/business_control_tauri/src/pages/RequisitionsApprovalPage.tsx"
+  - "apps/business_control_tauri/src/pages/TransfersPage.tsx"
+  - "apps/business_control_tauri/src/pages/ReceiptsPage.tsx"
 title: "Stock Replenishment & Transfer Workflow"
 description: "End-to-end workflow tracing branch requisitions through warehouse approval, transit shipment, and destination reception."
 status: "verified"
@@ -15,7 +28,7 @@ tags:
 sources:
   - "INVENTORY_ARCHITECTURE.md"
   - "docs/purchase-order-to-inventory-flow.md"
-  - "apps/sync_api/src/modules/inventory/transfers/"
+  - "apps/sync_api/src/modules/inventory/"
 ---
 
 # Stock Replenishment & Transfer Workflow

@@ -1,5 +1,15 @@
 ---
 type: "workflow"
+flow: "procurement-to-stock"
+actors: [purchasing-admin, warehouse-operator]
+endpoints: [inventory/alerts, purchase-orders, inventory, supplier-products, providers]
+seeds: [AlertsService, PurchaseOrdersController, PurchaseOrdersService, InventoryController, InventoryService, LedgerService]
+tables: [inventory_alerts, purchase_orders, purchase_order_items, inventory_receipts, inventory_receipt_items, supplier_products, stock_ledger, stock_levels]
+rules: [BR-PO-001, BR-PO-002, BR-PO-003, BR-INV-001, BR-INV-002]
+screens:
+  - "apps/business_control_tauri/src/pages/PurchaseOrdersPage.tsx"
+  - "apps/business_control_tauri/src/pages/ReceiptsPage.tsx"
+  - "apps/business_control_tauri/src/pages/InventoryDashboardPage.tsx"
 title: "Procurement & Purchase Orders Workflow"
 description: "Procedure for converting inventory alerts to purchase orders, price comparison, supplier confirmation, and goods reception."
 status: "verified"

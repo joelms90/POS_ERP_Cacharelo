@@ -1,5 +1,15 @@
 ---
 type: "workflow"
+flow: "branch-operator-daily"
+actors: [branch-operator]
+endpoints: [auth, cash-shifts, reports, orders, requisitions, inventory, sync]
+seeds: [AuthController, ShiftsController, ShiftsService, ReportsController, ReportsService, OrdersController, SyncGateway]
+tables: [users, devices, cash_shifts, cash_transactions, orders, payments, branch_requisitions]
+rules: [BR-ROLE-001, BR-ROLE-002, BR-INV-003, BR-ORD-001]
+screens:
+  - "apps/pos_flutter/lib/ui/encargado/encargado_dashboard_screen.dart"
+  - "apps/pos_flutter/lib/ui/cashier/shift_control_panel.dart"
+  - "apps/pos_flutter/lib/ui/cashier/cashier_dashboard_screen.dart"
 title: "Branch Operator Daily Operational Workflow"
 description: "Step-by-step procedure for branch operators managing requisitions, inbound shipments, and sales reconciliation."
 status: "verified"
@@ -14,7 +24,7 @@ tags:
   - "requisitions"
 sources:
   - "specs/013-unify-roles/spec.md"
-  - "apps/pos_flutter/lib/ui/branch_operator/"
+  - "apps/pos_flutter/lib/ui/encargado/"
 ---
 
 # Branch Operator Daily Operational Workflow

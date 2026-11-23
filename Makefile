@@ -1128,6 +1128,7 @@ check-pos:
 	@./scripts/agent-team.sh check pos
 
 check-all:
+	@node scripts/flows.mjs check
 	@./scripts/agent-team.sh check all
 
 team-status:
@@ -1157,7 +1158,7 @@ team-logs:
 # -----------------------------------------------------------------------------
 # Codebase knowledge graph (Graphify) — see AGENTS.md
 # -----------------------------------------------------------------------------
-.PHONY: graphify-build graphify-update graphify-query graphify-hubs
+.PHONY: graphify-build graphify-update graphify-query graphify-hubs route flow flows flows-check
 
 graphify-build:
 	@command -v graphify >/dev/null 2>&1 || { echo 'graphify not installed. Run: uv tool install "graphifyy[sql,terraform,pdf,office,watch,leiden]" && uv tool update-shell'; exit 1; }
@@ -1174,6 +1175,20 @@ graphify-query:
 
 graphify-hubs:
 	@graphify god-nodes --top 15
+
+route:
+	@test -n "$(Q)" || { echo 'Usage: make route Q="deploy the backend"'; exit 1; }
+	@node scripts/agent-router.mjs "$(Q)"
+
+flow:
+	@test -n "$(Q)" || { echo 'Usage: make flow Q="order to cash"'; exit 1; }
+	@node scripts/flows.mjs show "$(Q)"
+
+flows:
+	@node scripts/flows.mjs list
+
+flows-check:
+	@node scripts/flows.mjs check
 
 # -----------------------------------------------------------------------------
 # Staging Environment (separate GCP project; see specs/014-staging-environment)

@@ -1,5 +1,16 @@
 ---
 type: "workflow"
+flow: "order-to-cash"
+actors: [waiter, kitchen, cashier]
+endpoints: [orders, kitchen, cash-shifts, reports]
+seeds: [OrdersController, OrdersService, KitchenController, KitchenService, LedgerService]
+tables: [orders, order_items, kitchen_tickets, payments, cash_shifts, print_jobs, stock_ledger]
+rules: [BR-KDS-001, BR-KDS-002, BR-ORD-001, BR-ORD-002]
+screens:
+  - "apps/pos_flutter/lib/ui/waiter/waiter_ordering_screen.dart"
+  - "apps/pos_flutter/lib/ui/waiter/payment_flow_dialog.dart"
+  - "apps/pos_flutter/lib/ui/kitchen/kitchen_dashboard_screen.dart"
+  - "apps/pos_flutter/lib/ui/cashier/cashier_dashboard_screen.dart"
 title: "Order, Kitchen Routing & Billing Workflow"
 description: "End-to-end dining operational workflow from floor order taking, KDS ticket dispatch, preparation, and cashier settlement."
 status: "verified"
@@ -16,7 +27,9 @@ tags:
 sources:
   - "specs/003-waiter-cashier-screens/spec.md"
   - "specs/005-waiter-billing-flow/spec.md"
-  - "apps/pos_flutter/lib/ui/order/"
+  - "apps/pos_flutter/lib/ui/waiter/"
+  - "apps/pos_flutter/lib/ui/kitchen/"
+  - "apps/pos_flutter/lib/ui/cashier/"
 ---
 
 # Order, Kitchen Routing & Billing Workflow

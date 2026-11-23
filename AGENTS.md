@@ -12,6 +12,12 @@ This is a **monorepo** with multiple independent apps. Multiple development sess
 
 ## Quick Start: Before You Begin
 
+0. **Route the task first** (no tokens spent guessing):
+   ```bash
+   make route Q="deploy the backend"
+   ```
+   Returns the best-matching skill, SOP doc, Make target and `graphify query` for code. Run it before reading `make help`, `docs/AGENT_NAVIGATION_GUIDE.md`, `knowledge/index.md`, or grepping.
+
 1. **Check active workspaces**:
    ```bash
    cat .claude/workspaces.md
@@ -274,3 +280,18 @@ Rules:
 - CLI install/refresh: `uv tool install "graphifyy[sql,terraform,pdf,office,watch,leiden]" && uv tool update-shell`.
 - The `/graphify` skill is installed for Claude (`.claude/skills`), Codex (`.codex/skills`), OpenCode (`.opencode/skills`) and generic agents (`.agents/skills`).
 - Subagents dispatched via `scripts/agent-team.sh` must also be told to query the graph first (the rule above applies inside `.worktrees/` when `graphify-out/graph.json` exists there).
+
+### Route before you search (skills · SOPs · make)
+
+`make route Q="<task>"` is a deterministic router (no LLM, no tokens, <100ms) over:
+- all Make targets and their help text,
+- every skill in `.agents/skills` and `.claude/skills`,
+- SOPs/runbooks in `docs/`, `knowledge/`, root `*.md` and `.claude/*.md`.
+
+It prints the matching skill to load, the SOP to read, the exact `make` target, and a `graphify query` for the code path. Use it instead of reading the static navigation matrices first; fall back to `make help` / `docs/AGENT_NAVIGATION_GUIDE.md` only when it returns no match. Source: `scripts/agent-router.mjs`.
+
+### Business flows (see + maintain)
+
+`make flows` lists the flow catalog. `make flow Q="order to cash"` joins the flow doc to the live code graph: actors, endpoints, tables, business rules, screens and a call chain derived with `graphify path` (never hardcoded). `make flows-check` validates every anchor and runs inside `make check-all`.
+
+Flow docs live in `knowledge/workflows/*.md`; their YAML frontmatter is the machine contract (`flow`, `actors`, `seeds`, `tables`, `rules`, `screens`, `endpoints`). To update or add a flow after a code change, load the **`maintain-business-flows`** skill (`.agents/skills/maintain-business-flows/SKILL.md`). Refresh the graph with `make graphify-update` before validating.

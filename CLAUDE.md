@@ -6,6 +6,8 @@
 
 | Domain | Where to Look |
 |---|---|
+| 🧭 **Task routing** | `make route Q="<task>"` — best skill + SOP + make target, no LLM |
+| 🔄 **Business flows** | `make flows` / `make flow Q="<flow>"`; maintain via skill `maintain-business-flows` |
 | 🗄️ **Database & Migrations** | [`docs/pre-deployment-checklist.md`](./docs/pre-deployment-checklist.md) / [`apps/sync_api/src/database/schema.ts`](./apps/sync_api/src/database/schema.ts) |
 | 📦 **Inventory, BOM & OP** | [`INVENTORY_ARCHITECTURE.md`](./INVENTORY_ARCHITECTURE.md) |
 | 🖥️ **Admin Dashboard** | [`apps/business_control_tauri/src/services/api.ts`](./apps/business_control_tauri/src/services/api.ts) |
