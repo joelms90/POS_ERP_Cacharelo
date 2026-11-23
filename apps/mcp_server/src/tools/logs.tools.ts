@@ -25,7 +25,7 @@ export function registerLogsTools(server: McpServer, client: PosApiClient) {
     'Resumen de incidencias en producción agrupadas por problema (fingerprint): conteos, sucursales afectadas, versiones, usuarios, mensaje y stack de muestra. Úsalo primero para responder "¿hubo problemas hoy?".',
     windowParams,
     async ({ minLevel, hours, ...rest }) =>
-      text(await client.request('/admin/logs/summary', { query: { minLevel: minLevel ?? 'warn', hours, ...rest } })),
+      text(await client.getErrorSummary({ minLevel: minLevel ?? 'warn', hours, ...rest })),
   );
 
   server.tool(
@@ -38,13 +38,13 @@ export function registerLogsTools(server: McpServer, client: PosApiClient) {
       limit: z.number().int().min(1).max(500).optional(),
     },
     async ({ hours, date, ...rest }) =>
-      text(await client.request('/admin/logs', { query: { date, hours: date ? undefined : hours ?? 24, ...rest } })),
+      text(await client.searchLogs({ date, hours: date ? undefined : hours ?? 24, ...rest })),
   );
 
   server.tool(
     'get_log_entry',
     'Entrada completa de log: stack trace, breadcrumbs (últimas acciones/peticiones del dispositivo), contexto HTTP, sucursal, usuario, dispositivo y versión.',
     { id: z.string().describe('ID del log (sampleId de get_error_summary o id de search_logs).') },
-    async ({ id }) => text(await client.request(`/admin/logs/${encodeURIComponent(id)}`)),
+    async ({ id }) => text(await client.getLogEntry(id)),
   );
 }

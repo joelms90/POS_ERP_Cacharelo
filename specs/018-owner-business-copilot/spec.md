@@ -64,6 +64,7 @@ Como propietario autorizado, puedo volver a una conversación y comprender qué 
 - **FR-007**: El navegador nunca recibe credenciales administrativas, credenciales MCP, secretos de sesión ni secretos de proveedor de IA.
 - **FR-008**: El sistema debe ofrecer un proveedor local determinista para las intenciones de consulta del MVP y documentar la configuración segura de un proveedor de producción.
 - **FR-009**: El sistema debe incluir una prueba repetible de selección de herramientas y seguridad de confirmación.
+- **FR-010**: El MCP privado del propietario debe registrar solo herramientas de lectura tipadas, usar el JWT vigente de la persona configurada localmente y no incluir secretos de firma, token administrativo ni un passthrough de rutas HTTP.
 
 ### Key Entities
 

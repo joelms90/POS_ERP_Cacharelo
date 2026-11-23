@@ -1,26 +1,31 @@
 # 🤖 POS-ERP MCP Server (Model Context Protocol)
 
-Servidor oficial de **Model Context Protocol (MCP)** para el sistema **POS-ERP Cacharelo**. 
+Servidor privado de **Model Context Protocol (MCP)** para el sistema **POS-ERP Cacharelo**.
 
-Permite a modelos de inteligencia artificial (Claude Desktop, Cursor, Antigravity CLI, Windsurf, ChatGPT, asistentes en WhatsApp/Slack) interactuar directamente con el backend del ERP: consultar inventarios, auditoría Kardex, catálogo de productos, órdenes de mesas, tickets de cocina (KDS), arqueos de caja y compras.
+Permite a un cliente de IA configurado en la computadora del propietario consultar el backend del ERP: inventarios, auditoría Kardex, catálogo, mesas, tickets de cocina (KDS), arqueos simulados, compras y diagnósticos.
+
+> Seguridad: opera exclusivamente por `stdio`; no escucha puertos ni se publica en Cloud Run. Solo registra herramientas de lectura. No incluye `call_backend_api`, herramientas de escritura, secreto JWT ni token administrativo. La sesión local usa un JWT vigente del propietario (`POS_MCP_ACCESS_TOKEN`).
 
 ---
 
 ## 🚀 Inicio Rápido
 
-### 1. Verificar Conectividad con el Backend
-Asegúrate de que el backend esté corriendo (`make dev-backend-local` en el puerto 3001 o apunta a producción).
+### 1. Configurar el acceso local
 ```bash
-make mcp-verify
-# o directamente:
-cd apps/mcp_server && pnpm test:verify
+cp apps/mcp_server/.env.example apps/mcp_server/.env
 ```
 
-### 2. Iniciar el Servidor MCP en modo Stdio
+En `apps/mcp_server/.env`, proporciona un JWT vigente de una cuenta con rol `owner`. No agregues `POS_JWT_SECRET`, `JWT_SECRET`, `POS_ADMIN_TOKEN` ni una clave de Gemini.
+
+### 2. Verificar la política y conectividad
 ```bash
-make mcp-start
-# o directamente:
-cd apps/mcp_server && pnpm start
+make mcp-private-test
+make mcp-verify
+```
+
+### 3. Iniciar el servidor MCP privado en modo stdio
+```bash
+make mcp-private
 ```
 
 ---
@@ -34,7 +39,6 @@ El servidor organiza sus herramientas en **7 dominios operativos**:
 | :--- | :--- | :--- | :--- |
 | `search_products` | `search?`, `categoryId?`, `isSellable?`, `businessId?` | Busca productos por nombre, SKU o categoría con precios y costos. | *"¿Cuánto cuesta el Baguette Cacharelo y cuál es su SKU?"* |
 | `get_product_details` | `productId` | Obtiene la ficha técnica completa del producto. | *"Dame la ficha del producto con ID cf661b19..."* |
-| `update_product_price` | `productId`, `price?`, `priceWholesale?` | Modifica el precio de venta o mayoreo de un producto. | *"Sube el precio del Baguette a $125.00"* |
 | `get_categories` | `businessId?` | Lista categorías del catálogo con su estación KDS. | *"¿Qué categorías tenemos asignadas a Barra?"* |
 
 ### 2. Inventario & Kardex (`inventory.tools.ts`)
@@ -62,9 +66,7 @@ El servidor organiza sus herramientas en **7 dominios operativos**:
 | Herramienta | Parámetros | Descripción | Ejemplo de consulta IA |
 | :--- | :--- | :--- | :--- |
 | `get_branch_tables` | `branchId` | Semáforo de mesas (disponibles, ocupadas, por cobrar, limpieza). | *"¿Cuántas mesas están ocupadas y cuántas libres en Centro?"* |
-| `update_table_state` | `branchId`, `tableId`, `state` | Actualiza estado de mesa (ej. liberar mesa tras limpieza). | *"Marca la Mesa 6 como disponible"* |
 | `get_kitchen_tickets` | `branchId` | Tickets activos en pantalla KDS de cocina y barra. | *"¿Qué comandas están pendientes de preparar en cocina?"* |
-| `update_kitchen_ticket_status` | `ticketId`, `status` | Avanza estado del ticket (`preparing`, `ready`, `served`). | *"Cambia el ticket 8b8a71d6 a Listo para servir"* |
 
 ### 5. Compras & Requisiciones (`purchasing.tools.ts`)
 | Herramienta | Parámetros | Descripción | Ejemplo de consulta IA |
@@ -83,7 +85,7 @@ El servidor organiza sus herramientas en **7 dominios operativos**:
 | :--- | :--- | :--- |
 | `system_health_and_capabilities` | *(ninguno)* | Diagnóstico de conexión al backend, latencia y lista de herramientas activas. |
 
-> El Copiloto de Propietario del panel administrativo no usa esta conexión MCP, sus credenciales ni una identidad global. Sus consultas se resuelven en la API con la identidad real del propietario, un catálogo tipado de lecturas y auditoría propia.
+> El Copiloto de Propietario del panel administrativo no usa esta conexión MCP ni sus credenciales. Sus consultas se resuelven en la API con la identidad real del propietario, un catálogo tipado de lecturas y auditoría propia.
 
 ---
 
@@ -98,8 +100,9 @@ Añade a tu archivo `~/Library/Application Support/Claude/claude_desktop_config.
       "command": "npx",
       "args": ["-y", "tsx", "/Users/joelmorales/web/POS-ERP/apps/mcp_server/src/index.ts"],
       "env": {
-        "POS_API_URL": "http://localhost:3001/api",
-        "POS_DEFAULT_BUSINESS_ID": "d3b07384-d113-4a0e-a555-e5b12824bf01"
+        "POS_API_URL": "http://localhost:3000/api",
+        "POS_MCP_ACCESS_TOKEN": "JWT_VIGENTE_DEL_OWNER",
+        "POS_DEFAULT_BUSINESS_ID": "ID_DEL_NEGOCIO"
       }
     }
   }
@@ -115,20 +118,24 @@ Crea o edita `.cursor/mcp.json` en la raíz del proyecto:
       "command": "npx",
       "args": ["-y", "tsx", "apps/mcp_server/src/index.ts"],
       "env": {
-        "POS_API_URL": "http://localhost:3001/api",
-        "POS_DEFAULT_BUSINESS_ID": "d3b07384-d113-4a0e-a555-e5b12824bf01"
+        "POS_API_URL": "http://localhost:3000/api",
+        "POS_MCP_ACCESS_TOKEN": "JWT_VIGENTE_DEL_OWNER",
+        "POS_DEFAULT_BUSINESS_ID": "ID_DEL_NEGOCIO"
       }
     }
   }
 }
 ```
 
-### C. Producción (Google Cloud Run)
-Para apuntar el MCP a la API en producción en lugar del backend local:
+### C. Producción (API existente, MCP sigue local)
+Para apuntar el proceso local a la API de producción en lugar del backend local:
 ```env
 POS_API_URL=https://pos-sync-api-232144991863.us-central1.run.app/api
-POS_DEFAULT_BUSINESS_ID=d3b07384-d113-4a0e-a555-e5b12824bf01
+POS_MCP_ACCESS_TOKEN=JWT_VIGENTE_DEL_OWNER
+POS_DEFAULT_BUSINESS_ID=ID_DEL_NEGOCIO
 ```
+
+El proceso MCP continúa en tu computadora; no se despliega como servicio público.
 
 ---
 

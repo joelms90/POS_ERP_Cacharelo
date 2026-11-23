@@ -809,40 +809,40 @@
     "semantic_hash": "489d9c1c074048227d06704b1252e3c7"
   },
   "apps/mcp_server/package.json": {
-    "mtime": 1795407028.6897812,
-    "seen": 1795411091.993728,
-    "ast_hash": "6f783f9d548319c75218651a97095b13",
-    "semantic_hash": "6f783f9d548319c75218651a97095b13"
+    "mtime": 1795420166.2926948,
+    "seen": 1795420421.750548,
+    "ast_hash": "dac1e007f1998ca6774744fbe84d2a38",
+    "semantic_hash": ""
   },
   "apps/mcp_server/scripts/sync-check.ts": {
-    "mtime": 1795407028.6901438,
-    "seen": 1795411091.993729,
-    "ast_hash": "eb33613ea3f5cf9400457b861f73bc0b",
-    "semantic_hash": "eb33613ea3f5cf9400457b861f73bc0b"
+    "mtime": 1795420275.2305276,
+    "seen": 1795420421.750549,
+    "ast_hash": "c388bb1cfe162c1af4736dec409dd691",
+    "semantic_hash": ""
   },
   "apps/mcp_server/scripts/verify-tools.ts": {
-    "mtime": 1795407028.6902409,
-    "seen": 1795411091.99373,
-    "ast_hash": "2edbaf6acaf279ace1ea53a0e55cb229",
-    "semantic_hash": "2edbaf6acaf279ace1ea53a0e55cb229"
+    "mtime": 1795420166.364246,
+    "seen": 1795420421.7505522,
+    "ast_hash": "2ca66d1769630102d2845f3266b82a8b",
+    "semantic_hash": ""
   },
   "apps/mcp_server/src/client.ts": {
-    "mtime": 1795407028.6903775,
-    "seen": 1795411091.993731,
-    "ast_hash": "b692cac8fc10ba7d3e40b039ab5046ae",
-    "semantic_hash": "b692cac8fc10ba7d3e40b039ab5046ae"
+    "mtime": 1795419997.029309,
+    "seen": 1795420421.7505531,
+    "ast_hash": "1753fec3d1e3b59933ffe4539ddd7a18",
+    "semantic_hash": ""
   },
   "apps/mcp_server/src/config.ts": {
-    "mtime": 1795407028.6904476,
-    "seen": 1795411091.9937322,
-    "ast_hash": "4eed680eb8f1727268bec464b3a90ed1",
-    "semantic_hash": "4eed680eb8f1727268bec464b3a90ed1"
+    "mtime": 1795419997.004085,
+    "seen": 1795420421.750554,
+    "ast_hash": "c94aa27143d5c32d80b96222e0a5ce24",
+    "semantic_hash": ""
   },
   "apps/mcp_server/src/index.ts": {
-    "mtime": 1795407028.690522,
-    "seen": 1795411091.9937332,
-    "ast_hash": "8f9a5e90511f419a282c900df1d822d9",
-    "semantic_hash": "8f9a5e90511f419a282c900df1d822d9"
+    "mtime": 1795419997.0493996,
+    "seen": 1795420421.7505548,
+    "ast_hash": "934990bc53e91f3bf59574cee31bb74f",
+    "semantic_hash": ""
   },
   "apps/mcp_server/src/registry.ts": {
     "mtime": 1795407028.6908898,
@@ -851,10 +851,10 @@
     "semantic_hash": "473cb36ec933d71587c46e70a4b1f4d4"
   },
   "apps/mcp_server/src/tools/catalog.tools.ts": {
-    "mtime": 1795407028.6910584,
-    "seen": 1795411091.993738,
-    "ast_hash": "f681578f8af99497e3e783744dd9ea5f",
-    "semantic_hash": "f681578f8af99497e3e783744dd9ea5f"
+    "mtime": 1795420051.8424816,
+    "seen": 1795420421.75056,
+    "ast_hash": "640105841912bafc0e87492de339bce8",
+    "semantic_hash": ""
   },
   "apps/mcp_server/src/tools/inventory.tools.ts": {
     "mtime": 1795407028.6911402,
@@ -863,16 +863,16 @@
     "semantic_hash": "49aa13a3b62fac8904ac9fc6800db496"
   },
   "apps/mcp_server/src/tools/logs.tools.ts": {
-    "mtime": 1795407028.6914093,
-    "seen": 1795411091.99374,
-    "ast_hash": "99880f88954c2403760d61c32cd3ad91",
-    "semantic_hash": "99880f88954c2403760d61c32cd3ad91"
+    "mtime": 1795420077.8380425,
+    "seen": 1795420421.750562,
+    "ast_hash": "37c7771604e6f85d9572ef559a5071c0",
+    "semantic_hash": ""
   },
   "apps/mcp_server/src/tools/pos.tools.ts": {
-    "mtime": 1795407028.6915042,
-    "seen": 1795411091.993741,
-    "ast_hash": "23d8477ac3d1a764696d6463f63120c0",
-    "semantic_hash": "23d8477ac3d1a764696d6463f63120c0"
+    "mtime": 1795420051.8624458,
+    "seen": 1795420421.7505631,
+    "ast_hash": "3ba757d8fe28bc42f97abc17374222c9",
+    "semantic_hash": ""
   },
   "apps/mcp_server/src/tools/production.tools.ts": {
     "mtime": 1795407028.6916096,
@@ -893,10 +893,10 @@
     "semantic_hash": "c47cde93cf7e1c664f91896f27b486f7"
   },
   "apps/mcp_server/src/tools/system.tools.ts": {
-    "mtime": 1795407028.6919267,
-    "seen": 1795411091.9937458,
-    "ast_hash": "45700e0ba30fe1e445ee981d373c4472",
-    "semantic_hash": "45700e0ba30fe1e445ee981d373c4472"
+    "mtime": 1795420077.873746,
+    "seen": 1795420421.750568,
+    "ast_hash": "91e622444d44d42490cc60189e1c4723",
+    "semantic_hash": ""
   },
   "apps/mcp_server/tsconfig.json": {
     "mtime": 1795407028.6919959,
@@ -3591,9 +3591,9 @@
     "semantic_hash": ""
   },
   ".claude/workspaces.md": {
-    "mtime": 1795411143.705317,
-    "seen": 1795411519.853149,
-    "ast_hash": "486fa4a4425a0aebb2aae4ea8d543ae0",
+    "mtime": 1795419844.7652316,
+    "seen": 1795420421.7511601,
+    "ast_hash": "09b14312cd2c3e92f039e12488a75c28",
     "semantic_hash": ""
   },
   ".github/copilot-instructions.md": {
@@ -3783,9 +3783,9 @@
     "semantic_hash": ""
   },
   "apps/mcp_server/README.md": {
-    "mtime": 1795408569.6189573,
-    "seen": 1795411091.99431,
-    "ast_hash": "13460d24c2c83b6cb1af4650645deea5",
+    "mtime": 1795420232.8044784,
+    "seen": 1795420421.751202,
+    "ast_hash": "053c8f11f5811b4baf11beb436f1d0d5",
     "semantic_hash": ""
   },
   "apps/menu_generator/README.md": {
@@ -4191,9 +4191,9 @@
     "semantic_hash": ""
   },
   "knowledge/apps/mcp-server.md": {
-    "mtime": 1795407029.6948555,
-    "seen": 1795411091.994389,
-    "ast_hash": "04cff7fcf0a389db738125f54a2b6cdc",
+    "mtime": 1795420232.8276758,
+    "seen": 1795420421.751298,
+    "ast_hash": "186b12cea1872afd4c1b82fba4c73eed",
     "semantic_hash": ""
   },
   "knowledge/apps/pos-flutter.md": {
@@ -4227,9 +4227,9 @@
     "semantic_hash": ""
   },
   "knowledge/architecture/mcp-server.md": {
-    "mtime": 1795407029.6956205,
-    "seen": 1795411091.994396,
-    "ast_hash": "6a329cedd8ed1d38c2985804954d180c",
+    "mtime": 1795420232.8582172,
+    "seen": 1795420421.751306,
+    "ast_hash": "156d322e29c8e9c820db0a4556afe501",
     "semantic_hash": ""
   },
   "knowledge/architecture/monorepo-overview.md": {
@@ -6717,9 +6717,9 @@
     "semantic_hash": ""
   },
   "specs/018-owner-business-copilot/plan.md": {
-    "mtime": 1795408543.5639322,
-    "seen": 1795411091.994581,
-    "ast_hash": "822d84744e61d11f2ce1bcaefa3980be",
+    "mtime": 1795420184.0654864,
+    "seen": 1795420421.751552,
+    "ast_hash": "824a787ef319884b4963ffb9ddcd2274",
     "semantic_hash": ""
   },
   "specs/018-owner-business-copilot/quickstart.md": {
@@ -6735,15 +6735,15 @@
     "semantic_hash": ""
   },
   "specs/018-owner-business-copilot/spec.md": {
-    "mtime": 1795408543.5427794,
-    "seen": 1795411091.994585,
-    "ast_hash": "cb66c382892e05bf2f80bfa6d6ed826a",
+    "mtime": 1795420184.0396338,
+    "seen": 1795420421.7515562,
+    "ast_hash": "a62d3b82447b87e4119a0e3c725419db",
     "semantic_hash": ""
   },
   "specs/018-owner-business-copilot/tasks.md": {
-    "mtime": 1795411789.9564757,
-    "seen": 1795411889.944115,
-    "ast_hash": "ad2179361b5590ac37065a37269bb519",
+    "mtime": 1795420184.085012,
+    "seen": 1795420421.751557,
+    "ast_hash": "c9c96fddd5415f5fedddb98e53b5238e",
     "semantic_hash": ""
   },
   "apps/sync_api/src/modules/owner-copilot/gemini.provider.spec.ts": {
@@ -6756,6 +6756,18 @@
     "mtime": 1795413541.8847415,
     "seen": 1795413625.453812,
     "ast_hash": "45d4b8e696e43753b0a11208da64d72b",
+    "semantic_hash": ""
+  },
+  "apps/mcp_server/scripts/verify-readonly-policy.ts": {
+    "mtime": 1795420166.3173797,
+    "seen": 1795420421.75055,
+    "ast_hash": "a0e142396ed82fb82cfdb842620711fc",
+    "semantic_hash": ""
+  },
+  "docs/owner-business-copilot-overview.html": {
+    "mtime": 1795414490.00501,
+    "seen": 1795420421.751286,
+    "ast_hash": "d622868c1141eb7455830f24aa899a94",
     "semantic_hash": ""
   },
   "apps/business_control_tauri/pnpm-lock.yaml": {
@@ -6783,9 +6795,9 @@
     "semantic_hash": ""
   },
   "apps/mcp_server/pnpm-lock.yaml": {
-    "mtime": 1795407028.6899843,
-    "seen": 1795411091.994901,
-    "ast_hash": "e76af841037b66b50fdbdfa48e4fa500",
+    "mtime": 1795420243.4452097,
+    "seen": 1795420421.75194,
+    "ast_hash": "46f7123d577237ca07fe311eccfcee59",
     "semantic_hash": ""
   },
   "apps/menu_generator/pnpm-lock.yaml": {

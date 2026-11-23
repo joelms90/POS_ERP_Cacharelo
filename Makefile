@@ -1110,11 +1110,19 @@ flutter-release-info:
 # -----------------------------------------------------------------------------
 # Model Context Protocol (MCP) Server for AI Assistants
 # -----------------------------------------------------------------------------
-.PHONY: mcp-start mcp-verify mcp-sync-check mcp-build
+.PHONY: mcp-start mcp-private mcp-private-test mcp-verify mcp-sync-check mcp-build
 
 mcp-start:
-	@echo "Starting POS-ERP MCP Server..."
-	cd apps/mcp_server && pnpm start
+	@$(MAKE) mcp-private
+
+mcp-private:
+	@if [ ! -f apps/mcp_server/.env ]; then echo "Missing apps/mcp_server/.env. Copy apps/mcp_server/.env.example and provide a current owner JWT."; exit 2; fi
+	@echo "Starting private, read-only POS-ERP MCP Server (stdio)..."
+	@set -a; . apps/mcp_server/.env; set +a; cd apps/mcp_server && pnpm start
+
+mcp-private-test:
+	@echo "Verifying private read-only MCP policy..."
+	cd apps/mcp_server && pnpm build && pnpm test:readonly
 
 mcp-verify:
 	@echo "Running POS-ERP MCP Diagnostic Verification..."

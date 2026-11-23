@@ -6,6 +6,8 @@
 
 Add a secure owner-only Spanish Copiloto page backed by an authenticated NestJS module. The server owns identity, tool policy, model-provider configuration, redaction, audit, and confirmation state. The first provider is deterministic and invokes only typed read adapters inspired by existing MCP concepts; it does not call MCP, mint a static owner identity, or expose a generic endpoint passthrough.
 
+The companion local MCP remains a separate owner integration. It uses stdio, a locally supplied short-lived owner JWT, typed GET adapters only, and has no public HTTP listener, static JWT signing identity, administrative token, write tool, or dynamic backend passthrough.
+
 ## Technical Context
 
 **Language/Version**: TypeScript; React/Vite administrative client and NestJS API.  

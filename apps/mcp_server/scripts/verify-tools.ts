@@ -1,14 +1,15 @@
 import { PosApiClient } from '../src/client.js';
-import { config } from '../src/config.js';
+import { assertPrivateReadOnlyConfig, config } from '../src/config.js';
 
 async function verify() {
+  assertPrivateReadOnlyConfig();
   console.log('======================================================');
   console.log('  🔍 POS-ERP MCP Server - Diagnostic Tool Verification');
   console.log('======================================================');
   console.log(`Target Backend: ${config.apiUrl}`);
   console.log(`Default Business: ${config.defaultBusinessId}\n`);
 
-  const client = new PosApiClient(config.apiUrl, config.adminToken);
+  const client = new PosApiClient(config.apiUrl, config.accessToken);
   let passed = 0;
   let failed = 0;
 

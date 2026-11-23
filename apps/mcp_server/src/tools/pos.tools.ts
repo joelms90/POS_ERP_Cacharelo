@@ -39,29 +39,7 @@ export function registerPosTools(server: McpServer, client: PosApiClient) {
     },
   );
 
-  // 2. Update table state (e.g. mark clean)
-  server.tool(
-    'update_table_state',
-    'Actualiza el estado operativo de una mesa (ej: cambiar de "cleaning" a "available" tras desocuparse y limpiarse).',
-    {
-      branchId: z.string().describe('ID de la sucursal'),
-      tableId: z.string().describe('ID de la mesa'),
-      state: z.enum(['available', 'occupied', 'billing', 'cleaning']).describe('Nuevo estado de la mesa'),
-    },
-    async ({ branchId, tableId, state }) => {
-      const updated = await client.updateTable(branchId, tableId, { state });
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({ success: true, message: `Mesa actualizada a estado ${state}`, table: updated }, null, 2),
-          },
-        ],
-      };
-    },
-  );
-
-  // 3. Get kitchen tickets (KDS)
+  // 2. Get kitchen tickets (KDS)
   server.tool(
     'get_kitchen_tickets',
     'Obtiene los tickets activos en la pantalla de cocina (KDS) ordenados por estación (cocina o barra) y estado (pending, preparing, ready, served).',
@@ -81,24 +59,4 @@ export function registerPosTools(server: McpServer, client: PosApiClient) {
     },
   );
 
-  // 4. Update kitchen ticket status
-  server.tool(
-    'update_kitchen_ticket_status',
-    'Avanza el estado de un ticket en cocina (ej: "preparing" para empezar a cocinar, "ready" cuando esté listo para servir, o "served" al entregarse).',
-    {
-      ticketId: z.string().describe('ID del ticket de cocina'),
-      status: z.enum(['pending', 'preparing', 'ready', 'served']).describe('Nuevo estado del ticket'),
-    },
-    async ({ ticketId, status }) => {
-      const updated = await client.updateKitchenTicket(ticketId, status);
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({ success: true, ticket: updated }, null, 2),
-          },
-        ],
-      };
-    },
-  );
 }

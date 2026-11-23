@@ -37,3 +37,4 @@
 
 - [x] T015 Run `make graphify-update`, then refresh feature task status in `specs/018-owner-business-copilot/tasks.md`
 - [x] T016 Add optional server-only Gemini provider, local environment template, and Secret Manager operating guidance in `apps/sync_api/src/modules/owner-copilot/`, `apps/sync_api/.env.example`, and `docs/owner-business-copilot.md`
+- [x] T017 Harden the companion private stdio MCP: remove static identity, writes and generic passthrough; add a local launcher and read-only policy check in `apps/mcp_server/` and `Makefile`.

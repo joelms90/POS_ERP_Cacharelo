@@ -1,44 +1,18 @@
-import jwt from 'jsonwebtoken';
 import { config } from './config.js';
-
-export interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
-  body?: any;
-  query?: Record<string, string | number | boolean | undefined>;
-}
 
 export class PosApiClient {
   private baseUrl: string;
-  private token: string;
-  private jwtToken: string;
+  private accessToken: string;
 
   constructor(
     baseUrl = config.apiUrl,
-    token = config.adminToken,
-    jwtSecret = config.jwtSecret,
-    businessId = config.defaultBusinessId,
+    accessToken = config.accessToken,
   ) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
-    this.token = token;
-
-    // Generate valid admin JWT token
-    this.jwtToken = jwt.sign(
-      {
-        sub: 'mcp-server-admin',
-        name: 'MCP Server Admin',
-        role: 'owner',
-        roles: ['owner', 'inventory_admin', 'support_tech'],
-        businessId,
-        businessAccess: [{ businessId, role: 'owner' }],
-      },
-      jwtSecret,
-      { expiresIn: '365d' },
-    );
+    this.accessToken = accessToken;
   }
 
-  async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-    const { method = 'GET', body, query } = options;
-
+  private async get<T>(endpoint: string, query?: Record<string, string | number | boolean | undefined>): Promise<T> {
     let url = `${this.baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
 
     if (query) {
@@ -55,21 +29,10 @@ export class PosApiClient {
     }
 
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'X-Admin-Token': this.token,
-      'Authorization': `Bearer ${this.jwtToken}`,
+      'Authorization': `Bearer ${this.accessToken}`,
     };
 
-    const fetchOptions: RequestInit = {
-      method,
-      headers,
-    };
-
-    if (body && method !== 'GET') {
-      fetchOptions.body = JSON.stringify(body);
-    }
-
-    const response = await fetch(url, fetchOptions);
+    const response = await fetch(url, { method: 'GET', headers });
 
     if (!response.ok) {
       let errorDetail = `${response.status} ${response.statusText}`;
@@ -84,7 +47,7 @@ export class PosApiClient {
           // ignore
         }
       }
-      throw new Error(`API Error [${method} ${endpoint}]: ${errorDetail}`);
+      throw new Error(`API Error [GET ${endpoint}]: ${errorDetail}`);
     }
 
     return response.json() as Promise<T>;
@@ -92,123 +55,80 @@ export class PosApiClient {
 
   // Convenience Methods
   async getHealth() {
-    return this.request<{ status: string; database?: string }>('/health');
+    return this.get<{ status: string; database?: string }>('/health');
   }
 
   // Catalog
   async getProducts(businessId: string, query?: { search?: string; categoryId?: string; isSellable?: boolean }) {
-    return this.request<any[]>('/products', {
-      query: { businessId, ...query },
-    });
+    return this.get<any[]>('/products', { businessId, ...query });
   }
 
   async getProductById(id: string) {
-    return this.request<any>(`/products/${id}`);
-  }
-
-  async updateProduct(id: string, updates: Record<string, any>) {
-    return this.request<any>(`/products/${id}`, {
-      method: 'PATCH',
-      body: updates,
-    });
+    return this.get<any>(`/products/${id}`);
   }
 
   async getCategories(businessId: string) {
-    return this.request<any[]>('/categories', {
-      query: { businessId },
-    });
+    return this.get<any[]>('/categories', { businessId });
   }
 
   // Branches & Tables
   async getBranches(businessId: string) {
-    return this.request<any[]>('/branches', {
-      query: { businessId },
-    });
+    return this.get<any[]>('/branches', { businessId });
   }
 
   async getTables(branchId: string) {
-    return this.request<any[]>(`/branches/${branchId}/tables`);
-  }
-
-  async updateTable(branchId: string, tableId: string, updates: { state?: string; label?: string }) {
-    return this.request<any>(`/branches/${branchId}/tables/${tableId}`, {
-      method: 'PATCH',
-      body: updates,
-    });
+    return this.get<any[]>(`/branches/${branchId}/tables`);
   }
 
   // POS & Kitchen
   async getActiveOrders(branchId: string) {
-    return this.request<any[]>('/orders/active', {
-      query: { branchId },
-    });
+    return this.get<any[]>('/orders/active', { branchId });
   }
 
   async getKitchenTickets(branchId: string) {
-    return this.request<any[]>('/kitchen/active', {
-      query: { branchId },
-    });
-  }
-
-  async updateKitchenTicket(ticketId: string, status: string) {
-    return this.request<any>(`/kitchen/tickets/${ticketId}/status`, {
-      method: 'PATCH',
-      body: { status },
-    });
+    return this.get<any[]>('/kitchen/active', { branchId });
   }
 
   // Inventory
   async getWarehouses(businessId: string) {
-    return this.request<any[]>('/warehouses', {
-      query: { businessId },
-    });
+    return this.get<any[]>('/warehouses', { businessId });
   }
 
   async getStockAlerts(businessId: string, warehouseId?: string) {
-    return this.request<any[]>('/inventory/alerts', {
-      query: { businessId, warehouseId },
-    });
+    return this.get<any[]>('/inventory/alerts', { businessId, warehouseId });
   }
 
   async getInventoryExistence(businessId: string, query?: { productId?: string; warehouseId?: string }) {
-    return this.request<any>('/inventory/reports/existence', {
-      query: { businessId, ...query },
-    });
+    return this.get<any>('/inventory/reports/existence', { businessId, ...query });
   }
 
   async getProductKardex(businessId: string, productId: string, limit?: number) {
-    return this.request<any[]>('/inventory/reports/kardex', {
-      query: { businessId, productId, limit },
-    });
+    return this.get<any[]>('/inventory/reports/kardex', { businessId, productId, limit });
   }
 
   // Purchasing & Requisitions
   async getRequisitions(businessId: string, status?: string) {
-    return this.request<any[]>('/requisitions', {
-      query: { businessId, status },
-    });
-  }
-
-  async approveRequisition(requisitionId: string, itemsApproved: any[]) {
-    return this.request<any>(`/requisitions/${requisitionId}/approve`, {
-      method: 'POST',
-      body: { items: itemsApproved },
-    });
+    return this.get<any[]>('/requisitions', { businessId, status });
   }
 
   async getPurchaseOrders(businessId: string, status?: string) {
-    return this.request<any[]>('/purchase-orders', {
-      query: { businessId, status },
-    });
+    return this.get<any[]>('/purchase-orders', { businessId, status });
   }
 
   // Production / BOM
   async getBomRecipe(productId: string) {
-    return this.request<any>(`/assembly/bom?productId=${productId}`);
+    return this.get<any>('/assembly/bom', { productId });
   }
 
-  // Direct passthrough to any current or future API endpoint
-  async rawRequest<T = any>(endpoint: string, method: RequestOptions['method'] = 'GET', body?: any, query?: any) {
-    return this.request<T>(endpoint, { method, body, query });
+  async getErrorSummary(query: Record<string, string | number | boolean | undefined>) {
+    return this.get<any>('/admin/logs/summary', query);
+  }
+
+  async searchLogs(query: Record<string, string | number | boolean | undefined>) {
+    return this.get<any>('/admin/logs', query);
+  }
+
+  async getLogEntry(id: string) {
+    return this.get<any>(`/admin/logs/${encodeURIComponent(id)}`);
   }
 }

@@ -66,7 +66,6 @@ function scanControllers(dir: string): EndpointInfo[] {
 const MAPPED_TOOL_PREFIXES: Record<string, string[]> = {
   search_products: ['/api/products'],
   get_product_details: ['/api/products'],
-  update_product_price: ['/api/products'],
   get_categories: ['/api/categories'],
   get_stock_alerts: ['/api/inventory/alerts'],
   get_inventory_existence: ['/api/inventory/reports/existence'],
@@ -75,9 +74,7 @@ const MAPPED_TOOL_PREFIXES: Record<string, string[]> = {
   get_active_orders: ['/api/orders/active'],
   simulate_corte_caja: ['/api/reports/daily-sales', '/api/reports/corte'],
   get_branch_tables: ['/api/branches'],
-  update_table_state: ['/api/branches'],
   get_kitchen_tickets: ['/api/kitchen/active'],
-  update_kitchen_ticket_status: ['/api/kitchen/tickets'],
   get_requisitions: ['/api/requisitions'],
   get_purchase_orders: ['/api/purchase-orders'],
   get_product_recipe_bom: ['/api/assembly/bom'],
@@ -97,6 +94,10 @@ function main() {
   const unmappedEndpoints: EndpointInfo[] = [];
 
   for (const ep of endpoints) {
+    if (ep.method !== 'GET') {
+      unmappedEndpoints.push(ep);
+      continue;
+    }
     let isCovered = false;
     for (const [toolName, prefixes] of Object.entries(MAPPED_TOOL_PREFIXES)) {
       if (prefixes.some((prefix) => ep.fullPath.startsWith(prefix))) {
@@ -111,7 +112,7 @@ function main() {
   }
 
   console.log(`✅ Dedicated MCP Tools Coverage: ${mappedEndpoints.size} endpoints covered`);
-  console.log(`⚡ Dynamic Fallback Coverage: ALL ${endpoints.length} endpoints are immediately callable via "call_backend_api"\n`);
+  console.log('🔒 Private policy: only dedicated GET tools are exposed; write routes are intentionally excluded.\n');
 
   if (unmappedEndpoints.length > 0) {
     console.log('---------------------------------------------------------------');
@@ -136,10 +137,10 @@ function main() {
     }
 
     console.log('\n===============================================================');
-    console.log('  Mecanismo de sincronización:');
-    console.log('  1. Cualquier nuevo endpoint puede ser consumido hoy mismo con:');
-    console.log('     Tool: call_backend_api({ endpoint: "/nuevo-endpoint" })');
-    console.log('  2. Para crear una herramienta especializada, añade la función en');
+    console.log('  Mecanismo de sincronización seguro:');
+    console.log('  1. Un endpoint nuevo requiere una herramienta GET tipada y revisión explícita.');
+    console.log('  2. Las rutas de escritura no se agregan a este MCP privado.');
+    console.log('  3. Para crear una herramienta especializada de lectura, añade la función en');
     console.log('     apps/mcp_server/src/tools/<modulo>.tools.ts');
     console.log('===============================================================\n');
   }

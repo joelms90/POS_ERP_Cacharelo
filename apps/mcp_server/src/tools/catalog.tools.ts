@@ -61,33 +61,7 @@ export function registerCatalogTools(server: McpServer, client: PosApiClient) {
     },
   );
 
-  // 3. Update product price
-  server.tool(
-    'update_product_price',
-    'Actualiza el precio de venta o mayoreo de un producto en el catálogo.',
-    {
-      productId: z.string().describe('ID del producto a modificar'),
-      price: z.string().optional().describe('Nuevo precio de venta al público en MXN (ej: "125.00")'),
-      priceWholesale: z.string().optional().describe('Nuevo precio de mayoreo en MXN'),
-    },
-    async ({ productId, price, priceWholesale }) => {
-      const updates: Record<string, any> = {};
-      if (price !== undefined) updates.price = price;
-      if (priceWholesale !== undefined) updates.priceWholesale = priceWholesale;
-
-      const updated = await client.updateProduct(productId, updates);
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({ success: true, message: 'Precio actualizado', product: updated }, null, 2),
-          },
-        ],
-      };
-    },
-  );
-
-  // 4. Get categories
+  // 3. Get categories
   server.tool(
     'get_categories',
     'Obtiene la lista de categorías del catálogo con su estación KDS asignada (cocina, barra o sin estación).',

@@ -33,8 +33,8 @@ Configure your AI assistant (e.g. Cursor, Claude Desktop, Antigravity) with the 
       "command": "node",
       "args": ["/absolute/path/to/POS-ERP/apps/mcp_server/dist/index.js"],
       "env": {
-        "API_BASE_URL": "http://localhost:3001/api",
-        "API_BEARER_TOKEN": "<operator-jwt-token>"
+        "POS_API_URL": "http://localhost:3000/api",
+        "POS_MCP_ACCESS_TOKEN": "<current-owner-jwt>"
       }
     }
   }
@@ -45,10 +45,10 @@ Configure your AI assistant (e.g. Cursor, Claude Desktop, Antigravity) with the 
 
 ## 2. Tool Categories
 
-1. **Catalog Tools**: `search_products`, `get_product_details`, `update_product_price`, `get_categories`.
+1. **Catalog Tools**: `search_products`, `get_product_details`, `get_categories`.
 2. **Inventory Tools**: `get_stock_alerts`, `get_inventory_existence`, `get_product_kardex`, `get_warehouses`.
 3. **Sales Tools**: `get_active_orders`, `simulate_corte_caja`.
-4. **POS Tools**: `get_branch_tables`, `update_table_state`, `get_kitchen_tickets`, `update_kitchen_ticket_status`.
+4. **POS Tools**: `get_branch_tables`, `get_kitchen_tickets`.
 5. **Purchasing Tools**: `get_purchase_orders`, `get_branch_requisitions`, `approve_branch_requisition`.
 6. **Production Tools**: `get_recipes`, `create_production_run`.
 7. **Shift Tools**: `get_active_shift`, `record_cash_movement`.
@@ -64,7 +64,7 @@ make mcp-verify
 cd apps/mcp_server && pnpm test:verify
 
 # Start MCP stdio server
-make mcp-start
+make mcp-private
 # or
 cd apps/mcp_server && pnpm start
 ```
