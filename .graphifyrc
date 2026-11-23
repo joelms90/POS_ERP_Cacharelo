@@ -1,0 +1,4 @@
+# Graphify project configuration
+# Query defaults tuned for this monorepo (5610 nodes across TS/TSX, Dart, SQL, Terraform, Markdown).
+query_budget=4000
+query_depth=3

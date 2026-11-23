@@ -1155,6 +1155,27 @@ team-logs:
 	@./scripts/agent-team.sh logs $(AGENT)
 
 # -----------------------------------------------------------------------------
+# Codebase knowledge graph (Graphify) — see AGENTS.md
+# -----------------------------------------------------------------------------
+.PHONY: graphify-build graphify-update graphify-query graphify-hubs
+
+graphify-build:
+	@command -v graphify >/dev/null 2>&1 || { echo 'graphify not installed. Run: uv tool install "graphifyy[sql,terraform,pdf,office,watch,leiden]" && uv tool update-shell'; exit 1; }
+	@graphify extract . --code-only
+	@graphify cluster-only . --no-label
+
+graphify-update:
+	@command -v graphify >/dev/null 2>&1 || { echo 'graphify not installed. See make graphify-build'; exit 1; }
+	@graphify update .
+
+graphify-query:
+	@test -n "$(Q)" || { echo 'Usage: make graphify-query Q="how does auth connect to the database?"'; exit 1; }
+	@graphify query "$(Q)"
+
+graphify-hubs:
+	@graphify god-nodes --top 15
+
+# -----------------------------------------------------------------------------
 # Staging Environment (separate GCP project; see specs/014-staging-environment)
 # -----------------------------------------------------------------------------
 .PHONY: staging-guard deploy-staging backend-deploy-staging backend-migrate-staging backend-status-staging admin-deploy-staging flutter-web-deploy-staging flutter-apk-build-staging flutter-apk-upload-staging flutter-portal-deploy-staging

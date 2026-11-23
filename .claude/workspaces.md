@@ -7,6 +7,11 @@
 ---
 
 ## Currently Active Sessions
+### Session: graphify-knowledge-graph
+- **Scope**: Add the Graphify code knowledge graph (local CLI, project-scoped skills for Claude/Codex/OpenCode/generic agents), `graphify-out/` artifacts, `.graphifyrc`, Make targets, git hooks, and AGENTS.md/CLAUDE.md query-first rules. Shared tooling only; no app deployment, no migrations.
+- **Branch**: `main`
+- **Status**: 🔄 Set up locally; artifacts pending commit.
+
 ### Session: feature-delivery-workflow
 - **Scope**: Add the reusable feature-delivery skill, safe feature lifecycle Make targets, and team-status portability fix. Shared tooling only; no app deployment.
 - **Branch**: `chore/feature-delivery-workflow`
