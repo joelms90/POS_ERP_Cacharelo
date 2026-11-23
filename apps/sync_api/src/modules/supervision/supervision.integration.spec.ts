@@ -612,6 +612,14 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       .expect(201);
   });
 
+  it('lists only the branches a supervisor can see', async () => {
+    const res = await http()
+      .get('/supervision/branches')
+      .auth(as.supervisor(), { type: 'bearer' })
+      .expect(200);
+    expect(res.body.map((b: any) => b.id)).toEqual([branchA]);
+  });
+
   it('assignments are owner-only and audited', async () => {
     await http()
       .put(`/supervision/assignments/${ids.foreignSupervisor}`)

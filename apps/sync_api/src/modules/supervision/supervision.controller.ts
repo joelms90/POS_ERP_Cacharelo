@@ -68,6 +68,11 @@ export class SupervisionController {
     });
   }
 
+  @Get('branches')
+  branches(@Req() req: SupervisionRequest) {
+    return this.approvals.visibleBranches(req.user!);
+  }
+
   @Get('approvals/count')
   count(@Req() req: SupervisionRequest) {
     return this.approvals.countActionable(req.user!);

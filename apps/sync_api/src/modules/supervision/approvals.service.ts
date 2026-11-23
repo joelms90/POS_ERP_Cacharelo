@@ -873,6 +873,22 @@ export class ApprovalsService {
     };
   }
 
+  /** Branches the caller can supervise or see (supervisor: assigned; owner: business-wide). */
+  async visibleBranches(user: JwtUser) {
+    const actor = await this.scope.buildActor(user);
+    const ids = await this.scope.visibleBranchIds(actor, user);
+    if (!ids.length) return [];
+    return this.db
+      .select({
+        id: schema.branches.id,
+        name: schema.branches.name,
+        businessId: schema.branches.businessId,
+      })
+      .from(schema.branches)
+      .where(inArray(schema.branches.id, ids))
+      .orderBy(schema.branches.name);
+  }
+
   async countActionable(user: JwtUser) {
     const result = await this.listApprovals(user, { actionable: true });
     return {
@@ -1163,16 +1179,14 @@ export class ApprovalsService {
           );
       }
       if (toAdd.length) {
-        await tx
-          .insert(schema.supervisorBranchAssignments)
-          .values(
-            toAdd.map((branchId) => ({
-              businessId,
-              userId,
-              branchId,
-              assignedBy: actorId,
-            })),
-          );
+        await tx.insert(schema.supervisorBranchAssignments).values(
+          toAdd.map((branchId) => ({
+            businessId,
+            userId,
+            branchId,
+            assignedBy: actorId,
+          })),
+        );
       }
       if (toRevoke.length || toAdd.length) {
         await this.audit.record(tx, {
