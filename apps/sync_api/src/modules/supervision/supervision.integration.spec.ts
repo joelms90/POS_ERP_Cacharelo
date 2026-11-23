@@ -129,7 +129,9 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
         forbidNonWhitelisted: true,
       }),
     );
-    await app.init();
+    // Listen on IPv4 loopback explicitly: an implicit listen(0) binds '::' while the
+    // client dials 127.0.0.1, which can reach another jest worker's server.
+    await app.listen(0, '127.0.0.1');
     jwt = moduleRef.get(JwtService);
   });
 

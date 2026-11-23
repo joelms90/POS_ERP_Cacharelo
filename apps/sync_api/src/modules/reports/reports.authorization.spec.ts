@@ -34,7 +34,9 @@ describe('Cash-shift audit authorization', () => {
       .compile();
     app = module.createNestApplication();
     jwt = module.get(JwtService);
-    await app.init();
+    // Listen on IPv4 loopback explicitly: an implicit listen(0) binds '::' while the
+    // client dials 127.0.0.1, which can reach another jest worker's server.
+    await app.listen(0, '127.0.0.1');
   });
   beforeEach(() => {
     jest.clearAllMocks();
@@ -99,7 +101,9 @@ describe('Report endpoints authorization (spec 019 R-1, D-9/P-3)', () => {
       .compile();
     app = module.createNestApplication();
     jwt = module.get(JwtService);
-    await app.init();
+    // Listen on IPv4 loopback explicitly: an implicit listen(0) binds '::' while the
+    // client dials 127.0.0.1, which can reach another jest worker's server.
+    await app.listen(0, '127.0.0.1');
   });
   beforeEach(() => {
     jest.clearAllMocks();
