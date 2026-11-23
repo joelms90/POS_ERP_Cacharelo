@@ -28,6 +28,7 @@ import {
   SupervisorScopeService,
 } from '../audit/supervisor-scope.service';
 import { ShiftsService } from '../shifts/shifts.service';
+import { dayEnd, dayStart, todayInTz } from './supervision-dates';
 import { TransactionsRepository } from '../shifts/repositories/transactions.repository';
 import { BRANCH_OPERATOR_ROLE, BRANCH_SUPERVISOR_ROLE } from '../auth/roles';
 import {
@@ -811,8 +812,9 @@ export class ApprovalsService {
     if (filters.branchId)
       branchIds = branchIds.filter((id) => id === filters.branchId);
     if (branchIds.length === 0) return { cortes: [], movements: [] };
-    const from = filters.from ? new Date(`${filters.from}T00:00:00`) : null;
-    const to = filters.to ? new Date(`${filters.to}T23:59:59`) : null;
+    const { from: fromDay, to: toDay } = this.dateWindow(actor, filters);
+    const from = dayStart(fromDay);
+    const to = dayEnd(toDay);
 
     const cortes =
       filters.type === 'cash_movement'
@@ -1028,16 +1030,33 @@ export class ApprovalsService {
     let branchIds = await this.scope.visibleBranchIds(actor, user);
     if (filters.branchId)
       branchIds = branchIds.filter((id) => id === filters.branchId);
+    const { from, to } = this.dateWindow(actor, filters);
     return this.audit.query({
       branchIds,
       entityType: filters.entityType,
       entityId: filters.entityId,
       actorId: filters.actorId,
       action: filters.action,
-      from: filters.from ? new Date(`${filters.from}T00:00:00`) : undefined,
-      to: filters.to ? new Date(`${filters.to}T23:59:59`) : undefined,
+      from: dayStart(from) ?? undefined,
+      to: dayEnd(to) ?? undefined,
       limit: 500,
     });
+  }
+
+  /**
+   * Supervisors (non-owner) only see the current business day in the inbox
+   * and audit log; the owner may pick any range (and defaults to today in the UI).
+   * Branch operators/cashiers keep their own unfiltered branch inbox.
+   */
+  private dateWindow(
+    actor: { isOwner: boolean; roles: string[] },
+    filters: { from?: string; to?: string },
+  ): { from?: string; to?: string } {
+    if (!actor.isOwner && actor.roles.includes(BRANCH_SUPERVISOR_ROLE)) {
+      const today = todayInTz();
+      return { from: today, to: today };
+    }
+    return { from: filters.from, to: filters.to };
   }
 
   async listAssignments(user: JwtUser, businessId: string) {

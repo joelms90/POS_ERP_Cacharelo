@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Heading } from '../../components/atoms/Heading';
 import { Button } from '../../components/atoms/Button';
 import { api, AuditLogEntry, SupervisionBranch } from '../../services/api';
-import { errorMessage, formatDateTime } from './supervisionUi';
+import { errorMessage, formatDateTime, localToday } from './supervisionUi';
 
 const ENTITY_LABELS: Record<string, string> = {
   cash_shift: 'Corte Z',
@@ -11,16 +11,14 @@ const ENTITY_LABELS: Record<string, string> = {
   supervisor_assignment: 'Asignación',
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
-const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
-
 /** Spec 019 §6: append-only audit trail (who, when, why, before/after). */
-export const AuditLogPage: React.FC<{ businessId: string }> = ({ businessId }) => {
+/** Supervisors only see today's events (enforced by the API); the owner can search any range, defaulting to today. */
+export const AuditLogPage: React.FC<{ businessId: string; isOwner: boolean }> = ({ businessId, isOwner }) => {
   const [branches, setBranches] = useState<SupervisionBranch[]>([]);
   const [branchId, setBranchId] = useState('all');
   const [entityType, setEntityType] = useState('');
-  const [from, setFrom] = useState(daysAgo(7));
-  const [to, setTo] = useState(today());
+  const [from, setFrom] = useState(localToday());
+  const [to, setTo] = useState(localToday());
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,8 +33,8 @@ export const AuditLogPage: React.FC<{ businessId: string }> = ({ businessId }) =
       const rows = await api.getSupervisionAuditLog({
         branchId: branchId !== 'all' ? branchId : undefined,
         entityType: entityType || undefined,
-        from,
-        to,
+        from: isOwner ? from : undefined,
+        to: isOwner ? to : undefined,
       });
       setEntries(rows.filter((r) => r.businessId === businessId));
     } catch (err) {
@@ -44,7 +42,7 @@ export const AuditLogPage: React.FC<{ businessId: string }> = ({ businessId }) =
     } finally {
       setLoading(false);
     }
-  }, [businessId, branchId, entityType, from, to]);
+  }, [businessId, branchId, entityType, from, to, isOwner]);
 
   useEffect(() => {
     load();
@@ -71,7 +69,7 @@ export const AuditLogPage: React.FC<{ businessId: string }> = ({ businessId }) =
     const csv = [header, ...rows].map((r) => r.map(escape).join(',')).join('\n');
     const link = document.createElement('a');
     link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-    link.download = `bitacora-caja-${from}-a-${to}.csv`;
+    link.download = isOwner ? `bitacora-caja-${from}-a-${to}.csv` : `bitacora-caja-${localToday()}.csv`;
     link.click();
   };
 
@@ -81,6 +79,7 @@ export const AuditLogPage: React.FC<{ businessId: string }> = ({ businessId }) =
         <div>
           <Heading level={2} className="!text-lg sm:!text-2xl">Bitácora de caja</Heading>
           <p className="text-xs text-text-secondary mt-1">Registro inmutable: usuario, fecha, motivo y valores antes/después.</p>
+          {!isOwner && <p className="text-xs text-text-secondary mt-1">Mostrando solo el día de hoy.</p>}
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="bg-charcoal border border-aged-bronze/45 rounded px-2 py-1.5 text-xs text-champagne-gold" aria-label="Sucursal">
@@ -91,8 +90,13 @@ export const AuditLogPage: React.FC<{ businessId: string }> = ({ businessId }) =
             <option value="">Todas las entidades</option>
             {Object.entries(ENTITY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="bg-charcoal border border-aged-bronze/45 rounded px-2 py-1 text-xs text-text-primary" aria-label="Desde" />
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="bg-charcoal border border-aged-bronze/45 rounded px-2 py-1 text-xs text-text-primary" aria-label="Hasta" />
+          {isOwner && (
+            <>
+              <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className="bg-charcoal border border-aged-bronze/45 rounded px-2 py-1 text-xs text-text-primary" aria-label="Desde" />
+              <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className="bg-charcoal border border-aged-bronze/45 rounded px-2 py-1 text-xs text-text-primary" aria-label="Hasta" />
+              <Button size="sm" variant="secondary" onClick={() => { setFrom(localToday()); setTo(localToday()); }}>Hoy</Button>
+            </>
+          )}
           <Button size="sm" variant="secondary" onClick={exportCsv} disabled={!entries.length}>Exportar CSV</Button>
         </div>
       </div>

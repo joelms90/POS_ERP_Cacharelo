@@ -176,3 +176,9 @@ export const ConfirmActionDialog: React.FC<ConfirmActionDialogProps> = ({
 };
 
 export const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+/** Today's calendar date (YYYY-MM-DD) in the viewer's local timezone. */
+export const localToday = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};

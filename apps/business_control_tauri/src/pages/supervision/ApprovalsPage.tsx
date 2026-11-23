@@ -17,6 +17,7 @@ import {
   errorMessage,
   formatCurrency,
   formatDateTime,
+  localToday,
   Modal,
   MovementBadge,
   ReviewBadge,
@@ -32,8 +33,10 @@ const FINAL_STATUSES = 'aprobado,aprobado_con_ajuste';
  * Spec 019 — approvals inbox for the owner and branch supervisors (D-10).
  * Every rule is enforced by the API; the page shows what the user can do.
  */
-export const ApprovalsPage: React.FC = () => {
+export const ApprovalsPage: React.FC<{ isOwner: boolean }> = ({ isOwner }) => {
   const [view, setView] = useState<View>('cortes');
+  // Supervisors only see today (enforced by the API); the owner can pick a day or clear it for all dates.
+  const [day, setDay] = useState<string>(localToday());
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
   const [branches, setBranches] = useState<SupervisionBranch[]>([]);
   const [branchId, setBranchId] = useState<string>('all');
@@ -55,6 +58,8 @@ export const ApprovalsPage: React.FC = () => {
         api.getApprovals({
           status: statusFilter === 'final' ? FINAL_STATUSES : undefined,
           branchId: branchId !== 'all' ? branchId : undefined,
+          from: isOwner ? day || undefined : undefined,
+          to: isOwner ? day || undefined : undefined,
         }),
       ]);
       const ids = new Set(visible.map((b) => b.id));
@@ -66,7 +71,7 @@ export const ApprovalsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [branchId, statusFilter]);
+  }, [branchId, statusFilter, isOwner, day]);
 
   useEffect(() => {
     load();
@@ -86,6 +91,9 @@ export const ApprovalsPage: React.FC = () => {
           <Heading level={2} className="!text-lg sm:!text-2xl">Aprobaciones de caja</Heading>
           <p className="text-xs text-text-secondary mt-1">
             Cortes Z con una sola aprobación (operador de sucursal, supervisor u owner) e ingresos/egresos de caja.
+          </p>
+          <p className="text-xs text-text-secondary mt-1">
+            {isOwner ? (day ? `Mostrando el día ${day}.` : 'Mostrando todas las fechas.') : 'Mostrando solo el día de hoy.'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -109,6 +117,19 @@ export const ApprovalsPage: React.FC = () => {
             <option value="pending">Pendientes y rechazados</option>
             <option value="final">Aprobados</option>
           </select>
+          {isOwner && (
+            <>
+              <input
+                type="date"
+                value={day}
+                onChange={(e) => setDay(e.target.value)}
+                className="bg-charcoal border border-aged-bronze/45 rounded px-2 py-1 text-xs text-text-primary"
+                aria-label="Fecha"
+              />
+              <Button variant="secondary" size="sm" onClick={() => setDay(localToday())} disabled={day === localToday()}>Hoy</Button>
+              <Button variant="secondary" size="sm" onClick={() => setDay('')} disabled={!day}>Todas las fechas</Button>
+            </>
+          )}
           <Button variant="secondary" size="sm" onClick={load} disabled={loading}>Actualizar</Button>
         </div>
       </div>
@@ -135,7 +156,7 @@ export const ApprovalsPage: React.FC = () => {
 
       {!loading && view === 'cortes' && (
         <div className="flex flex-col gap-2 lg:overflow-y-auto pr-1">
-          {cortes.length === 0 && <div className="p-8 text-center text-text-secondary text-sm italic">No hay cortes en este filtro.</div>}
+          {cortes.length === 0 && <div className="p-8 text-center text-text-secondary text-sm italic">{isOwner ? 'No hay cortes en este filtro.' : 'No hay cortes de hoy en este filtro.'}</div>}
           {cortes.map((corte) => (
             <button
               key={corte.id}
@@ -170,7 +191,7 @@ export const ApprovalsPage: React.FC = () => {
 
       {!loading && view === 'movements' && (
         <div className="flex flex-col gap-2 lg:overflow-y-auto pr-1">
-          {movements.length === 0 && <div className="p-8 text-center text-text-secondary text-sm italic">No hay movimientos pendientes.</div>}
+          {movements.length === 0 && <div className="p-8 text-center text-text-secondary text-sm italic">{isOwner ? 'No hay movimientos pendientes.' : 'No hay movimientos pendientes de hoy.'}</div>}
           {movements.map((mv) => (
             <div key={mv.id} className="p-4 rounded-lg border border-aged-bronze/20 bg-charcoal/50 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-col gap-1">

@@ -210,10 +210,10 @@ function App() {
             <div className="p-8 text-center text-text-secondary text-sm">No tienes sucursales asignadas en este negocio.</div>
           )
         )}
-        {activeTab === 'approvals' && user && <ApprovalsPage />}
+        {activeTab === 'approvals' && user && <ApprovalsPage isOwner={!isSupervisorOnly} />}
         {activeTab === 'notifications' && <NotificationsPage onNavigateTab={(tab) => setRequestedTab(tab as AdminTab)} />}
         {activeTab === 'debts' && <DebtsPage businessId={activeBusinessId} />}
-        {activeTab === 'audit-log' && <AuditLogPage businessId={activeBusinessId} />}
+        {activeTab === 'audit-log' && <AuditLogPage businessId={activeBusinessId} isOwner={!isSupervisorOnly} />}
         {activeTab === 'supervisors' && <SupervisorsPage businessId={activeBusinessId} />}
         {activeTab === 'tickets' && <TicketsPage businessId={activeBusinessId} />}
         {activeTab === 'mesas' && <MesasActivasPage businessId={activeBusinessId} onNavigateTab={(tab) => setRequestedTab(tab as any)} />}
