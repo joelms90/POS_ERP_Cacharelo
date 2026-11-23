@@ -1,142 +1,176 @@
 # Data Model: Supervisor de Sucursal — Fase 1
 
 **Estado**: Propuesta. Ninguna migración se ha ejecutado. Ver [plan.md](plan.md) §1.6.
-**Actualizado**: 2026-11-22. Decisiones del dueño aplicadas: cadena de aprobación de dos niveles (operador de sucursal → supervisor/administrador), sin umbrales ni tratamiento de auto-cierre en Fase 1.
+**Actualizado**: 2026-11-22. Decisiones del dueño aplicadas (D-1 a D-11, S-1 a S-6): Corte Z en dos niveles (OIS → supervisor/owner), movimientos en un nivel (OIS) con cancelación y ajuste del supervisor, bloqueo de apertura, Corte Z offline, adeudos y push.
 
-Convenciones del repo respetadas: PK `uuid` con `defaultRandom()`, `timestamp with time zone`, `version` para concurrencia optimista, estados como `varchar` (no `pgEnum`, igual que `branch_requisitions.status`), montos `decimal(10,2)`.
+Convenciones del repo: PK `uuid` con `defaultRandom()`, `timestamptz`, `version` para concurrencia optimista, estados en `varchar` (como `branch_requisitions.status`) y montos `decimal(10,2)`.
 
 ---
 
 ## 1. Rol nuevo
 
-| Valor | Etiqueta UI | Grupo |
+| Valor | Etiqueta | Grupo |
 |---|---|---|
-| `branch_supervisor` | Supervisor de sucursal | `SUPERVISION_ROLES` (nuevo; **no** se agrega a `ADMIN_ROLES`, ver spec R-2) |
+| `branch_supervisor` | Supervisor de sucursal | `SUPERVISION_ROLES` (nuevo; **no** `ADMIN_ROLES`, ver spec R-2) |
 
-Cabe en `users.role varchar(50)` y en `admin_business_access.role varchar(20)` (17 caracteres). Se guarda en `users.roles` (multi-rol, spec 013).
+Administrador aprobador = `owner` únicamente (S-2).
 
 ## 2. Estados
 
 ### 2.1 `cash_shifts.review_status`
 
-| Estado | Significado | Quién lo produce |
+| Estado | Significado | Bloquea apertura (D-4) |
 |---|---|---|
-| `no_aplica` | Histórico (antes del despliegue) o auto-cerrado >24 h (fuera de Fase 1, D-11) | default |
-| `pendiente_operador` | Esperando N1 | Corte Z o reconteo |
-| `pendiente_supervisor` | N1 aprobó; esperando N2 | operador de sucursal |
-| `aprobado` | N2 aprobó (final) | supervisor / administrador |
-| `aprobado_con_ajuste` | N2 aprobó con monto corregido (final) | supervisor / administrador |
-| `rechazado` | N1 o N2 rechazó; requiere reconteo | operador / supervisor / administrador |
-| `reabierto` | Owner reabre un aprobado → vuelve a `pendiente_supervisor` | owner |
+| `no_aplica` | Histórico o auto-cerrado >24 h (D-11) | No |
+| `pendiente_sync` | Corte Z hecho offline, aún sin llegar al servidor (solo existe localmente en el POS) | Sí (en el POS) |
+| `pendiente_operador` | Esperando N1 (OIS) | **Sí** |
+| `rechazado_operador` | N1 rechazó; espera el reconteo del cajero | **Sí** |
+| `pendiente_supervisor` | Esperando N2 (N1 aprobó, o lo cerró el OIS) | No |
+| `rechazado_supervisor` | N2 rechazó; espera un nuevo conteo (va directo a N2) o un ajuste del supervisor | No |
+| `aprobado` | Final | No |
+| `aprobado_con_ajuste` | Final, con monto corregido por N2 | No |
+
+Reabrir (owner): `aprobado*` → `pendiente_supervisor`, con evento `corte_z_reabierto` en la bitácora.
 
 ### 2.2 `cash_transactions.approval_status`
 
-| Estado | Significado |
-|---|---|
-| `aprobado_historico` | Movimiento previo al despliegue (default de migración) |
-| `pendiente_operador` | Esperando N1 |
-| `pendiente_supervisor` | N1 aprobó; esperando N2 |
-| `aprobado` | N2 aprobó (final) |
-| `rechazado` | N1 o N2 rechazó; sigue contando en caja como incidencia (supuesto S-4) |
-| `cancelado` | El creador lo canceló mientras estaba `pendiente_operador`; deja de contar en caja |
+| Estado | Cuenta en caja | Significado |
+|---|---|---|
+| `aprobado_historico` | Sí | Previo al despliegue (default de la migración) |
+| `pendiente_operador` | Sí | Autor = cajero; esperando al OIS |
+| `pendiente_supervisor` | Sí | Autor = OIS; esperando al supervisor/owner (S-3) |
+| `aprobado` | Sí | Final |
+| `rechazado` | Sí | Incidencia; el dinero sí se movió (S-4) |
+| `cancelado` | **No** | Cancelado por el supervisor/owner con motivo |
 
-Si el dueño decide que N2 no es obligatorio para todo (S-1), `pendiente_supervisor` se omite en esos casos y N1 produce `aprobado`. No se necesita cambio de esquema.
+El ajuste no es un estado: cambia `amount` y deja `original_amount`, `adjusted_by`, `adjusted_at` y `adjust_reason`, más un evento en la bitácora.
 
 ## 3. Tablas nuevas
 
-### 3.1 `supervisor_branch_assignments` (D-1: varias sucursales por supervisor)
+### 3.1 `supervisor_branch_assignments` (D-1)
 
 | Columna | Tipo | Reglas |
 |---|---|---|
 | `id` | uuid PK | |
-| `business_id` | uuid FK `businesses` NOT NULL | |
-| `user_id` | uuid FK `users` NOT NULL | El usuario debe tener `branch_supervisor` en `roles`. |
-| `branch_id` | uuid FK `branches` NOT NULL | Mismo `business_id` que el usuario. |
-| `assigned_by` | uuid FK `users` NOT NULL | Owner que asignó. |
-| `created_at` | timestamptz NOT NULL default now() | |
-| `revoked_at` | timestamptz NULL | Desasignar = poner fecha (no se borra; queda histórico). |
+| `business_id` | uuid FK NOT NULL | |
+| `user_id` | uuid FK `users` NOT NULL | Debe tener `branch_supervisor` en `roles`. |
+| `branch_id` | uuid FK `branches` NOT NULL | Mismo negocio. |
+| `assigned_by` | uuid FK `users` NOT NULL | Owner. |
+| `created_at` | timestamptz NOT NULL | |
+| `revoked_at` | timestamptz NULL | Desasignar = poner fecha. |
 
 Índices: `UNIQUE (user_id, branch_id) WHERE revoked_at IS NULL`; `(branch_id) WHERE revoked_at IS NULL`.
 
-### 3.2 `audit_log` (append-only)
+### 3.2 `cashier_debts` (D-8)
+
+| Columna | Tipo | Reglas |
+|---|---|---|
+| `id` | uuid PK | |
+| `business_id` | uuid FK NOT NULL | |
+| `branch_id` | uuid FK NOT NULL | |
+| `shift_id` | uuid FK `cash_shifts` NOT NULL | |
+| `cashier_id` | uuid FK `users` NOT NULL | `cash_shifts.cashier_id`. |
+| `amount` | decimal(10,2) NOT NULL | \|diferencia final\| > 0. |
+| `status` | varchar(20) NOT NULL default `'pendiente'` | `pendiente`, `liquidado`, `condonado`, `anulado` (P-1). |
+| `generated_by` | uuid FK `users` NOT NULL | Aprobador de N2. |
+| `generated_at` | timestamptz NOT NULL | |
+| `resolved_by` | uuid FK `users` NULL | |
+| `resolved_at` | timestamptz NULL | |
+| `resolution_notes` | text NULL | |
+| `version` | integer NOT NULL default 1 | |
+
+Índices: `UNIQUE (shift_id) WHERE status <> 'anulado'` (un adeudo vigente por turno); `(cashier_id, status)`.
+
+### 3.3 `push_subscriptions` (D-6)
+
+| Columna | Tipo | Reglas |
+|---|---|---|
+| `id` | uuid PK | |
+| `user_id` | uuid FK `users` NOT NULL | |
+| `platform` | varchar(20) NOT NULL | `web`, `android` |
+| `app` | varchar(20) NOT NULL | `admin_web`, `pos` |
+| `fcm_token` | text NOT NULL UNIQUE | |
+| `branch_id` | uuid FK NULL | Sucursal de la terminal (POS). |
+| `created_at` | timestamptz NOT NULL | |
+| `last_seen_at` | timestamptz NOT NULL | |
+| `revoked_at` | timestamptz NULL | Al cerrar sesión o si FCM reporta un token inválido. |
+
+### 3.4 `audit_log` (append-only)
 
 | Columna | Tipo | Notas |
 |---|---|---|
-| `id` | bigserial PK | Orden total, como `change_log`. |
+| `id` | bigserial PK | |
 | `business_id` | uuid FK NOT NULL | |
 | `branch_id` | uuid FK NULL | |
-| `entity_type` | varchar(40) NOT NULL | `cash_shift`, `cash_transaction`, `supervisor_assignment` |
+| `entity_type` | varchar(40) NOT NULL | `cash_shift`, `cash_transaction`, `cashier_debt`, `supervisor_assignment` |
 | `entity_id` | uuid NOT NULL | |
 | `action` | varchar(40) NOT NULL | Ver spec §6. |
 | `approval_level` | varchar(10) NULL | `n1`, `n2`, `owner` |
-| `actor_id` | uuid FK `users` NULL | NULL solo para `source = system`. |
-| `actor_role` | varchar(50) NULL | Rol activo con el que actuó. |
-| `reason` | text NULL | Obligatorio según AU-03 (validado en el servicio). |
-| `before` | jsonb NULL | |
-| `after` | jsonb NULL | |
+| `actor_id` | uuid FK NULL | NULL solo si `source = system`. |
+| `actor_role` | varchar(50) NULL | |
+| `reason` | text NULL | |
+| `before` / `after` | jsonb NULL | |
 | `source` | varchar(20) NOT NULL | `admin_web`, `pos`, `system` |
 | `device_id` | varchar(255) NULL | |
-| `created_at` | timestamptz NOT NULL default now() | Hora del servidor. |
+| `created_at` | timestamptz NOT NULL default now() | |
 
-Índices: `(entity_type, entity_id, created_at)`, `(branch_id, created_at)`, `(actor_id, created_at)`.
-Inmutabilidad: `REVOKE UPDATE, DELETE ON audit_log FROM pos_user` o trigger `BEFORE UPDATE OR DELETE … RAISE EXCEPTION`.
+Índices: `(entity_type, entity_id, created_at)`, `(branch_id, created_at)`, `(actor_id, created_at)`. Inmutabilidad: `REVOKE UPDATE, DELETE` o un trigger.
 
 ## 4. Tablas existentes modificadas
 
-### 4.1 `cash_shifts` (columnas nuevas; `status` open/closed no cambia)
+### 4.1 `cash_shifts`
 
 | Columna | Tipo | Notas |
 |---|---|---|
 | `review_status` | varchar(30) NOT NULL default `'no_aplica'` | §2.1 |
-| `closed_by` | uuid FK `users` NULL | Quién ejecutó el Corte Z (puede ser el cajero o el operador). |
-| `operator_reviewed_by` | uuid FK `users` NULL | N1 |
-| `operator_reviewed_at` | timestamptz NULL | |
-| `operator_notes` | text NULL | |
-| `reviewed_by` | uuid FK `users` NULL | N2 |
-| `reviewed_at` | timestamptz NULL | |
-| `review_notes` | text NULL | |
-| `approved_amount` | decimal(10,2) NULL | Monto final aceptado (contado, reconteo o ajuste). |
-| `approved_difference` | decimal(10,2) NULL | Diferencia oficial tras N2. |
-| `recount_count` | integer NOT NULL default 0 | Sin límite en Fase 1. |
+| `client_uuid` | varchar(120) NULL UNIQUE | Idempotencia del Corte Z offline (D-5). |
+| `closed_by` | uuid FK NULL | Determina si salta N1 (S-3). |
+| `closed_offline` | boolean NOT NULL default false | |
+| `local_expected_cash` | decimal(10,2) NULL | Esperado que calculó el POS offline, para comparar con el del servidor. |
+| `operator_reviewed_by` / `operator_reviewed_at` / `operator_notes` | uuid / timestamptz / text | N1 |
+| `reviewed_by` / `reviewed_at` / `review_notes` | uuid / timestamptz / text | N2 |
+| `approved_amount` | decimal(10,2) NULL | Monto final aceptado. |
+| `approved_difference` | decimal(10,2) NULL | Base del adeudo. |
+| `recount_count` | integer NOT NULL default 0 | |
 
-Índice: `(branch_id, review_status) WHERE review_status IN ('pendiente_operador','pendiente_supervisor','rechazado')`.
-`close_snapshot` se mantiene inmutable una vez escrito; el historial de N1/N2 y reconteos vive en `audit_log`.
-Backfill: ninguno; los turnos cerrados antes quedan `no_aplica`.
+Índice: `(branch_id, review_status) WHERE review_status IN ('pendiente_operador','rechazado_operador','pendiente_supervisor','rechazado_supervisor')`.
+`close_snapshot` es inmutable; los reconteos y ajustes viven en `audit_log`. Backfill: ninguno (`no_aplica`).
 
-### 4.2 `cash_transactions` (columnas nuevas)
+### 4.2 `cash_transactions`
 
 | Columna | Tipo | Notas |
 |---|---|---|
-| `client_uuid` | varchar(120) NULL UNIQUE | Idempotencia (mismo tamaño que `orders.client_uuid`). |
-| `created_by` | uuid FK `users` NULL | NULL solo en históricos. |
-| `category` | varchar(40) NULL | Spec MV-02; históricos NULL (opcional: backfill por prefijo de `reason`). |
-| `approval_status` | varchar(30) NOT NULL default `'aprobado_historico'` | §2.2. El servicio inserta `pendiente_operador` en los nuevos. |
-| `operator_reviewed_by` | uuid FK `users` NULL | N1 |
-| `operator_reviewed_at` | timestamptz NULL | |
-| `operator_reason` | text NULL | |
-| `reviewed_by` | uuid FK `users` NULL | N2 |
-| `reviewed_at` | timestamptz NULL | |
-| `review_reason` | text NULL | |
+| `client_uuid` | varchar(120) NULL UNIQUE | |
+| `created_by` | uuid FK NULL | |
+| `category` | varchar(40) NULL | |
+| `approval_status` | varchar(30) NOT NULL default `'aprobado_historico'` | §2.2 |
+| `reviewed_by` / `reviewed_at` / `review_reason` | uuid / timestamptz / text | Quien aprobó o rechazó (OIS, o supervisor/owner si el autor era OIS). |
+| `review_level` | varchar(10) NULL | `n1` o `n2`. |
+| `original_amount` | decimal(10,2) NULL | Se llena con el primer ajuste. |
+| `adjusted_by` / `adjusted_at` / `adjust_reason` | uuid / timestamptz / text | |
+| `cancelled_by` / `cancelled_at` / `cancel_reason` | uuid / timestamptz / text | |
 | `device_id` | varchar(255) NULL | |
-| `version` | integer NOT NULL default 1 | Concurrencia optimista. |
+| `version` | integer NOT NULL default 1 | |
 
 Índice: `(shift_id, approval_status)`.
-Cálculo del esperado (`buildShiftReport`): suma todos los movimientos excepto `cancelado` (supuesto S-4). Para los históricos el resultado no cambia.
+Esperado (`buildShiftReport`): suma todo excepto `cancelado`, con el `amount` vigente (ajustado). Para los históricos el resultado no cambia.
 
-## 5. Payload JWT
+## 5. JWT
 
-Sin cambios de estructura: `roles` incluye `branch_supervisor`; `branchId` queda NULL para el supervisor en el Admin web. Las sucursales permitidas se leen de `supervisor_branch_assignments` en cada petición (no van en el token, para que una desasignación tenga efecto inmediato). El operador de sucursal ya trae `branchId` en su token de tablet (BR-ROLE-002), y eso delimita su N1.
+Sin cambios de estructura. Las sucursales del supervisor se leen de `supervisor_branch_assignments` en cada petición. El OIS trae `branchId` en su token de tablet (BR-ROLE-002), que delimita su N1.
 
 ## 6. Flutter (local)
 
 | Dato | Dónde | Notas |
 |---|---|---|
-| Cola de movimientos offline | Nuevo job en la cola existente (`_pendingCashMovementJobs`, análoga a `_pendingSaleSyncJobs`) | `{clientUuid, shiftId, type, category, amount, reason}` |
-| Estado de movimientos del turno | Cache en `SecureStorageService` junto al turno activo | Para mostrar estados sin red. |
-| Bandeja N1 del operador | Memoria + último snapshot cacheado | Acciones deshabilitadas offline (OF-03). |
+| Cola de movimientos offline | `_pendingCashMovementJobs` (análoga a `_pendingSaleSyncJobs`) | `{clientUuid, shiftId, type, category, amount, reason}` |
+| Corte Z offline | `_pendingShiftCloseJobs` | `{clientUuid, shiftId, actualAmount, denominationCounts, closeNotes, localExpectedCash, closedAt}`; se envía después de las ventas y los movimientos del turno (OF-03). |
+| Estado del último corte de la sucursal | Cache en `SecureStorageService` | Para aplicar el bloqueo de apertura (D-4) en la UI. |
+| Bandeja N1 del OIS | Memoria + último snapshot | Acciones deshabilitadas offline. |
+| Token FCM | `SecureStorageService` | Se registra al iniciar sesión y se revoca al cerrarla. |
 
-## 7. Fase futura (no en Fase 1)
+## 7. Fase futura
 
-- `cash_approval_policies` (umbrales, override por sucursal, SLA, límite de reconteos) y `policy_snapshot` en cortes/movimientos.
-- `cash_shifts.auto_closed` y diferencia "sin conteo" para turnos auto-cerrados >24 h (R-7).
-- Campos de autorización con PIN en sitio (`authorization_method`, `authorized_by`).
+- `cash_approval_policies` (umbrales, SLA, límite de reconteos) y `policy_snapshot`.
+- `cash_shifts.auto_closed` y diferencia "sin conteo" (R-7).
+- Campos de autorización con PIN en sitio.

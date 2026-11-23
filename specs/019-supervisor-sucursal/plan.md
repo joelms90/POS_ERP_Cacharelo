@@ -1,117 +1,142 @@
 # Implementation Plan: Supervisor de Sucursal — Fase 1
 
-**Branch**: `019-supervisor-sucursal` | **Date**: 2026-11-22 (decisiones del dueño aplicadas) | **Spec**: [spec.md](spec.md) | **Data model**: [data-model.md](data-model.md)
+**Branch**: `019-supervisor-sucursal` | **Date**: 2026-11-22 (segunda ronda de decisiones del dueño) | **Spec**: [spec.md](spec.md) | **Data model**: [data-model.md](data-model.md)
 
-> Propuesta. No se ha implementado ni migrado nada. D-1, D-3, D-10 y D-11 están resueltas. Antes de empezar conviene confirmar los supuestos S-1 a S-6 de [spec.md §15.2](spec.md#152-supuestos-a-confirmar-con-el-dueño-no-se-inventan-reglas), sobre todo S-1 (si N2 es obligatorio para todo) y S-3 (quién hace N1 cuando el autor es el operador).
+> Propuesta. No se ha implementado ni migrado nada. Las decisiones D-1 a D-11 y los supuestos S-1 a S-6 están resueltos. Quedan P-1 a P-3 ([spec.md §15.3](spec.md#153-detalles-menores-por-confirmar)), que no bloquean el inicio.
 
 ## Summary
 
-Agregar el rol `branch_supervisor` con varias sucursales asignadas y una **cadena de aprobación de dos niveles**, sin umbrales, para **cada** Corte Z y **cada** ingreso/egreso:
-
-1. **N1, operador de sucursal** (`branch_operator`): aprueba o rechaza desde el POS.
-2. **N2, supervisor asignado o administrador**: aprueba, rechaza o ajusta desde la bandeja del Admin web.
-
-Todo queda en una bitácora append-only. La operación de caja en el POS no se bloquea; lo nuevo es la capa de control.
+- **Corte Z**: dos niveles obligatorios. N1 es el OIS de la sucursal, en el POS. N2 es el supervisor asignado o el owner, en el Admin web. Si el corte lo cerró el OIS, va directo a N2.
+- **Ingresos/egresos**: cuentan al registrarse y los aprueba el OIS. Si el autor es el OIS, los aprueba el supervisor. El supervisor u owner puede cancelarlos o ajustarlos hasta que se apruebe el corte.
+- **Bloqueo de apertura**: no se abre turno mientras el OIS no apruebe el Corte Z anterior.
+- **Corte Z offline**, con recálculo en el servidor.
+- **Adeudo del cajero** por faltante aprobado.
+- **Push en celular** y bitácora append-only.
+- El supervisor solo ve caja; no ve ventas en vivo.
 
 ## Technical Context
 
-- **Backend**: NestJS + Drizzle + PostgreSQL (`apps/sync_api`).
-- **Admin web**: React + Vite + Tailwind (`apps/business_control_tauri`), https://cacharelo-central.web.app/.
-- **POS**: Flutter, `AppState` (ChangeNotifier) en `lib/ui/common/app_state.dart`.
-- **Constraints**: autorización en el servidor (BR-ROLE-004); no bloquear ventas; idempotencia en reintentos del POS; migraciones idempotentes coordinadas en `.claude/workspaces.md`.
+- **Backend**: NestJS + Drizzle + PostgreSQL (`apps/sync_api`). Envío de push con `firebase-admin` (nuevo).
+- **Admin web**: React + Vite + Tailwind (`apps/business_control_tauri`), Firebase Hosting. Web Push con el SDK `firebase/messaging` (nuevo) y un service worker.
+- **POS**: Flutter, `AppState` en `lib/ui/common/app_state.dart`. Push con `firebase_messaging` (nuevo; Android y web).
+- **Constraints**: autorización en el servidor (BR-ROLE-004); idempotencia de todo lo que se encola offline; orden de sincronización ventas → movimientos → Corte Z; migraciones idempotentes coordinadas.
 
 ## Constitution Check
 
-- **Offline continuity**: PASS — los movimientos se encolan offline; el Corte Z sigue en línea (como hoy); las aprobaciones requieren conexión.
-- **Local authority**: Las decisiones N1/N2 son del servidor; el POS nunca aprueba localmente.
-- **Sync contract**: Nuevos eventos WS `approval_requested` / `approval_resolved` en el cuarto de sucursal existente; nuevo job de cola para movimientos.
-- **Cloud role**: Nuevos endpoints, 2 tablas nuevas y columnas en 2 existentes; migración propuesta, no ejecutada.
-- **Verification**: tests de autorización (como `shifts.authorization.spec.ts`, `reports.authorization.spec.ts`), tests de servicio para cada transición, widget tests Flutter, `make check-all`.
+- **Offline continuity**: movimientos y Corte Z funcionan offline. Abrir turno ya requiere conexión hoy, y con D-4 además requiere que el OIS haya aprobado el corte anterior (riesgo R-8 aceptado por el dueño).
+- **Local authority**: el esperado oficial y todas las aprobaciones son del servidor. El ticket offline es provisional.
+- **Sync contract**: nuevos jobs de cola (movimiento, Corte Z), eventos WS `approval_requested` / `approval_resolved` y push.
+- **Cloud role**: 4 tablas nuevas y columnas en 2 existentes. Migración propuesta, no ejecutada.
+- **Verification**: tests de autorización por nivel, tests de la máquina de estados, test de idempotencia/orden de sincronización, widget tests y `make check-all`.
 
 ---
 
-## 0. Pre-requisito independiente (recomendado antes de Fase 1)
+## 0. Pre-requisito independiente (antes de Fase 1)
 
-Proteger los endpoints de `ReportsController` que hoy no tienen guard (`cash-shifts`, `sales/payment-methods`, `sales/products`, `inventory/existence`, `inventory/kardex`) con `JwtAuthGuard + RolesGuard + assertScope` (spec R-1). Antes, verificar que el Admin web y el POS envían `Authorization` en esas llamadas. PR separado y pequeño.
+Proteger los endpoints de `ReportsController` que no tienen guard (`cash-shifts`, `sales/payment-methods`, `sales/products`, `inventory/existence`, `inventory/kardex`) con `JwtAuthGuard + RolesGuard + assertScope` (R-1). Además, **excluir `branch_supervisor`** de los endpoints de ventas (`sales-dashboard`, `sales/*`, `tickets/today`) para cumplir D-9. PR separado.
 
 ## 1. Backend (`apps/sync_api`)
 
 ### 1.1 Roles y alcance
-- `modules/auth/roles.ts`: `SUPERVISION_ROLES = ['branch_supervisor']`, `BRANCH_SUPERVISOR_ROLE`. **No** tocar `ADMIN_ROLES` (spec R-2).
-- Constante `CASH_APPROVAL_ADMIN_ROLES = [OWNER_ROLE]`, ampliable según S-2 (`inventory_admin`, `support_tech`).
-- Nuevo `modules/supervision/approval-scope.service.ts`:
-  - `canActN1(user, branchId)`: `branch_operator` con `user.branchId === branchId` (+ S-6 si se habilita a otros).
-  - `canActN2(user, branchId)`: supervisor con asignación activa, o administrador con acceso al negocio (`assertBusinessAccess`).
-  - `getVisibleBranchIds(user)`.
-- `users.service.ts` / `admin-users.controller.ts`: permitir crear y editar usuarios con `branch_supervisor` (login email+password para el Admin web).
+- `roles.ts`: `SUPERVISION_ROLES = ['branch_supervisor']`, `BRANCH_SUPERVISOR_ROLE`; `CASH_APPROVAL_ADMIN_ROLES = [OWNER_ROLE]` (S-2). No tocar `ADMIN_ROLES`.
+- `approval-scope.service.ts`:
+  - `canActN1(user, branchId)`: solo `branch_operator` con `user.branchId === branchId`. **No** owner ni supervisor (S-6). Hay que evitar el bypass de owner que tiene `RolesGuard`.
+  - `canActN2(user, branchId)`: supervisor con asignación activa, u owner con acceso al negocio.
+  - `canCancelOrAdjust(user, branchId)` = `canActN2`.
+- `users.service.ts` / `admin-users.controller.ts`: alta y edición de `branch_supervisor`.
 
-### 1.2 Módulo nuevo `modules/supervision`
+### 1.2 Módulo `modules/supervision`
 ```
 supervision/
-├── supervision.module.ts
-├── approvals.controller.ts      # bandeja N1 (POS) y N2 (Admin), acciones
-├── assignments.controller.ts    # owner
+├── approvals.controller.ts       # bandejas N1/N2 y acciones
+├── assignments.controller.ts     # owner
 ├── audit-log.controller.ts
-├── approvals.service.ts         # máquina de estados N1→N2 + reglas CZ/MV
-├── audit-log.service.ts         # insert dentro de la transacción del llamador
+├── debts.controller.ts           # adeudos (D-8)
+├── push.controller.ts            # registrar/revocar token FCM
+├── approvals.service.ts          # máquina de estados (tabla de transiciones)
+├── debts.service.ts
+├── notifications.service.ts      # WS + FCM (firebase-admin)
+├── audit-log.service.ts
 ├── approval-scope.service.ts
-├── dto/…
-└── *.spec.ts                    # incl. supervision.authorization.spec.ts
+└── *.spec.ts
 ```
 
-Máquina de estados centralizada en `approvals.service.ts`: una tabla de transiciones `(estado, nivel, acción) → estado`, que se usa tanto para cortes como para movimientos. Así, si cambia S-1 o S-5, se modifica una sola tabla.
+Tabla de transiciones en `approvals.service.ts` (fuente única):
+
+| Entidad | Estado | Actor | Acción | Nuevo estado |
+|---|---|---|---|---|
+| Corte | (cierre) autor cajero | — | cerrar | `pendiente_operador` |
+| Corte | (cierre) autor OIS | — | cerrar | `pendiente_supervisor` |
+| Corte | `pendiente_operador` | N1 | aprobar / rechazar | `pendiente_supervisor` / `rechazado_operador` |
+| Corte | `rechazado_operador` | cajero | reconteo | `pendiente_operador` |
+| Corte | `pendiente_supervisor` | N2 | aprobar / ajustar / rechazar | `aprobado` / `aprobado_con_ajuste` / `rechazado_supervisor` |
+| Corte | `rechazado_supervisor` | cajero u OIS | reconteo | `pendiente_supervisor` |
+| Corte | `rechazado_supervisor` | N2 | ajustar | `aprobado_con_ajuste` |
+| Corte | `aprobado*` | owner | reabrir | `pendiente_supervisor` (anula el adeudo) |
+| Movimiento | (alta) autor cajero / OIS | — | registrar | `pendiente_operador` / `pendiente_supervisor` |
+| Movimiento | `pendiente_operador` | N1 | aprobar / rechazar | `aprobado` / `rechazado` |
+| Movimiento | `pendiente_supervisor` | N2 | aprobar / rechazar | `aprobado` / `rechazado` |
+| Movimiento | cualquiera salvo `cancelado`, con el corte sin aprobar | N2 | cancelar / ajustar | `cancelado` / (mismo estado, monto nuevo) |
+
+Al pasar a `aprobado*` con diferencia final < 0, `debts.service` crea el adeudo en la misma transacción.
 
 ### 1.3 Cambios en `modules/shifts`
-- `closeShift`: recibir el actor (`closed_by`), `review_status = pendiente_operador`, `audit_log` (`corte_z_cerrado`), evento WS `approval_requested`. Todo en una transacción.
-- `openShift` (auto-cierre >24 h): **sin cambios en Fase 1** (D-11). Los auto-cerrados quedan `no_aplica`.
-- `createTransaction`: `created_by`, `category`, `client_uuid` (`ON CONFLICT DO NOTHING` y devolver el existente), `approval_status = pendiente_operador`, validar que el esperado no quede negativo (MV-05), bitácora y evento WS.
-- `buildShiftReport`: excluir movimientos `cancelado` (S-4); incluir `approvalStatus` por movimiento y `reviewStatus` del turno.
-- `CreateTransactionDto`: `category` (enum), `clientUuid?`.
-- Nuevo `POST /cash-shifts/:id/recount` (cajero dueño del turno o `branch_operator` de la sucursal) → `pendiente_operador` (S-5).
-- Nuevo `POST /cash-shifts/:id/transactions/:txId/cancel` (solo `pendiente_operador`, solo su creador).
-- `ShiftsController.ownedShift` sigue exigiendo "mi caja"; el reconteo y la bandeja del operador necesitan un chequeo por sucursal, no por cajero.
+- **`openShift`**: antes de crear el turno, buscar el último corte de la sucursal. Si su `review_status` es `pendiente_operador` o `rechazado_operador`, responder **409** con el mensaje "El Corte Z anterior debe ser aprobado por el operador de sucursal". Además, evento `apertura_bloqueada` en la bitácora y push al OIS (D-4). El auto-cierre >24 h no cambia (D-11) y queda `no_aplica`.
+- **`closeShift`**: aceptar `clientUuid`, `closedOffline`, `localExpectedCash` y `closedAt` del cliente. Idempotente por `client_uuid`. Recalcular el esperado en el servidor; `closed_by` = actor; estado inicial según el autor; bitácora; WS + push.
+- **`createTransaction`**: `created_by`, `category`, `client_uuid` (`ON CONFLICT` devuelve el existente), estado según el autor, validación de esperado no negativo, bitácora, WS + push. Debe aceptar movimientos offline que llegan **después** del cierre de su turno, si fueron creados antes del `closedAt` (orden de sincronización, OF-03).
+- **`buildShiftReport`**: excluir `cancelado`, usar el monto vigente e incluir estados.
+- Nuevos: `POST /cash-shifts/:id/recount` (cajero u OIS según el estado).
 
 ### 1.4 Endpoints
 
 | Método y ruta | Quién | Descripción |
 |---|---|---|
-| `GET /supervision/approvals?level=n1\|n2&type=corte_z\|cash_movement&status=&branchId=&from=&to=` | N1: operador (su sucursal) · N2: supervisor (asignadas), administrador | Bandeja. |
-| `GET /supervision/approvals/count?level=` | ídem | Contador para badge. |
-| `GET /supervision/cash-shifts/:id` | operador (su sucursal), supervisor, administrador | Reporte de corte (reusa `getCorteReport`) + movimientos con estado + historial de bitácora. |
-| `POST /supervision/cash-shifts/:id/approve` `{version, reason?}` | N1 o N2 según estado | `pendiente_operador`→`pendiente_supervisor` (N1); `pendiente_supervisor`→`aprobado` (N2). 409 si cambió `version`; 422 si hay movimientos pendientes en ese nivel; 403 si `closed_by == actor` o el nivel no corresponde. |
-| `POST /supervision/cash-shifts/:id/reject` `{version, reason}` | N1 o N2 | → `rechazado`; aviso a la sucursal. |
-| `POST /supervision/cash-shifts/:id/adjust` `{version, approvedAmount, denominationCounts?, reason}` | N2 | → `aprobado_con_ajuste`. |
-| `POST /supervision/cash-shifts/:id/reopen` `{reason}` | owner | `aprobado*` → `reabierto` → `pendiente_supervisor`. |
-| `POST /supervision/cash-movements/:id/approve` `{version, reason?}` | N1 o N2 según estado | Igual que el corte. |
-| `POST /supervision/cash-movements/:id/reject` `{version, reason}` | N1 o N2 | → `rechazado` (sigue contando como incidencia, S-4). |
-| `GET /supervision/audit-log?branchId=&entityType=&entityId=&actorId=&action=&from=&to=` | supervisor (asignadas), administrador | Consulta paginada; CSV en el cliente. |
-| `GET /supervision/assignments?userId=\|branchId=` | owner | |
-| `PUT /supervision/assignments/:userId` `{branchIds[]}` | owner | Diff → altas/revocaciones + bitácora. |
-| `POST /cash-shifts/:id/recount` `{actualAmount, denominationCounts?, notes}` | cajero (su turno), operador (su sucursal) | Solo si `rechazado`. |
-| `POST /cash-shifts/:id/transactions/:txId/cancel` | creador | Solo si `pendiente_operador`. |
-| `GET /reports/cash-shifts` (extendido) | con guard (paso 0) | Agrega `reviewStatus`, `approvedDifference` y filtro `reviewStatus`. |
-
-Un solo endpoint `approve` decide el nivel según el estado actual y el rol del actor. Esto evita que alguien "salte" a N2 con una petición directa (SC-003).
+| `GET /supervision/approvals?level=n1\|n2&type=&status=&branchId=&from=&to=` | N1: OIS · N2: supervisor/owner | Bandejas. |
+| `GET /supervision/approvals/count?level=` | ídem | Contador. |
+| `GET /supervision/cash-shifts/:id` | OIS (su sucursal), supervisor, owner | Reporte + movimientos + bitácora + esperado local vs servidor. |
+| `POST /supervision/cash-shifts/:id/approve` `{version, reason?}` | N1 o N2 según el estado | 403 si el nivel no corresponde o es propio; 409 si cambió la versión; 422 si hay movimientos pendientes. |
+| `POST /supervision/cash-shifts/:id/reject` `{version, reason}` | N1 o N2 | |
+| `POST /supervision/cash-shifts/:id/adjust` `{version, approvedAmount, denominationCounts?, reason}` | N2 | |
+| `POST /supervision/cash-shifts/:id/reopen` `{reason}` | owner | |
+| `POST /cash-shifts/:id/recount` `{actualAmount, denominationCounts?, notes}` | cajero (`rechazado_operador`); cajero u OIS (`rechazado_supervisor`) | |
+| `POST /supervision/cash-movements/:id/approve` · `/reject` | N1 (autor cajero) / N2 (autor OIS) | |
+| `POST /supervision/cash-movements/:id/cancel` `{version, reason}` | supervisor/owner | Solo si el corte del turno no está aprobado. |
+| `POST /supervision/cash-movements/:id/adjust` `{version, amount, reason}` | supervisor/owner | ídem. |
+| `GET /supervision/activity?branchId=&userId=&from=&to=` | supervisor/owner | Actividad de **caja** de cajeros y OIS (D-9): turnos, movimientos, acciones de N1. |
+| `GET /supervision/audit-log?…` | supervisor/owner | |
+| `GET /supervision/debts?branchId=&cashierId=&status=` | supervisor (asignadas), owner; cajero `?mine=true` | |
+| `POST /supervision/debts/:id/resolve` `{status: liquidado\|condonado, notes}` | owner (P-1) | |
+| `GET/PUT /supervision/assignments…` | owner | |
+| `POST /push/subscriptions` `{fcmToken, platform, app, branchId?}` · `DELETE /push/subscriptions/:token` | cualquier usuario autenticado | |
+| `GET /reports/cash-shifts` (extendido) | con guard | `reviewStatus`, `approvedDifference`, filtro por estado. |
 
 ### 1.5 Notificaciones
-- `sync.gateway.ts`: `notifyBranch(branchId, payload)` con `tipo: 'approval_requested' | 'approval_resolved'`, usando `activeClients` por sucursal (llega a la terminal del operador para N1).
-- N2: polling del contador en el Admin web (60 s). Fase 2: cuarto `user:{id}` o push.
+- `notifications.service.ts`: un solo punto que envía el evento WS al cuarto de la sucursal (`sync.gateway.ts`) y el push FCM a los destinatarios de la spec §8 (OIS de la sucursal, supervisores asignados, owner, cajero autor).
+- Credenciales FCM en Secret Manager, igual que `pos-jwt-secret`.
+- Tokens inválidos → `revoked_at`.
 
 ### 1.6 Migraciones propuestas (NO ejecutar)
 
-Archivo propuesto: `apps/sync_api/migrations/0022_supervisor_cash_approvals.sql`, más un bloque equivalente con `IF NOT EXISTS` en `scripts/idempotent-deploy-migrations.ts` (el journal de Drizzle no es confiable en prod; ver `AGENTS.md`).
+Archivo: `apps/sync_api/migrations/0022_supervisor_cash_approvals.sql`, más un bloque `IF NOT EXISTS` en `scripts/idempotent-deploy-migrations.ts`.
 
 ```sql
--- 1) Tablas nuevas
-CREATE TABLE IF NOT EXISTS supervisor_branch_assignments (... ver data-model §3.1);
+-- Tablas nuevas (detalle en data-model §3)
+CREATE TABLE IF NOT EXISTS supervisor_branch_assignments (...);
+CREATE TABLE IF NOT EXISTS cashier_debts (...);
+CREATE TABLE IF NOT EXISTS push_subscriptions (...);
+CREATE TABLE IF NOT EXISTS audit_log (...);
 CREATE UNIQUE INDEX IF NOT EXISTS unq_sba_user_branch_active
   ON supervisor_branch_assignments (user_id, branch_id) WHERE revoked_at IS NULL;
-CREATE TABLE IF NOT EXISTS audit_log (... §3.2);
+CREATE UNIQUE INDEX IF NOT EXISTS unq_cashier_debt_shift_active
+  ON cashier_debts (shift_id) WHERE status <> 'anulado';
 
--- 2) cash_shifts
+-- cash_shifts
 ALTER TABLE cash_shifts
   ADD COLUMN IF NOT EXISTS review_status varchar(30) NOT NULL DEFAULT 'no_aplica',
+  ADD COLUMN IF NOT EXISTS client_uuid varchar(120),
   ADD COLUMN IF NOT EXISTS closed_by uuid REFERENCES users(id),
+  ADD COLUMN IF NOT EXISTS closed_offline boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS local_expected_cash numeric(10,2),
   ADD COLUMN IF NOT EXISTS operator_reviewed_by uuid REFERENCES users(id),
   ADD COLUMN IF NOT EXISTS operator_reviewed_at timestamptz,
   ADD COLUMN IF NOT EXISTS operator_notes text,
@@ -121,106 +146,123 @@ ALTER TABLE cash_shifts
   ADD COLUMN IF NOT EXISTS approved_amount numeric(10,2),
   ADD COLUMN IF NOT EXISTS approved_difference numeric(10,2),
   ADD COLUMN IF NOT EXISTS recount_count integer NOT NULL DEFAULT 0;
+CREATE UNIQUE INDEX IF NOT EXISTS unq_cash_shift_client_uuid
+  ON cash_shifts (client_uuid) WHERE client_uuid IS NOT NULL;
 
--- 3) cash_transactions
+-- cash_transactions
 ALTER TABLE cash_transactions
   ADD COLUMN IF NOT EXISTS client_uuid varchar(120),
   ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES users(id),
   ADD COLUMN IF NOT EXISTS category varchar(40),
   ADD COLUMN IF NOT EXISTS approval_status varchar(30) NOT NULL DEFAULT 'aprobado_historico',
-  ADD COLUMN IF NOT EXISTS operator_reviewed_by uuid REFERENCES users(id),
-  ADD COLUMN IF NOT EXISTS operator_reviewed_at timestamptz,
-  ADD COLUMN IF NOT EXISTS operator_reason text,
   ADD COLUMN IF NOT EXISTS reviewed_by uuid REFERENCES users(id),
   ADD COLUMN IF NOT EXISTS reviewed_at timestamptz,
   ADD COLUMN IF NOT EXISTS review_reason text,
+  ADD COLUMN IF NOT EXISTS review_level varchar(10),
+  ADD COLUMN IF NOT EXISTS original_amount numeric(10,2),
+  ADD COLUMN IF NOT EXISTS adjusted_by uuid REFERENCES users(id),
+  ADD COLUMN IF NOT EXISTS adjusted_at timestamptz,
+  ADD COLUMN IF NOT EXISTS adjust_reason text,
+  ADD COLUMN IF NOT EXISTS cancelled_by uuid REFERENCES users(id),
+  ADD COLUMN IF NOT EXISTS cancelled_at timestamptz,
+  ADD COLUMN IF NOT EXISTS cancel_reason text,
   ADD COLUMN IF NOT EXISTS device_id varchar(255),
   ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1;
 CREATE UNIQUE INDEX IF NOT EXISTS unq_cash_tx_client_uuid
   ON cash_transactions (client_uuid) WHERE client_uuid IS NOT NULL;
 
--- 4) Bitácora inmutable
 REVOKE UPDATE, DELETE ON audit_log FROM pos_user;  -- o trigger equivalente
 ```
 
-Todo es aditivo y con defaults, así que es compatible hacia atrás. Ojo: un POS viejo que no envíe `category`/`clientUuid` también generará movimientos `pendiente_operador` (lo decide el servidor) sin categoría. Por eso conviene publicar la versión del POS junto con el backend. **Orden de despliegue**: migración → backend → Admin → POS. Registrar en `docs/pre-deployment-checklist.md` cuando se implemente.
+La migración es aditiva y compatible hacia atrás. **Ojo con D-4**: en cuanto el backend nuevo esté en producción, los cortes nuevos quedarán `pendiente_operador` y bloquearán la apertura del siguiente turno. Por eso el POS con la bandeja N1 tiene que publicarse **junto** con el backend; si no, ninguna sucursal podrá abrir caja. Para mitigarlo se propone una bandera de entorno `CASH_APPROVALS_ENFORCE_OPEN_BLOCK` (apagada hasta que el POS nuevo esté en todas las terminales). Orden de despliegue: migración → backend (bloqueo apagado) → Admin → POS → encender el bloqueo. Registrar todo en `docs/pre-deployment-checklist.md`.
 
-## 2. Admin web (`apps/business_control_tauri`), bandeja N2 en Fase 1 (D-10)
+## 2. Admin web (`apps/business_control_tauri`)
 
 - `App.tsx` `roleTabs`:
-  - `branch_supervisor: ['approvals', 'reports', 'audit-log', 'help']` (en `reports` solo la pestaña "Cortes de Caja").
-  - owner (y los roles que confirme S-2) suma `approvals`, `audit-log`, `supervision-assignments`.
-  - Calcular pestañas con la unión de `user.roles` (spec R-4) y añadir `branch_supervisor` a `allowedBusinessIds`.
-- Nueva `pages/ApprovalsPage.tsx` (patrón `RequisitionsApprovalPage.tsx`):
-  - Pestañas "Cortes Z" y "Movimientos de caja"; filtros por sucursal, estado y fecha.
-  - Por defecto, `pendiente_supervisor`. También deja ver `pendiente_operador` (solo lectura) para saber qué está atorado en N1.
-  - Detalle con el reporte de corte (reusar el modal de auditoría de `ReportsPage.tsx`), movimientos con su estado, quién aprobó N1 y el historial de bitácora.
-  - Acciones: Aprobar / Rechazar (motivo) / Aprobar con ajuste (monto + motivo).
-  - Diseño móvil primero (el supervisor está en campo; seguir las guías de responsividad de `AGENTS.md`).
-- Badge con contador de pendientes N2 en `AdminLayout.tsx` (polling 60 s).
-- `ReportsPage.tsx`, pestaña "Cortes de Caja": columna "Revisión", filtro por `reviewStatus`, CSV con la columna.
-- Nueva `pages/AuditLogPage.tsx`: tabla filtrable, antes/después legible, export CSV.
-- Asignación de sucursales a supervisores (owner): sección en la página de Personal/Administradores o página propia.
-- `services/api.ts`: tipos `ReviewStatus`, `CashMovementApprovalStatus`, `ApprovalItem`, `AuditLogEntry`, `SupervisorAssignment` y métodos para cada endpoint de §1.4.
-- Tests: Vitest/Playwright para la bandeja (render por rol; aprobar con 409 → recarga; supervisor no ve sucursales no asignadas).
+  - `branch_supervisor: ['approvals', 'cash-activity', 'debts', 'audit-log', 'help']`. **Sin** `reports` de ventas (D-9); los cortes se ven en `approvals` / `cash-activity`.
+  - owner suma `approvals`, `cash-activity`, `debts`, `audit-log`, `supervision-assignments`.
+  - Calcular pestañas con la unión de `user.roles` (R-4).
+- `pages/ApprovalsPage.tsx` (patrón `RequisitionsApprovalPage.tsx`):
+  - Pestañas "Cortes Z" y "Movimientos del OIS".
+  - Por defecto, N2 pendiente. También deja ver lo que está en N1 (solo lectura).
+  - Detalle: reporte (reusa el modal de auditoría de `ReportsPage.tsx`), esperado local vs servidor en cortes offline, movimientos con botones **Cancelar / Ajustar**, e historial.
+  - Acciones: Aprobar / Rechazar / Aprobar con ajuste. Diseño móvil primero.
+- `pages/CashActivityPage.tsx`: actividad de caja por sucursal y por usuario (cajero/OIS): turnos, movimientos y decisiones del OIS (D-9).
+- `pages/DebtsPage.tsx`: adeudos con filtros; el owner marca `liquidado`/`condonado` (P-1).
+- `pages/AuditLogPage.tsx`; asignaciones de supervisores (owner).
+- **Push**: `firebase/messaging`, service worker `firebase-messaging-sw.js` en el build de Hosting, solicitud de permiso tras el login y `POST /push/subscriptions`.
+- Badge de pendientes en `AdminLayout.tsx` (polling 60 s como respaldo del push).
+- `services/api.ts`: tipos y métodos de §1.4.
+- Tests: render por rol (el supervisor no ve ventas), aprobar con 409, cancelar/ajustar.
 
-## 3. POS Flutter (`apps/pos_flutter`), registro y bandeja N1
+## 3. POS Flutter (`apps/pos_flutter`)
 
-- `app_state.dart`:
-  - `addCashDrop` / `removeCashDrop` → `recordCashMovement({type, category, amount, note})` con `clientUuid` (uuid v4), encolado offline (OF-01). El cajón se actualiza como hoy (S-4).
-  - `closeShift`: leer `reviewStatus` de la respuesta y mostrarlo en el resumen.
-  - Para el operador: `fetchPendingApprovals()`, `approveItem(...)`, `rejectItem(...)` (solo en línea, OF-03) y `recountShift(...)`.
-  - Manejo de los eventos WS `approval_requested` (refresca la bandeja y el contador del operador) y `approval_resolved` (refresca el estado del cajero).
-  - `_parseRole`: `branch_supervisor` → `UserRole.none` (sin dashboard POS en Fase 1).
-- `ui/encargado/encargado_caja_tab.dart` (operador):
-  - Nueva sección **"Por aprobar"** con contador: cortes Z y movimientos de su sucursal en `pendiente_operador`, detalle (reusa la vista de Corte X/Z existente) y botones Aprobar / Rechazar (motivo). Los suyos aparecen deshabilitados con la leyenda "requiere otro operador" (S-3).
-  - Sección **"Cortes por recontar"** reutilizando el formulario de denominaciones existente.
-- `ui/encargado/encargado_caja_tab.dart` y `ui/cashier/shift_control_panel.dart` (diálogos de ingreso/retiro ya existentes):
-  - Categoría como valor estructurado (mismas etiquetas que hoy).
-  - Lista de movimientos del turno con chip de estado (Pendiente operador, Pendiente supervisor, Aprobado, Rechazado).
-  - Resumen de Corte Z con chip de estado y aviso "Rechazado — recontar".
-- Ticket térmico de Corte Z: línea "Estado de revisión" (opcional).
-- Tests: widget tests de la bandeja N1 (aprobar, rechazar con motivo, ítem propio deshabilitado) y test de la cola offline con `clientUuid`.
+- **`app_state.dart`**:
+  - `recordCashMovement({type, category, amount, note})` con `clientUuid`, encolado offline en `_pendingCashMovementJobs`.
+  - `closeShift(...)`:
+    - Con conexión, como hoy, más `clientUuid`.
+    - **Sin conexión**: calcular el esperado local, encolar en `_pendingShiftCloseJobs`, marcar el turno cerrado localmente con `pendiente_sync` e imprimir un ticket "PROVISIONAL".
+  - Sincronización ordenada por turno: ventas → movimientos → Corte Z (OF-03).
+  - `openShift`: si el servidor responde 409 por D-4, mostrar el motivo y, si el usuario es OIS, un acceso directo a la bandeja "Por aprobar".
+  - OIS: `fetchPendingApprovals()`, `approveItem`, `rejectItem` (solo en línea), `recountShift`.
+  - Cajero: `fetchMyDebts()`.
+  - Eventos WS `approval_requested` / `approval_resolved`.
+  - **Push**: `firebase_messaging`; registrar el token al iniciar sesión y revocarlo al cerrarla; al tocar una notificación, abrir la bandeja o el detalle.
+  - `_parseRole`: `branch_supervisor` → `UserRole.none` (el supervisor no tiene dashboard POS).
+- **`ui/encargado/encargado_caja_tab.dart` (OIS)**:
+  - Sección **"Por aprobar"** con contador: cortes y movimientos de cajeros de su sucursal (lo suyo no aparece porque va al supervisor).
+  - Sección **"Cortes por recontar"** cuando el supervisor rechazó.
+- **Diálogos de ingreso/retiro y Corte Z** (`encargado_caja_tab.dart`, `cashier/shift_control_panel.dart`):
+  - Categoría estructurada.
+  - Chips de estado (Pendiente OIS, Pendiente supervisor, Aprobado, Rechazado, Cancelado, Ajustado).
+  - Aviso de corte rechazado con botón "Recontar".
+  - Ticket provisional offline.
+- **Cajero**: aviso de adeudo y lista "Mis adeudos".
+- Tests: bandeja N1, bloqueo de apertura, cola offline con idempotencia y orden, ticket provisional.
 
-## 4. Documentación a actualizar al implementar
+## 4. Documentación al implementar
 
-- `knowledge/business-rules/roles-permissions-rules.md`: rol `branch_supervisor`, BR-ROLE-005 (cadena N1→N2 para caja; no auto-aprobación), BR-ROLE-006 (alcance por asignación).
-- `docs/pre-deployment-checklist.md`: migración 0022 y orden de despliegue.
+- `knowledge/business-rules/roles-permissions-rules.md`: `branch_supervisor`, BR-ROLE-005 (cadena de caja), BR-ROLE-006 (alcance por asignación), BR-ROLE-007 (supervisor sin ventas en vivo).
+- `docs/pre-deployment-checklist.md`: migración 0022, secretos FCM y orden de despliegue con la bandera.
 - `HANDOFF.md`, `.claude/workspaces.md`.
 
-## 5. Secuencia sugerida y reparto (agentes)
+## 5. Secuencia sugerida
 
-1. **Backend (`agy`/claude)**: paso 0 → migración (local/staging) → roles/alcance → `audit_log` → máquina de estados → cambios en shifts → endpoints → tests de autorización.
-2. **POS (`codex`)**: movimiento estructurado + idempotencia → estados en UI → bandeja N1 del operador → reconteo → cola offline.
-3. **Admin (`opencode`)**: tipos y API → ApprovalsPage (N2) → columna en ReportsPage → AuditLog → asignaciones.
+1. **Backend**: paso 0 → migración (local/staging) → alcance → bitácora → máquina de estados → shifts (bloqueo detrás de la bandera) → adeudos → notificaciones/FCM → tests.
+2. **POS (`codex`)**: movimiento estructurado + idempotencia → bandeja N1 → manejo del 409 de apertura → Corte Z offline + orden de sync → push → adeudos.
+3. **Admin (`opencode`)**: ApprovalsPage → cancelar/ajustar → CashActivity → Debts → AuditLog → push web.
 4. **Staging E2E**:
-   - Retiro del cajero → operador aprueba en POS → supervisor aprueba en Admin → POS refleja `aprobado`.
-   - Corte Z con faltante → operador aprueba → administrador rechaza → reconteo → N1 → N2 aprueba.
-   - Verificar la bitácora y los 403 por auto-aprobación y por sucursal no asignada.
+   - Retiro del cajero → OIS aprueba.
+   - Retiro del OIS → supervisor aprueba.
+   - Supervisor ajusta un movimiento → cambia la diferencia del corte.
+   - Corte Z con faltante: OIS aprueba → supervisor rechaza → nuevo conteo → supervisor aprueba → adeudo generado.
+   - Apertura bloqueada con el corte en N1.
+   - Corte Z offline → sincroniza en orden y sin duplicar.
+   - Push recibido en Android y en web.
 
 ## 6. Estimación gruesa
 
 | Bloque | Tamaño |
 |---|---|
-| Paso 0 (guards de reportes) | S |
-| Backend Fase 1 | L |
-| Admin Fase 1 (bandeja N2, bitácora, asignaciones) | M–L |
-| POS Fase 1 (bandeja N1, estados, offline) | M–L |
+| Paso 0 | S |
+| Backend | L |
+| Push (FCM en las 3 apps) | M |
+| Admin | L |
+| POS (incluye Corte Z offline) | L |
 | QA staging + docs | M |
 
-## Fuera de Fase 1 (por decisión del dueño)
+## Fuera de Fase 1
 
-- Umbrales configurables, autorización previa y PIN en sitio (spec §5, D-3/D-7).
-- Turnos auto-cerrados >24 h: marcado `auto_closed`, revisión y diferencia "sin conteo" (spec R-7, D-11).
+Umbrales y PIN en sitio (§5 de la spec), auto-cierre >24 h (R-7), ventas en vivo para el supervisor (D-9).
 
 ## Project Structure (documentation)
 
 ```text
 specs/019-supervisor-sucursal/
-├── brief.md        # pedido del dueño (input)
-├── spec.md         # problema, flujos, reglas, permisos, decisiones y supuestos
-├── plan.md         # este archivo
-└── data-model.md   # tablas/columnas propuestas
+├── brief.md
+├── spec.md
+├── plan.md
+└── data-model.md
 ```
 
-`research.md`, `contracts/`, `quickstart.md` y `tasks.md` se generarán cuando el dueño confirme los supuestos S-1 a S-6.
+`research.md`, `contracts/`, `quickstart.md` y `tasks.md` se generan al aprobar la propuesta.
