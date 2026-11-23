@@ -23,29 +23,30 @@ Administrador aprobador = `owner` únicamente (S-2).
 |---|---|---|
 | `no_aplica` | Histórico o auto-cerrado >24 h (D-11) | No |
 | `pendiente_sync` | Corte Z hecho offline, aún sin llegar al servidor (solo existe localmente en el POS) | Sí (en el POS) |
-| `pendiente_operador` | Esperando N1 (OIS) | **Sí** |
-| `rechazado_operador` | N1 rechazó; espera el reconteo del cajero | **Sí** |
+| `pendiente_n1` | Esperando N1 (OIS) | **Sí** |
+| `rechazado_n1` | N1 rechazó; espera el reconteo del cajero | **Sí** |
 
-Nota: `pendiente_operador` y `rechazado_operador` dejan de bloquear si `open_block_overridden_at` tiene valor (desbloqueo del owner, P-2).
-| `pendiente_supervisor` | Esperando N2 (N1 aprobó, o lo cerró el OIS) | No |
-| `rechazado_supervisor` | N2 rechazó; espera un nuevo conteo (va directo a N2) o un ajuste del supervisor | No |
+Nota: `pendiente_n1` y `rechazado_n1` dejan de bloquear si `open_block_overridden_at` tiene valor (desbloqueo del owner, P-2).
+| `pendiente_n2` | Esperando N2 (N1 aprobó) | No |
+| `rechazado_n2` | N2 rechazó; espera un nuevo conteo (va directo a N2) o un ajuste del supervisor | No |
 | `aprobado` | Final | No |
 | `aprobado_con_ajuste` | Final, con monto corregido por N2 | No |
 
-Reabrir (owner): `aprobado*` → `pendiente_supervisor`, con evento `corte_z_reabierto` en la bitácora.
+Reabrir (owner): `aprobado*` → `pendiente_n2`, con evento `corte_z_reabierto` en la bitácora.
 
-### 2.2 `cash_transactions.approval_status`
+### 2.2 `cash_transactions.approval_status` (solo asientos `entry_kind = movimiento`)
 
-| Estado | Cuenta en caja | Significado |
+| Estado | Efecto neto en caja | Significado |
 |---|---|---|
-| `aprobado_historico` | Sí | Previo al despliegue (default de la migración) |
-| `pendiente_operador` | Sí | Autor = cajero; esperando al OIS |
-| `pendiente_supervisor` | Sí | Autor = OIS; esperando al supervisor/owner (S-3) |
-| `aprobado` | Sí | Final |
-| `rechazado` | Sí | Incidencia; el dinero sí se movió (S-4) |
-| `cancelado` | **No** | Cancelado por el supervisor/owner con motivo |
+| `aprobado_historico` | Cuenta | Previo al despliegue (default de la migración) |
+| `pendiente_n1` | Cuenta (S-4) | Esperando N1: OIS, o el supervisor si el autor es el OIS (S-3) |
+| `pendiente_n2` | Cuenta | Solo si S-1 = alternativa (N2 también en movimientos) |
+| `aprobado` | Cuenta | Final |
+| `rechazado` | 0 (original + reverso) | Rechazado por N1/N2; reverso insertado |
+| `cancelado` | 0 (original + reverso) | Cancelado por el supervisor/owner; reverso insertado |
+| `ajustado` | Cuenta el monto del asiento de ajuste | Reverso + asiento `ajuste` con el monto correcto |
 
-El ajuste no es un estado: cambia `amount` y deja `original_amount`, `adjusted_by`, `adjusted_at` y `adjust_reason`, más un evento en la bitácora.
+Los asientos `reverso` y `ajuste` llevan `approval_status = 'no_aplica'`; heredan el contexto del original. Un asiento `ajuste` nace aprobado, porque lo crea el supervisor u owner.
 
 ## 3. Tablas nuevas
 
@@ -131,7 +132,9 @@ Las notificaciones con `requires_action` se marcan leídas solas cuando la entid
 |---|---|---|
 | `review_status` | varchar(30) NOT NULL default `'no_aplica'` | §2.1 |
 | `client_uuid` | varchar(120) NULL UNIQUE | Idempotencia del Corte Z offline (D-5). |
-| `closed_by` | uuid FK NULL | Determina si salta N1 (S-3). |
+| `closed_by` | uuid FK NULL | Determina quién hace N1 (S-3) y la regla de no auto-aprobación. |
+| `n1_resolver_role` | varchar(30) NULL | `branch_operator` o `branch_supervisor` (S-3); para la bandeja y los permisos. |
+| `approval_snapshot` | jsonb NULL | Cifras oficiales congeladas al aprobar en N2: esperado ajustado, contado, diferencia y asientos (§4.4.3 de la spec). |
 | `closed_offline` | boolean NOT NULL default false | |
 | `local_expected_cash` | decimal(10,2) NULL | Esperado que calculó el POS offline, para comparar con el del servidor. |
 | `operator_reviewed_by` / `operator_reviewed_at` / `operator_notes` | uuid / timestamptz / text | N1 |
@@ -143,27 +146,32 @@ Las notificaciones con `requires_action` se marcan leídas solas cuando la entid
 | `open_block_overridden_at` | timestamptz NULL | |
 | `open_block_override_reason` | text NULL | Obligatorio. |
 
-Índice: `(branch_id, review_status) WHERE review_status IN ('pendiente_operador','rechazado_operador','pendiente_supervisor','rechazado_supervisor')`.
+Índice: `(branch_id, review_status) WHERE review_status IN ('pendiente_n1','rechazado_n1','pendiente_n2','rechazado_n2')`.
 `close_snapshot` es inmutable; los reconteos y ajustes viven en `audit_log`. Backfill: ninguno (`no_aplica`).
 
-### 4.2 `cash_transactions`
+### 4.2 `cash_transactions` → ledger de caja append-only (S-4)
+
+Patrón tomado de `stock_ledger`: delta con signo, tipo de asiento, referencia al asiento relacionado y sin `UPDATE`/`DELETE` de columnas financieras.
 
 | Columna | Tipo | Notas |
 |---|---|---|
-| `client_uuid` | varchar(120) NULL UNIQUE | |
-| `created_by` | uuid FK NULL | |
-| `category` | varchar(40) NULL | |
-| `approval_status` | varchar(30) NOT NULL default `'aprobado_historico'` | §2.2 |
-| `reviewed_by` / `reviewed_at` / `review_reason` | uuid / timestamptz / text | Quien aprobó o rechazó (OIS, o supervisor/owner si el autor era OIS). |
+| `client_uuid` | varchar(120) NULL UNIQUE | Idempotencia. |
+| `created_by` | uuid FK NULL | Autor del asiento (cajero/OIS en el original; supervisor/owner o sistema en reversos y ajustes). |
+| `category` | varchar(40) NULL | Copiada al reverso o ajuste. |
+| `entry_kind` | varchar(20) NOT NULL default `'movimiento'` | `movimiento`, `reverso`, `ajuste` |
+| `reverses_transaction_id` | uuid FK `cash_transactions` NULL | Obligatorio si `entry_kind = reverso`; `UNIQUE` (un solo reverso por asiento). |
+| `replaces_transaction_id` | uuid FK `cash_transactions` NULL | En `ajuste`: el original que corrige. |
+| `cash_effect` | decimal(10,2) GENERATED ALWAYS AS (…) STORED | `+amount` si `cash-in`, `−amount` si `cash-out`; negado si `reverso`. Se suma directamente en los reportes. |
+| `approval_status` | varchar(30) NOT NULL default `'aprobado_historico'` | §2.2 (`no_aplica` en reversos y ajustes). |
+| `reviewed_by` / `reviewed_at` / `review_reason` | uuid / timestamptz / text | Quien aprobó o rechazó. |
 | `review_level` | varchar(10) NULL | `n1` o `n2`. |
-| `original_amount` | decimal(10,2) NULL | Se llena con el primer ajuste. |
-| `adjusted_by` / `adjusted_at` / `adjust_reason` | uuid / timestamptz / text | |
-| `cancelled_by` / `cancelled_at` / `cancel_reason` | uuid / timestamptz / text | |
 | `device_id` | varchar(255) NULL | |
-| `version` | integer NOT NULL default 1 | |
+| `version` | integer NOT NULL default 1 | Concurrencia optimista de las columnas de flujo. |
 
-Índice: `(shift_id, approval_status)`.
-Esperado (`buildShiftReport`): suma todo excepto `cancelado`, con el `amount` vigente (ajustado). Para los históricos el resultado no cambia.
+`created_at` del reverso = fecha real del rechazo o cancelación; `shift_id` = turno del original (spec §4.4.2).
+Inmutabilidad: trigger `BEFORE UPDATE` que rechaza cambios en `shift_id`, `type`, `amount`, `entry_kind`, `reverses_transaction_id`, `replaces_transaction_id` y `created_at`, más `BEFORE DELETE` que rechaza todo. Solo se pueden actualizar las columnas de flujo.
+Índices: `(shift_id, created_at)`, `(shift_id, approval_status)`, `UNIQUE (reverses_transaction_id) WHERE reverses_transaction_id IS NOT NULL`.
+Esperado (`buildShiftReport`) = fondo + ventas en efectivo + `SUM(cash_effect)` del turno. Para los históricos el resultado no cambia.
 
 ## 5. JWT
 

@@ -2,7 +2,7 @@
 
 **Feature Branch**: `019-supervisor-sucursal`
 **Created**: 2026-11-22 · **Updated**: 2026-11-22 (segunda ronda de decisiones del dueño)
-**Status**: Propuesta (NO implementado). Todas las decisiones (D-1 a D-11), supuestos (S-1 a S-6) y detalles (P-1 a P-3) están resueltos (3.ª ronda, 2026-11-22: notificaciones por REST en lugar de push, adeudo solo auditado, desbloqueo de emergencia del owner, supervisor ve ventas).
+**Status**: Propuesta (NO implementado). D-1 a D-11 y P-1 a P-3 resueltos. Supuestos (4.ª ronda): S-2, S-3, S-4 y S-6 resueltos; **S-1 y S-5 PENDIENTES DE CONFIRMAR**; C-1 y C-2 (consecuencias de S-3) por confirmar (§15.2).
 **Input**: [brief.md](brief.md) — pedido del dueño: rol "supervisor de sucursal"; lo primero que debe tener es (1) **aprobar cortes Z** y (2) **aprobar ingresos y egresos de caja**.
 
 ---
@@ -27,7 +27,8 @@ Hoy el sistema **registra** el dinero de caja pero nadie lo **valida**:
 2. **Cadena de aprobación de caja** (D-3, S-1):
    - **Corte Z**: dos niveles obligatorios. Primero el Operador Integral de Sucursal (OIS, `branch_operator`) y después el supervisor asignado u owner.
    - **Ingresos/egresos**: un nivel, el OIS. Además, el supervisor puede **cancelar o ajustar** cualquier movimiento (S-4).
-   - Lo que hace el propio OIS pasa **directo al supervisor** (S-3).
+   - Si el autor del corte o movimiento es el propio OIS, **el nivel 1 lo hace el supervisor** de esa sucursal (S-3).
+   - Los movimientos de caja funcionan como **ledger**: nada se borra; rechazos, cancelaciones y ajustes se corrigen con asientos de reverso (S-4, §4.4).
 3. **Bloqueo de apertura**: no se abre el siguiente turno de la sucursal mientras el OIS no haya aprobado el Corte Z anterior (D-4).
 4. **Corte Z sin conexión** en el POS Flutter (D-5).
 5. **Adeudo formal del cajero** por faltante aprobado (D-8).
@@ -44,7 +45,8 @@ Umbrales configurables, tratamiento de turnos auto-cerrados >24 h (D-11), notifi
 - **OIS**: Operador Integral de Sucursal = rol `branch_operator` (spec 013).
 - **Corte Z**: cierre definitivo de turno con conteo físico. **Corte X**: reporte de turno abierto (sin cambios).
 - **Diferencia**: `contado − esperado`, con `esperado = fondo inicial + ventas efectivo + ingresos − egresos` (`ShiftsService.buildShiftReport`). Negativa = faltante.
-- **N1**: aprobación del OIS de la sucursal. **N2**: aprobación del supervisor asignado o del owner.
+- **N1**: primer nivel. Lo resuelve el OIS de la sucursal, o el supervisor asignado si el autor es el OIS (S-3). **N2**: segundo nivel, el supervisor asignado o el owner.
+- **Asiento / reverso**: cada fila de `cash_transactions` es un asiento inmutable del ledger de caja. Un reverso es un asiento nuevo que compensa a otro (S-4).
 - **Administrador** (para aprobar): solo `owner` (S-2).
 
 ## 4. Flujos actuales vs propuestos
@@ -56,37 +58,39 @@ Umbrales configurables, tratamiento de turnos auto-cerrados >24 h (D-11), notifi
 **Propuesto**: el ciclo operativo (`status`, sin cambios) se separa del de revisión (`review_status`, nuevo):
 
 ```
-                        Corte Z (en línea u offline → al sincronizar)
-                                        │
-          cerró el cajero ──────────────┴────────────── cerró el OIS (S-3)
-                 ▼                                              │
-        pendiente_operador (N1: OIS)                            │
-        aprueba │          │ rechaza                            │
-                │          ▼                                    │
-                │   rechazado_operador                          │
-                │     └─ reconteo del cajero ─▶ pendiente_operador
-                ▼                                               ▼
-        pendiente_supervisor (N2: supervisor asignado u owner) ◀┘
-        aprueba │      ajusta │        │ rechaza
-                ▼             ▼        ▼
-            aprobado   aprobado_con_   rechazado_supervisor
-                       ajuste            ├─ reconteo de cajero/OIS ─▶ pendiente_supervisor (S-5)
-                                         └─ supervisor ajusta ───────▶ aprobado_con_ajuste
-     (owner) aprobado* ─reabrir─▶ pendiente_supervisor
+                Corte Z (en línea u offline → al sincronizar)
+                                 │
+                                 ▼
+        pendiente_n1   N1 = OIS de la sucursal
+                       (si el corte lo cerró el OIS → N1 = supervisor asignado, S-3)
+        aprueba │             │ rechaza
+                │             ▼
+                │        rechazado_n1 ── reconteo del cajero/OIS ──▶ pendiente_n1
+                ▼
+        pendiente_n2   N2 = supervisor asignado u owner (persona distinta de N1, C-1)
+        aprueba │    ajusta │      │ rechaza
+                ▼           ▼      ▼
+            aprobado   aprobado_   rechazado_n2
+                       con_ajuste    ├─ nuevo conteo ──▶ pendiente_n2   (regla actual; S-5 PENDIENTE)
+                                     │    [alternativa S-5: nuevo conteo ──▶ pendiente_n1]
+                                     └─ supervisor ajusta ──▶ aprobado_con_ajuste
+   (owner) aprobado* ── reabrir ──▶ pendiente_n2
 ```
 
 Reglas:
-- **CZ-01** El Corte Z se hace igual que hoy en la terminal, **también sin conexión** (D-5, ver §9). Al llegar al servidor queda en `pendiente_operador`, o en `pendiente_supervisor` si lo cerró un OIS (S-3).
-- **CZ-02** **N1 (OIS de esa sucursal)**: aprueba (→ `pendiente_supervisor`) o rechaza (→ `rechazado_operador`, motivo obligatorio). Tras el rechazo, el cajero registra un **reconteo** y el corte vuelve a `pendiente_operador`.
-- **CZ-03** **N2 es obligatorio para todo Corte Z** (S-1). Lo hace un supervisor asignado a la sucursal o el owner (S-2): aprueba (→ `aprobado`), aprueba con ajuste (monto final + motivo → `aprobado_con_ajuste`) o rechaza (→ `rechazado_supervisor`, motivo obligatorio).
-- **CZ-04** Tras un rechazo de N2 (S-5), el cajero u OIS registra un nuevo conteo que regresa **directo al supervisor** (`pendiente_supervisor`, sin pasar otra vez por N1), **o** el supervisor resuelve con un ajuste.
+- **CZ-01** El Corte Z se hace igual que hoy en la terminal, **también sin conexión** (D-5, ver §9). Al llegar al servidor queda siempre en `pendiente_n1`. Si lo cerró un cajero, lo resuelve el OIS; si lo cerró el OIS, lo resuelve el supervisor asignado (S-3).
+- **CZ-02** **N1**: aprueba (→ `pendiente_n2`) o rechaza (→ `rechazado_n1`, motivo obligatorio). Tras el rechazo, el autor del corte (cajero u OIS) registra un **reconteo** y el corte vuelve a `pendiente_n1`.
+- **CZ-03** **N2 es obligatorio para todo Corte Z** (S-1). Lo hace un supervisor asignado a la sucursal o el owner (S-2): aprueba (→ `aprobado`), aprueba con ajuste (monto final + motivo → `aprobado_con_ajuste`) o rechaza (→ `rechazado_n2`, motivo obligatorio).
+- **CZ-04** **(S-5 PENDIENTE DE CONFIRMAR)** Tras un rechazo de N2, el cajero u OIS registra un nuevo conteo.
+  - **Regla actual**: el nuevo conteo regresa **directo a N2** (`pendiente_n2`, sin pasar otra vez por N1), **o** el supervisor resuelve con un ajuste.
+  - **Alternativa en evaluación**: el nuevo conteo **vuelve a pasar por N1** (`pendiente_n1`) y luego por N2; el supervisor conserva la opción de ajustar en lugar de rechazar.
 - **CZ-05** Ningún rechazo reabre el turno (el efectivo ya salió y puede haber otro turno abierto). El `close_snapshot` original **nunca se sobrescribe**; los reconteos y ajustes quedan como versiones en la bitácora.
 - **CZ-06** Un nivel no puede aprobar un corte mientras haya movimientos del mismo turno pendientes de N1 o N2.
-- **CZ-07** Nadie aprueba su propio corte (`closed_by == actor` → 403). Esto extiende BR-ROLE-003.
-- **CZ-08** El supervisor y el owner **no sustituyen al OIS** en N1 (S-6): cuando un corte espera la aprobación del OIS, no pueden aprobarlo en su lugar, solo actuar después en N2. La única forma de saltar N1 es que el autor sea el OIS (S-3). Desbloquear la apertura (CZ-10b) **no** es aprobar.
+- **CZ-07** Nadie aprueba su propio corte (`closed_by == actor` → 403). Esto extiende BR-ROLE-003. Propuesta C-1: **N1 y N2 deben ser personas distintas**. En un corte del OIS donde el supervisor hizo N1, el N2 lo hace el owner u otro supervisor asignado.
+- **CZ-08** **Sin sustitución (S-6)**: ni el supervisor ni el owner aprueban N1 en lugar del OIS cuando el autor es un cajero; solo actúan después, en N2. **Única excepción (S-3)**: si el autor es el OIS, el N1 lo hace el supervisor asignado (el owner no). Desbloquear la apertura (CZ-10b) **no** es aprobar.
 - **CZ-09** Concurrencia: cada acción exige la `version` vigente; si otra persona actuó antes, el servidor responde 409.
-- **CZ-10** **Bloqueo de apertura (D-4)**: no se puede abrir un turno nuevo en la sucursal mientras su último Corte Z esté en `pendiente_operador` o `rechazado_operador`. Cuando el OIS lo aprueba, la sucursal puede abrir aunque el supervisor no haya resuelto N2. Un corte cerrado por el OIS (que no pasa por N1) no bloquea.
-- **CZ-10b** **Desbloqueo de emergencia (P-2)**: si la sucursal está bloqueada y el OIS no está disponible, el **owner** puede desbloquear la apertura con un motivo obligatorio. El corte anterior **sigue** en `pendiente_operador` (el OIS lo aprobará después); solo se permite abrir el turno nuevo. Queda en la bitácora (`apertura_desbloqueada`) y genera una notificación al supervisor de la sucursal.
+- **CZ-10** **Bloqueo de apertura (D-4)**: no se puede abrir un turno nuevo en la sucursal mientras su último Corte Z esté en `pendiente_n1` o `rechazado_n1`. Cuando N1 lo aprueba, la sucursal puede abrir aunque N2 no esté resuelto. Consecuencia de S-3 (C-2, por confirmar): un corte cerrado por el OIS bloquea hasta que **el supervisor** apruebe su N1; si el supervisor no está disponible, aplica el desbloqueo del owner (CZ-10b).
+- **CZ-10b** **Desbloqueo de emergencia (P-2)**: si la sucursal está bloqueada y quien debe resolver N1 no está disponible, el **owner** puede desbloquear la apertura con un motivo obligatorio. El corte anterior **sigue** en `pendiente_n1` (N1 lo resolverá después); solo se permite abrir el turno nuevo. Queda en la bitácora (`apertura_desbloqueada`) y genera una notificación al supervisor de la sucursal.
 - **CZ-11** Al quedar **aprobado** o **aprobado con ajuste** con diferencia final negativa, se genera un **adeudo** a nombre del cajero del turno (§4.3).
 - **CZ-12** Los turnos históricos y los auto-cerrados por el sistema (>24 h) quedan `no_aplica` y no entran al flujo ni bloquean (D-11; ver R-7).
 
@@ -94,36 +98,119 @@ Reglas:
 
 **Actual**: `POST transactions` se aplica al cajón, sin actor ni aprobación.
 
-**Propuesto**: **todo se registra y cuenta en caja desde el momento del registro** (S-4). La aprobación de movimientos es de un solo nivel, el OIS (S-1):
+**Propuesto**: cada movimiento es un **asiento** de un ledger de caja que solo admite inserciones. **Cuenta en caja desde que se registra**; nada se borra ni se edita, y toda corrección es un **asiento de reverso** (S-4). La aprobación es de un nivel, N1 (S-1 PENDIENTE; ver alternativa):
 
 ```
-registrado (cuenta en caja)
-   ├─ autor = cajero ─▶ pendiente_operador ─(OIS aprueba)─▶ aprobado
-   │                                      └(OIS rechaza)─▶ rechazado  (sigue contando; incidencia)
-   └─ autor = OIS ────▶ pendiente_supervisor ─(supervisor/owner aprueba)─▶ aprobado      (S-3)
-                                             └(rechaza)─▶ rechazado
+registrado  → asiento original (cuenta en caja)
+   ▼
+pendiente_n1   N1 = OIS  (si el autor es el OIS → N1 = supervisor asignado, S-3)
+   ├─ aprueba ─▶ aprobado                     [alternativa S-1: ─▶ pendiente_n2 ─▶ aprobado]
+   └─ rechaza ─▶ rechazado  + asiento de reverso (neto 0)
 
-En cualquier estado, mientras el Corte Z del turno no esté aprobado:
-   supervisor/owner ─cancelar─▶ cancelado  (deja de contar en caja)
-   supervisor/owner ─ajustar──▶ monto corregido (conserva el monto original)
+Mientras el Corte Z del turno no esté aprobado, el supervisor o el owner pueden:
+   cancelar ─▶ cancelado  + asiento de reverso (neto 0)
+   ajustar  ─▶ ajustado   + reverso del original + asiento nuevo con el monto correcto
 ```
 
 Reglas:
 - **MV-01** Todo movimiento guarda `created_by`, categoría estructurada, motivo y `client_uuid` (idempotencia).
 - **MV-02** Categorías iniciales = las de Flutter. Ingresos: `aporte_cambio`, `reposicion_fondo`, `correccion`, `otro_ingreso`. Egresos: `gasto_operativo`, `entrega_encargado`, `transferencia_caja`, `correccion`, `otro_egreso`.
-- **MV-03** El movimiento **cuenta en el efectivo esperado desde que se registra**. Un `rechazado` sigue contando (el dinero sí se movió) y queda como incidencia del turno. Solo un **cancelado** deja de contar.
-- **MV-04** **Cancelar y ajustar** son acciones exclusivas del supervisor (sus sucursales) y del owner. Requieren motivo y se permiten hasta que el Corte Z del turno quede aprobado. Un ajuste recalcula el esperado y la diferencia del corte; la bitácora conserva antes y después. Cajero y OIS no cancelan ni editan; para corregir registran un movimiento de categoría `correccion`.
-- **MV-05** Un egreso que deje el esperado en negativo se rechaza en el servidor (hoy solo Flutter lo recorta a 0).
-- **MV-06** Nadie aprueba su propio movimiento (por eso los del OIS van al supervisor).
+- **MV-03** **Ledger (S-4)**: el movimiento cuenta en el efectivo esperado desde que se registra. Rechazar o cancelar no borra nada: se inserta un **reverso** que lo compensa. Si el dinero sí salió del cajón, el reverso hace que aparezca como **faltante** en el corte, lo que puede terminar en adeudo (§4.4.3).
+- **MV-04** **Cancelar y ajustar** son acciones exclusivas del supervisor (sus sucursales) y del owner. Requieren motivo y se permiten hasta que el Corte Z del turno quede aprobado. Cancelar = reverso. Ajustar = reverso del original + asiento nuevo con el monto correcto. Cajero y OIS no cancelan ni editan; para corregir registran un movimiento de categoría `correccion`.
+- **MV-05** Un egreso **nuevo** que deje el esperado en negativo se rechaza en el servidor (hoy solo Flutter lo recorta a 0). Los **reversos** nunca se bloquean, aunque dejen el esperado en negativo (p. ej. reverso de un ingreso); ese caso se reporta como `REQUIRES_RECONCILIATION` (§4.4.5).
+- **MV-06** Nadie aprueba su propio movimiento; por eso el N1 de los movimientos del OIS lo hace el supervisor (S-3).
 - **MV-07** Los movimientos se ven con su estado en el detalle del Corte Z (CZ-06).
 
 ### 4.3 Adeudo del cajero (D-8)
 
-- **AD-01** Al aprobarse en N2 un Corte Z con diferencia final negativa, el sistema crea un adeudo con: cajero del turno, sucursal, turno, monto = |diferencia final|, fecha y aprobador.
+- **AD-01** Al aprobarse en N2 un Corte Z con diferencia final negativa (calculada del `approval_snapshot`, es decir, con los reversos incluidos, §4.4.3), el sistema crea un adeudo con: cajero del turno, sucursal, turno, monto = |diferencia final|, fecha y aprobador.
 - **AD-02** Si después el owner reabre el corte, el adeudo se anula y se vuelve a generar con la nueva aprobación. Todo queda en la bitácora.
 - **AD-03** El adeudo se puede consultar en el Admin web (supervisor: sus sucursales; owner: todo) y el cajero ve los suyos en el POS.
 - **AD-04** Los sobrantes no generan adeudo; quedan registrados en el corte.
 - **AD-05** **El adeudo solo se registra y audita (P-1)**: el sistema no gestiona su cobro ni su liquidación (nómina, pago, condonación). Estados posibles: `vigente` y `anulado` (por reapertura del corte). Cada alta y cada anulación quedan en la bitácora.
+
+### 4.4 Ledger de caja y efecto en reportes (S-4)
+
+Análisis hecho sobre el código actual:
+
+- `ShiftsService.createTransaction` / `buildShiftReport` / `closeShift`.
+- `ReportsService.getCashShiftAuditReport`, `getCashShiftsList`, `getSalesDashboard`, `getPaymentMethodsSalesReport`.
+- `reconcileCash` en `ReportsPage.tsx:285`.
+- `stock_ledger` / `ledger.service.ts` como patrón de ledger: delta con signo, `event_type`, `reference_type/id`, sin updates.
+
+#### 4.4.1 Modelo
+
+- `cash_transactions` pasa a ser un **ledger append-only**:
+  - Las columnas financieras (`shift_id`, `type`, `amount`, `entry_kind`, `reverses_transaction_id`, `created_at`) son inmutables; un trigger impide `UPDATE` de esas columnas y cualquier `DELETE`.
+  - Solo cambian las columnas de flujo (`approval_status`, revisores), y cada cambio queda en `audit_log`.
+- `entry_kind`:
+  - `movimiento`: el asiento original.
+  - `reverso`: compensa a `reverses_transaction_id`.
+  - `ajuste`: el asiento nuevo con el monto corregido, enlazado al original con `replaces_transaction_id`.
+- Columna generada `cash_effect` con el signo ya aplicado, igual que `stock_ledger.quantity_delta`:
+  - `+amount` para `cash-in` y `−amount` para `cash-out`;
+  - invertido si es `reverso`.
+- **Esperado = fondo inicial + ventas en efectivo + Σ `cash_effect` del turno.** Un movimiento rechazado o cancelado suma 0 en neto (original + reverso). Un ajustado suma el monto nuevo.
+- `cash_shifts.cash_drawer_amount` hoy es un acumulado mutable que además `closeShift` sobrescribe con el contado (`shifts.service.ts:188`). **Deja de usarse como esperado**: el esperado siempre se calcula del ledger, y la columna queda solo como "contado" por compatibilidad (R-15).
+
+#### 4.4.2 ¿Con qué fecha se registra el reverso?
+
+**Recomendación: con la fecha real del rechazo o cancelación, sin retrofechar, pero atribuido al turno del movimiento original.**
+
+- `created_at` del reverso = momento en que se decidió. El ledger nunca se reescribe y la bitácora sabe cuándo y quién corrigió.
+- `shift_id` del reverso = **turno del original**. Todos los reportes **por turno** (Corte X/Z, diferencias, adeudos, KPIs de caja) lo cuentan en ese turno.
+- Un futuro reporte **por fecha** (flujo de efectivo del día) usa `created_at` y muestra el reverso el día en que ocurrió.
+- Es el mismo criterio de `stock_ledger`: un ajuste de inventario lleva su propia fecha y referencia al documento original.
+- **Retrofechar** al día del original se descarta: cambiaría en silencio reportes ya consultados y rompería la inmutabilidad.
+
+#### 4.4.3 ¿Se recalcula un corte ya cerrado o se muestra el ajuste aparte?
+
+**Recomendación: nunca se recalcula ni sobrescribe el `close_snapshot`. Los reversos posteriores al cierre se muestran aparte, y la cifra oficial se congela al aprobar.**
+
+| Momento del reverso | Qué pasa |
+|---|---|
+| Turno abierto | Entra al mismo turno; el Corte X lo refleja de inmediato. |
+| Corte Z hecho, aún sin aprobación final (`pendiente_n1/n2`, `rechazado_*`) | El detalle muestra **"Esperado al cierre"** (snapshot) + **"Ajustes posteriores al cierre"** (asientos del turno con `created_at > closed_at`) = **"Esperado ajustado"**, y la **diferencia ajustada** = contado − esperado ajustado. N1 y N2 deciden sobre los valores ajustados. |
+| Aprobación final (N2) | Se guarda un `approval_snapshot` congelado (esperado ajustado, contado aceptado, diferencia final y lista de asientos) junto con `approved_difference`. El adeudo (D-8) se calcula de aquí. |
+| Corte ya aprobado | **No se aceptan más reversos** en ese turno (MV-04). Para corregirlo, el owner lo reabre: hace los reversos, se vuelve a aprobar con un `approval_snapshot` nuevo, y el adeudo anterior se anula y se regenera. Todo queda en la bitácora. |
+
+**Efecto clave para el dueño.** Ejemplo:
+
+- Fondo $1,000, ventas en efectivo $5,000, egreso "gasto operativo" de $800. Esperado al cierre: $5,200. El cajero cuenta $5,200, así que la diferencia es $0.
+- El supervisor **rechaza** el egreso después del cierre. Se inserta un reverso de +$800 y el esperado ajustado sube a $6,000.
+- La diferencia ajustada queda en **−$800 (faltante)**. Si se aprueba así, se genera un **adeudo de $800** al cajero.
+
+Al revés, rechazar un **ingreso** baja el esperado y aparece un **sobrante**. Es el comportamiento correcto ("ese dinero no estaba justificado"), pero conviene que el dueño lo sepa antes de usar el rechazo.
+
+#### 4.4.4 ¿Cómo se distinguen pendientes, aprobados y revertidos?
+
+Todos los reportes de caja muestran los movimientos del turno en cuatro grupos, con su neto:
+
+| Grupo | Incluye | Efecto en el esperado |
+|---|---|---|
+| **Aprobados** | `aprobado`, `aprobado_historico` | Cuentan |
+| **Pendientes de aprobación** | `pendiente_n1`, `pendiente_n2` | **Cuentan** (S-4), marcados "por aprobar" |
+| **Revertidos** | `rechazado`, `cancelado`: original + reverso juntos | Neto 0 |
+| **Ajustados** | original + reverso + asiento de ajuste | Cuenta el monto nuevo |
+
+Totales: ingresos brutos, egresos brutos, reversos, **neto** (lo que entra al esperado) y **monto pendiente** (para saber qué parte del esperado aún no está validada).
+
+#### 4.4.5 Efecto en cada reporte
+
+| Reporte | Hoy (código) | Efecto del ledger | Recomendación |
+|---|---|---|---|
+| **Ventas del día / dashboard / métodos de pago / ventas por producto** | `getSalesDashboard`, `getPaymentMethodsSalesReport`, `getProductSalesReport` leen solo `payments` + `orders`; no tocan `cash_transactions`. | **Ninguno**: los ingresos/egresos no son ventas. | Sin cambios. |
+| **Resumen de Sucursal** (spec 015) | Ventas desde `payments`; efectivo/esperado desde el reporte del turno. | Las ventas no cambian. El efectivo esperado pasa a ser el neto del ledger. | Mostrar "esperado (incluye $X pendientes de aprobación)" y el contador de pendientes. |
+| **Corte X** | `getCorteReport('x')` → `buildShiftReport` suma todos los `cash-in`/`cash-out`. | Debe sumar `cash_effect` (incluye reversos). | Usar los 4 grupos de §4.4.4. |
+| **Corte Z al cerrar** | `closeShift` guarda `close_snapshot`. | El snapshot congela los asientos y estados al cierre. | Agregar al snapshot los grupos y el monto pendiente. |
+| **Corte Z ya cerrado** | `getCashShiftAuditReport` devuelve el `close_snapshot` tal cual. | Los reversos posteriores no aparecerían. | Devolver `closeSnapshot` + `postCloseEntries` + `adjustedExpected` + `adjustedDifference`. Si está aprobado, devolver `approvalSnapshot` como cifra oficial. |
+| **`reconcileCash`** (`ReportsPage.tsx:285`, cliente) | Clasifica en BALANCED / SURPLUS / SHORTAGE / `REQUIRES_RECONCILIATION` (esperado < 0) usando el esperado del snapshot vs `cashDrawerAmount`. | Si sigue usando el snapshot, ignora los reversos. Un reverso de ingreso puede dejar el esperado < 0. | Calcular el estado **en el backend** sobre el esperado ajustado (o aprobado) y devolver `reconciliationStatus`, para que Admin, POS y CSV coincidan. Mantener `REQUIRES_RECONCILIATION`, ahora alcanzable por reversos. |
+| **Lista de cortes** (`getCashShiftsList`) | Sin estado de revisión. | — | Agregar `reviewStatus`, `approvedDifference` y la bandera "tiene ajustes posteriores al cierre". |
+| **Diferencias de caja** | Del snapshot. | Cambian si hay reversos posteriores. | **Oficial** = `approved_difference` (solo cortes aprobados). Los no aprobados se muestran como "diferencia provisional". |
+| **Adeudos (D-8)** | — | — | Solo desde `approval_snapshot`. |
+| **KPIs (Fase 4)** | — | — | Diferencias y adeudos por **fecha del turno** usando cifras aprobadas. Incidencias = número y monto de reversos por motivo y por cajero. Extra: tiempo hasta la aprobación. |
+
+Datos históricos: las filas existentes quedan `entry_kind = movimiento` y `aprobado_historico`, sin reversos, así que todos los reportes pasados dan exactamente lo mismo.
 
 ## 5. Umbrales configurables — fase futura
 
@@ -149,13 +236,14 @@ Acciones: `corte_z_cerrado`, `corte_z_aprobado`, `corte_z_rechazado`, `corte_z_r
 |---|---|---|---|---|
 | Abrir turno / Corte X / Corte Z de su caja (también offline) | 🔸 | 🔸 | ❌ | ✅ |
 | Registrar ingreso/egreso en su turno | 🔸 | 🔸 | ❌ | ✅ |
-| Registrar reconteo tras rechazo del OIS | 🔸 (su turno) | ❌ | ❌ | ❌ |
-| Registrar reconteo tras rechazo del supervisor | 🔸 (su turno) | 🔸 (su sucursal) | ❌ | ❌ |
-| N1: aprobar/rechazar Corte Z del cajero | ❌ | 🔸 | ❌ (S-6) | ❌ (S-6) |
-| N1: aprobar/rechazar movimiento del cajero | ❌ | 🔸 | ❌ (S-6) | ❌ (S-6) |
-| N2: aprobar/rechazar/ajustar Corte Z | ❌ | ❌ | 🔹 (no propios) | ✅ |
-| Aprobar/rechazar movimiento hecho por el OIS | ❌ | ❌ | 🔹 | ✅ |
-| Cancelar o ajustar un movimiento (antes de aprobar el corte) | ❌ | ❌ | 🔹 | ✅ |
+| Registrar reconteo tras rechazo de N1 | 🔸 (su turno) | 🔸 (su propio corte) | ❌ | ❌ |
+| Registrar reconteo tras rechazo de N2 (va a N2 o a N1 según S-5) | 🔸 (su turno) | 🔸 (su sucursal) | ❌ | ❌ |
+| N1: aprobar/rechazar Corte Z **de un cajero** | ❌ | 🔸 | ❌ (S-6) | ❌ (S-6) |
+| N1: aprobar/rechazar movimiento **de un cajero** | ❌ | 🔸 | ❌ (S-6) | ❌ (S-6) |
+| N1: aprobar/rechazar Corte Z o movimiento **del OIS** (S-3) | ❌ | ❌ (propio) | 🔹 | ❌ |
+| N2: aprobar/rechazar/ajustar Corte Z | ❌ | ❌ | 🔹 (no si hizo N1, C-1) | ✅ (S-2: único admin) |
+| N2 de movimientos (solo si S-1 = alternativa) | ❌ | ❌ | 🔹 | ✅ |
+| Cancelar o ajustar un movimiento con asiento de reverso (antes de aprobar el corte) | ❌ | ❌ | 🔹 | ✅ |
 | Reabrir un Corte Z aprobado | ❌ | ❌ | ❌ | ✅ con motivo |
 | Desbloquear apertura de turno en emergencia (P-2) | ❌ | ❌ | ❌ | ✅ con motivo |
 | Ver cortes, movimientos y bitácora de caja de cajeros y OIS | 🔸 (los suyos) | 🔸 | 🔹 | ✅ |
@@ -184,8 +272,8 @@ No hay push en Fase 1. El servidor **guarda** cada notificación en la tabla `no
 
 | Evento | Destinatarios |
 |---|---|
-| Corte Z o movimiento en `pendiente_operador` | OIS de la sucursal |
-| Corte Z o movimiento en `pendiente_supervisor` | Supervisores asignados y owner (**requiere acción**) |
+| Corte Z o movimiento en `pendiente_n1` | OIS de la sucursal |
+| Corte Z o movimiento en `pendiente_n2` | Supervisores asignados y owner (**requiere acción**) |
 | Aprobado / rechazado / cancelado / ajustado | Cajero autor; supervisores asignados (informativa) |
 | Apertura de turno bloqueada | OIS de la sucursal; supervisores asignados y owner |
 | Apertura desbloqueada por el owner | OIS y supervisores asignados |
@@ -216,8 +304,9 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 
 - **FR-001** El sistema MUST incorporar el rol `branch_supervisor` con alcance por varias sucursales asignadas.
 - **FR-002** El owner MUST poder asignar y desasignar sucursales a supervisores, con auditoría.
-- **FR-003** Todo Corte Z MUST pasar por N1 (OIS) y N2 (supervisor u owner), salvo que lo haya cerrado el OIS, en cuyo caso va directo a N2.
-- **FR-004** Todo ingreso/egreso MUST contar en caja al registrarse y MUST ser aprobado por el OIS, o por el supervisor si su autor es el OIS.
+- **FR-003** Todo Corte Z MUST pasar por N1 (OIS, o el supervisor si el autor es el OIS) y N2 (supervisor u owner).
+- **FR-004** Todo ingreso/egreso MUST registrarse como asiento inmutable que cuenta en caja desde su registro, y MUST ser aprobado en N1 (OIS, o el supervisor si su autor es el OIS). Rechazos, cancelaciones y ajustes MUST generar asientos de reverso, nunca borrar ni editar.
+- **FR-015** Los reportes de caja MUST distinguir montos pendientes, aprobados, revertidos y ajustados, y MUST mostrar los ajustes posteriores al cierre aparte del `close_snapshot`.
 - **FR-005** El supervisor y el owner MUST poder cancelar o ajustar movimientos, con motivo, hasta que se apruebe el corte.
 - **FR-006** El sistema MUST impedir abrir un turno nuevo mientras el último Corte Z de la sucursal esté pendiente o rechazado en N1.
 - **FR-007** El POS MUST permitir el Corte Z sin conexión y sincronizarlo después, con recálculo en el servidor.
@@ -244,12 +333,13 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 - **SC-001** 100 % de los Cortes Z posteriores al despliegue (no auto-cerrados) tienen `review_status` distinto de `no_aplica`.
 - **SC-002** 0 movimientos sin `created_by`.
 - **SC-003** Las peticiones HTTP directas para auto-aprobar, para que el supervisor actúe en N1 o para aprobar N2 antes de N1 devuelven 403/409.
-- **SC-004** Abrir un turno con el último corte en `pendiente_operador` devuelve 409 con un mensaje claro.
+- **SC-004** Abrir un turno con el último corte en `pendiente_n1` devuelve 409 con un mensaje claro.
 - **SC-005** Un Corte Z hecho offline se sincroniza sin duplicarse y con el esperado recalculado.
 - **SC-006** Cada transición tiene exactamente un evento en `audit_log`.
 - **SC-007** Un corte aprobado con faltante genera exactamente un adeudo.
 - **SC-008** El supervisor solo ve datos (caja, ventas, notificaciones) de sus sucursales asignadas.
 - **SC-009** Toda notificación generada se puede consultar por `GET /notifications` y aparece en la sección del Admin web.
+- **SC-011** La suma de `cash_effect` de un turno con movimientos rechazados o cancelados es igual a la de un turno sin esos movimientos; ningún `DELETE` ni `UPDATE` de columnas financieras tiene éxito en `cash_transactions`.
 - **SC-010** Un desbloqueo de emergencia permite abrir el turno sin cambiar el estado del corte pendiente y deja un evento en la bitácora.
 
 ## 13. Riesgos
@@ -268,6 +358,8 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 | R-10 | **Adeudo generado por error** (ventas no sincronizadas, auto-cierre, ajuste posterior) | AD-01 | Solo se genera tras N2; se anula si el owner reabre; los auto-cerrados se excluyen. |
 | R-11 | Carga operativa: cada movimiento y cada corte requieren aprobación | D-3 | Medir el volumen; los umbrales son la palanca futura. |
 | R-12 | **Notificaciones solo por consulta (sin push)** | D-6: notificaciones por REST. Ni `pubspec.yaml` ni `package.json` tienen Firebase Messaging, así que no se agrega esa dependencia. | El aviso depende de que el usuario abra la app: contador con polling (60 s) en el Admin web y en la pestaña Caja del POS. Push queda como mejora futura. |
+| R-15 | **`cash_drawer_amount` con doble significado** | Hoy es el acumulado del cajón (`createTransaction`) y al cerrar se sobrescribe con el contado (`shifts.service.ts:188`); los reportes lo leen como "contado". | El esperado siempre se calcula del ledger; la columna solo significa "contado" tras el cierre. |
+| R-16 | **Rechazar después del cierre genera faltante/adeudo** | §4.4.3 | Mostrar en la UI, antes de confirmar el rechazo, el impacto ("esto generará un faltante de $X"). |
 | R-13 | Migraciones fuera del journal de Drizzle | `AGENTS.md` | Script idempotente coordinado. |
 | R-14 | Dos aprobadores al mismo tiempo | — | `version` (CZ-09). |
 
@@ -298,16 +390,23 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 | **D-10** | ¿Admins aprueban desde el Admin web? | ✅ RESUELTA | Sí; la bandeja del Admin web está en Fase 1 (admin = owner, S-2). |
 | **D-11** | ¿Auto-cierre >24 h en Fase 1? | ✅ RESUELTA | No por ahora (R-7). |
 
-### 15.2 Supuestos
+### 15.2 Supuestos (4.ª ronda, 2026-11-22)
 
 | # | Pregunta | Estado | Resolución |
 |---|---|---|---|
-| **S-1** | ¿N2 obligatorio para todo? | ✅ RESUELTA | **Solo para el Corte Z.** En movimientos basta el OIS. |
-| **S-2** | ¿Qué administradores aprueban? | ✅ RESUELTA | **Solo `owner`.** |
-| **S-3** | ¿Quién hace N1 cuando el autor es el OIS? | ✅ RESUELTA | **Siempre directo al supervisor** (o al owner). |
-| **S-4** | ¿El movimiento cuenta desde que se registra? | ✅ RESUELTA | **Sí, todo se registra y cuenta**; el supervisor puede cancelarlo o ajustarlo. |
-| **S-5** | ¿Quién recuenta tras un rechazo de N2? | ✅ RESUELTA | El cajero/OIS registra un nuevo conteo que aprueba el supervisor, **o** el supervisor hace el ajuste. |
-| **S-6** | ¿Supervisor/owner sustituyen al OIS en N1? | ✅ RESUELTA | **No.** |
+| **S-1** | ¿N2 obligatorio también para ingresos/egresos? | ⏳ **PENDIENTE DE CONFIRMAR por el dueño** | **Escrito hoy**: N2 obligatorio solo para el Corte Z; en movimientos basta N1, y el supervisor puede cancelar o ajustar. **Alternativa en evaluación**: N2 obligatorio también para cada ingreso/egreso. Qué implica: con la alternativa, cada movimiento espera además al supervisor u owner. Hay más trabajo para el supervisor y más pendientes; el Corte Z no se puede aprobar hasta que todos sus movimientos pasen N2 (CZ-06), así que los cortes tardan más. A cambio, todo el dinero que entra o sale lo valida alguien de fuera de la sucursal. No cambia el ledger ni los reportes (los pendientes ya cuentan en caja). |
+| **S-2** | ¿Qué administradores aprueban? | ✅ RESUELTA | **Solo `owner`.** `inventory_admin` y `support_tech` no aprueban. |
+| **S-3** | ¿Quién hace N1 cuando el autor es el OIS? | ✅ RESUELTA (actualizada) | **El supervisor asignado a esa sucursal** hace el N1 (antes decía "directo a N2"). Aplica a cortes y movimientos. |
+| **S-4** | ¿El movimiento cuenta desde que se registra? | ✅ RESUELTA | **Sí, como ledger**: nada se borra; los rechazos, cancelaciones y ajustes se corrigen con asientos de reverso. Reverso con fecha real y atribuido al turno original; el `close_snapshot` no se recalcula, los ajustes se muestran aparte y la cifra oficial se congela al aprobar (§4.4). |
+| **S-5** | ¿Por dónde pasa el reconteo tras un rechazo de N2? | ⏳ **PENDIENTE DE CONFIRMAR** (la respuesta "sí" fue ambigua) | **Escrito hoy**: el nuevo conteo va directo a N2, o el supervisor ajusta. **Alternativa**: el nuevo conteo vuelve a pasar por N1 (OIS) y luego por N2. |
+| **S-6** | ¿Supervisor/owner sustituyen al OIS en N1? | ✅ RESUELTA | **No.** Única excepción: S-3 (si el autor es el OIS, el N1 lo hace el supervisor). |
+
+**Consecuencias de S-3 por confirmar** (propuestas, no reglas del dueño):
+
+| # | Punto | Propuesta |
+|---|---|---|
+| **C-1** | En un corte del OIS, el supervisor hace N1. ¿Puede la misma persona hacer también N2? | **No**: N1 y N2 deben ser personas distintas. El N2 lo hace el owner u otro supervisor asignado a la sucursal. |
+| **C-2** | Con D-4, un corte del OIS bloquea la apertura hasta su N1, que ahora hace el supervisor (puede estar en otra sucursal). | Se aplica igual: bloquea hasta que el supervisor apruebe el N1, con el desbloqueo de emergencia del owner (CZ-10b) como salida. Alternativa: que los cortes del OIS no bloqueen. |
 
 ### 15.3 Detalles (3.ª ronda)
 

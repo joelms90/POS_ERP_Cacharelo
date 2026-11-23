@@ -67,26 +67,31 @@ Tabla de transiciones en `approvals.service.ts` (fuente única):
 
 | Entidad | Estado | Actor | Acción | Nuevo estado |
 |---|---|---|---|---|
-| Corte | (cierre) autor cajero | — | cerrar | `pendiente_operador` |
-| Corte | (cierre) autor OIS | — | cerrar | `pendiente_supervisor` |
-| Corte | `pendiente_operador` | N1 | aprobar / rechazar | `pendiente_supervisor` / `rechazado_operador` |
-| Corte | `rechazado_operador` | cajero | reconteo | `pendiente_operador` |
-| Corte | `pendiente_supervisor` | N2 | aprobar / ajustar / rechazar | `aprobado` / `aprobado_con_ajuste` / `rechazado_supervisor` |
-| Corte | `rechazado_supervisor` | cajero u OIS | reconteo | `pendiente_supervisor` |
-| Corte | `rechazado_supervisor` | N2 | ajustar | `aprobado_con_ajuste` |
-| Corte | `aprobado*` | owner | reabrir | `pendiente_supervisor` (anula el adeudo) |
-| Movimiento | (alta) autor cajero / OIS | — | registrar | `pendiente_operador` / `pendiente_supervisor` |
-| Movimiento | `pendiente_operador` | N1 | aprobar / rechazar | `aprobado` / `rechazado` |
-| Movimiento | `pendiente_supervisor` | N2 | aprobar / rechazar | `aprobado` / `rechazado` |
-| Movimiento | cualquiera salvo `cancelado`, con el corte sin aprobar | N2 | cancelar / ajustar | `cancelado` / (mismo estado, monto nuevo) |
+| Corte | (cierre) cualquier autor | — | cerrar | `pendiente_n1` (N1 = OIS si el autor es cajero; supervisor si el autor es el OIS, S-3) |
+| Corte | `pendiente_n1` | N1 | aprobar / rechazar | `pendiente_n2` / `rechazado_n1` |
+| Corte | `rechazado_n1` | autor del corte | reconteo | `pendiente_n1` |
+| Corte | `pendiente_n2` | N2 (≠ quien hizo N1, C-1) | aprobar / ajustar / rechazar | `aprobado` / `aprobado_con_ajuste` / `rechazado_n2` (guarda `approval_snapshot` al aprobar) |
+| Corte | `rechazado_n2` | cajero u OIS | reconteo | `pendiente_n2` (regla actual) · `pendiente_n1` (alternativa S-5, **pendiente**) |
+| Corte | `rechazado_n2` | N2 | ajustar | `aprobado_con_ajuste` |
+| Corte | `aprobado*` | owner | reabrir | `pendiente_n2` (anula el adeudo) |
+| Movimiento | (alta) cualquier autor | — | registrar asiento | `pendiente_n1` (N1 = OIS o supervisor según el autor, S-3) |
+| Movimiento | `pendiente_n1` | N1 | aprobar / rechazar | `aprobado` (o `pendiente_n2` si S-1 = alternativa) / `rechazado` + **asiento de reverso** |
+| Movimiento | `pendiente_n2` (solo S-1 alternativa) | N2 | aprobar / rechazar | `aprobado` / `rechazado` + reverso |
+| Movimiento | cualquiera salvo `rechazado`/`cancelado`/`ajustado`, con el corte sin aprobación final | supervisor/owner | cancelar / ajustar | `cancelado` + reverso / `ajustado` + reverso + asiento `ajuste` |
+
+La máquina de estados está parametrizada por dos banderas de configuración, `REQUIRE_N2_FOR_CASH_MOVEMENTS` (S-1) y `N2_RECOUNT_GOES_TO_N1` (S-5), para no reescribirla cuando el dueño confirme.
 
 Al pasar a `aprobado*` con diferencia final < 0, `debts.service` crea el adeudo en la misma transacción.
 
 ### 1.3 Cambios en `modules/shifts`
-- **`openShift`**: antes de crear el turno, buscar el último corte de la sucursal. Si su `review_status` es `pendiente_operador` o `rechazado_operador`, responder **409** con el mensaje "El Corte Z anterior debe ser aprobado por el operador de sucursal". Excepción: si el owner desbloqueó (`open_block_overridden_at`), se permite abrir (P-2). Además, evento `apertura_bloqueada` en la bitácora y notificación al OIS y al supervisor (D-4). El auto-cierre >24 h no cambia (D-11) y queda `no_aplica`.
+- **`openShift`**: antes de crear el turno, buscar el último corte de la sucursal. Si su `review_status` es `pendiente_n1` o `rechazado_n1`, responder **409** con el mensaje "El Corte Z anterior debe ser aprobado (nivel 1)"; si el autor fue el OIS, N1 es el supervisor (C-2). Excepción: si el owner desbloqueó (`open_block_overridden_at`), se permite abrir (P-2). Además, evento `apertura_bloqueada` en la bitácora y notificación al OIS y al supervisor (D-4). El auto-cierre >24 h no cambia (D-11) y queda `no_aplica`.
 - **`closeShift`**: aceptar `clientUuid`, `closedOffline`, `localExpectedCash` y `closedAt` del cliente. Idempotente por `client_uuid`. Recalcular el esperado en el servidor; `closed_by` = actor; estado inicial según el autor; bitácora; notificación.
 - **`createTransaction`**: `created_by`, `category`, `client_uuid` (`ON CONFLICT` devuelve el existente), estado según el autor, validación de esperado no negativo, bitácora, notificación. Debe aceptar movimientos offline que llegan **después** del cierre de su turno, si fueron creados antes del `closedAt` (orden de sincronización, OF-03).
-- **`buildShiftReport`**: excluir `cancelado`, usar el monto vigente e incluir estados.
+- **`createTransaction` / reversos (S-4)**: el ledger solo inserta. `rejectMovement`, `cancelMovement` y `adjustMovement` insertan el reverso (y el asiento `ajuste`) en la misma transacción que el cambio de estado y la bitácora. El reverso usa `created_at = now()` y `shift_id` del original (spec §4.4.2). No se valida el esperado negativo en los reversos (MV-05).
+- **`buildShiftReport`**: esperado = fondo + ventas en efectivo + `SUM(cash_effect)`. Devuelve los grupos aprobados / pendientes / revertidos / ajustados, el neto y el monto pendiente (spec §4.4.4).
+- **Corte cerrado**: `getCorteReport('z')` y `ReportsService.getCashShiftAuditReport` devuelven `closeSnapshot` intacto + `postCloseEntries` (asientos con `created_at > closed_at`) + `adjustedExpected` / `adjustedDifference`; si está aprobado, `approvalSnapshot` como cifra oficial.
+- **`reconciliationStatus`** (`BALANCED` / `SURPLUS` / `SHORTAGE` / `REQUIRES_RECONCILIATION`) se calcula en el backend sobre el esperado ajustado o aprobado y se devuelve en el reporte y en `getCashShiftsList`.
+- `cash_drawer_amount` deja de usarse como esperado (R-15).
 - Nuevos: `POST /cash-shifts/:id/recount` (cajero u OIS según el estado).
 
 ### 1.4 Endpoints
@@ -101,10 +106,10 @@ Al pasar a `aprobado*` con diferencia final < 0, `debts.service` crea el adeudo 
 | `POST /supervision/cash-shifts/:id/adjust` `{version, approvedAmount, denominationCounts?, reason}` | N2 | |
 | `POST /supervision/cash-shifts/:id/reopen` `{reason}` | owner | |
 | `POST /supervision/cash-shifts/:id/override-open-block` `{reason}` | owner | Desbloqueo de emergencia (P-2). No cambia el `review_status`; se permite una vez por corte. |
-| `POST /cash-shifts/:id/recount` `{actualAmount, denominationCounts?, notes}` | cajero (`rechazado_operador`); cajero u OIS (`rechazado_supervisor`) | |
+| `POST /cash-shifts/:id/recount` `{actualAmount, denominationCounts?, notes}` | cajero (`rechazado_n1`); cajero u OIS (`rechazado_n2`) | |
 | `POST /supervision/cash-movements/:id/approve` · `/reject` | N1 (autor cajero) / N2 (autor OIS) | |
-| `POST /supervision/cash-movements/:id/cancel` `{version, reason}` | supervisor/owner | Solo si el corte del turno no está aprobado. |
-| `POST /supervision/cash-movements/:id/adjust` `{version, amount, reason}` | supervisor/owner | ídem. |
+| `POST /supervision/cash-movements/:id/cancel` `{version, reason}` | supervisor/owner | Inserta un reverso. Solo si el corte del turno no tiene aprobación final. |
+| `POST /supervision/cash-movements/:id/adjust` `{version, amount, reason}` | supervisor/owner | Inserta un reverso + un asiento `ajuste`. Misma restricción. |
 | `GET /supervision/activity?branchId=&userId=&from=&to=` | supervisor/owner | Actividad de **caja** de cajeros y OIS: turnos, movimientos, acciones de N1. |
 | `GET /supervision/audit-log?…` | supervisor/owner | |
 | `GET /supervision/debts?branchId=&cashierId=&status=` | supervisor (asignadas), owner; cajero `?mine=true` | |
@@ -159,32 +164,41 @@ ALTER TABLE cash_shifts
 CREATE UNIQUE INDEX IF NOT EXISTS unq_cash_shift_client_uuid
   ON cash_shifts (client_uuid) WHERE client_uuid IS NOT NULL;
 
--- cash_transactions
+-- cash_shifts (ledger/aprobación)
+ALTER TABLE cash_shifts
+  ADD COLUMN IF NOT EXISTS n1_resolver_role varchar(30),
+  ADD COLUMN IF NOT EXISTS approval_snapshot jsonb;
+
+-- cash_transactions → ledger append-only (S-4)
 ALTER TABLE cash_transactions
   ADD COLUMN IF NOT EXISTS client_uuid varchar(120),
   ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES users(id),
   ADD COLUMN IF NOT EXISTS category varchar(40),
+  ADD COLUMN IF NOT EXISTS entry_kind varchar(20) NOT NULL DEFAULT 'movimiento',
+  ADD COLUMN IF NOT EXISTS reverses_transaction_id uuid REFERENCES cash_transactions(id),
+  ADD COLUMN IF NOT EXISTS replaces_transaction_id uuid REFERENCES cash_transactions(id),
+  ADD COLUMN IF NOT EXISTS cash_effect numeric(10,2) GENERATED ALWAYS AS (
+    (CASE WHEN type = 'cash-in' THEN amount ELSE -amount END)
+    * (CASE WHEN entry_kind = 'reverso' THEN -1 ELSE 1 END)) STORED,
   ADD COLUMN IF NOT EXISTS approval_status varchar(30) NOT NULL DEFAULT 'aprobado_historico',
   ADD COLUMN IF NOT EXISTS reviewed_by uuid REFERENCES users(id),
   ADD COLUMN IF NOT EXISTS reviewed_at timestamptz,
   ADD COLUMN IF NOT EXISTS review_reason text,
   ADD COLUMN IF NOT EXISTS review_level varchar(10),
-  ADD COLUMN IF NOT EXISTS original_amount numeric(10,2),
-  ADD COLUMN IF NOT EXISTS adjusted_by uuid REFERENCES users(id),
-  ADD COLUMN IF NOT EXISTS adjusted_at timestamptz,
-  ADD COLUMN IF NOT EXISTS adjust_reason text,
-  ADD COLUMN IF NOT EXISTS cancelled_by uuid REFERENCES users(id),
-  ADD COLUMN IF NOT EXISTS cancelled_at timestamptz,
-  ADD COLUMN IF NOT EXISTS cancel_reason text,
   ADD COLUMN IF NOT EXISTS device_id varchar(255),
   ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1;
 CREATE UNIQUE INDEX IF NOT EXISTS unq_cash_tx_client_uuid
   ON cash_transactions (client_uuid) WHERE client_uuid IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS unq_cash_tx_reverses
+  ON cash_transactions (reverses_transaction_id) WHERE reverses_transaction_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_cash_tx_shift_created ON cash_transactions (shift_id, created_at);
+-- Trigger: impedir UPDATE de columnas financieras y todo DELETE en cash_transactions
+-- (CREATE OR REPLACE FUNCTION cash_tx_immutable() ... ; CREATE TRIGGER ... BEFORE UPDATE OR DELETE)
 
 REVOKE UPDATE, DELETE ON audit_log FROM pos_user;  -- o trigger equivalente
 ```
 
-La migración es aditiva y compatible hacia atrás. **Ojo con D-4**: en cuanto el backend nuevo esté en producción, los cortes nuevos quedarán `pendiente_operador` y bloquearán la apertura del siguiente turno. Por eso el POS con la bandeja N1 tiene que publicarse **junto** con el backend; si no, ninguna sucursal podrá abrir caja. Para mitigarlo se propone una bandera de entorno `CASH_APPROVALS_ENFORCE_OPEN_BLOCK` (apagada hasta que el POS nuevo esté en todas las terminales). Orden de despliegue: migración → backend (bloqueo apagado) → Admin → POS → encender el bloqueo. Registrar todo en `docs/pre-deployment-checklist.md`.
+La migración es aditiva y compatible hacia atrás. **Ojo con D-4**: en cuanto el backend nuevo esté en producción, los cortes nuevos quedarán `pendiente_n1` y bloquearán la apertura del siguiente turno. Por eso el POS con la bandeja N1 tiene que publicarse **junto** con el backend; si no, ninguna sucursal podrá abrir caja. Para mitigarlo se propone una bandera de entorno `CASH_APPROVALS_ENFORCE_OPEN_BLOCK` (apagada hasta que el POS nuevo esté en todas las terminales). Orden de despliegue: migración → backend (bloqueo apagado) → Admin → POS → encender el bloqueo. Registrar todo en `docs/pre-deployment-checklist.md`.
 
 ## 2. Admin web (`apps/business_control_tauri`)
 
@@ -195,7 +209,8 @@ La migración es aditiva y compatible hacia atrás. **Ojo con D-4**: en cuanto e
 - `pages/ApprovalsPage.tsx` (patrón `RequisitionsApprovalPage.tsx`):
   - Pestañas "Cortes Z" y "Movimientos del OIS".
   - Por defecto, N2 pendiente. También deja ver lo que está en N1 (solo lectura).
-  - Detalle: reporte (reusa el modal de auditoría de `ReportsPage.tsx`), esperado local vs servidor en cortes offline, movimientos con botones **Cancelar / Ajustar**, e historial.
+  - Detalle: reporte (reusa el modal de auditoría de `ReportsPage.tsx`), esperado local vs servidor en cortes offline, **"Esperado al cierre" + "Ajustes posteriores al cierre" = "Esperado ajustado"**, movimientos agrupados (aprobados / pendientes / revertidos / ajustados) con botones **Cancelar / Ajustar**, e historial. Antes de confirmar un rechazo o cancelación, mostrar su impacto en la diferencia (R-16).
+- `ReportsPage.tsx`: `reconcileCash` (línea 285) deja de calcular en el cliente y usa el `reconciliationStatus` del backend (sobre el esperado ajustado o aprobado). El CSV de cortes y la columna de diferencia usan `approvedDifference` (oficial) o la diferencia provisional marcada como tal.
   - Acciones: Aprobar / Rechazar / Aprobar con ajuste. Diseño móvil primero.
 - Detalle de corte (owner): botón **"Desbloquear apertura"** con motivo obligatorio cuando la sucursal está bloqueada (P-2).
 - `pages/CashActivityPage.tsx`: actividad de caja por sucursal y por usuario (cajero/OIS): turnos, movimientos y decisiones del OIS.
