@@ -23,11 +23,6 @@ import {
 } from './supervisionUi';
 import { ShiftReviewPanel } from './ShiftReviewPanel';
 
-interface ApprovalsPageProps {
-  businessId: string;
-  currentUserId: string;
-}
-
 type View = 'cortes' | 'movements';
 type StatusFilter = 'pending' | 'final';
 
@@ -37,7 +32,7 @@ const FINAL_STATUSES = 'aprobado,aprobado_con_ajuste';
  * Spec 019 — approvals inbox for the owner and branch supervisors (D-10).
  * Every rule is enforced by the API; the page shows what the user can do.
  */
-export const ApprovalsPage: React.FC<ApprovalsPageProps> = ({ businessId }) => {
+export const ApprovalsPage: React.FC = () => {
   const [view, setView] = useState<View>('cortes');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
   const [branches, setBranches] = useState<SupervisionBranch[]>([]);
@@ -49,7 +44,7 @@ export const ApprovalsPage: React.FC<ApprovalsPageProps> = ({ businessId }) => {
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
   const [movementAction, setMovementAction] = useState<{ item: ApprovalMovementItem | LedgerMovement; version: number; branchName?: string; action: 'approve' | 'reject' | 'cancel' | 'adjust' } | null>(null);
 
-  const businessBranchIds = useMemo(() => new Set(branches.map((b) => b.id)), [branches]);
+  const branchIds = useMemo(() => new Set(branches.map((b) => b.id)), [branches]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,9 +57,8 @@ export const ApprovalsPage: React.FC<ApprovalsPageProps> = ({ businessId }) => {
           branchId: branchId !== 'all' ? branchId : undefined,
         }),
       ]);
-      const ofBusiness = visible.filter((b) => b.businessId === businessId);
-      const ids = new Set(ofBusiness.map((b) => b.id));
-      setBranches(ofBusiness);
+      const ids = new Set(visible.map((b) => b.id));
+      setBranches(visible);
       setCortes(inbox.cortes.filter((c) => ids.has(c.branchId)));
       setMovements(statusFilter === 'final' ? [] : inbox.movements.filter((m) => ids.has(m.branchId)));
     } catch (err) {
@@ -72,15 +66,15 @@ export const ApprovalsPage: React.FC<ApprovalsPageProps> = ({ businessId }) => {
     } finally {
       setLoading(false);
     }
-  }, [businessId, branchId, statusFilter]);
+  }, [branchId, statusFilter]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   useEffect(() => {
-    if (branchId !== 'all' && branches.length && !businessBranchIds.has(branchId)) setBranchId('all');
-  }, [branches, branchId, businessBranchIds]);
+    if (branchId !== 'all' && branches.length && !branchIds.has(branchId)) setBranchId('all');
+  }, [branches, branchId, branchIds]);
 
   const actionableCortes = cortes.filter((c) => c.canAct).length;
   const actionableMovements = movements.filter((m) => m.canAct || m.canCorrect).length;
