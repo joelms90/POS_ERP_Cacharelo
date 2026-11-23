@@ -36,6 +36,7 @@
 
 - `warehouses.location_type` supports a virtual `En Tránsito` warehouse.
 - Transfer lifecycle: `pending` → (ship: origin −qty, transit +qty) `in_transit` → (receive: transit −qty, destination +qty) `received`.
+- **Requisition transfers** skip `pending`: Almacén y Bodega dispatches an authorized requisition and the transfer is created already `in_transit` (with `requisition_id`), then `delivered` (bodega) → `received` (OIS). Requisition lifecycle: `pending_approval` → `approved` ⇄ `standby` → `in_transit` → `delivered` → `completed` (or `rejected`). Per-product quantities and differences live in the append-only `requisition_item_ledger`. Full flow: [`knowledge/workflows/replenishment-and-transfers.md`](./knowledge/workflows/replenishment-and-transfers.md).
 
 ---
 

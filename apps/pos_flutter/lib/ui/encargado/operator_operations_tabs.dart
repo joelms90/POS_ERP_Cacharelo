@@ -84,22 +84,35 @@ class _InventoryReceiptsTabState extends State<InventoryReceiptsTab> {
                         itemCount: _transfers.length,
                         itemBuilder: (context, index) {
                           final transfer = _transfers[index];
+                          // Requisition deliveries are confirmed once Almacén y
+                          // Bodega marks them delivered; until then they are on the way.
+                          final onTheWay =
+                              transfer['requisitionId'] != null &&
+                                  transfer['status'] == 'in_transit';
                           return Card(
                             color: EmpireColors.onyxSurface,
                             child: ListTile(
-                              leading: const Icon(Icons.local_shipping_outlined,
+                              leading: Icon(
+                                  onTheWay
+                                      ? Icons.local_shipping_outlined
+                                      : Icons.move_to_inbox_outlined,
                                   color: EmpireColors.champagneGold),
                               title: Text(
                                   'Entrega ${transfer['id'].toString().substring(0, 8).toUpperCase()}',
                                   style: const TextStyle(
                                       color: EmpireColors.textPrimary)),
                               subtitle: Text(
-                                  '${transfer['itemCount'] ?? 0} productos · ${transfer['fromWarehouseName'] ?? transfer['fromBranchName'] ?? 'Origen'}',
+                                  '${transfer['itemCount'] ?? 0} productos · ${transfer['fromWarehouseName'] ?? transfer['fromBranchName'] ?? 'Origen'}'
+                                  '${onTheWay ? ' · En camino' : ''}',
                                   style: const TextStyle(
                                       color: EmpireColors.textSecondary)),
-                              trailing: ElevatedButton(
-                                  onPressed: () => _receive(transfer),
-                                  child: const Text('Recibir')),
+                              trailing: onTheWay
+                                  ? const Text('En camino',
+                                      style: TextStyle(
+                                          color: EmpireColors.textSecondary))
+                                  : ElevatedButton(
+                                      onPressed: () => _receive(transfer),
+                                      child: const Text('Recibir')),
                             ),
                           );
                         },

@@ -74,7 +74,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
       final pos = await widget.state.fetchWarehousePurchaseOrders();
       if (mounted) setState(() => _purchaseOrders = pos);
     } else if (_selectedTabIndex == 1) {
-      final reqs = await widget.state.fetchWarehousePendingRequisitions();
+      final reqs = await widget.state.fetchWarehouseOutboundRequisitions();
       if (mounted) setState(() => _requisitions = reqs);
     } else if (_selectedTabIndex == 2) {
       final stock = await widget.state
@@ -647,7 +647,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                 size: 64, color: EmpireColors.textSecondary),
             const SizedBox(height: 16),
             const Text(
-              'No hay requisiciones pendientes de surtir',
+              'No hay salidas autorizadas',
               style: TextStyle(
                 color: EmpireColors.textPrimary,
                 fontSize: 18,
@@ -656,7 +656,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Las solicitudes de insumos emitidas por las tiendas y cafeterías aparecerán aquí.',
+              'Aquí aparecen las requisiciones que el propietario o el administrador de inventario ya autorizaron.',
               style: TextStyle(color: EmpireColors.textSecondary, fontSize: 13),
               textAlign: TextAlign.center,
             ),
@@ -675,199 +675,290 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
       );
     }
 
+    List<Map<String, dynamic>> withStatus(List<String> statuses) =>
+        _requisitions.where((r) => statuses.contains(r['status'])).toList();
+    final toFulfil = withStatus(const ['approved', 'standby']);
+    final onTheWay = withStatus(const ['in_transit']);
+    final delivered = withStatus(const ['delivered']);
+
     return RefreshIndicator(
       onRefresh: _refreshCurrentTab,
       color: EmpireColors.champagneGold,
       backgroundColor: EmpireColors.onyxSurface,
-      child: ListView.separated(
+      child: ListView(
         padding: const EdgeInsets.all(16),
-        itemCount: _requisitions.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final req = _requisitions[index];
-          final reqId = req['id']?.toString() ?? '';
-          final branch = req['fromBranchName']?.toString() ??
-              req['fromBranch']?['name']?.toString() ??
-              'Sucursal';
-          final status = req['status']?.toString() ?? 'pending';
-          final rawItems = req['items'] as List? ?? const [];
-          final itemsCount = (req['itemCount'] as num?)?.toInt() ??
-              int.tryParse(req['itemCount']?.toString() ?? '') ??
-              rawItems.length;
-          final notes = req['notes']?.toString();
-          final createdAt = req['createdAt']?.toString() ?? '';
+        children: [
+          _sectionHeader('Por surtir', toFulfil.length, EmpireColors.infoCyan),
+          ...toFulfil.map(_buildRequisitionCard),
+          if (toFulfil.isEmpty) _emptySectionHint('Nada por surtir.'),
+          const SizedBox(height: 20),
+          _sectionHeader('En camino', onTheWay.length, EmpireColors.champagneGold),
+          ...onTheWay.map(_buildRequisitionCard),
+          if (onTheWay.isEmpty) _emptySectionHint('Ninguna salida en camino.'),
+          const SizedBox(height: 20),
+          _sectionHeader('Entregadas · esperando confirmación de la sucursal',
+              delivered.length, EmpireColors.successGreen),
+          ...delivered.map(_buildRequisitionCard),
+          if (delivered.isEmpty) _emptySectionHint('Sin entregas pendientes de confirmar.'),
+        ],
+      ),
+    );
+  }
 
-          return Card(
-            color: EmpireColors.charcoalSurface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Colors.white10),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _sectionHeader(String title, int count, Color color) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Row(
+          children: [
+            Container(width: 4, height: 18, color: color),
+            const SizedBox(width: 8),
+            Text('$title ($count)',
+                style: TextStyle(
+                    color: color, fontWeight: FontWeight.bold, fontSize: 15)),
+          ],
+        ),
+      );
+
+  Widget _emptySectionHint(String text) => Padding(
+        padding: const EdgeInsets.only(left: 12, bottom: 4),
+        child: Text(text,
+            style: const TextStyle(
+                color: EmpireColors.textSecondary, fontSize: 12)),
+      );
+
+  String _fmtQty(double value) =>
+      value % 1 == 0 ? value.toInt().toString() : value.toString();
+
+  /// Quantity Bodega must fulfil: the approved one (legacy rows fall back to requested).
+  double _approvedQty(dynamic item) {
+    final approved = _asDouble(item['quantityApproved'], 0);
+    return approved > 0 ? approved : _asDouble(item['quantityRequested'], 0);
+  }
+
+  ({String label, Color color}) _statusChip(String status) {
+    switch (status) {
+      case 'standby':
+        return (label: 'En Espera', color: EmpireColors.warningOrange);
+      case 'in_transit':
+        return (label: 'En Camino', color: EmpireColors.champagneGold);
+      case 'delivered':
+        return (label: 'Entregada', color: EmpireColors.successGreen);
+      default:
+        return (label: 'Autorizada · Por Surtir', color: EmpireColors.infoCyan);
+    }
+  }
+
+  Widget _buildRequisitionCard(Map<String, dynamic> req) {
+    final reqId = req['id']?.toString() ?? '';
+    final branch = req['fromBranchName']?.toString() ??
+        req['fromBranch']?['name']?.toString() ??
+        'Sucursal';
+    final status = req['status']?.toString() ?? 'approved';
+    final rawItems = req['items'] as List? ?? const [];
+    final notes = req['notes']?.toString();
+    final createdAt = req['createdAt']?.toString() ?? '';
+    final chip = _statusChip(status);
+    final shipped = status == 'in_transit' || status == 'delivered';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        color: EmpireColors.charcoalSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Colors.white10),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: EmpireColors.infoCyan.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.storefront_outlined,
-                                color: EmpireColors.infoCyan, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                branch,
-                                style: const TextStyle(
-                                  color: EmpireColors.textPrimary,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  Text(
-                                    '$itemsCount insumos solicitados • Solicitud: ${createdAt.split('T').first}',
-                                    style: const TextStyle(
-                                        color: EmpireColors.textSecondary,
-                                        fontSize: 12),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: req['toWarehouseName'] != null
-                                          ? EmpireColors.champagneGold
-                                              .withOpacity(0.15)
-                                          : Colors.white10,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      req['toWarehouseName'] != null
-                                          ? 'Bodega: ${req['toWarehouseName']}'
-                                          : 'Bodega: Asignar al surtir',
-                                      style: TextStyle(
-                                        color: req['toWarehouseName'] != null
-                                            ? EmpireColors.champagneGold
-                                            : Colors.white54,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: status == 'standby'
-                              ? EmpireColors.warningOrange.withOpacity(0.2)
-                              : EmpireColors.infoCyan.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          status == 'standby' ? 'En Espera' : 'Pendiente de Surtir',
-                          style: TextStyle(
-                            color: status == 'standby'
-                                ? EmpireColors.warningOrange
-                                : EmpireColors.infoCyan,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (notes != null && notes.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black26,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'Nota de la sucursal: $notes',
-                        style: const TextStyle(
-                            color: EmpireColors.textSecondary,
-                            fontStyle: FontStyle.italic,
-                            fontSize: 12),
-                      ),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: EmpireColors.infoCyan.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                  ],
-                  const SizedBox(height: 12),
-                  const Divider(color: Colors.white10),
-                  const SizedBox(height: 8),
-
-                  // Requested items preview chips
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: rawItems.map((item) {
-                      final name = item['productName']?.toString() ??
-                          item['product']?['name']?.toString() ??
-                          'Insumo';
-                      final qty = _asDouble(item['quantityRequested'], 1.0);
-                      final unit = item['unit']?.toString() ?? item['uom']?.toString() ?? '';
-                      final qtyFormatted =
-                          qty % 1 == 0 ? qty.toInt().toString() : qty.toString();
-                      return Chip(
-                        backgroundColor: Colors.black45,
-                        label: Text('$name: $qtyFormatted $unit'.trim(),
-                            style: const TextStyle(
-                                color: Colors.white70, fontSize: 12)),
-                        padding: const EdgeInsets.all(4),
-                      );
-                    }).toList(),
+                    child: const Icon(Icons.storefront_outlined,
+                        color: EmpireColors.infoCyan, size: 20),
                   ),
-
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () => _standbyRequisition(reqId),
-                        icon: const Icon(Icons.pause_circle_outline, size: 16),
-                        label: const Text('Poner en Espera'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: EmpireColors.warningOrange,
-                          side: const BorderSide(
-                              color: EmpireColors.warningOrange),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(branch,
+                            style: const TextStyle(
+                              color: EmpireColors.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            )),
+                        Text(
+                          '${rawItems.length} insumos • Solicitud: ${createdAt.split('T').first}'
+                          '${req['toWarehouseName'] != null ? ' • Bodega: ${req['toWarehouseName']}' : ''}',
+                          style: const TextStyle(
+                              color: EmpireColors.textSecondary, fontSize: 12),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        onPressed: () => _openRequisitionDispatchDialog(req),
-                        icon: const Icon(Icons.send_outlined, size: 16),
-                        label: const Text('Surtir y Despachar'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: EmpireColors.successGreen,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: chip.color.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(chip.label,
+                        style: TextStyle(
+                          color: chip.color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        )),
                   ),
                 ],
               ),
-            ),
-          );
-        },
+              if (notes != null && notes.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text('Nota de la sucursal: $notes',
+                      style: const TextStyle(
+                          color: EmpireColors.textSecondary,
+                          fontStyle: FontStyle.italic,
+                          fontSize: 12)),
+                ),
+              ],
+              const SizedBox(height: 12),
+              const Divider(color: Colors.white10),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: rawItems.map((item) {
+                  final name = item['productName']?.toString() ?? 'Insumo';
+                  final unit = item['unit']?.toString() ?? '';
+                  final qty = shipped
+                      ? _asDouble(item['quantityDispatched'], 0)
+                      : _approvedQty(item);
+                  return Chip(
+                    backgroundColor: Colors.black45,
+                    label: Text('$name: ${_fmtQty(qty)} $unit'.trim(),
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 12)),
+                    padding: const EdgeInsets.all(4),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (status == 'approved') ...[
+                    OutlinedButton.icon(
+                      onPressed: () => _standbyRequisition(reqId),
+                      icon: const Icon(Icons.pause_circle_outline, size: 16),
+                      label: const Text('Poner en Espera'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: EmpireColors.warningOrange,
+                        side: const BorderSide(
+                            color: EmpireColors.warningOrange),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  if (status == 'approved' || status == 'standby')
+                    ElevatedButton.icon(
+                      onPressed: () => _openRequisitionDispatchDialog(req),
+                      icon: const Icon(Icons.send_outlined, size: 16),
+                      label: const Text('Surtir y Despachar'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: EmpireColors.successGreen,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  if (status == 'in_transit')
+                    ElevatedButton.icon(
+                      onPressed: () => _markDelivered(reqId, branch),
+                      icon: const Icon(Icons.task_alt, size: 16),
+                      label: const Text('Marcar Entregada'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: EmpireColors.champagneGold,
+                        foregroundColor: Colors.black,
+                      ),
+                    ),
+                  if (status == 'delivered')
+                    const Text('La sucursal confirmará lo recibido.',
+                        style: TextStyle(
+                            color: EmpireColors.textSecondary, fontSize: 12)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _markDelivered(String reqId, String branch) async {
+    final notesController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: EmpireColors.charcoalSurface,
+        title: Text('Entregada en $branch',
+            style: const TextStyle(color: EmpireColors.champagneGold)),
+        content: TextField(
+          controller: notesController,
+          style: const TextStyle(color: Colors.white, fontSize: 13),
+          decoration: const InputDecoration(
+            labelText: 'Nota de entrega (opcional)',
+            labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
+            hintText: 'Ej. Recibió Juan en cocina',
+            hintStyle: TextStyle(color: Colors.white30, fontSize: 12),
+            filled: true,
+            fillColor: Colors.black26,
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar',
+                style: TextStyle(color: EmpireColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: EmpireColors.champagneGold,
+                foregroundColor: Colors.black),
+            child: const Text('Confirmar entrega'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+    final error = await widget.state.deliverRequisition(
+        requisitionId: reqId, notes: notesController.text);
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    _showResult(error, 'Entrega registrada. La sucursal ya puede confirmar lo recibido.');
+    if (error == null) _refreshCurrentTab();
+  }
+
+  void _showResult(String? error, String success) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor:
+            error == null ? EmpireColors.successGreen : EmpireColors.errorRed,
+        content: Text(error ?? success),
       ),
     );
   }
@@ -906,16 +997,15 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
           item['product']?['name']?.toString() ??
           'Insumo';
       final unit = item['unit']?.toString() ?? item['uom']?.toString() ?? 'pza';
-      final qtyReq = _asDouble(item['quantityRequested'], 1.0);
-      final qtyFormatted =
-          qtyReq % 1 == 0 ? qtyReq.toInt().toString() : qtyReq.toString();
+      final qtyApproved = _approvedQty(item);
 
       rows.add({
         'productId': item['productId'],
         'productName': name,
         'unit': unit,
-        'qtyRequested': qtyReq,
-        'controller': TextEditingController(text: qtyFormatted),
+        'qtyRequested': _asDouble(item['quantityRequested'], 0),
+        'qtyApproved': qtyApproved,
+        'controller': TextEditingController(text: _fmtQty(qtyApproved)),
       });
     }
 
@@ -992,7 +1082,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Verifica los insumos surtidos de la bodega para su entrega a "$branch". Al confirmar, se generará la salida del inventario.',
+                            'Verifica los insumos surtidos para "$branch". Al confirmar sale el inventario de la bodega y queda En Camino. Si despachas una cantidad distinta a la autorizada, explica el motivo en las notas.',
                             style: const TextStyle(
                                 color: Colors.white70, fontSize: 12),
                           ),
@@ -1095,7 +1185,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                           ),
                           Padding(
                             padding: EdgeInsets.symmetric(vertical: 8),
-                            child: Text('Solicitado',
+                            child: Text('Autorizado',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                     color: Colors.white60,
@@ -1114,9 +1204,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                         ],
                       ),
                       ...rows.map((row) {
-                        final reqDisplay = row['qtyRequested'] % 1 == 0
-                            ? row['qtyRequested'].toInt().toString()
-                            : row['qtyRequested'].toString();
+                        final reqDisplay = _fmtQty(row['qtyApproved']);
                         return TableRow(
                           children: [
                             Padding(
@@ -1182,7 +1270,8 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                     controller: dispatchNotesController,
                     style: const TextStyle(color: Colors.white, fontSize: 13),
                     decoration: const InputDecoration(
-                      labelText: 'Notas de despacho / Chofer / Folio (opcional)',
+                      labelText:
+                          'Notas de despacho / Chofer / Motivo de diferencias',
                       labelStyle:
                           TextStyle(color: Colors.white54, fontSize: 12),
                       hintText: 'Ej. Entregado completo en camioneta 02',
@@ -1205,34 +1294,54 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
             ),
             ElevatedButton.icon(
               onPressed: () async {
+                final notes = dispatchNotesController.text.trim();
+                final items = rows
+                    .map((row) => {
+                          'productId': row['productId'],
+                          'quantity': _asDouble(
+                              (row['controller'] as TextEditingController)
+                                  .text
+                                  .replaceAll(',', '.'),
+                              -1),
+                        })
+                    .toList();
+                final invalid = items.any((i) => (i['quantity'] as double) < 0);
+                final adjusted = rows.any((row) =>
+                    (_asDouble(
+                                (row['controller'] as TextEditingController)
+                                    .text
+                                    .replaceAll(',', '.'),
+                                -1) -
+                            (row['qtyApproved'] as double))
+                        .abs() >
+                    0.0005);
+                if (invalid || (adjusted && notes.isEmpty)) {
+                  _showResult(
+                      invalid
+                          ? 'Revisa las cantidades a despachar.'
+                          : 'Explica en las notas por qué despachas una cantidad distinta a la autorizada.',
+                      '');
+                  return;
+                }
+                if (currentDispatchWarehouseId.isEmpty) {
+                  _showResult('Selecciona la bodega de salida.', '');
+                  return;
+                }
                 Navigator.of(dialogCtx).pop();
                 setState(() => _isLoading = true);
 
-                final notes = dispatchNotesController.text.trim();
-                final ok = await widget.state.updateRequisitionStatus(
+                final error = await widget.state.dispatchRequisition(
                   requisitionId: reqId,
-                  status: 'approved',
-                  notes: notes.isNotEmpty ? notes : null,
-                  warehouseId: currentDispatchWarehouseId.isNotEmpty
-                      ? currentDispatchWarehouseId
-                      : null,
+                  warehouseId: currentDispatchWarehouseId,
+                  items: items,
+                  notes: notes,
                 );
 
+                if (!mounted) return;
                 setState(() => _isLoading = false);
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: ok
-                          ? EmpireColors.successGreen
-                          : EmpireColors.errorRed,
-                      content: Text(ok
-                          ? 'Traspaso surtido y despachado exitosamente hacia "$branch".'
-                          : 'Error al despachar la requisición.'),
-                    ),
-                  );
-                  if (ok) _refreshCurrentTab();
-                }
+                _showResult(error,
+                    'Salida registrada: va en camino hacia "$branch".');
+                if (error == null) _refreshCurrentTab();
               },
               icon: const Icon(Icons.send_outlined, size: 18),
               label: const Text('Confirmar Despacho a Sucursal'),
@@ -1298,28 +1407,19 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
       ),
     );
 
-    if (confirmed == true) {
-      setState(() => _isLoading = true);
-      final ok = await widget.state.updateRequisitionStatus(
-        requisitionId: reqId,
-        status: 'standby',
-        notes: notesController.text.trim(),
-      );
-      setState(() => _isLoading = false);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor:
-                ok ? EmpireColors.warningOrange : EmpireColors.errorRed,
-            content: Text(ok
-                ? 'Requisición colocada en espera.'
-                : 'Error al actualizar requisición.'),
-          ),
-        );
-        if (ok) _refreshCurrentTab();
-      }
+    if (confirmed != true) return;
+    final reason = notesController.text.trim();
+    if (reason.isEmpty) {
+      _showResult('Indica el motivo para poner la requisición en espera.', '');
+      return;
     }
+    setState(() => _isLoading = true);
+    final error = await widget.state
+        .holdRequisition(requisitionId: reqId, reason: reason);
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    _showResult(error, 'Requisición colocada en espera.');
+    if (error == null) _refreshCurrentTab();
   }
 
   // ---------------------------------------------------------------------------

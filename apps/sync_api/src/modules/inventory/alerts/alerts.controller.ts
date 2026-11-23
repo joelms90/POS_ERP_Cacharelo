@@ -91,10 +91,11 @@ export class AlertsController {
     return this.alertsService.acknowledge(id, req.user?.sub);
   }
 
+  // Only Owner / Admin. Inventario create requisitions on the web (they are born approved).
   @Post(':id/generate-requisition')
-  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE)
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE)
   async generateRequisition(@Param('id') id: string, @Req() req: any) {
-    return this.alertsService.generateRequisition(id, req.user?.sub);
+    return this.alertsService.generateRequisition(id, req.user);
   }
 
   @Post(':id/generate-purchase-order')

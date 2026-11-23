@@ -105,13 +105,13 @@ test.describe('Sucursal out-of-stock -> requisition flow (Empanadas)', () => {
     await page.locator(`[data-testid="alert-generate-req-${alert!.id}"]`).click();
     await expect(page.getByText('Requisición generada')).toBeVisible({ timeout: 10000 });
 
-    // ── Verify a pending requisition now exists for this branch ──
+    // ── The owner generated it, so it is born authorized (visible to Almacén y Bodega) ──
     const requisitions = await apiGet<
       Array<{ id: string; fromBranchId: string; status: string }>
     >(token, `/requisitions?businessId=${BUSINESS_ID}`);
 
     const requisition = requisitions.find(
-      (r) => r.fromBranchId === branch.id && r.status === 'pending',
+      (r) => r.fromBranchId === branch.id && r.status === 'approved',
     );
     expect(requisition).toBeTruthy();
   });

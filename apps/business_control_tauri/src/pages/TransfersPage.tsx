@@ -33,6 +33,8 @@ interface TransferRow {
   status: string;
   notes?: string | null;
   transferredAt?: string | null;
+  /** Set when the transfer fulfils a branch requisition (managed from Requisiciones). */
+  requisitionId?: string | null;
   itemCount?: number;
   items?: Array<{ productId: string; productName: string; quantity: string; unitCost?: string; totalCost?: string; availableQty?: number; itemType?: string; providerId?: string | null; uom?: string }>;
 }
@@ -249,7 +251,12 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
   const handleReceive = async (id: string) => {
     setActioningId(id);
     try {
-      await api.receiveTransfer(id);
+      // Full receipt of what was sent; partial receipts are confirmed by the branch in the POS.
+      const items = (viewingTransfer?.id === id ? viewingTransfer.items ?? [] : []).map((item) => ({
+        productId: item.productId,
+        quantityReceived: parseFloat(item.quantity || '0'),
+      }));
+      await api.receiveTransfer(id, { items });
       showToast('Traspaso recibido. Stock actualizado en destino.', 'success');
       setViewingTransfer(null);
       await fetchData();
@@ -293,6 +300,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
     const badges: Record<string, string> = {
       pending: 'bg-gray-500/20 text-gray-300',
       in_transit: 'bg-blue-500/20 text-blue-300',
+      delivered: 'bg-purple-500/20 text-purple-300',
       received: 'bg-green-500/20 text-green-300',
       completed: 'bg-green-500/20 text-green-300',
       cancelled: 'bg-red-500/20 text-red-300',
@@ -300,6 +308,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
     const labels: Record<string, string> = {
       pending: 'Pendiente',
       in_transit: 'En Tránsito',
+      delivered: 'Entregado (por confirmar)',
       received: 'Recibido',
       completed: 'Completado',
       cancelled: 'Cancelado',
@@ -476,7 +485,7 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
                                     Enviar
                                   </button>
                                 )}
-                                {t.status === 'in_transit' && (
+                                {!t.requisitionId && (t.status === 'in_transit' || t.status === 'delivered') && (
                                   <button
                                     onClick={() => handleView(t.id)}
                                     disabled={actioningId === t.id}
@@ -722,7 +731,12 @@ export const TransfersPage: React.FC<TransfersPageProps> = ({ businessId }) => {
               </div>
 
               <div className="p-6 border-t border-aged-bronze/25 flex flex-col gap-2">
-                {viewingTransfer.status === 'in_transit' && (
+                {viewingTransfer.requisitionId && ['in_transit', 'delivered'].includes(viewingTransfer.status) && (
+                  <p className="text-xs text-text-secondary text-center">
+                    Traspaso de una requisición: Almacén y Bodega marca la entrega y la sucursal confirma la recepción.
+                  </p>
+                )}
+                {!viewingTransfer.requisitionId && (viewingTransfer.status === 'in_transit' || viewingTransfer.status === 'delivered') && (
                   <Button
                     variant="primary"
                     fullWidth

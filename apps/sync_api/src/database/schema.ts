@@ -655,6 +655,12 @@ export const stockTransfers = pgTable('stock_transfers', {
   receivedBy: uuid('received_by').references(() => users.id),
   receivedAt: timestamp('received_at', { withTimezone: true }),
   receiptNote: text('receipt_note'),
+  // Set when the transfer fulfils a branch requisition (dispatched by Almacén y Bodega).
+  requisitionId: uuid('requisition_id'),
+  shippedBy: uuid('shipped_by').references(() => users.id),
+  deliveredBy: uuid('delivered_by').references(() => users.id),
+  deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+  deliveryNote: text('delivery_note'),
 });
 
 export const stockTransferItems = pgTable('stock_transfer_items', {
@@ -907,8 +913,10 @@ export const branchRequisitions = pgTable('branch_requisitions', {
     .references(() => warehouses.id),
   status: varchar('status', { length: 20 })
     .default('pending_approval')
-    .notNull(), // 'pending_approval', 'approved', 'standby', 'rejected', 'completed'
+    .notNull(), // pending_approval → approved ⇄ standby → in_transit → delivered → completed | rejected
   notes: text('notes'),
+  approvedBy: uuid('approved_by').references(() => users.id),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
   createdBy: uuid('created_by')
     .references(() => users.id)
     .notNull(),
@@ -936,7 +944,39 @@ export const branchRequisitionItems = pgTable('branch_requisition_items', {
   quantityApproved: decimal('quantity_approved', { precision: 12, scale: 3 })
     .default('0.000')
     .notNull(),
+  quantityDispatched: decimal('quantity_dispatched', { precision: 12, scale: 3 }),
+  quantityReceived: decimal('quantity_received', { precision: 12, scale: 3 }),
 });
+
+/**
+ * Append-only, per-product trail of a requisition: what was requested, approved,
+ * dispatched and received, and by whom. `difference` is against the previous
+ * stage, so discrepancies can be queried and investigated like ledger rows.
+ */
+export const requisitionItemLedger = pgTable(
+  'requisition_item_ledger',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    businessId: uuid('business_id').references(() => businesses.id).notNull(),
+    branchId: uuid('branch_id').references(() => branches.id).notNull(),
+    requisitionId: uuid('requisition_id').references(() => branchRequisitions.id).notNull(),
+    transferId: uuid('transfer_id').references(() => stockTransfers.id),
+    productId: uuid('product_id').references(() => products.id).notNull(),
+    stage: varchar('stage', { length: 20 }).notNull(), // requested | approved | dispatched | received
+    quantity: decimal('quantity', { precision: 12, scale: 3 }).notNull(),
+    expectedQuantity: decimal('expected_quantity', { precision: 12, scale: 3 }),
+    difference: decimal('difference', { precision: 12, scale: 3 }).default('0.000').notNull(),
+    note: text('note'),
+    actorId: uuid('actor_id').references(() => users.id),
+    actorRole: varchar('actor_role', { length: 50 }),
+    source: varchar('source', { length: 20 }).notNull(), // admin_web | pos
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_req_item_ledger_requisition').on(table.requisitionId, table.createdAt),
+    index('idx_req_item_ledger_product').on(table.businessId, table.productId, table.createdAt),
+  ],
+);
 
 // ==========================================
 // 6. Intelligent Inventory Control (alerts & thresholds)

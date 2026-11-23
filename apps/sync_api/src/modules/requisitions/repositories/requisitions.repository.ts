@@ -1,9 +1,12 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { DRIZZLE_CONNECTION } from '../../../database/database.module';
+import { Inject, Injectable } from '@nestjs/common';
+import { and, asc, desc, eq, inArray, ne, SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import * as schema from '../../../database/schema';
-import { eq, and, inArray, desc, asc } from 'drizzle-orm';
 
+type Reader = Pick<NodePgDatabase<typeof schema>, 'select'>;
+
+/** Read side of branch requisitions. State changes live in RequisitionsService. */
 @Injectable()
 export class RequisitionsRepository {
   constructor(
@@ -11,109 +14,115 @@ export class RequisitionsRepository {
     private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
-  private async populateRequisitions(
+  private selectRequisitions(exec: Reader, where: SQL | undefined) {
+    return exec
+      .select({
+        requisition: schema.branchRequisitions,
+        fromBranchName: schema.branches.name,
+        toWarehouseName: schema.warehouses.name,
+        createdByName: schema.users.name,
+      })
+      .from(schema.branchRequisitions)
+      .leftJoin(schema.branches, eq(schema.branchRequisitions.fromBranchId, schema.branches.id))
+      .leftJoin(schema.warehouses, eq(schema.branchRequisitions.toWarehouseId, schema.warehouses.id))
+      .leftJoin(schema.users, eq(schema.branchRequisitions.createdBy, schema.users.id))
+      .where(where)
+      .orderBy(desc(schema.branchRequisitions.createdAt));
+  }
+
+  /** Attach items and the (non-cancelled) transfer that fulfils each requisition. */
+  private async populate(
+    exec: Reader,
     rows: Array<{
       requisition: typeof schema.branchRequisitions.$inferSelect;
       fromBranchName: string | null;
       toWarehouseName: string | null;
+      createdByName: string | null;
     }>,
   ) {
     if (rows.length === 0) return [];
-
     const reqIds = rows.map((r) => r.requisition.id);
 
-    const items = await this.db
-      .select({
-        requisitionItem: schema.branchRequisitionItems,
-        productName: schema.products.name,
-        unit: schema.products.uom,
-      })
-      .from(schema.branchRequisitionItems)
-      .leftJoin(schema.products, eq(schema.branchRequisitionItems.productId, schema.products.id))
-      .where(inArray(schema.branchRequisitionItems.requisitionId, reqIds));
+    const [items, transfers] = await Promise.all([
+      exec
+        .select({
+          requisitionItem: schema.branchRequisitionItems,
+          productName: schema.products.name,
+          unit: schema.products.uom,
+        })
+        .from(schema.branchRequisitionItems)
+        .leftJoin(schema.products, eq(schema.branchRequisitionItems.productId, schema.products.id))
+        .where(inArray(schema.branchRequisitionItems.requisitionId, reqIds)),
+      exec
+        .select()
+        .from(schema.stockTransfers)
+        .where(and(inArray(schema.stockTransfers.requisitionId, reqIds), ne(schema.stockTransfers.status, 'cancelled'))),
+    ]);
 
     const itemsMap = new Map<string, any[]>();
     for (const item of items) {
       const list = itemsMap.get(item.requisitionItem.requisitionId) || [];
-      list.push({
-        ...item.requisitionItem,
-        productName: item.productName || 'Insumo',
-        unit: item.unit || 'pza',
-      });
+      list.push({ ...item.requisitionItem, productName: item.productName || 'Insumo', unit: item.unit || 'pza' });
       itemsMap.set(item.requisitionItem.requisitionId, list);
     }
+    const transferMap = new Map(transfers.map((t) => [t.requisitionId as string, t]));
 
     return rows.map((r) => {
       const reqItems = itemsMap.get(r.requisition.id) || [];
+      const transfer = transferMap.get(r.requisition.id);
       return {
         ...r.requisition,
         fromBranchName: r.fromBranchName || null,
         toWarehouseName: r.toWarehouseName || null,
+        createdByName: r.createdByName || null,
         itemCount: reqItems.length,
         items: reqItems,
+        transfer: transfer
+          ? {
+              id: transfer.id,
+              status: transfer.status,
+              shippedAt: transfer.transferredAt,
+              deliveredAt: transfer.deliveredAt,
+              receivedAt: transfer.receivedAt,
+              receiptNote: transfer.receiptNote,
+            }
+          : null,
       };
     });
   }
 
   async findById(id: string) {
-    const results = await this.db
-      .select()
-      .from(schema.branchRequisitions)
-      .where(eq(schema.branchRequisitions.id, id));
-    return results[0] || null;
+    const [row] = await this.db.select().from(schema.branchRequisitions).where(eq(schema.branchRequisitions.id, id));
+    return row || null;
   }
 
-  async findByIdWithItems(id: string) {
-    const rows = await this.db
-      .select({
-        requisition: schema.branchRequisitions,
-        fromBranchName: schema.branches.name,
-        toWarehouseName: schema.warehouses.name,
-      })
-      .from(schema.branchRequisitions)
-      .leftJoin(schema.branches, eq(schema.branchRequisitions.fromBranchId, schema.branches.id))
-      .leftJoin(schema.warehouses, eq(schema.branchRequisitions.toWarehouseId, schema.warehouses.id))
-      .where(eq(schema.branchRequisitions.id, id));
-
-    if (rows.length === 0) return null;
-    const populated = await this.populateRequisitions(rows);
-    return populated[0] || null;
+  async findByIdWithItems(id: string, exec: Reader = this.db) {
+    const rows = await this.selectRequisitions(exec, eq(schema.branchRequisitions.id, id));
+    const [populated] = await this.populate(exec, rows);
+    return populated || null;
   }
 
   async findByBranch(branchId: string, businessId?: string) {
     const conditions = [eq(schema.branchRequisitions.fromBranchId, branchId)];
-    if (businessId) {
-      conditions.push(eq(schema.branchRequisitions.businessId, businessId));
-    }
-    const rows = await this.db
-      .select({
-        requisition: schema.branchRequisitions,
-        fromBranchName: schema.branches.name,
-        toWarehouseName: schema.warehouses.name,
-      })
-      .from(schema.branchRequisitions)
-      .leftJoin(schema.branches, eq(schema.branchRequisitions.fromBranchId, schema.branches.id))
-      .leftJoin(schema.warehouses, eq(schema.branchRequisitions.toWarehouseId, schema.warehouses.id))
-      .where(and(...conditions))
-      .orderBy(desc(schema.branchRequisitions.createdAt));
-
-    return this.populateRequisitions(rows);
+    if (businessId) conditions.push(eq(schema.branchRequisitions.businessId, businessId));
+    return this.populate(this.db, await this.selectRequisitions(this.db, and(...conditions)));
   }
 
   async findAll(businessId: string) {
-    const rows = await this.db
-      .select({
-        requisition: schema.branchRequisitions,
-        fromBranchName: schema.branches.name,
-        toWarehouseName: schema.warehouses.name,
-      })
-      .from(schema.branchRequisitions)
-      .leftJoin(schema.branches, eq(schema.branchRequisitions.fromBranchId, schema.branches.id))
-      .leftJoin(schema.warehouses, eq(schema.branchRequisitions.toWarehouseId, schema.warehouses.id))
-      .where(eq(schema.branchRequisitions.businessId, businessId))
-      .orderBy(desc(schema.branchRequisitions.createdAt));
+    return this.populate(
+      this.db,
+      await this.selectRequisitions(this.db, eq(schema.branchRequisitions.businessId, businessId)),
+    );
+  }
 
-    return this.populateRequisitions(rows);
+  async findByStatuses(businessId: string, statuses: string[]) {
+    return this.populate(
+      this.db,
+      await this.selectRequisitions(
+        this.db,
+        and(eq(schema.branchRequisitions.businessId, businessId), inArray(schema.branchRequisitions.status, statuses)),
+      ),
+    );
   }
 
   async findByRequester(businessId: string, branchId: string, createdBy: string, status?: string) {
@@ -123,231 +132,32 @@ export class RequisitionsRepository {
       eq(schema.branchRequisitions.createdBy, createdBy),
     ];
     if (status) conditions.push(eq(schema.branchRequisitions.status, status));
-    const rows = await this.db
+    return this.populate(this.db, await this.selectRequisitions(this.db, and(...conditions)));
+  }
+
+  /** Per-product trail, oldest first, with product and actor names. */
+  async findLedger(requisitionId: string) {
+    return this.db
       .select({
-        requisition: schema.branchRequisitions,
-        fromBranchName: schema.branches.name,
-        toWarehouseName: schema.warehouses.name,
+        id: schema.requisitionItemLedger.id,
+        stage: schema.requisitionItemLedger.stage,
+        productId: schema.requisitionItemLedger.productId,
+        productName: schema.products.name,
+        transferId: schema.requisitionItemLedger.transferId,
+        quantity: schema.requisitionItemLedger.quantity,
+        expectedQuantity: schema.requisitionItemLedger.expectedQuantity,
+        difference: schema.requisitionItemLedger.difference,
+        note: schema.requisitionItemLedger.note,
+        actorId: schema.requisitionItemLedger.actorId,
+        actorName: schema.users.name,
+        actorRole: schema.requisitionItemLedger.actorRole,
+        source: schema.requisitionItemLedger.source,
+        createdAt: schema.requisitionItemLedger.createdAt,
       })
-      .from(schema.branchRequisitions)
-      .leftJoin(schema.branches, eq(schema.branchRequisitions.fromBranchId, schema.branches.id))
-      .leftJoin(schema.warehouses, eq(schema.branchRequisitions.toWarehouseId, schema.warehouses.id))
-      .where(and(...conditions))
-      .orderBy(desc(schema.branchRequisitions.createdAt));
-
-    return this.populateRequisitions(rows);
-  }
-
-  async findPendingForBusiness(businessId: string) {
-    const rows = await this.db
-      .select({
-        requisition: schema.branchRequisitions,
-        fromBranchName: schema.branches.name,
-        toWarehouseName: schema.warehouses.name,
-      })
-      .from(schema.branchRequisitions)
-      .leftJoin(schema.branches, eq(schema.branchRequisitions.fromBranchId, schema.branches.id))
-      .leftJoin(schema.warehouses, eq(schema.branchRequisitions.toWarehouseId, schema.warehouses.id))
-      .where(
-        and(
-          eq(schema.branchRequisitions.businessId, businessId),
-          inArray(schema.branchRequisitions.status, ['pending', 'pending_approval', 'standby']),
-        ),
-      )
-      .orderBy(desc(schema.branchRequisitions.createdAt));
-
-    return this.populateRequisitions(rows);
-  }
-
-  async create(data: {
-    id?: string;
-    businessId: string;
-    fromBranchId: string;
-    toWarehouseId?: string | null;
-    createdBy: string;
-    notes?: string;
-    items: Array<{
-      productId: string;
-      quantityRequested: number;
-    }>;
-  }) {
-    return await this.db.transaction(async (tx) => {
-      if (data.id) {
-        const existing = await tx
-          .select()
-          .from(schema.branchRequisitions)
-          .where(eq(schema.branchRequisitions.id, data.id));
-        if (existing[0]) {
-          const items = await tx
-            .select({
-              requisitionItem: schema.branchRequisitionItems,
-              productName: schema.products.name,
-            })
-            .from(schema.branchRequisitionItems)
-            .leftJoin(schema.products, eq(schema.branchRequisitionItems.productId, schema.products.id))
-            .where(eq(schema.branchRequisitionItems.requisitionId, data.id));
-
-          return {
-            ...existing[0],
-            items: items.map((i) => ({
-              ...i.requisitionItem,
-              productName: i.productName,
-            })),
-          };
-        }
-      }
-
-      // Create requisition
-      const [requisition] = await tx
-        .insert(schema.branchRequisitions)
-        .values({
-          id: data.id,
-          businessId: data.businessId,
-          fromBranchId: data.fromBranchId,
-          toWarehouseId: data.toWarehouseId || null,
-          createdBy: data.createdBy,
-          status: 'pending',
-          notes: data.notes || null,
-        })
-        .returning();
-
-      // Create requisition items
-      let insertedItems: Array<typeof schema.branchRequisitionItems.$inferSelect> = [];
-      if (data.items && data.items.length > 0) {
-        insertedItems = await tx
-          .insert(schema.branchRequisitionItems)
-          .values(
-            data.items.map((item) => ({
-              requisitionId: requisition.id,
-              productId: item.productId,
-              quantityRequested: item.quantityRequested.toString(),
-            })),
-          )
-          .returning();
-      }
-
-      // Attach product names within the same transaction
-      const productIds = insertedItems.map((i) => i.productId);
-      const products = productIds.length
-        ? await tx
-            .select({ id: schema.products.id, name: schema.products.name })
-            .from(schema.products)
-            .where(inArray(schema.products.id, productIds))
-        : [];
-      const nameMap = new Map(products.map((p) => [p.id, p.name]));
-
-      return {
-        ...requisition,
-        items: insertedItems.map((item) => ({
-          ...item,
-          productName: nameMap.get(item.productId) || null,
-        })),
-      };
-    });
-  }
-
-  async createForBranch(data: {
-    id?: string;
-    businessId: string;
-    fromBranchId: string;
-    createdBy: string;
-    notes?: string;
-    items: Array<{ productId: string; quantityRequested: number }>;
-  }) {
-    return this.create({ ...data, toWarehouseId: null });
-  }
-
-  async updateStatus(
-    id: string,
-    status: 'pending' | 'pending_approval' | 'approved' | 'rejected' | 'completed' | 'standby',
-    approvalNotes?: string,
-    warehouseId?: string,
-  ) {
-    return await this.db.transaction(async (tx) => {
-      // 1. Update status and optionally assign origin warehouse
-      const [requisition] = await tx
-        .update(schema.branchRequisitions)
-        .set({
-          status,
-          ...(approvalNotes ? { notes: approvalNotes } : {}),
-          ...(warehouseId ? { toWarehouseId: warehouseId } : {}),
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.branchRequisitions.id, id))
-        .returning();
-
-      if (!requisition) return null;
-
-      // 2. If approved, create a pending stock transfer
-      if (status === 'approved') {
-        let dispatchWarehouseId = warehouseId || requisition.toWarehouseId;
-        if (!dispatchWarehouseId) {
-          const [defaultWh] = await tx
-            .select({ id: schema.warehouses.id })
-            .from(schema.warehouses)
-            .where(eq(schema.warehouses.businessId, requisition.businessId))
-            .orderBy(asc(schema.warehouses.createdAt))
-            .limit(1);
-          if (defaultWh) {
-            dispatchWarehouseId = defaultWh.id;
-            await tx
-              .update(schema.branchRequisitions)
-              .set({ toWarehouseId: dispatchWarehouseId })
-              .where(eq(schema.branchRequisitions.id, id));
-          }
-        }
-
-        // Fetch requisition items
-        const items = await tx
-          .select()
-          .from(schema.branchRequisitionItems)
-          .where(eq(schema.branchRequisitionItems.requisitionId, id));
-
-        if (items.length > 0 && dispatchWarehouseId) {
-          // Fetch product costs to log unitCost/totalCost
-          const productIds = items.map(item => item.productId);
-          const products = await tx
-            .select({ id: schema.products.id, cost: schema.products.cost })
-            .from(schema.products)
-            .where(inArray(schema.products.id, productIds));
-
-          const productCostMap = new Map(products.map(p => [p.id, p.cost]));
-
-          // Create stock transfer
-          const [transfer] = await tx
-            .insert(schema.stockTransfers)
-            .values({
-              businessId: requisition.businessId,
-              fromWarehouseId: dispatchWarehouseId,
-              toBranchId: requisition.fromBranchId,
-              status: 'pending',
-              notes: `Aprobación de Requisición: ${requisition.notes || ''}. Notas de aprobación: ${approvalNotes || ''}`.trim(),
-            })
-            .returning();
-
-          // Create stock transfer items
-          await tx
-            .insert(schema.stockTransferItems)
-            .values(
-              items.map((item) => {
-                const costStr = productCostMap.get(item.productId) || '0.00';
-                const costVal = parseFloat(costStr);
-                const qtyVal = parseFloat(item.quantityRequested);
-                const totalCostVal = costVal * qtyVal;
-
-                return {
-                  transferId: transfer.id,
-                  productId: item.productId,
-                  quantity: item.quantityRequested,
-                  unitCost: costStr,
-                  totalCost: totalCostVal.toFixed(2),
-                };
-              })
-            );
-        }
-      }
-
-      return requisition;
-    });
+      .from(schema.requisitionItemLedger)
+      .leftJoin(schema.products, eq(schema.requisitionItemLedger.productId, schema.products.id))
+      .leftJoin(schema.users, eq(schema.requisitionItemLedger.actorId, schema.users.id))
+      .where(eq(schema.requisitionItemLedger.requisitionId, requisitionId))
+      .orderBy(asc(schema.requisitionItemLedger.createdAt), asc(schema.requisitionItemLedger.id));
   }
 }

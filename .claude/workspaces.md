@@ -2,7 +2,7 @@
 
 **Purpose**: Track which development sessions (terminals/developers/assistants) are working on which parts of the monorepo to prevent conflicts.
 
-**Last Updated**: 2026-11-22
+**Last Updated**: 2026-11-23
 
 ---
 
@@ -17,6 +17,7 @@
 - **Branch**: `019-supervisor-sucursal` (worktree `.worktrees/supervisor-sucursal`)
 - **Migration Status**: ✅ Step 21 applied to the local docker DB only; NOT run in staging/production.
 - **Status**: ✅ Phase 1 implemented and tested locally (backend, admin, POS), merged to main. Handoff: `docs/handoffs/019-supervisor-sucursal.md`. Pending: C-1/C-2 confirmation, deploy.
+- **Requisition dispatch flow (2026-11-23)**: owner / admin inventario authorize, Almacén y Bodega dispatch → deliver, OIS confirms; `requisition_item_ledger` + audit. Migration step 22 applied to the local docker DB only. Committed locally, not pushed or deployed. See `HANDOFF.md` latest session.
 ### Session: feature-delivery-workflow
 - **Scope**: Add the reusable feature-delivery skill, safe feature lifecycle Make targets, and team-status portability fix. Shared tooling only; no app deployment.
 - **Branch**: `chore/feature-delivery-workflow`

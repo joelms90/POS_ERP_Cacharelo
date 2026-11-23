@@ -4,6 +4,13 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
 import { eq, and, or, inArray, desc, sql, isNull } from 'drizzle-orm';
 import { ThresholdsService } from '../thresholds/thresholds.service';
+import { AuditLogService } from '../../audit/audit-log.service';
+import { assertBusinessAccess } from '../../auth/business-access';
+import {
+  AWAITING_APPROVAL_STATUSES,
+  OPEN_BEFORE_DISPATCH_STATUSES,
+  insertRequisition,
+} from '../../requisitions/requisition-flow';
 
 @Injectable()
 export class AlertsService {
@@ -11,6 +18,7 @@ export class AlertsService {
     @Inject(DRIZZLE_CONNECTION)
     private readonly db: NodePgDatabase<typeof schema>,
     private readonly thresholdsService: ThresholdsService,
+    private readonly auditLog: AuditLogService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -521,7 +529,7 @@ export class AlertsService {
       .where(
         and(
           eq(schema.branchRequisitions.businessId, businessId),
-          eq(schema.branchRequisitions.status, 'pending'),
+          inArray(schema.branchRequisitions.status, AWAITING_APPROVAL_STATUSES),
         ),
       );
     return Number(rows[0]?.c ?? 0);
@@ -563,7 +571,7 @@ export class AlertsService {
   /**
    * One-click requisition from an alert: replenish up to effective maxStock.
    */
-  async generateRequisition(alertId: string, userId: string) {
+  async generateRequisition(alertId: string, actor: any) {
     const [alert] = await this.db
       .select()
       .from(schema.inventoryAlerts)
@@ -571,6 +579,7 @@ export class AlertsService {
       .limit(1);
 
     if (!alert) throw new NotFoundException('Alerta no encontrada');
+    assertBusinessAccess(actor, alert.businessId);
 
     if (!alert.branchId) {
       throw new BadRequestException(
@@ -611,7 +620,7 @@ export class AlertsService {
           eq(schema.branchRequisitions.businessId, alert.businessId),
           eq(schema.branchRequisitions.fromBranchId, branchId),
           eq(schema.branchRequisitions.toWarehouseId, warehouse.id),
-          eq(schema.branchRequisitions.status, 'pending'),
+          inArray(schema.branchRequisitions.status, OPEN_BEFORE_DISPATCH_STATUSES),
         ),
       )
       .limit(1);
@@ -639,25 +648,16 @@ export class AlertsService {
     }
 
     return this.db.transaction(async (tx) => {
-      const [requisition] = await tx
-        .insert(schema.branchRequisitions)
-        .values({
-          businessId: alert.businessId,
-          fromBranchId: branchId,
-          toWarehouseId: warehouse.id,
-          createdBy: userId,
-          status: 'pending',
-          notes: `Generada desde alerta de inventario (${alert.alertType})`,
-        })
-        .returning();
-
-      await tx.insert(schema.branchRequisitionItems).values({
-        requisitionId: requisition.id,
-        productId: alert.productId,
-        quantityRequested: qty.toFixed(3),
+      const requisition = await insertRequisition(tx, this.auditLog, {
+        businessId: alert.businessId,
+        branchId,
+        toWarehouseId: warehouse.id,
+        notes: `Generada desde alerta de inventario (${alert.alertType})`,
+        actor,
+        items: [{ productId: alert.productId, quantityRequested: qty }],
       });
 
-      return { requisitionId: requisition.id, quantityRequested: qty };
+      return { requisitionId: requisition.id, quantityRequested: qty, status: requisition.status };
     });
   }
 

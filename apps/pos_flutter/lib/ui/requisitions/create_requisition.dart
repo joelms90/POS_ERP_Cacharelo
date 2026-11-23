@@ -132,6 +132,9 @@ class _RequisitionsScreenState extends State<RequisitionsScreen> {
       case 'pending':
       case 'pending_approval':
         return EmpireColors.warningOrange;
+      case 'in_transit':
+      case 'delivered':
+        return EmpireColors.infoCyan;
       case 'completed':
         return EmpireColors.champagneGold;
       default:
@@ -139,20 +142,25 @@ class _RequisitionsScreenState extends State<RequisitionsScreen> {
     }
   }
 
+  // pending_approval → approved ⇄ standby → in_transit → delivered → completed
   String _getStatusLabel(String status) {
     switch (status) {
       case 'approved':
-        return 'Aprobada';
+        return 'Autorizada';
       case 'rejected':
         return 'Rechazada';
+      case 'standby':
+        return 'En Espera (Bodega)';
+      case 'in_transit':
+        return 'En Camino';
+      case 'delivered':
+        return 'Entregada · Confirma en Recibir';
       case 'completed':
         return 'Completada';
-      case 'standby':
-        return 'En Espera';
       case 'pending':
       case 'pending_approval':
       default:
-        return 'Pendiente';
+        return 'Por Autorizar';
     }
   }
 
@@ -178,15 +186,20 @@ class _RequisitionsScreenState extends State<RequisitionsScreen> {
                     items: const [
                       DropdownMenuItem(value: 'all', child: Text('Todas')),
                       DropdownMenuItem(
-                          value: 'pending', child: Text('Pendientes')),
+                          value: 'pending_approval',
+                          child: Text('Por autorizar')),
                       DropdownMenuItem(
-                          value: 'pending_approval', child: Text('Pendientes')),
+                          value: 'approved', child: Text('Autorizadas')),
                       DropdownMenuItem(
-                          value: 'approved', child: Text('Aprobadas')),
+                          value: 'standby', child: Text('En espera')),
                       DropdownMenuItem(
-                          value: 'rejected', child: Text('Rechazadas')),
+                          value: 'in_transit', child: Text('En camino')),
+                      DropdownMenuItem(
+                          value: 'delivered', child: Text('Entregadas')),
                       DropdownMenuItem(
                           value: 'completed', child: Text('Completadas')),
+                      DropdownMenuItem(
+                          value: 'rejected', child: Text('Rechazadas')),
                     ],
                     onChanged: _setStatusFilter,
                   ),

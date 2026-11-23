@@ -57,121 +57,63 @@ async function api<T>(token: string, path: string, init?: RequestInit): Promise<
   return response.json() as Promise<T>;
 }
 
-function stockFor(rows: StockRow[], productId: string, warehouseId?: string, branchId?: string): number {
-  return Number(rows.find((row) =>
-    row.productId === productId && row.warehouseId === (warehouseId ?? null) && row.branchId === (branchId ?? null),
-  )?.quantity ?? 0);
-}
-
-async function completeTaggedPendingTransfers(token: string, businessId: string): Promise<void> {
-  const transfers = await api<Transfer[]>(token, `/inventory/transfers?businessId=${businessId}`);
-  const pending = transfers.filter((transfer) =>
-    transfer.status === 'pending' && transfer.notes?.includes('E2E-STAGING-REQ-'),
-  );
-
-  for (const transfer of pending) {
-    const detail = await api<Transfer>(token, `/inventory/transfers/${transfer.id}`);
-    const items = detail.items ?? [];
-    await api(token, `/inventory/transfers/${transfer.id}/ship`, {
-      method: 'POST',
-      body: JSON.stringify({ adjustToAvailable: false }),
-    });
-    await api(token, `/inventory/transfers/${transfer.id}/receive`, {
-      method: 'POST',
-      body: JSON.stringify({
-        note: 'Recovered by staging E2E retry',
-        items: items.map((item) => ({
-          productId: item.productId,
-          quantityReceived: Number(item.quantity),
-        })),
-      }),
-    });
-  }
-}
-
-test.describe('Staging requisition → transfer → receipt', () => {
-  test('approves a tagged requisition and delivers its stock to a branch', async ({ page }) => {
+test.describe('Staging requisition created by the owner', () => {
+  // Dispatch, delivery and receipt need the POS roles (Almacén y Bodega, OIS); that chain
+  // is covered end to end by apps/sync_api/src/modules/requisitions/requisitions.integration.spec.ts.
+  test('is born authorized, is visible to Bodega and shows its audit timeline', async ({ page }) => {
     const token = await login(page);
     expect(token).not.toBe('');
 
     const businessId = process.env.E2E_BUSINESS_ID ?? await page.locator('header select').inputValue();
     expect(businessId).not.toBe('');
 
-    // A failed assertion must not strand an earlier tagged transfer in pending.
-    await completeTaggedPendingTransfers(token, businessId);
-
-    const [branches, initialStock] = await Promise.all([
+    const [branches, stock] = await Promise.all([
       api<Branch[]>(token, `/branches?businessId=${businessId}`),
       api<StockRow[]>(token, `/inventory/stock?businessId=${businessId}`),
     ]);
     expect(branches.length).toBeGreaterThan(0);
-
-    // The transfer is deliberately tiny and uses stock that already exists in a
-    // warehouse, so the test never relies on a fixture product or creates stock.
-    const source = initialStock.find((row) =>
-      row.warehouseId && !row.branchId && Number(row.quantity) >= QUANTITY,
-    );
+    const source = stock.find((row) => row.warehouseId && !row.branchId && Number(row.quantity) >= QUANTITY);
     expect(source, 'staging needs one warehouse stock row with a positive quantity').toBeTruthy();
 
-    const branch = branches[0];
     const tag = `E2E-STAGING-REQ-${Date.now()}`;
-    const initialSourceQty = stockFor(initialStock, source!.productId, source!.warehouseId!);
-    const initialBranchQty = stockFor(initialStock, source!.productId, undefined, branch.id);
-
     const requisition = await api<Requisition>(token, '/requisitions', {
       method: 'POST',
       body: JSON.stringify({
         businessId,
-        fromBranchId: branch.id,
+        fromBranchId: branches[0].id,
         toWarehouseId: source!.warehouseId,
         notes: tag,
         items: [{ productId: source!.productId, quantityRequested: QUANTITY }],
       }),
     });
-    expect(requisition.status).toMatch(/pending/);
+    expect(requisition.status).toBe('approved');
 
-    // Approval is exercised through the deployed admin UI, including the owner
-    // justification required when approving a requisition created by that owner.
+    // Approval no longer creates a transfer: Almacén y Bodega creates it when dispatching.
+    const transfers = await api<Transfer[]>(token, `/inventory/transfers?businessId=${businessId}`);
+    expect(transfers.some((transfer) => transfer.notes?.includes(tag))).toBe(false);
+
+    const outbound = await api<Requisition[]>(token, `/requisitions/outbound?businessId=${businessId}`);
+    expect(outbound.map((r) => r.id)).toContain(requisition.id);
+
     await page.getByRole('button', { name: 'Requisiciones', exact: true }).click();
     await page.getByPlaceholder('Buscar por sucursal...').fill(tag);
     const row = page.locator('tr', { hasText: tag });
     await expect(row).toBeVisible({ timeout: 15000 });
-    await row.getByRole('button', { name: 'Revisar' }).click();
+    await expect(row.getByText('Autorizada', { exact: true })).toBeVisible();
+    await expect(row.getByRole('button', { name: 'Revisar' })).toHaveCount(0);
 
+    await row.getByTitle('Ver detalle').click();
     const modal = page.locator('div.fixed').last();
-    await modal.locator('select').selectOption(source!.warehouseId!);
-    await modal.locator('textarea').fill(`${tag} approved by staging E2E`);
-    await modal.getByRole('button', { name: 'Aprobar', exact: true }).click();
-    await expect(page.getByText('Requisición aprobada. Se generó el traspaso.')).toBeVisible({ timeout: 10000 });
+    await expect(modal.getByText('Creada y autorizada')).toBeVisible({ timeout: 10000 });
 
-    const approved = await api<Requisition>(token, `/requisitions/${requisition.id}`);
-    expect(approved.status).toBe('approved');
+    // Leave staging clean: cancelling an authorized requisition requires a reason.
+    await modal.getByRole('button', { name: 'Cancelar requisición' }).click();
+    await expect(page.getByText('Indica el motivo; queda registrado en la auditoría.')).toBeVisible();
+    await modal.locator('textarea').fill(`${tag} cancelled by staging E2E`);
+    await modal.getByRole('button', { name: 'Cancelar requisición' }).click();
+    await expect(page.getByText('Requisición cancelada.')).toBeVisible({ timeout: 10000 });
 
-    const transfers = await api<Transfer[]>(token, `/inventory/transfers?businessId=${businessId}`);
-    const transfer = transfers.find((entry) => entry.notes?.includes(tag));
-    expect(transfer, 'approval should create a tagged pending transfer').toBeTruthy();
-    expect(transfer!.status).toBe('pending');
-
-    const transferDetail = await api<Transfer>(token, `/inventory/transfers/${transfer!.id}`);
-    const transferredItem = transferDetail.items?.find((item) => item.productId === source!.productId);
-    expect(transferredItem).toBeTruthy();
-    expect(Number(transferredItem!.quantity)).toBeCloseTo(QUANTITY, 6);
-
-    await api(token, `/inventory/transfers/${transfer!.id}/ship`, {
-      method: 'POST',
-      body: JSON.stringify({ adjustToAvailable: false }),
-    });
-    const received = await api<{ status: string }>(token, `/inventory/transfers/${transfer!.id}/receive`, {
-      method: 'POST',
-      body: JSON.stringify({
-        note: `${tag} received by staging E2E`,
-        items: [{ productId: source!.productId, quantityReceived: QUANTITY }],
-      }),
-    });
-    expect(received.status).toBe('received');
-
-    const finalStock = await api<StockRow[]>(token, `/inventory/stock?businessId=${businessId}`);
-    expect(stockFor(finalStock, source!.productId, source!.warehouseId!)).toBeCloseTo(initialSourceQty - QUANTITY, 6);
-    expect(stockFor(finalStock, source!.productId, undefined, branch.id)).toBeCloseTo(initialBranchQty + QUANTITY, 6);
+    const cancelled = await api<Requisition>(token, `/requisitions/${requisition.id}`);
+    expect(cancelled.status).toBe('rejected');
   });
 });

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AlertsService } from './alerts.service';
+import { AuditLogService } from '../../audit/audit-log.service';
 import { ThresholdsService } from '../thresholds/thresholds.service';
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 
@@ -34,6 +35,7 @@ describe('AlertsService - Warehouse Support', () => {
         AlertsService,
         { provide: DRIZZLE_CONNECTION, useValue: mockDb },
         { provide: ThresholdsService, useValue: mockThresholdsService },
+        { provide: AuditLogService, useValue: { record: jest.fn() } },
       ],
     }).compile();
 

@@ -332,29 +332,79 @@ export interface PurchaseOrder {
 export interface BranchRequisitionItem {
   id?: string;
   productId: string;
-  quantityRequested: number;
-  quantityApproved?: number;
+  quantityRequested: number | string;
+  quantityApproved?: number | string;
+  quantityDispatched?: number | string | null;
+  quantityReceived?: number | string | null;
   productName?: string;
+  unit?: string;
 }
+
+/**
+ * pending_approval → approved ⇄ standby → in_transit → delivered → completed (or rejected).
+ * 'pending' is a legacy alias of pending_approval.
+ */
+export type RequisitionStatus =
+  | 'pending'
+  | 'pending_approval'
+  | 'approved'
+  | 'standby'
+  | 'in_transit'
+  | 'delivered'
+  | 'completed'
+  | 'rejected';
 
 export interface BranchRequisition {
   id: string;
   businessId: string;
   fromBranchId: string;
-  toWarehouseId: string;
-  requestedById: string;
+  toWarehouseId: string | null;
   createdBy?: string;
-  status: 'pending' | 'pending_approval' | 'approved' | 'rejected' | 'completed';
-  notes?: string;
-  approvalNotes?: string;
-  approvedById?: string;
+  createdByName?: string | null;
+  status: RequisitionStatus;
+  notes?: string | null;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   items?: BranchRequisitionItem[];
   itemCount?: number;
-  fromBranchName?: string;
-  toWarehouseName?: string;
-  requestedByName?: string;
+  fromBranchName?: string | null;
+  toWarehouseName?: string | null;
+  transfer?: {
+    id: string;
+    status: string;
+    shippedAt?: string | null;
+    deliveredAt?: string | null;
+    receivedAt?: string | null;
+    receiptNote?: string | null;
+  } | null;
+}
+
+export interface RequisitionHistory {
+  requisition: BranchRequisition;
+  events: Array<{
+    id: number;
+    action: string;
+    actorName?: string | null;
+    actorRole?: string | null;
+    reason?: string | null;
+    source: string;
+    createdAt: string;
+  }>;
+  ledger: Array<{
+    id: number;
+    stage: 'requested' | 'approved' | 'dispatched' | 'received';
+    productId: string;
+    productName?: string | null;
+    quantity: string;
+    expectedQuantity?: string | null;
+    difference: string;
+    note?: string | null;
+    actorName?: string | null;
+    actorRole?: string | null;
+    createdAt: string;
+  }>;
 }
 
 export interface InventoryAlert {
@@ -1266,10 +1316,13 @@ export const api = {
     });
   },
 
-  async receiveTransfer(id: string): Promise<{ success: boolean; transferId: string; status: string }> {
+  async receiveTransfer(
+    id: string,
+    receipt: { items: Array<{ productId: string; quantityReceived: number }>; note?: string } = { items: [] },
+  ): Promise<{ success: boolean; transferId: string; status: string }> {
     return apiRequest<{ success: boolean; transferId: string; status: string }>(`/inventory/transfers/${id}/receive`, {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify(receipt),
     });
   },
 
@@ -1714,15 +1767,35 @@ export const api = {
     return apiRequest<BranchRequisition[]>(url);
   },
 
-  async updateRequisitionStatus(id: string, data: {
-    status: 'pending' | 'pending_approval' | 'approved' | 'rejected' | 'completed' | 'standby';
+  /** Owner / Admin. Inventario. Omitted items are approved as requested; differences need notes. */
+  async approveRequisition(id: string, data: {
+    items?: Array<{ productId: string; quantityApproved: number }>;
     notes?: string;
     warehouseId?: string;
   }): Promise<BranchRequisition> {
-    return apiRequest<BranchRequisition>(`/requisitions/${id}/status`, {
-      method: 'PATCH',
+    return apiRequest<BranchRequisition>(`/requisitions/${id}/approve`, {
+      method: 'POST',
       body: JSON.stringify(data),
     });
+  },
+
+  async rejectRequisition(id: string, reason: string): Promise<BranchRequisition> {
+    return apiRequest<BranchRequisition>(`/requisitions/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  /** Owner / Admin. Inventario marking the delivery on behalf of Almacén y Bodega (reason required). */
+  async deliverRequisition(id: string, notes: string): Promise<BranchRequisition> {
+    return apiRequest<BranchRequisition>(`/requisitions/${id}/deliver`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
+  },
+
+  async getRequisitionHistory(id: string): Promise<RequisitionHistory> {
+    return apiRequest<RequisitionHistory>(`/requisitions/${id}/history`);
   },
 
   /**

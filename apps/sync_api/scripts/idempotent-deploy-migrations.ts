@@ -1,5 +1,9 @@
 import { APP_LOGS_TABLE_SQL } from '../src/modules/logs/app-logs.sql';
 import { SUPERVISOR_CASH_APPROVALS_SQL } from '../src/modules/supervision/supervision.sql';
+import {
+  REQUISITION_DISPATCH_FLOW_SQL,
+  REQUISITION_UNLINKED_LEGACY_REPORT_SQL,
+} from '../src/modules/requisitions/requisitions.sql';
 import { Client } from 'pg';
 
 async function main() {
@@ -506,6 +510,20 @@ async function main() {
     // notifications and audit_log.
     await client.query(SUPERVISOR_CASH_APPROVALS_SQL);
     console.log('Supervisor cash approvals schema ensured.');
+
+    // 22. Requisition dispatch flow: approval no longer creates a transfer; Almacén y
+    // Bodega dispatches → delivers, OIS confirms. Adds the append-only
+    // requisition_item_ledger and reconciles legacy approved requisitions.
+    await client.query(REQUISITION_DISPATCH_FLOW_SQL);
+    const unlinked = await client.query(REQUISITION_UNLINKED_LEGACY_REPORT_SQL);
+    console.log('Requisition dispatch flow schema ensured.');
+    if (unlinked.rows.length > 0) {
+      console.warn(
+        `⚠️  ${unlinked.rows.length} legacy approved requisition(s) could not be linked to a transfer. ` +
+          'They will appear in Bodega "Salidas"; verify they were not already shipped:',
+        unlinked.rows.map((row: any) => row.id).join(', '),
+      );
+    }
 
     console.log('✅ Idempotent migrations executed successfully!');
   } catch (error) {

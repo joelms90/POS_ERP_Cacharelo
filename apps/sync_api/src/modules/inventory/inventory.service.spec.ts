@@ -1,3 +1,4 @@
+import { AuditLogService } from '../audit/audit-log.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { InventoryService } from './inventory.service';
 import { InventoryRepository } from './repositories/inventory.repository';
@@ -72,6 +73,10 @@ describe('InventoryService - Average Cost Recalculation', () => {
         {
           provide: DRIZZLE_CONNECTION,
           useValue: {},
+        },
+        {
+          provide: AuditLogService,
+          useValue: { record: jest.fn() },
         },
       ],
     }).compile();

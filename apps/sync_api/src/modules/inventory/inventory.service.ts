@@ -7,12 +7,23 @@ import { CompleteProductionRunDto } from './dto/complete-production-run.dto';
 import { ReceiveTransferDto } from './dto/receive-transfer.dto';
 import * as schema from '../../database/schema';
 import { eq, and, gte, lte, sql, desc, inArray } from 'drizzle-orm';
+import { AuditLogService } from '../audit/audit-log.service';
+import {
+  actorSource,
+  isApprover,
+  isBranchOperator,
+  primaryRole,
+  qty,
+  qtyStr,
+  recordRequisitionLedger,
+} from '../requisitions/requisition-flow';
 
 @Injectable()
 export class InventoryService {
   constructor(
     private readonly inventoryRepository: InventoryRepository,
     private readonly ledgerService: LedgerService,
+    private readonly auditLog: AuditLogService,
   ) {}
 
   async getStockLevels(businessId: string, warehouseId?: string, branchId?: string) {
@@ -645,18 +656,35 @@ export class InventoryService {
         throw new NotFoundException(`Traspaso con ID ${transferId} no encontrado`);
       }
 
-      if (transfer.status !== 'in_transit') {
+      // Requisition transfers are confirmed only after Almacén y Bodega marks them delivered.
+      const forRequisition = Boolean(transfer.requisitionId);
+      const receivable = forRequisition ? ['delivered'] : ['in_transit', 'delivered'];
+      if (!receivable.includes(transfer.status)) {
         throw new BadRequestException(
-          `El traspaso no se puede recibir en estado "${transfer.status}".`,
+          forRequisition && transfer.status === 'in_transit'
+            ? 'Almacén y Bodega aún no marca esta entrega como entregada.'
+            : `El traspaso no se puede recibir en estado "${transfer.status}".`,
         );
       }
 
-      const actorRoles = Array.isArray(actor.roles) ? actor.roles : [actor.role];
-      const isManagement = actorRoles.some((role: string) =>
-        ['owner', 'inventory_admin', 'support_tech', 'warehouse_purchasing_operator'].includes(role),
-      );
-      if (!isManagement && (!actor.branchId || transfer.toBranchId !== actor.branchId)) {
-        throw new BadRequestException('Solo la sucursal destino puede recibir este traspaso.');
+      let receivedOnBehalf = false;
+      if (forRequisition) {
+        const branchOperator = isBranchOperator(actor) && actor.branchId === transfer.toBranchId;
+        if (!branchOperator && !isApprover(actor)) {
+          throw new ForbiddenException('Solo la sucursal destino confirma la recepción.');
+        }
+        receivedOnBehalf = !branchOperator;
+        if (receivedOnBehalf && !receipt.note?.trim()) {
+          throw new BadRequestException('Indica el motivo para confirmar la recepción en nombre de la sucursal.');
+        }
+      } else {
+        const actorRoles = Array.isArray(actor.roles) ? actor.roles : [actor.role];
+        const isManagement = actorRoles.some((role: string) =>
+          ['owner', 'inventory_admin', 'support_tech', 'warehouse_purchasing_operator'].includes(role),
+        );
+        if (!isManagement && (!actor.branchId || transfer.toBranchId !== actor.branchId)) {
+          throw new BadRequestException('Solo la sucursal destino puede recibir este traspaso.');
+        }
       }
 
       const transitWh = await this.getOrCreateTransitWarehouse(tx, transfer.businessId);
@@ -780,6 +808,14 @@ export class InventoryService {
         .where(eq(schema.stockTransfers.id, transferId))
         .returning();
 
+      if (forRequisition) {
+        await this.completeRequisitionReceipt(tx, transfer, receivedByProduct, actor, {
+          note: receipt.note?.trim() || null,
+          hasDiscrepancy,
+          onBehalf: receivedOnBehalf,
+        });
+      }
+
       return { success: true, transferId, status: updated.status, hasDiscrepancy };
     });
   }
@@ -876,7 +912,89 @@ export class InventoryService {
     });
   }
 
-  private async getOrCreateTransitWarehouse(tx: any, businessId: string) {
+  /**
+   * Close the requisition a transfer fulfils: store received quantities, append the
+   * 'received' ledger rows (difference vs dispatched) and the audit entry.
+   */
+  private async completeRequisitionReceipt(
+    tx: any,
+    transfer: typeof schema.stockTransfers.$inferSelect,
+    receivedByProduct: Map<string, number>,
+    actor: any,
+    opts: { note: string | null; hasDiscrepancy: boolean; onBehalf: boolean },
+  ) {
+    const requisitionId = transfer.requisitionId as string;
+    const [requisition] = await tx
+      .select()
+      .from(schema.branchRequisitions)
+      .where(eq(schema.branchRequisitions.id, requisitionId))
+      .for('update');
+    if (!requisition) return;
+
+    const reqItems: Array<typeof schema.branchRequisitionItems.$inferSelect> = await tx
+      .select()
+      .from(schema.branchRequisitionItems)
+      .where(eq(schema.branchRequisitionItems.requisitionId, requisitionId));
+
+    const rows = reqItems.map((item) => ({
+      productId: item.productId,
+      quantity: qty(receivedByProduct.get(item.productId) ?? 0),
+      expectedQuantity: qty(item.quantityDispatched ?? 0),
+      note: opts.note,
+    }));
+    // Products that arrived without being requested are still part of the trail.
+    const requested = new Set(reqItems.map((i) => i.productId));
+    for (const [productId, received] of receivedByProduct) {
+      if (!requested.has(productId) && received > 0) {
+        rows.push({ productId, quantity: qty(received), expectedQuantity: 0, note: opts.note });
+      }
+    }
+
+    for (const item of reqItems) {
+      await tx
+        .update(schema.branchRequisitionItems)
+        .set({ quantityReceived: qtyStr(receivedByProduct.get(item.productId) ?? 0) })
+        .where(eq(schema.branchRequisitionItems.id, item.id));
+    }
+    await tx
+      .update(schema.branchRequisitions)
+      .set({ status: 'completed', updatedAt: new Date() })
+      .where(eq(schema.branchRequisitions.id, requisitionId));
+
+    await recordRequisitionLedger(
+      tx,
+      {
+        businessId: requisition.businessId,
+        branchId: requisition.fromBranchId,
+        requisitionId,
+        transferId: transfer.id,
+        stage: 'received',
+        actor,
+      },
+      rows,
+    );
+    await this.auditLog.record(tx, {
+      businessId: requisition.businessId,
+      branchId: requisition.fromBranchId,
+      entityType: 'branch_requisition',
+      entityId: requisitionId,
+      action: opts.onBehalf ? 'received_on_behalf' : 'received',
+      actorId: actor.sub,
+      actorRole: primaryRole(actor),
+      reason: opts.note,
+      before: { status: requisition.status },
+      after: {
+        status: 'completed',
+        transferId: transfer.id,
+        hasDiscrepancy: opts.hasDiscrepancy,
+        items: rows.map((r) => ({ productId: r.productId, dispatched: r.expectedQuantity, received: r.quantity })),
+      },
+      source: actorSource(actor),
+    });
+  }
+
+  /** The virtual "En Tránsito" warehouse that holds stock between dispatch and receipt. */
+  async getOrCreateTransitWarehouse(tx: any, businessId: string) {
     const [existing] = await tx
       .select()
       .from(schema.warehouses)

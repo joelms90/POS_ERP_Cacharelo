@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { api, BranchRequisition, BranchRequisitionItem, Branch, Warehouse, Product } from '../services/api';
+import { api, BranchRequisition, Branch, Warehouse, Product, RequisitionHistory } from '../services/api';
 import { Heading } from '../components/atoms/Heading';
 import { Button } from '../components/atoms/Button';
 import { Input } from '../components/atoms/Input';
@@ -45,10 +45,13 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const [viewingReq, setViewingReq] = useState<BranchRequisition | null>(null);
-  const [viewingReqItems, setViewingReqItems] = useState<BranchRequisitionItem[]>([]);
+  const [history, setHistory] = useState<RequisitionHistory | null>(null);
+  const [behalfNote, setBehalfNote] = useState('');
+  const [receivedQty, setReceivedQty] = useState<Record<string, string>>({});
+  const [isActing, setIsActing] = useState(false);
 
   const [approvingReq, setApprovingReq] = useState<BranchRequisition | null>(null);
+  const [approvalQty, setApprovalQty] = useState<Record<string, string>>({});
   const [approvalWarehouseId, setApprovalWarehouseId] = useState('');
   const [approvalNotes, setApprovalNotes] = useState('');
 
@@ -64,11 +67,9 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
   }, []);
 
   const effectiveRoles = (userRoles && userRoles.length > 0 ? userRoles : [userRole]).map((r) => r.toLowerCase());
-  const isApprover = effectiveRoles.some((r) =>
-    ['owner', 'inventory_admin', 'support_tech', 'warehouse_purchasing_operator'].includes(r)
-  );
-  const isOwner = effectiveRoles.includes('owner');
-  const isSelfCreated = (req: BranchRequisition) => (req.createdBy === userId || req.requestedById === userId) && !isOwner;
+  // Owner / Admin. Inventario authorize; their own requisitions are born authorized.
+  const isApprover = effectiveRoles.some((r) => ['owner', 'inventory_admin'].includes(r));
+  const canCreate = isApprover || effectiveRoles.includes('branch_operator');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -182,7 +183,12 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
         notes: reqNotes || undefined,
         items: items.map((it) => ({ productId: it.productId, quantityRequested: it.quantityRequested })),
       });
-      showToast('Requisición creada exitosamente.', 'success');
+      showToast(
+        isApprover
+          ? 'Requisición creada y autorizada. Ya aparece en Salidas de Almacén y Bodega.'
+          : 'Requisición enviada. Queda pendiente de autorización.',
+        'success',
+      );
       setIsCreating(false);
       resetForm();
       await fetchData();
@@ -193,12 +199,25 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
     }
   };
 
+  const num = (value: unknown) => parseFloat(String(value ?? '0')) || 0;
+  const fmt = (value: unknown) => {
+    const n = num(value);
+    return Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/0+$/, '');
+  };
+
+  const loadHistory = async (id: string) => {
+    const data = await api.getRequisitionHistory(id);
+    setHistory(data);
+    setReceivedQty(
+      Object.fromEntries((data.requisition.items || []).map((i) => [i.productId, fmt(i.quantityDispatched ?? 0)])),
+    );
+  };
+
   const handleViewDetails = async (req: BranchRequisition) => {
     try {
       setLoading(true);
-      const full = await api.getRequisition(req.id);
-      setViewingReq(full);
-      setViewingReqItems(full.items || []);
+      setBehalfNote('');
+      await loadHistory(req.id);
     } catch (err: any) {
       showToast(err.message || 'Error al cargar detalles.', 'error');
     } finally {
@@ -206,21 +225,45 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
     }
   };
 
+  const openReview = async (req: BranchRequisition) => {
+    try {
+      const full = await api.getRequisition(req.id);
+      setApprovingReq(full);
+      setApprovalQty(Object.fromEntries((full.items || []).map((i) => [i.productId, fmt(i.quantityRequested)])));
+      setApprovalWarehouseId(full.toWarehouseId || '');
+      setApprovalNotes('');
+    } catch (err: any) {
+      showToast(err.message || 'Error al cargar la requisición.', 'error');
+    }
+  };
+
+  const closeReview = () => {
+    setApprovingReq(null);
+    setApprovalNotes('');
+    setApprovalWarehouseId('');
+  };
+
+  const approvalAdjusted = (approvingReq?.items || []).some(
+    (i) => Math.abs(num(approvalQty[i.productId]) - num(i.quantityRequested)) > 0.0005,
+  );
+
   const handleApprove = async () => {
     if (!approvingReq) return;
+    if (approvalAdjusted && !approvalNotes.trim()) {
+      showToast('Explica el motivo al autorizar cantidades distintas a las solicitadas.', 'warning');
+      return;
+    }
     try {
-      await api.updateRequisitionStatus(approvingReq.id, {
-        status: 'approved',
-        notes: approvalNotes || undefined,
-        warehouseId: approvalWarehouseId || approvingReq.toWarehouseId || undefined,
+      await api.approveRequisition(approvingReq.id, {
+        items: (approvingReq.items || []).map((i) => ({ productId: i.productId, quantityApproved: num(approvalQty[i.productId]) })),
+        notes: approvalNotes.trim() || undefined,
+        warehouseId: approvalWarehouseId || undefined,
       });
-      showToast('Requisición aprobada. Se generó el traspaso.', 'success');
-      setApprovingReq(null);
-      setApprovalNotes('');
-      setApprovalWarehouseId('');
+      showToast('Requisición autorizada. Almacén y Bodega ya la ve en Salidas.', 'success');
+      closeReview();
       await fetchData();
     } catch (err: any) {
-      showToast(err.message || 'Error al aprobar.', 'error');
+      showToast(err.message || 'Error al autorizar.', 'error');
     }
   };
 
@@ -231,43 +274,89 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
       return;
     }
     try {
-      await api.updateRequisitionStatus(approvingReq.id, { status: 'rejected', notes: approvalNotes });
+      await api.rejectRequisition(approvingReq.id, approvalNotes.trim());
       showToast('Requisición rechazada.', 'success');
-      setApprovingReq(null);
-      setApprovalNotes('');
+      closeReview();
       await fetchData();
     } catch (err: any) {
       showToast(err.message || 'Error al rechazar.', 'error');
     }
   };
 
+  /** Owner / Admin. Inventario acting on behalf of Bodega or the branch; always with a reason. */
+  const actOnBehalf = async (action: 'cancel' | 'deliver' | 'receive') => {
+    const req = history?.requisition;
+    if (!req) return;
+    const note = behalfNote.trim();
+    if (!note) {
+      showToast('Indica el motivo; queda registrado en la auditoría.', 'warning');
+      return;
+    }
+    setIsActing(true);
+    try {
+      if (action === 'cancel') {
+        await api.rejectRequisition(req.id, note);
+        showToast('Requisición cancelada.', 'success');
+      } else if (action === 'deliver') {
+        await api.deliverRequisition(req.id, note);
+        showToast('Entrega registrada en nombre de Almacén y Bodega.', 'success');
+      } else if (req.transfer) {
+        await api.receiveTransfer(req.transfer.id, {
+          items: (req.items || []).map((i) => ({ productId: i.productId, quantityReceived: num(receivedQty[i.productId]) })),
+          note,
+        });
+        showToast('Recepción confirmada en nombre de la sucursal.', 'success');
+      }
+      setBehalfNote('');
+      await Promise.all([loadHistory(req.id), fetchData()]);
+    } catch (err: any) {
+      showToast(err.message || 'No se pudo completar la acción.', 'error');
+    } finally {
+      setIsActing(false);
+    }
+  };
+
+  const STATUS_META: Record<string, { label: string; className: string }> = {
+    pending: { label: 'Por autorizar', className: 'bg-gray-500/20 text-gray-300' },
+    pending_approval: { label: 'Por autorizar', className: 'bg-gray-500/20 text-gray-300' },
+    approved: { label: 'Autorizada', className: 'bg-green-500/20 text-green-300' },
+    standby: { label: 'En espera (Bodega)', className: 'bg-amber-500/20 text-amber-300' },
+    in_transit: { label: 'En camino', className: 'bg-blue-500/20 text-blue-300' },
+    delivered: { label: 'Entregada (por confirmar)', className: 'bg-purple-500/20 text-purple-300' },
+    completed: { label: 'Completada', className: 'bg-champagne-gold/20 text-champagne-gold' },
+    rejected: { label: 'Rechazada', className: 'bg-red-500/20 text-red-300' },
+  };
+
   const getStatusBadge = (status: string) => {
-    const badges: Record<string, string> = {
-      pending: 'bg-gray-500/20 text-gray-300',
-      pending_approval: 'bg-gray-500/20 text-gray-300',
-      approved: 'bg-green-500/20 text-green-300',
-      rejected: 'bg-red-500/20 text-red-300',
-      completed: 'bg-blue-500/20 text-blue-300',
-    };
-    const labels: Record<string, string> = {
-      pending: 'Pendiente',
-      pending_approval: 'Pendiente',
-      approved: 'Aprobada',
-      rejected: 'Rechazada',
-      completed: 'Completada',
-    };
-    return (
-      <span className={`px-2 py-1 rounded text-xs font-medium ${badges[status] || badges.pending}`}>
-        {labels[status] || status}
-      </span>
-    );
+    const meta = STATUS_META[status] || { label: status, className: STATUS_META.pending.className };
+    return <span className={`px-2 py-1 rounded text-xs font-medium ${meta.className}`}>{meta.label}</span>;
+  };
+
+  const ACTION_LABELS: Record<string, string> = {
+    created: 'Solicitada',
+    created_approved: 'Creada y autorizada',
+    approved: 'Autorizada',
+    rejected: 'Rechazada / cancelada',
+    held: 'Puesta en espera por Bodega',
+    dispatched: 'Despachada por Bodega',
+    delivered: 'Entregada por Bodega',
+    delivered_on_behalf: 'Entrega marcada en nombre de Bodega',
+    received: 'Recepción confirmada por la sucursal',
+    received_on_behalf: 'Recepción confirmada en nombre de la sucursal',
+  };
+  const STAGE_LABELS: Record<string, string> = {
+    requested: 'Solicitado',
+    approved: 'Autorizado',
+    dispatched: 'Despachado',
+    received: 'Recibido',
   };
 
   const filteredReqs = requisitions.filter((r) => {
     const q = searchQuery.toLowerCase();
     const branchName = branches.find((b) => b.id === r.fromBranchId)?.name || '';
     const matchesSearch = !q || branchName.toLowerCase().includes(q) || (r.notes || '').toLowerCase().includes(q);
-    const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
+    const matchesStatus =
+      statusFilter === 'all' || r.status === statusFilter || (statusFilter === 'pending_approval' && r.status === 'pending');
     return matchesSearch && matchesStatus;
   });
 
@@ -284,9 +373,11 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
             <Heading level={2} className="!text-lg sm:!text-2xl !border-none !pb-0 text-champagne-gold">
               Requisiciones
             </Heading>
-            <Button onClick={() => { setIsCreating(true); resetForm(); }} disabled={isCreating}>
-              + Nueva Requisición
-            </Button>
+            {canCreate && (
+              <Button onClick={() => { setIsCreating(true); resetForm(); }} disabled={isCreating}>
+                + Nueva Requisición
+              </Button>
+            )}
           </div>
 
           {error && (
@@ -330,11 +421,13 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
                       className="px-3 py-1.5 bg-charcoal-surface border border-aged-bronze focus:border-champagne-gold rounded font-sans text-xs text-text-primary transition-all duration-300 focus:outline-none cursor-pointer"
                     >
                       <option value="all">Todos los Estados</option>
-                      <option value="pending">Pendiente</option>
-                      <option value="pending_approval">Pendiente</option>
-                      <option value="approved">Aprobada</option>
-                      <option value="rejected">Rechazada</option>
+                      <option value="pending_approval">Por autorizar</option>
+                      <option value="approved">Autorizada</option>
+                      <option value="standby">En espera (Bodega)</option>
+                      <option value="in_transit">En camino</option>
+                      <option value="delivered">Entregada (por confirmar)</option>
                       <option value="completed">Completada</option>
+                      <option value="rejected">Rechazada</option>
                     </select>
                   </div>
                 </div>
@@ -387,22 +480,13 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
                                     </svg>
                                   </button>
                                   {isApprover && isPending(req.status) && (
-                                    isSelfCreated(req) ? (
-                                      <span
-                                        className="text-text-secondary/60 text-xs px-2 italic select-none"
-                                        title="No puedes autorizar tu propia requisición (requiere otro operador o propietario)"
-                                      >
-                                        Propia
-                                      </span>
-                                    ) : (
-                                      <button
-                                        onClick={() => setApprovingReq(req)}
-                                        className="text-champagne-gold hover:underline text-xs px-2"
-                                        title="Aprobar / Rechazar"
-                                      >
-                                        Revisar
-                                      </button>
-                                    )
+                                    <button
+                                      onClick={() => openReview(req)}
+                                      className="text-champagne-gold hover:underline text-xs px-2"
+                                      title="Autorizar / Rechazar"
+                                    >
+                                      Revisar
+                                    </button>
                                   )}
                                 </div>
                               </td>
@@ -631,117 +715,234 @@ export const RequisitionsPage: React.FC<RequisitionsPageProps> = ({ businessId, 
           </div>
         )}
 
-        {/* Approval Modal */}
+        {/* Review Modal (Owner / Admin. Inventario) */}
         {approvingReq && (
           <div className="fixed inset-0 bg-obsidian/85 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-onyx-surface border border-aged-bronze/35 rounded-xl max-w-xl w-full shadow-2xl">
+            <div className="bg-onyx-surface border border-aged-bronze/35 rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl">
               <div className="p-6 border-b border-aged-bronze/25 flex justify-between items-center">
-                <Heading level={2} className="!text-champagne-gold !border-none !pb-0 font-light text-lg">Aprobar / Rechazar</Heading>
-                <button onClick={() => { setApprovingReq(null); setApprovalNotes(''); }} className="text-text-secondary hover:text-text-primary">
+                <div>
+                  <Heading level={2} className="!text-champagne-gold !border-none !pb-0 font-light text-lg">Autorizar / Rechazar</Heading>
+                  <p className="text-xs text-text-secondary mt-1">
+                    {approvingReq.fromBranchName || branches.find((b) => b.id === approvingReq.fromBranchId)?.name || '—'}
+                    {approvingReq.createdByName ? ` · Solicitó ${approvingReq.createdByName}` : ''}
+                  </p>
+                </div>
+                <button onClick={closeReview} className="text-text-secondary hover:text-text-primary">
                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
-              <div className="p-6 space-y-4">
-                <div className="text-xs space-y-1">
-                  <p><span className="text-text-secondary">Sucursal:</span> {branches.find(b => b.id === approvingReq.fromBranchId)?.name || '—'}</p>
-                  <p><span className="text-text-secondary">Bodega Solicitada:</span> {warehouses.find(w => w.id === approvingReq.toWarehouseId)?.name || 'Sin especificar (a asignar)'}</p>
-                  <p><span className="text-text-secondary">Notas:</span> {approvingReq.notes || '—'}</p>
-                  <p><span className="text-text-secondary">Items:</span> {approvingReq.itemCount || 0}</p>
-                </div>
-                {isSelfCreated(approvingReq) ? (
-                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded text-amber-200 text-xs">
-                    ⚠️ No puedes autorizar tu propia requisición. Esta acción debe ser realizada por otro operador o el propietario.
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
-                        Bodega de donde se surte (Origen del inventario)
-                      </label>
-                      <select
-                        value={approvalWarehouseId || approvingReq.toWarehouseId || (warehouses[0]?.id || '')}
-                        onChange={(e) => setApprovalWarehouseId(e.target.value)}
-                        className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-xs"
-                      >
-                        {warehouses.map((w) => (
-                          <option key={w.id} value={w.id}>{w.name}</option>
-                        ))}
-                      </select>
-                    </div>
+              <div className="p-6 space-y-4 overflow-y-auto">
+                {approvingReq.notes && <p className="text-xs text-text-secondary italic">Nota de la sucursal: {approvingReq.notes}</p>}
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="text-[11px] text-text-secondary uppercase tracking-wider border-b border-aged-bronze/30">
+                      <th className="py-2">Producto</th>
+                      <th className="py-2 text-right">Solicitado</th>
+                      <th className="py-2 text-right w-32">Autorizar</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-aged-bronze/20">
+                    {(approvingReq.items || []).map((item) => {
+                      const changed = Math.abs(num(approvalQty[item.productId]) - num(item.quantityRequested)) > 0.0005;
+                      return (
+                        <tr key={item.productId}>
+                          <td className="py-2 text-text-primary">{item.productName}</td>
+                          <td className="py-2 text-right font-mono">{fmt(item.quantityRequested)} {item.unit || ''}</td>
+                          <td className="py-2 text-right">
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={approvalQty[item.productId] ?? ''}
+                              onChange={(e) => setApprovalQty((prev) => ({ ...prev, [item.productId]: e.target.value }))}
+                              className={`w-24 bg-charcoal border rounded px-2 py-1 text-right font-mono ${changed ? 'border-amber-400 text-amber-200' : 'border-aged-bronze/40 text-champagne-gold'}`}
+                              data-testid={`approve-qty-${item.productId}`}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">Notas de aprobación / razón de rechazo</label>
-                      <textarea
-                        value={approvalNotes}
-                        onChange={(e) => setApprovalNotes(e.target.value)}
-                        className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-xs"
-                        rows={3}
-                        placeholder="Ej. Aprobado, surtir de Bodega Central..."
-                      />
-                    </div>
-                    <div className="flex gap-3">
-                      <Button onClick={handleApprove} className="flex-1 bg-success-green hover:bg-success-green/90 text-onyx-surface">Aprobar</Button>
-                      <Button onClick={handleReject} className="flex-1 bg-error-red hover:bg-error-red/90 text-white">Rechazar</Button>
-                    </div>
-                  </>
-                )}
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                    Bodega sugerida (Almacén y Bodega puede cambiarla al despachar)
+                  </label>
+                  <select
+                    value={approvalWarehouseId}
+                    onChange={(e) => setApprovalWarehouseId(e.target.value)}
+                    className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-xs"
+                  >
+                    <option value="">Sin sugerencia</option>
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                    {approvalAdjusted ? 'Motivo del ajuste (obligatorio)' : 'Notas de autorización / razón de rechazo'}
+                  </label>
+                  <textarea
+                    value={approvalNotes}
+                    onChange={(e) => setApprovalNotes(e.target.value)}
+                    className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-xs"
+                    rows={3}
+                    placeholder="Ej. Se autoriza menos queso por consumo de la semana..."
+                    data-testid="approval-notes"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <Button onClick={handleApprove} className="flex-1 bg-success-green hover:bg-success-green/90 text-onyx-surface">Autorizar</Button>
+                  <Button onClick={handleReject} className="flex-1 bg-error-red hover:bg-error-red/90 text-white">Rechazar</Button>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Detail Modal */}
-        {viewingReq && (
-          <div className="fixed inset-0 bg-obsidian/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in font-sans">
-            <div className="bg-onyx-surface border border-aged-bronze/35 rounded-xl max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
-              <div className="p-6 border-b border-aged-bronze/25 flex items-center justify-between">
-                <div>
-                  <Heading level={2} className="!text-champagne-gold !border-none !pb-0 font-light font-sans text-lg">
-                    Detalle de Requisición
-                  </Heading>
-                  <div className="flex gap-4 mt-1 text-xs text-text-secondary">
-                    <span>{branches.find(b => b.id === viewingReq.fromBranchId)?.name || '—'}</span>
-                    <span>{warehouses.find(w => w.id === viewingReq.toWarehouseId)?.name || '—'}</span>
-                    <span>{getStatusBadge(viewingReq.status)}</span>
+        {/* Detail Modal: quantities per step, discrepancies and audit timeline */}
+        {history && (() => {
+          const req = history.requisition;
+          const discrepancies = history.ledger.filter((row) => row.stage !== 'requested' && Math.abs(num(row.difference)) > 0.0005);
+          const diffClass = (a: unknown, b: unknown) => (Math.abs(num(a) - num(b)) > 0.0005 ? 'text-amber-300' : '');
+          return (
+            <div className="fixed inset-0 bg-obsidian/85 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in font-sans">
+              <div className="bg-onyx-surface border border-aged-bronze/35 rounded-xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+                <div className="p-6 border-b border-aged-bronze/25 flex items-center justify-between">
+                  <div>
+                    <Heading level={2} className="!text-champagne-gold !border-none !pb-0 font-light font-sans text-lg">
+                      Detalle de Requisición
+                    </Heading>
+                    <div className="flex flex-wrap gap-4 mt-1 text-xs text-text-secondary items-center">
+                      <span>{req.fromBranchName || '—'}</span>
+                      <span>{req.toWarehouseName || 'Bodega por asignar'}</span>
+                      {getStatusBadge(req.status)}
+                    </div>
+                    {req.notes && <p className="text-xs text-text-secondary mt-1 italic">Notas: {req.notes}</p>}
                   </div>
-                  {viewingReq.notes && <p className="text-xs text-text-secondary mt-1 italic">Notas: {viewingReq.notes}</p>}
+                  <button onClick={() => setHistory(null)} className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
-                <button onClick={() => { setViewingReq(null); setViewingReqItems([]); }} className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
 
-              <div className="overflow-y-auto p-6">
-                {viewingReqItems.length > 0 ? (
+                <div className="overflow-y-auto p-6 space-y-6">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-charcoal-surface/60 border-b border-aged-bronze/35 text-[11px] font-semibold text-text-secondary uppercase tracking-wider">
-                        <th className="px-4 py-3">Producto</th>
-                        <th className="px-4 py-3 text-right">Cant. Solicitada</th>
-                        <th className="px-4 py-3 text-right">Cant. Aprobada</th>
+                        <th className="px-3 py-2">Producto</th>
+                        <th className="px-3 py-2 text-right">Solicitada</th>
+                        <th className="px-3 py-2 text-right">Autorizada</th>
+                        <th className="px-3 py-2 text-right">Despachada</th>
+                        <th className="px-3 py-2 text-right">Recibida</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-aged-bronze/20">
-                      {viewingReqItems.map((item) => (
-                        <tr key={item.id || item.productId}>
-                          <td className="px-4 py-3 font-medium text-text-primary">{item.productName || products.find(p => p.id === item.productId)?.name || '—'}</td>
-                          <td className="px-4 py-3 text-right font-mono">{item.quantityRequested}</td>
-                          <td className="px-4 py-3 text-right font-mono text-champagne-gold">{item.quantityApproved || 0}</td>
-                        </tr>
-                      ))}
+                      {(req.items || []).map((item) => {
+                        const approved = isPending(req.status) ? null : item.quantityApproved;
+                        return (
+                          <tr key={item.productId}>
+                            <td className="px-3 py-2 font-medium text-text-primary">{item.productName || products.find((p) => p.id === item.productId)?.name || '—'}</td>
+                            <td className="px-3 py-2 text-right font-mono">{fmt(item.quantityRequested)}</td>
+                            <td className={`px-3 py-2 text-right font-mono ${approved === null ? '' : diffClass(approved, item.quantityRequested)}`}>
+                              {approved === null ? '—' : fmt(approved)}
+                            </td>
+                            <td className={`px-3 py-2 text-right font-mono ${item.quantityDispatched == null ? '' : diffClass(item.quantityDispatched, item.quantityApproved)}`}>
+                              {item.quantityDispatched == null ? '—' : fmt(item.quantityDispatched)}
+                            </td>
+                            <td className={`px-3 py-2 text-right font-mono ${item.quantityReceived == null ? '' : diffClass(item.quantityReceived, item.quantityDispatched)}`}>
+                              {req.status === 'delivered' && isApprover ? (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={receivedQty[item.productId] ?? ''}
+                                  onChange={(e) => setReceivedQty((prev) => ({ ...prev, [item.productId]: e.target.value }))}
+                                  className="w-20 bg-charcoal border border-aged-bronze/40 rounded px-2 py-1 text-right"
+                                />
+                              ) : item.quantityReceived == null ? '—' : fmt(item.quantityReceived)}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
-                ) : (
-                  <div className="text-center py-8 text-text-secondary/50 text-xs">Sin productos registrados.</div>
-                )}
+
+                  {discrepancies.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-300 mb-2">Diferencias registradas</h3>
+                      <ul className="space-y-1 text-xs">
+                        {discrepancies.map((row) => (
+                          <li key={row.id} className="bg-amber-500/5 border border-amber-500/20 rounded px-3 py-2">
+                            <span className="text-text-primary font-medium">{row.productName}</span>
+                            <span className="text-text-secondary"> · {STAGE_LABELS[row.stage] || row.stage}: </span>
+                            <span className="font-mono">{fmt(row.expectedQuantity)} → {fmt(row.quantity)} ({num(row.difference) > 0 ? '+' : ''}{fmt(row.difference)})</span>
+                            {row.note && <span className="text-text-secondary italic"> — {row.note}</span>}
+                            {row.actorName && <span className="text-text-secondary/70"> · {row.actorName}</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-champagne-gold mb-2">Historial</h3>
+                    <ol className="border-l border-aged-bronze/30 pl-4 space-y-3 text-xs">
+                      {history.events.map((event) => (
+                        <li key={event.id}>
+                          <div className="text-text-primary font-medium">{ACTION_LABELS[event.action] || event.action}</div>
+                          <div className="text-text-secondary">
+                            {new Date(event.createdAt).toLocaleString('es-MX')} · {event.actorName || 'Sistema'}
+                            {event.actorRole ? ` (${event.actorRole})` : ''}
+                          </div>
+                          {event.reason && <div className="text-text-secondary italic">“{event.reason}”</div>}
+                        </li>
+                      ))}
+                      {history.events.length === 0 && <li className="text-text-secondary/60">Sin eventos registrados (requisición anterior a la auditoría).</li>}
+                    </ol>
+                  </div>
+
+                  {isApprover && isPending(req.status) && (
+                    <div className="border-t border-aged-bronze/25 pt-4">
+                      <Button onClick={() => { setHistory(null); openReview(req); }}>Autorizar / Rechazar</Button>
+                    </div>
+                  )}
+                  {isApprover && ['approved', 'standby', 'in_transit', 'delivered'].includes(req.status) && (
+                    <div className="border-t border-aged-bronze/25 pt-4 space-y-3">
+                      <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                        Motivo (queda en la auditoría)
+                      </label>
+                      <textarea
+                        value={behalfNote}
+                        onChange={(e) => setBehalfNote(e.target.value)}
+                        rows={2}
+                        className="w-full px-3 py-2 bg-charcoal border border-aged-bronze/30 rounded text-text-primary text-xs"
+                        placeholder="Ej. El chofer confirmó la entrega por teléfono"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        {['approved', 'standby'].includes(req.status) && (
+                          <Button variant="secondary" disabled={isActing} onClick={() => actOnBehalf('cancel')}>Cancelar requisición</Button>
+                        )}
+                        {req.status === 'in_transit' && (
+                          <Button disabled={isActing} onClick={() => actOnBehalf('deliver')}>Marcar entregada (en nombre de Bodega)</Button>
+                        )}
+                        {req.status === 'delivered' && (
+                          <Button disabled={isActing} onClick={() => actOnBehalf('receive')}>Confirmar recepción (en nombre de la sucursal)</Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

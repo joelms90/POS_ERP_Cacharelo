@@ -1,5 +1,16 @@
 # Session Handoff
 
+## Latest Session — Requisition dispatch flow (2026-11-23, Claude Code)
+- **Branch:** `019-supervisor-sucursal` (worktree `.worktrees/supervisor-sucursal`), committed locally, **not pushed, not deployed**.
+- **Problem:** the owner's approval did the warehouse step (it created the transfer), so the requisition vanished from Bodega's "Salidas". The transfer then stayed `pending` because only the admin Traspasos page could ship it. Bodega's quantity edits in the dispatch dialog were also never sent.
+- **New flow:** OIS requests (`pending_approval`) → Owner / Admin. Inventario authorize, possibly adjusting quantities (`approved`); their own requisitions are born `approved` → Bodega dispatches, which creates the transfer and ships it in one step (`in_transit`) → Bodega marks it delivered (`delivered`) → OIS confirms, reporting differences (`completed`). Bodega never sees unauthorized requisitions and cannot create or authorize. Owner / Admin. Inv. can mark delivered or confirm on behalf, always with a reason. Soporte Técnico is read-only.
+- **Audit:** append-only `requisition_item_ledger` (per product × stage, with difference and note) plus `audit_log` rows; `GET /requisitions/:id/history`; timeline and differences in the admin detail modal.
+- **Docs:** [`knowledge/workflows/replenishment-and-transfers.md`](./knowledge/workflows/replenishment-and-transfers.md); migration step 22 in [`docs/pre-deployment-checklist.md`](./docs/pre-deployment-checklist.md).
+- **Verified:** backend jest 297/297, including `requisitions.integration.spec.ts` (4 cases, real Postgres) and the supervision integration suite. Admin `tsc` + `vite build`. Flutter `warehouse_flow_test` 5/5; full Flutter suite has the same 15 pre-existing failures as untouched `HEAD`. Migration step 22 applied to the local docker DB.
+- **Not verified:** the Playwright specs were updated and compile, but were not run. `requisition-rejection.spec.ts` now needs `E2E_OIS_TOKEN` (a branch operator JWT) and skips without it.
+- **To ship:** `make backend-migrate` (step 22; read its warning list of unlinked legacy requisitions), then deploy backend, admin and the POS build together. `PATCH /requisitions/:id/status` was removed, so old POS builds cannot dispatch.
+
+---
 ## Latest Session — Production Logging (2026-11-20, Claude Code)
 - **Branch:** `feat/prod-logging` (committed locally, **not pushed, not deployed**)
 - **What:** Errors from the POS Flutter app, the admin web and API 5xx are now stored in a single `app_logs` table, tagged by sucursal, user, device and version. Agents triage them with `make logs-today` (or the MCP tools `get_error_summary`, `search_logs`, `get_log_entry`). Playbook: [`docs/prod-log-triage.md`](./docs/prod-log-triage.md). Claude skill: `/triage-prod-logs`.

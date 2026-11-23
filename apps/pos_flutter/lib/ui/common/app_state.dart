@@ -5556,7 +5556,8 @@ class AppState extends ChangeNotifier {
           .map((item) => Map<String, dynamic>.from(item as Map))
           .where((item) =>
               item['toBranchId'] == terminalBranchId &&
-              item['status'] == 'in_transit')
+              (item['status'] == 'in_transit' ||
+                  item['status'] == 'delivered'))
           .toList();
     } catch (error) {
       debugPrint('Unable to load inbound transfers: $error');
@@ -5709,14 +5710,16 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<List<Map<String, dynamic>>> fetchWarehousePendingRequisitions() async {
+  /// Almacén y Bodega "Salidas": only authorized requisitions (approved, on hold,
+  /// on the way, delivered awaiting the branch). Unapproved ones are never returned.
+  Future<List<Map<String, dynamic>>> fetchWarehouseOutboundRequisitions() async {
     if (!isTerminalConfigured || terminalBusinessId == null) return const [];
     try {
       final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
           .get(
             Uri.parse(
-                '$baseUrl/requisitions/pending?businessId=${Uri.encodeQueryComponent(terminalBusinessId!)}'),
+                '$baseUrl/requisitions/outbound?businessId=${Uri.encodeQueryComponent(terminalBusinessId!)}'),
             headers: await _operatorHeaders(),
           )
           .timeout(const Duration(seconds: 10));
@@ -5727,7 +5730,7 @@ class AppState extends ChangeNotifier {
           .map((item) => Map<String, dynamic>.from(item as Map))
           .toList();
     } catch (error) {
-      debugPrint('Unable to load pending warehouse requisitions: $error');
+      debugPrint('Unable to load outbound requisitions: $error');
       return const [];
     }
   }
@@ -5751,32 +5754,52 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateRequisitionStatus({
-    required String requisitionId,
-    required String status,
-    String? notes,
-    String? warehouseId,
-  }) async {
+  /// Runs one requisition flow action. Returns null on success or the server's
+  /// message (e.g. "Stock insuficiente…") so the screen can show why it failed.
+  Future<String?> _requisitionAction(
+      String requisitionId, String action, Map<String, dynamic> body) async {
     try {
       final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
       final response = await http
-          .patch(
-            Uri.parse('$baseUrl/requisitions/$requisitionId/status'),
+          .post(
+            Uri.parse('$baseUrl/requisitions/$requisitionId/$action'),
             headers: await _operatorHeaders(),
-            body: jsonEncode({
-              'status': status,
-              if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
-              if (warehouseId != null && warehouseId.trim().isNotEmpty)
-                'warehouseId': warehouseId.trim(),
-            }),
+            body: jsonEncode(body),
           )
-          .timeout(const Duration(seconds: 10));
-      return response.statusCode >= 200 && response.statusCode < 300;
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode >= 200 && response.statusCode < 300) return null;
+      return _apiErrorMessage(response, 'No se pudo actualizar la requisición.');
     } catch (error) {
-      debugPrint('Unable to update requisition status: $error');
-      return false;
+      debugPrint('Unable to run requisition action $action: $error');
+      return 'Sin conexión con el servidor. Intenta de nuevo.';
     }
   }
+
+  /// Almacén y Bodega: cannot fulfil yet (reason required).
+  Future<String?> holdRequisition(
+          {required String requisitionId, required String reason}) =>
+      _requisitionAction(requisitionId, 'hold', {'reason': reason.trim()});
+
+  /// Almacén y Bodega: creates the transfer and ships it (stock leaves the
+  /// warehouse). Quantities different from the approved ones need [notes].
+  Future<String?> dispatchRequisition({
+    required String requisitionId,
+    required String warehouseId,
+    required List<Map<String, dynamic>> items,
+    String? notes,
+  }) =>
+      _requisitionAction(requisitionId, 'dispatch', {
+        'warehouseId': warehouseId,
+        'items': items,
+        if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      });
+
+  /// Almacén y Bodega: the merchandise was handed over at the branch.
+  Future<String?> deliverRequisition(
+          {required String requisitionId, String? notes}) =>
+      _requisitionAction(requisitionId, 'deliver', {
+        if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      });
 
   Future<List<Map<String, dynamic>>> fetchWarehouseStock({String? warehouseId}) async {
     if (!isTerminalConfigured || terminalBusinessId == null) return const [];

@@ -1,194 +1,125 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { RequisitionsService } from './requisitions.service';
-import { RequisitionsRepository } from './repositories/requisitions.repository';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { mergeRequestedItems, primaryRole, qty, sameQty } from './requisition-flow';
 
+/**
+ * Role gates and pure helpers. The full flow (SQL, stock, ledger, audit) is covered
+ * against a real database in requisitions.integration.spec.ts.
+ */
 describe('RequisitionsService', () => {
-  let service: RequisitionsService;
-  let repository: RequisitionsRepository;
-
-  const mockRequisitionsRepository = {
-    create: jest.fn(),
-    createForBranch: jest.fn(),
+  const repository = {
     findByRequester: jest.fn(),
-    findByBranch: jest.fn(),
-    findPendingForBusiness: jest.fn(),
-    findById: jest.fn(),
     findByIdWithItems: jest.fn(),
-    updateStatus: jest.fn(),
+    findByStatuses: jest.fn(),
+    findAll: jest.fn(),
   };
+  const db = { transaction: jest.fn() };
+  const service = new RequisitionsService(repository as any, db as any, {} as any, {} as any, {} as any);
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        RequisitionsService,
-        {
-          provide: RequisitionsRepository,
-          useValue: mockRequisitionsRepository,
-        },
-      ],
-    }).compile();
+  const user = (role: string, extra: object = {}) => ({ sub: `${role}-1`, roles: [role], businessId: 'bus-1', ...extra });
+  const ois = user('branch_operator', { branchId: 'branch-1' });
+  const bodega = user('warehouse_purchasing_operator');
+  const owner = user('owner');
+  const invAdmin = user('inventory_admin');
+  const support = user('support_tech');
 
-    service = module.get<RequisitionsService>(RequisitionsService);
-    repository = module.get<RequisitionsRepository>(RequisitionsRepository);
-  });
+  afterEach(() => jest.clearAllMocks());
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
+  describe('who may do what (rejected before touching the database)', () => {
+    afterEach(() => expect(db.transaction).not.toHaveBeenCalled());
 
-  describe('create', () => {
-    it('should create and return a requisition', async () => {
-      const dto = {
-        businessId: 'bus-1',
-        fromBranchId: 'branch-1',
-        toWarehouseId: 'wh-1',
-        createdBy: 'user-1',
-        notes: 'Req notes',
-        items: [{ productId: 'prod-1', quantityRequested: 15.5 }],
-      };
-      const created = { id: 'req-1', ...dto, status: 'pending' };
-      mockRequisitionsRepository.create.mockResolvedValue(created);
+    it.each([
+      ['bodega', bodega],
+      ['soporte', support],
+    ])('%s cannot create requisitions', async (_, actor) => {
+      await expect(service.createForOperator({ items: [{ productId: 'p', quantityRequested: 1 }] } as any, actor)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
 
-      const result = await service.create(dto);
-      expect(result).toEqual(created);
-      expect(repository.create).toHaveBeenCalledWith(dto);
+    it.each([
+      ['bodega', bodega],
+      ['soporte', support],
+      ['OIS', ois],
+    ])('%s cannot approve or reject', async (_, actor) => {
+      await expect(service.approve('r', {}, actor)).rejects.toThrow(ForbiddenException);
+      await expect(service.reject('r', { reason: 'x' }, actor)).rejects.toThrow(ForbiddenException);
+    });
+
+    it.each([
+      ['owner', owner],
+      ['admin inventario', invAdmin],
+      ['OIS', ois],
+    ])('%s cannot do the warehouse step (hold / dispatch)', async (_, actor) => {
+      await expect(service.hold('r', { reason: 'x' }, actor)).rejects.toThrow(ForbiddenException);
+      await expect(service.dispatch('r', {}, actor)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('owner may mark delivered on behalf of bodega only with a reason', async () => {
+      await expect(service.deliver('r', {}, owner)).rejects.toThrow(BadRequestException);
+      await expect(service.deliver('r', {}, ois)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('requires a reason to reject or hold', async () => {
+      await expect(service.reject('r', { reason: '  ' }, owner)).rejects.toThrow(BadRequestException);
+      await expect(service.hold('r', { reason: '' }, bodega)).rejects.toThrow(BadRequestException);
     });
   });
 
-  describe('branch operator scope', () => {
-    const actor = { sub: 'user-1', businessId: 'bus-1', branchId: 'branch-1' };
-
-    it('derives the requester and branch instead of accepting them from the POS', async () => {
-      const dto = { notes: 'Faltan insumos', items: [{ productId: 'prod-1', quantityRequested: 2 }] } as any;
-      mockRequisitionsRepository.createForBranch.mockResolvedValue({ id: 'req-1' });
-
-      await service.createForOperator(dto, actor);
-
-      expect(repository.create).toHaveBeenCalledWith({
-        id: undefined,
-        businessId: 'bus-1',
-        fromBranchId: 'branch-1',
-        toWarehouseId: null,
-        createdBy: 'user-1',
-        notes: 'Faltan insumos',
-        items: dto.items,
-      });
+  describe('reads', () => {
+    it('returns only the current operator requisitions, scoped by the signed login', async () => {
+      repository.findByRequester.mockResolvedValue([{ id: 'req-1' }]);
+      await service.findMine(ois, 'approved');
+      expect(repository.findByRequester).toHaveBeenCalledWith('bus-1', 'branch-1', 'branch_operator-1', 'approved');
     });
 
-    it('returns only the current operator requisitions and applies the optional status filter', async () => {
-      mockRequisitionsRepository.findByRequester.mockResolvedValue([{ id: 'req-1', createdBy: 'user-1' }]);
-
-      await expect(service.findMine(actor, 'pending')).resolves.toEqual([{ id: 'req-1', createdBy: 'user-1' }]);
-      expect(repository.findByRequester).toHaveBeenCalledWith('bus-1', 'branch-1', 'user-1', 'pending');
+    it('hides unapproved and rejected requisitions from bodega', async () => {
+      repository.findAll.mockResolvedValue([
+        { id: 'a', status: 'pending_approval' },
+        { id: 'b', status: 'approved' },
+        { id: 'c', status: 'rejected' },
+        { id: 'd', status: 'in_transit' },
+      ]);
+      expect((await service.findAll('bus-1', bodega)).map((r: any) => r.id)).toEqual(['b', 'd']);
+      expect((await service.findAll('bus-1', owner)).map((r: any) => r.id)).toEqual(['a', 'b', 'c', 'd']);
     });
 
-    it('allows owner or admin to create requisition with explicit fromBranchId and toWarehouseId', async () => {
-      const ownerActor = { sub: 'owner-1', roles: ['owner'], businessId: 'bus-1', branchId: null };
-      const dto = {
-        businessId: 'bus-1',
-        fromBranchId: 'branch-99',
-        toWarehouseId: 'wh-88',
-        createdBy: 'owner-1',
-        items: [{ productId: 'prod-1', quantityRequested: 5 }],
-      };
-      mockRequisitionsRepository.create.mockResolvedValue({ id: 'req-99', ...dto });
+    it('bodega cannot open a requisition that is not authorized yet', () => {
+      expect(() => service.assertMayRead(bodega, { businessId: 'bus-1', status: 'pending_approval' })).toThrow(ForbiddenException);
+      expect(() => service.assertMayRead(bodega, { businessId: 'bus-1', status: 'approved' })).not.toThrow();
+    });
 
-      const res = await service.createForOperator(dto, ownerActor);
-      expect(res).toEqual({ id: 'req-99', ...dto });
-      expect(repository.create).toHaveBeenCalledWith({
-        id: undefined,
-        businessId: 'bus-1',
-        fromBranchId: 'branch-99',
-        toWarehouseId: 'wh-88',
-        createdBy: 'owner-1',
-        notes: undefined,
-        items: dto.items,
-      });
+    it('an OIS reads only its own branch requisitions', () => {
+      expect(() => service.assertMayRead(ois, { businessId: 'bus-1', fromBranchId: 'branch-2', status: 'approved' })).toThrow(
+        ForbiddenException,
+      );
+      expect(() => service.assertMayRead(ois, { businessId: 'bus-1', fromBranchId: 'branch-1', status: 'approved' })).not.toThrow();
     });
   });
 
-  describe('findByBranch', () => {
-    it('should return branch requisitions', async () => {
-      const list = [{ id: 'req-1', fromBranchId: 'branch-1', status: 'pending' }];
-      mockRequisitionsRepository.findByBranch.mockResolvedValue(list);
-
-      const result = await service.findByBranch('branch-1');
-      expect(result).toEqual(list);
-      expect(repository.findByBranch).toHaveBeenCalledWith('branch-1', undefined);
-    });
-  });
-
-  describe('findPendingForBusiness', () => {
-    it('should return pending requisitions', async () => {
-      const list = [{ id: 'req-1', businessId: 'bus-1', status: 'pending' }];
-      mockRequisitionsRepository.findPendingForBusiness.mockResolvedValue(list);
-
-      const result = await service.findPendingForBusiness('bus-1');
-      expect(result).toEqual(list);
-      expect(repository.findPendingForBusiness).toHaveBeenCalledWith('bus-1');
-    });
-  });
-
-  describe('findOne', () => {
-    it('should return a requisition with its items', async () => {
-      const requisition = {
-        id: 'req-1',
-        businessId: 'bus-1',
-        items: [{ productId: 'prod-1', quantityRequested: '10' }],
-      };
-      mockRequisitionsRepository.findByIdWithItems.mockResolvedValue(requisition);
-
-      const result = await service.findOne('req-1');
-      expect(result).toEqual(requisition);
-      expect(repository.findByIdWithItems).toHaveBeenCalledWith('req-1');
+  describe('helpers', () => {
+    it('merges repeated products into one line', () => {
+      expect(
+        mergeRequestedItems([
+          { productId: 'p1', quantityRequested: 1.5 },
+          { productId: 'p2', quantityRequested: 2 },
+          { productId: 'p1', quantityRequested: 0.25 },
+        ]),
+      ).toEqual([
+        { productId: 'p1', quantityRequested: 1.75 },
+        { productId: 'p2', quantityRequested: 2 },
+      ]);
     });
 
-    it('should throw NotFoundException if requisition does not exist', async () => {
-      mockRequisitionsRepository.findByIdWithItems.mockResolvedValue(null);
-      await expect(service.findOne('999')).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('updateStatus', () => {
-    it('should update status and return the requisition', async () => {
-      const existing = { id: 'req-1', status: 'pending', businessId: 'bus-1' };
-      const updated = { ...existing, status: 'approved' };
-      mockRequisitionsRepository.findById.mockResolvedValue(existing);
-      mockRequisitionsRepository.updateStatus.mockResolvedValue(updated);
-
-      const result = await service.updateStatus('req-1', {
-        status: 'approved',
-        notes: 'Approved notes',
-      });
-
-      expect(result).toEqual(updated);
-      expect(repository.updateStatus).toHaveBeenCalledWith('req-1', 'approved', 'Approved notes', undefined);
+    it('compares quantities at the stored 3-decimal precision', () => {
+      expect(qty('2.0004')).toBe(2);
+      expect(sameQty(1.0001, 1)).toBe(true);
+      expect(sameQty(1.001, 1)).toBe(false);
     });
 
-    it('should throw NotFoundException if requisition not found', async () => {
-      mockRequisitionsRepository.findById.mockResolvedValue(null);
-      await expect(
-        service.updateStatus('999', { status: 'approved', notes: 'Notes' }),
-      ).rejects.toThrow(NotFoundException);
-    });
-
-    it('should throw BadRequestException if already approved', async () => {
-      const existing = { id: 'req-1', status: 'approved', businessId: 'bus-1' };
-      mockRequisitionsRepository.findById.mockResolvedValue(existing);
-
-      await expect(
-        service.updateStatus('req-1', { status: 'approved', notes: 'Notes' }),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should throw BadRequestException if already rejected', async () => {
-      const existing = { id: 'req-1', status: 'rejected', businessId: 'bus-1' };
-      mockRequisitionsRepository.findById.mockResolvedValue(existing);
-
-      await expect(
-        service.updateStatus('req-1', { status: 'approved', notes: 'Notes' }),
-      ).rejects.toThrow(BadRequestException);
+    it('records the most specific role of the actor', () => {
+      expect(primaryRole({ roles: ['branch_operator', 'owner'] })).toBe('owner');
+      expect(primaryRole({ roles: ['encargado'] })).toBe('branch_operator');
     });
   });
 });

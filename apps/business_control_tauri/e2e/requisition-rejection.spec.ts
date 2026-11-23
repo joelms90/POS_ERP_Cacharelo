@@ -37,27 +37,23 @@ async function api<T>(token: string, path: string, init?: RequestInit): Promise<
 }
 
 test.describe('Staging requisition rejection', () => {
-  test('requires a reason and rejects without generating a stock transfer', async ({ page }) => {
+  // Owner-created requisitions are born authorized, so a pending one is seeded the way
+  // the POS creates it: E2E_OIS_TOKEN must be a branch operator JWT (skipped otherwise).
+  test('requires a reason and rejects a branch request without generating a stock transfer', async ({ page }) => {
+    const oisToken = process.env.E2E_OIS_TOKEN;
+    test.skip(!oisToken, 'E2E_OIS_TOKEN (branch operator JWT) is required to create a pending requisition');
+
     const token = await login(page);
     const businessId = process.env.E2E_BUSINESS_ID ?? await page.locator('header select').inputValue();
-
-    const [branches, products] = await Promise.all([
-      api<Entity[]>(token, `/branches?businessId=${businessId}`),
-      api<Entity[]>(token, `/products?businessId=${businessId}`),
-    ]);
-    expect(branches.length).toBeGreaterThan(0);
+    const products = await api<Entity[]>(token, `/products?businessId=${businessId}`);
     expect(products.length).toBeGreaterThan(0);
 
     const tag = `E2E-STAGING-REJECT-${Date.now()}`;
-    const requisition = await api<Requisition>(token, '/requisitions', {
+    const requisition = await api<Requisition>(oisToken!, '/requisitions', {
       method: 'POST',
-      body: JSON.stringify({
-        businessId,
-        fromBranchId: branches[0].id,
-        notes: tag,
-        items: [{ productId: products[0].id, quantityRequested: 0.01 }],
-      }),
+      body: JSON.stringify({ notes: tag, items: [{ productId: products[0].id, quantityRequested: 0.01 }] }),
     });
+    expect(requisition.status).toBe('pending_approval');
 
     await page.getByRole('button', { name: 'Requisiciones', exact: true }).click();
     await page.getByPlaceholder('Buscar por sucursal...').fill(tag);
@@ -69,7 +65,7 @@ test.describe('Staging requisition rejection', () => {
     await modal.getByRole('button', { name: 'Rechazar', exact: true }).click();
     await expect(page.getByText('Debe proporcionar una razón de rechazo.')).toBeVisible();
 
-    await modal.locator('textarea').fill(`${tag} rejected by staging E2E`);
+    await modal.getByTestId('approval-notes').fill(`${tag} rejected by staging E2E`);
     await modal.getByRole('button', { name: 'Rechazar', exact: true }).click();
     await expect(page.getByText('Requisición rechazada.')).toBeVisible({ timeout: 10000 });
 
