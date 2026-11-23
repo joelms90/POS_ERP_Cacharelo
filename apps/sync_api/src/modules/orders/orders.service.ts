@@ -8,6 +8,7 @@ import { DRIZZLE_CONNECTION } from '../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../database/schema';
 import { eq, and } from 'drizzle-orm';
+import { isAdminRole } from '../auth/roles';
 
 @Injectable()
 export class OrdersService {
@@ -235,6 +236,25 @@ export class OrdersService {
     if (!effectiveBranchId) throw new ForbiddenException('El operador no tiene una sucursal asignada.');
     const date = requestedDate || new Date().toISOString().slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new BadRequestException('La fecha debe tener formato AAAA-MM-DD.');
+
+    // Branch staff (OIS / cashier) only see the orders charged in the branch's
+    // currently open shift — never previous shifts' orders or sales amounts.
+    // Administrators keep the full-day view.
+    const roles: string[] = Array.isArray(actor?.roles) ? actor.roles : [actor?.role];
+    if (!roles.some((role) => isAdminRole(role))) {
+      if (!actor.branchId) throw new ForbiddenException('El operador no tiene una sucursal asignada.');
+      const [openShift] = await this.db
+        .select({ id: schema.cashShifts.id, openedAt: schema.cashShifts.openedAt })
+        .from(schema.cashShifts)
+        .where(and(eq(schema.cashShifts.branchId, actor.branchId), eq(schema.cashShifts.status, 'open')))
+        .limit(1);
+      if (!openShift) return { date, shiftId: null, ticketCount: 0, tickets: [] };
+      const result = await this.ordersRepository.getTodayTickets(actor.branchId, date, {
+        since: new Date(openShift.openedAt),
+      });
+      return { ...result, shiftId: openShift.id };
+    }
+
     return this.ordersRepository.getTodayTickets(effectiveBranchId, date);
   }
 

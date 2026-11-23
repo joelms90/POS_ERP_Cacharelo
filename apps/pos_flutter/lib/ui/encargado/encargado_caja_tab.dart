@@ -361,6 +361,8 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
 
       if (success) {
         _floatController.clear();
+        // New shift → start from an empty ticket list (only this shift's orders).
+        unawaited(_loadTickets());
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -1303,6 +1305,8 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
         isCorteX: false,
       );
       _clearCloseInputs();
+      // Shift closed → the previous shift's orders must not stay on screen.
+      if (mounted) setState(() => _tickets = []);
 
       unawaited(widget.state.enqueueCajaPrintJob(
         PrintJob(
@@ -1944,7 +1948,7 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
                     width: isWide ? (constraints.maxWidth - 56) / 2 : double.infinity,
                   ),
                   _buildMetricCard(
-                    title: 'TOTAL COBRADO HOY',
+                    title: 'TOTAL COBRADO EN TURNO',
                     value:
                         '\$${_tickets.fold<double>(0.0, (sum, t) => sum + _money(t['total'])).toStringAsFixed(2)}',
                     icon: Icons.point_of_sale,
@@ -2092,7 +2096,7 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
                         padding: EdgeInsets.symmetric(vertical: 12),
                         child: Center(
                           child: Text(
-                            'No hay órdenes cobradas registradas hoy.',
+                            'No hay órdenes cobradas en este turno.',
                             style: TextStyle(color: EmpireColors.textSecondary),
                           ),
                         ),
@@ -2363,7 +2367,7 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '${ticket['createdAt']?.toString().substring(11, 16) ?? ''} hrs · Mesero: ${ticket['waiterName'] ?? 'Cajero'}',
+                    '${formatTicketTime(ticket['createdAt'])} hrs · Mesero: ${ticket['waiterName'] ?? 'Cajero'}',
                     style: const TextStyle(
                       color: EmpireColors.textSecondary,
                       fontSize: 11,
@@ -2427,13 +2431,27 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
         ),
       ),
       subtitle: Text(
-        '${ticket['createdAt']?.toString().substring(11, 16) ?? ''} hrs · ${ticket['waiterName'] ?? 'Cajero'}',
+        '${formatTicketTime(ticket['createdAt'])} hrs · ${ticket['waiterName'] ?? 'Cajero'}',
         style: const TextStyle(color: EmpireColors.textSecondary, fontSize: 11),
       ),
       trailing: const Icon(Icons.chevron_right,
           color: EmpireColors.textSecondary, size: 18),
     );
   }
+}
+
+/// HH:mm of a ticket timestamp in the device's local time zone. The API sends
+/// UTC ISO strings (e.g. `2026-11-23T14:31:00.000Z`), so slicing the string
+/// showed 14:31 instead of the local 08:31.
+@visibleForTesting
+String formatTicketTime(dynamic value) {
+  if (value == null) return '';
+  final DateTime? parsed =
+      value is DateTime ? value : DateTime.tryParse(value.toString());
+  if (parsed == null) return '';
+  final local = parsed.toLocal();
+  return '${local.hour.toString().padLeft(2, '0')}:'
+      '${local.minute.toString().padLeft(2, '0')}';
 }
 
 class _DenomButton extends StatelessWidget {

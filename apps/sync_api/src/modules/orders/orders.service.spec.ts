@@ -19,6 +19,16 @@ describe('OrdersService', () => {
     createPayment: jest.fn(),
     cancelOrderWithAudit: jest.fn(),
     getDailyPaymentSummary: jest.fn(),
+    getTodayTickets: jest.fn(),
+  };
+
+  // Chainable select().from().where().limit() returning `openShiftRows`.
+  let openShiftRows: any[] = [];
+  const mockDb = {
+    insert: jest.fn(),
+    select: jest.fn(() => ({
+      from: () => ({ where: () => ({ limit: async () => openShiftRows }) }),
+    })),
   };
 
   const mockSyncGateway = {
@@ -39,7 +49,7 @@ describe('OrdersService', () => {
         },
         {
           provide: DRIZZLE_CONNECTION,
-          useValue: { insert: jest.fn() },
+          useValue: mockDb,
         },
       ],
     }).compile();
@@ -374,6 +384,35 @@ describe('OrdersService', () => {
       mockOrdersRepository.getDailyPaymentSummary.mockResolvedValue({ branchId: 'branch-1', totals: { cash: 20, card: 10 } });
       await service.getDailyPaymentSummary(operator, '2026-09-24');
       expect(repository.getDailyPaymentSummary).toHaveBeenCalledWith('branch-1', '2026-09-24');
+    });
+  });
+
+  describe('getTodayTickets shift scope', () => {
+    const ois = { sub: 'ois-1', roles: ['branch_operator'], branchId: 'branch-1' };
+    const owner = { sub: 'owner-1', roles: ['owner'], branchId: null };
+
+    beforeEach(() => {
+      mockOrdersRepository.getTodayTickets.mockResolvedValue({ date: '2026-11-23', ticketCount: 0, tickets: [] });
+    });
+
+    it('limits branch staff to the orders charged in the open shift', async () => {
+      const openedAt = new Date('2026-11-23T14:00:00.000Z');
+      openShiftRows = [{ id: 'shift-2', openedAt }];
+      const result = await service.getTodayTickets(ois, undefined, 'other-branch');
+      expect(repository.getTodayTickets).toHaveBeenCalledWith('branch-1', expect.any(String), { since: openedAt });
+      expect(result).toMatchObject({ shiftId: 'shift-2' });
+    });
+
+    it('returns no orders to branch staff when no shift is open', async () => {
+      openShiftRows = [];
+      const result = await service.getTodayTickets(ois);
+      expect(repository.getTodayTickets).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ shiftId: null, ticketCount: 0, tickets: [] });
+    });
+
+    it('keeps the full-day view for administrators', async () => {
+      await service.getTodayTickets(owner, '2026-11-23', 'branch-9');
+      expect(repository.getTodayTickets).toHaveBeenCalledWith('branch-9', '2026-11-23');
     });
   });
 });

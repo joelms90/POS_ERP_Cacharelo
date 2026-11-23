@@ -381,8 +381,16 @@ export class OrdersRepository {
     };
   }
 
-  async getTodayTickets(branchId: string, dateStr?: string) {
+  async getTodayTickets(branchId: string, dateStr?: string, shiftScope?: { since: Date }) {
     const date = dateStr || new Date().toISOString().slice(0, 10);
+    // Shift scope: orders with a payment charged since the shift opened (same
+    // rule the Corte X/Z uses), instead of the UTC calendar day.
+    const periodFilter = shiftScope
+      ? [sql`exists (select 1 from ${schema.payments} where ${schema.payments.orderId} = ${schema.orders.id} and ${schema.payments.createdAt} >= ${shiftScope.since.toISOString()}::timestamptz)`]
+      : [
+          sql`${schema.orders.createdAt} >= ${date}::date`,
+          sql`${schema.orders.createdAt} < (${date}::date + interval '1 day')`,
+        ];
     const closedOrders = await this.db
       .select({
         id: schema.orders.id,
@@ -402,8 +410,7 @@ export class OrdersRepository {
       .where(and(
         eq(schema.orders.branchId, branchId),
         eq(schema.orders.state, 'closed'),
-        sql`${schema.orders.createdAt} >= ${date}::date`,
-        sql`${schema.orders.createdAt} < (${date}::date + interval '1 day')`,
+        ...periodFilter,
         isNull(schema.orders.deletedAt),
       ))
       .orderBy(sql`${schema.orders.createdAt} DESC`);
