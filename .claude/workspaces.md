@@ -7,12 +7,16 @@
 ---
 
 ## Currently Active Sessions
+### Session: graphify-knowledge-graph
+- **Scope**: Add the Graphify code knowledge graph (local CLI, project-scoped skills for Claude/Codex/OpenCode/generic agents), `graphify-out/` artifacts, `.graphifyrc`, Make targets, git hooks, and AGENTS.md/CLAUDE.md query-first rules. Shared tooling only; no app deployment, no migrations.
+- **Branch**: `main`
+- **Status**: 🔄 Set up locally; artifacts pending commit.
+
 ### Session: 019-supervisor-sucursal
-- **Scope**: Propuesta (solo documentación) del rol `branch_supervisor`: Fase 1 = aprobación de Cortes Z e ingresos/egresos de caja, umbrales, bitácora, permisos, offline. Archivos: `specs/019-supervisor-sucursal/{spec,plan,data-model}.md`. Sin código, sin migraciones, sin deploy.
+- **Scope**: Rol `branch_supervisor`: Fase 1 = aprobación de Cortes Z e ingresos/egresos de caja, bitácora, permisos, offline. Archivos: `specs/019-supervisor-sucursal/*`, backend, Admin y POS.
 - **Branch**: `019-supervisor-sucursal` (worktree `.worktrees/supervisor-sucursal`)
-- **Migration Status**: Ninguna ejecutada; `0022_supervisor_cash_approvals` solo propuesta.
 - **Migration Status**: ✅ Step 21 applied to the local docker DB only; NOT run in staging/production.
-- **Status**: ✅ Phase 1 implemented locally (backend, admin, POS), not pushed/deployed/merged. Handoff: `docs/handoffs/019-supervisor-sucursal.md`. Pending: owner review/merge, C-1/C-2 confirmation, POS offline queue (T306).
+- **Status**: ✅ Phase 1 implemented and tested locally (backend, admin, POS), merged to main. Handoff: `docs/handoffs/019-supervisor-sucursal.md`. Pending: C-1/C-2 confirmation, deploy.
 ### Session: feature-delivery-workflow
 - **Scope**: Add the reusable feature-delivery skill, safe feature lifecycle Make targets, and team-status portability fix. Shared tooling only; no app deployment.
 - **Branch**: `chore/feature-delivery-workflow`

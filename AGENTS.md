@@ -12,6 +12,12 @@ This is a **monorepo** with multiple independent apps. Multiple development sess
 
 ## Quick Start: Before You Begin
 
+0. **Route the task first** (no tokens spent guessing):
+   ```bash
+   make route Q="deploy the backend"
+   ```
+   Returns the best-matching skill, SOP doc, Make target and `graphify query` for code. Run it before reading `make help`, `docs/AGENT_NAVIGATION_GUIDE.md`, `knowledge/index.md`, or grepping.
+
 1. **Check active workspaces**:
    ```bash
    cat .claude/workspaces.md
@@ -250,3 +256,42 @@ Use the existing Makefile targets from the repository root. Prefer these command
 - Firebase deploys update tracked `.firebase/hosting.*.cache` metadata files; commit those metadata changes after successful deploy.
 - Do not include unrelated untracked files in deployment commits.
 - If a deploy command fails due to sandbox access to `gcloud`, `firebase`, Cloud SQL Proxy, or local credential files, rerun the same command with escalated permissions.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.
+
+Rules:
+- When graphify-out/graph.json exists, run `graphify query "<question>"` before your first grep, search or source-file read for a codebase question, and put this rule in every subagent prompt that explores code. Read raw files only for lines the graph or an earlier read already located. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. When the answer is under a Markdown heading, `graphify section "<heading>"` prints that section's text, so the .md need not be opened. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- A committed graphify-out/graph.json is rewritten whole on every build, so a large diff to it in a pull request is expected. Do not flag it as churn or suggest skipping the graph rebuild or its hooks.
+
+### Project wiring
+
+- The graph is built from code only (local tree-sitter AST, no API cost) and covers TS/TSX, Dart, SQL, Terraform, shell and JSON.
+- Build it: `make graphify-build`. Refresh after code changes: `make graphify-update` (also runs from the installed git hooks).
+- Query it: `make graphify-query Q="how does the POS checkout reach the API?"` or `graphify query "<question>"`.
+- Architectural hubs: `make graphify-hubs`. Broad review: `graphify-out/GRAPH_REPORT.md`. Interactive view: open `graphify-out/graph.html`.
+- CLI install/refresh: `uv tool install "graphifyy[sql,terraform,pdf,office,watch,leiden]" && uv tool update-shell`.
+- The `/graphify` skill is installed for Claude (`.claude/skills`), Codex (`.codex/skills`), OpenCode (`.opencode/skills`) and generic agents (`.agents/skills`).
+- Subagents dispatched via `scripts/agent-team.sh` must also be told to query the graph first (the rule above applies inside `.worktrees/` when `graphify-out/graph.json` exists there).
+
+### Route before you search (skills · SOPs · make)
+
+`make route Q="<task>"` is a deterministic router (no LLM, no tokens, <100ms) over:
+- all Make targets and their help text,
+- every skill in `.agents/skills` and `.claude/skills`,
+- SOPs/runbooks in `docs/`, `knowledge/`, root `*.md` and `.claude/*.md`.
+
+It prints the matching skill to load, the SOP to read, the exact `make` target, and a `graphify query` for the code path. Use it instead of reading the static navigation matrices first; fall back to `make help` / `docs/AGENT_NAVIGATION_GUIDE.md` only when it returns no match. Source: `scripts/agent-router.mjs`.
+
+### Business flows (see + maintain)
+
+`make flows` lists the flow catalog. `make flow Q="order to cash"` joins the flow doc to the live code graph: actors, endpoints, tables, business rules, screens and a call chain derived with `graphify path` (never hardcoded). `make flows-check` validates every anchor and runs inside `make check-all`.
+
+Flow docs live in `knowledge/workflows/*.md`; their YAML frontmatter is the machine contract (`flow`, `actors`, `seeds`, `tables`, `rules`, `screens`, `endpoints`). To update or add a flow after a code change, load the **`maintain-business-flows`** skill (`.agents/skills/maintain-business-flows/SKILL.md`). Refresh the graph with `make graphify-update` before validating.

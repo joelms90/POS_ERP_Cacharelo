@@ -25,6 +25,10 @@ dist/
 
 # Local generated files
 *.isar
+
+# Graphify local build cache/state (regenerable and machine-specific; graph artifacts are committed)
+graphify-out/cache/
+graphify-out/.graphify_build_state.json
 # Multi-agent worktrees and logs
 .worktrees/
 .dev-logs/

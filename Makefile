@@ -1128,6 +1128,7 @@ check-pos:
 	@./scripts/agent-team.sh check pos
 
 check-all:
+	@node scripts/flows.mjs check
 	@./scripts/agent-team.sh check all
 
 team-status:
@@ -1153,6 +1154,41 @@ team-merge:
 
 team-logs:
 	@./scripts/agent-team.sh logs $(AGENT)
+
+# -----------------------------------------------------------------------------
+# Codebase knowledge graph (Graphify) — see AGENTS.md
+# -----------------------------------------------------------------------------
+.PHONY: graphify-build graphify-update graphify-query graphify-hubs route flow flows flows-check
+
+graphify-build:
+	@command -v graphify >/dev/null 2>&1 || { echo 'graphify not installed. Run: uv tool install "graphifyy[sql,terraform,pdf,office,watch,leiden]" && uv tool update-shell'; exit 1; }
+	@graphify extract . --code-only
+	@graphify cluster-only . --no-label
+
+graphify-update:
+	@command -v graphify >/dev/null 2>&1 || { echo 'graphify not installed. See make graphify-build'; exit 1; }
+	@graphify update .
+
+graphify-query:
+	@test -n "$(Q)" || { echo 'Usage: make graphify-query Q="how does auth connect to the database?"'; exit 1; }
+	@graphify query "$(Q)"
+
+graphify-hubs:
+	@graphify god-nodes --top 15
+
+route:
+	@test -n "$(Q)" || { echo 'Usage: make route Q="deploy the backend"'; exit 1; }
+	@node scripts/agent-router.mjs "$(Q)"
+
+flow:
+	@test -n "$(Q)" || { echo 'Usage: make flow Q="order to cash"'; exit 1; }
+	@node scripts/flows.mjs show "$(Q)"
+
+flows:
+	@node scripts/flows.mjs list
+
+flows-check:
+	@node scripts/flows.mjs check
 
 # -----------------------------------------------------------------------------
 # Staging Environment (separate GCP project; see specs/014-staging-environment)

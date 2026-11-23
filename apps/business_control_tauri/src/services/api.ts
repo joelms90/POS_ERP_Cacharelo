@@ -94,6 +94,99 @@ export interface Inquiry {
 }
 
 
+export type LogSource = 'pos_flutter' | 'admin_web' | 'sync_api';
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+
+export interface LogFilters {
+  date?: string;
+  hours?: number;
+  branchId?: string;
+  source?: LogSource | '';
+  minLevel?: LogLevel;
+  q?: string;
+  fingerprint?: string;
+  limit?: number;
+}
+
+export interface LogIssue {
+  fingerprint: string;
+  source: LogSource;
+  level: LogLevel;
+  count: number;
+  firstSeen: string;
+  lastSeen: string;
+  message: string;
+  route: string | null;
+  httpStatus: number | null;
+  sampleId: string;
+  sampleStack: string | null;
+  branches: string[];
+  appVersions: string[];
+  users: string[];
+  devices: number;
+}
+
+export interface LogSummary {
+  window: { since: string | null; until: string | null };
+  totals: Array<{ source: LogSource; level: LogLevel; count: number }>;
+  branches: Array<{ branchId: string | null; branchName: string; count: number; errors: number }>;
+  issues: LogIssue[];
+}
+
+export interface LogRow {
+  id: string;
+  occurredAt: string;
+  source: LogSource;
+  level: LogLevel;
+  message: string;
+  fingerprint: string;
+  branchId: string | null;
+  branchName: string | null;
+  userName: string | null;
+  userRole: string | null;
+  deviceId: string | null;
+  appVersion: string | null;
+  platform: string | null;
+  route: string | null;
+  httpMethod: string | null;
+  httpStatus: number | null;
+  stackPreview: string | null;
+}
+
+/** Full app_logs row as stored (snake_case). */
+export interface LogEntryDetail {
+  id: string;
+  occurred_at: string;
+  created_at: string;
+  source: LogSource;
+  level: LogLevel;
+  message: string;
+  stack: string | null;
+  fingerprint: string;
+  branch_id: string | null;
+  resolved_branch_name: string | null;
+  user_name: string | null;
+  user_role: string | null;
+  device_id: string | null;
+  app_version: string | null;
+  platform: string | null;
+  route: string | null;
+  http_method: string | null;
+  http_status: number | null;
+  context: Record<string, unknown> | null;
+  breadcrumbs: string[] | null;
+  user_agent: string | null;
+}
+
+const toQuery = (filters: LogFilters): string => {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== null && value !== '') params.set(key, String(value));
+  }
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+};
+
 export interface Category {
   id: string;
   businessId: string;
@@ -765,6 +858,18 @@ export const api = {
   /**
    * Get all contact form inquiries
    */
+  async getLogSummary(filters: LogFilters): Promise<LogSummary> {
+    return apiRequest<LogSummary>(`/admin/logs/summary${toQuery(filters)}`);
+  },
+
+  async searchLogs(filters: LogFilters): Promise<LogRow[]> {
+    return apiRequest<LogRow[]>(`/admin/logs${toQuery(filters)}`);
+  },
+
+  async getLogEntry(id: string): Promise<LogEntryDetail> {
+    return apiRequest<LogEntryDetail>(`/admin/logs/${encodeURIComponent(id)}`);
+  },
+
   async getInquiries(status?: string): Promise<Inquiry[]> {
     const url = status ? `/admin/inquiries?status=${status}` : '/admin/inquiries';
     return apiRequest<Inquiry[]>(url);
