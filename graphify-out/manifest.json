@@ -1446,9 +1446,9 @@
     "semantic_hash": "3e1016ebc7ecd6d1184c04ba92fb4518"
   },
   "apps/pos_flutter/lib/ui/warehouse/warehouse_dashboard_screen.dart": {
-    "mtime": 1795422316.9147344,
-    "seen": 1795422771.67047,
-    "ast_hash": "5504dec8b2cf999a1570b195f1370b71",
+    "mtime": 1795422836.401955,
+    "seen": 1795422854.868414,
+    "ast_hash": "cc039c8164f2c61a04a9152637a9db6e",
     "semantic_hash": ""
   },
   "apps/pos_flutter/lib/ui/widgets/app_version_badge.dart": {

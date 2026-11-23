@@ -1,14 +1,17 @@
 # Session Handoff
 
 ## Latest Session — Requisition dispatch flow (2026-11-23, Claude Code)
-- **Branch:** `019-supervisor-sucursal` (worktree `.worktrees/supervisor-sucursal`), committed locally, **not pushed, not deployed**.
+- **Branch:** `019-supervisor-sucursal` (worktree `.worktrees/supervisor-sucursal`), merged with `main`; committed locally, **not pushed**. **Deployed to production 2026-11-23**: migration step 22, backend revision `pos-sync-api-00144-xhn` (deployed with `gcloud run deploy --source` so existing env vars and secrets were kept), admin, and POS web + APK `1.0.1+50`.
 - **Problem:** the owner's approval did the warehouse step (it created the transfer), so the requisition vanished from Bodega's "Salidas". The transfer then stayed `pending` because only the admin Traspasos page could ship it. Bodega's quantity edits in the dispatch dialog were also never sent.
 - **New flow:** OIS requests (`pending_approval`) → Owner / Admin. Inventario authorize, possibly adjusting quantities (`approved`); their own requisitions are born `approved` → Bodega dispatches, which creates the transfer and ships it in one step (`in_transit`) → Bodega marks it delivered (`delivered`) → OIS confirms, reporting differences (`completed`). Bodega never sees unauthorized requisitions and cannot create or authorize. Owner / Admin. Inv. can mark delivered or confirm on behalf, always with a reason. Soporte Técnico is read-only.
 - **Audit:** append-only `requisition_item_ledger` (per product × stage, with difference and note) plus `audit_log` rows; `GET /requisitions/:id/history`; timeline and differences in the admin detail modal.
 - **Docs:** [`knowledge/workflows/replenishment-and-transfers.md`](./knowledge/workflows/replenishment-and-transfers.md); migration step 22 in [`docs/pre-deployment-checklist.md`](./docs/pre-deployment-checklist.md).
 - **Verified:** backend jest 297/297, including `requisitions.integration.spec.ts` (4 cases, real Postgres) and the supervision integration suite. Admin `tsc` + `vite build`. Flutter `warehouse_flow_test` 5/5; full Flutter suite has the same 15 pre-existing failures as untouched `HEAD`. Migration step 22 applied to the local docker DB.
 - **Not verified:** the Playwright specs were updated and compile, but were not run. `requisition-rejection.spec.ts` now needs `E2E_OIS_TOKEN` (a branch operator JWT) and skips without it.
-- **To ship:** `make backend-migrate` (step 22; read its warning list of unlinked legacy requisitions), then deploy backend, admin and the POS build together. `PATCH /requisitions/:id/status` was removed, so old POS builds cannot dispatch.
+- **Production data:** step 22 linked all 13 legacy approved requisitions: 8 → `completed`; 5 had transfers stuck in `pending` that were cancelled, so those requisitions show in Bodega Salidas for dispatch; 2 `pending` → `pending_approval`.
+- **⚠️ Terminals:** Android terminals must install APK `1.0.1+50` from the portal. Old builds cannot dispatch or hold (`PATCH /requisitions/:id/status` was removed).
+- **⚠️ `make backend-deploy-fast` uses `--set-env-vars`, which would wipe `CASH_APPROVALS_ENFORCE_OPEN_BLOCK`, `OWNER_COPILOT_PROVIDER` and `GEMINI_MODEL`.** Deploy with `gcloud run deploy pos-sync-api --source . --region us-central1 --project fresh-sensor-497515-d3` until the Makefile is fixed.
+- **⚠️ Uncommitted change shipped:** another session's sync menu in `warehouse_dashboard_screen.dart` was on disk during the POS build, so it is live but not committed.
 
 ---
 ## Latest Session — Production Logging (2026-11-20, Claude Code)
