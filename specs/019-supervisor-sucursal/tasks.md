@@ -25,9 +25,9 @@ Leyenda: `[ ]` pendiente · `[x]` hecho · `[~]` parcial / diferido (con nota)
 - [x] T104 Aplicar la migración **solo** en la base local de Docker y verificar el esquema. (Dos corridas OK; neto histórico sin cambios; triggers verificados.)
 
 ### 1.2 Reglas puras (sin BD)
-- [ ] T110 `cash-approval.config.ts`: C-1 (`N2_MUST_DIFFER_FROM_N1`), C-2 (`OIS_CLOSE_BLOCKS_OPENING_UNTIL_N1`), `ENFORCE_OPEN_BLOCK` (variable de entorno).
-- [ ] T111 `cash-approval.rules.ts`: estado inicial del corte y del movimiento, resolución de N1 (OIS o supervisor, S-3), transiciones del Corte Z (N1/N2, reconteos, S-5), transiciones de movimientos (S-1), no auto-aprobación, C-1, `cashEffect`, agrupación de movimientos (aprobados/pendientes/revertidos/ajustados), `reconciliationStatus`, condición de bloqueo de apertura (D-4, C-2, P-2).
-- [ ] T112 Tests jest de cada regla de T111.
+- [x] T110 `cash-approval.config.ts`: C-1 (`N2_MUST_DIFFER_FROM_N1`), C-2 (`OIS_CLOSE_BLOCKS_OPENING_UNTIL_N1`), `ENFORCE_OPEN_BLOCK` (variable de entorno).
+- [x] T111 `cash-approval.rules.ts`: estado inicial del corte y del movimiento, resolución de N1 (OIS o supervisor, S-3), transiciones del Corte Z (N1/N2, reconteos, S-5), transiciones de movimientos (S-1), no auto-aprobación, C-1, `cashEffect`, agrupación de movimientos (aprobados/pendientes/revertidos/ajustados), `reconciliationStatus`, condición de bloqueo de apertura (D-4, C-2, P-2).
+- [x] T112 Tests jest de cada regla de T111 (50 tests).
 
 ### 1.3 Servicios transversales
 - [ ] T120 `AuditModule`: `AuditLogService` (insert dentro de la transacción del llamador) y `NotificationsService` (fan-out por destinatario, marcar leídas).
