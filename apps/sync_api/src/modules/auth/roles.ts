@@ -9,6 +9,9 @@ export const SUPERVISION_ROLES = ['branch_supervisor'] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 export type PosRole = (typeof POS_ROLES)[number];
 export type SupervisionRole = (typeof SUPERVISION_ROLES)[number];
+// Users managed from Business Control (admin web): administrators plus supervisors.
+export const BUSINESS_CONTROL_ROLES = [...ADMIN_ROLES, ...SUPERVISION_ROLES] as const;
+export type BusinessControlRole = (typeof BUSINESS_CONTROL_ROLES)[number];
 export type UserRole = AdminRole | PosRole | SupervisionRole;
 
 export const OWNER_ROLE: AdminRole = 'owner';

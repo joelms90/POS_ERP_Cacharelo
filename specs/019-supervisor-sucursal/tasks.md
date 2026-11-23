@@ -42,13 +42,13 @@ Leyenda: `[ ]` pendiente · `[x]` hecho · `[~]` parcial / diferido (con nota)
 - [x] T135 Tests: los existentes siguen en verde + nuevos (bloqueo, idempotencia, MV-05, recount).
 
 ### 1.5 Supervisión (`modules/supervision`)
-- [ ] T140 Aprobar / rechazar / ajustar Corte Z (N1/N2) con `version` (409), no auto-aprobación (403), CZ-06 (422 si hay movimientos pendientes), `approval_snapshot` al aprobar en N2.
-- [ ] T141 Reabrir (owner) y desbloquear apertura (owner, P-2).
-- [ ] T142 Aprobar / rechazar movimiento (N1) con asiento de reverso; cancelar / ajustar (supervisor u owner) con reverso + asiento `ajuste`, solo antes de la aprobación final del corte.
-- [ ] T143 Adeudos (D-8, P-1): crear al aprobar con faltante; anular al reabrir; consulta.
-- [ ] T144 Bandejas `GET /supervision/approvals` (+ `count`), detalle del corte con esperado ajustado y ajustes posteriores al cierre.
-- [ ] T145 Asignaciones de supervisores (owner), bitácora (`GET /supervision/audit-log`), notificaciones (`GET /notifications`, `unread-count`, `read`, `read-all`).
-- [ ] T146 Tests de autorización HTTP (401/403/409/422) y de servicio para cada regla.
+- [x] T140 Aprobar / rechazar / ajustar Corte Z (N1/N2) con `version` (409), no auto-aprobación (403), CZ-06 (422 si hay movimientos pendientes), `approval_snapshot` al aprobar en N2.
+- [x] T141 Reabrir (owner) y desbloquear apertura (owner, P-2).
+- [x] T142 Aprobar / rechazar movimiento (N1) con asiento de reverso; cancelar / ajustar (supervisor u owner) con reverso + asiento `ajuste`, solo antes de la aprobación final del corte.
+- [x] T143 Adeudos (D-8, P-1): crear al aprobar con faltante; anular al reabrir; consulta.
+- [x] T144 Bandejas `GET /supervision/approvals` (+ `count`), detalle del corte con esperado ajustado y ajustes posteriores al cierre.
+- [x] T145 Asignaciones de supervisores (owner), bitácora (`GET /supervision/audit-log`), notificaciones (`GET /notifications`, `unread-count`, `read`, `read-all`).
+- [x] T146 Tests de autorización HTTP (401/403/409/422) y de servicio para cada regla.
 
 ### 1.6 Reportes
 - [ ] T150 Guards en endpoints de reportes sin protección (R-1) y alcance del supervisor a sus sucursales (D-9/P-3).

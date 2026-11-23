@@ -1,15 +1,15 @@
 import { IsArray, IsEmail, IsEnum, IsOptional, IsString, IsUUID, Length, Matches, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import type { AdminRole } from '../../auth/roles';
+import type { BusinessControlRole } from '../../auth/roles';
 
 export class AdminBusinessAccessDto {
   @IsUUID()
   businessId: string;
 
-  @IsEnum(['owner', 'inventory_admin', 'support_tech', 'web_inquiries_viewer'], {
-    message: 'Role must be one of: owner, inventory_admin, support_tech, web_inquiries_viewer',
+  @IsEnum(['owner', 'inventory_admin', 'support_tech', 'web_inquiries_viewer', 'branch_supervisor'], {
+    message: 'Role must be one of: owner, inventory_admin, support_tech, web_inquiries_viewer, branch_supervisor',
   })
-  role: AdminRole;
+  role: BusinessControlRole;
 }
 
 export class CreateAdminUserDto {
@@ -33,10 +33,10 @@ export class CreateAdminUserDto {
   @Matches(/^\d{4}$/, { message: 'PIN must consist of exactly 4 digits' })
   pin?: string;
 
-  @IsEnum(['owner', 'inventory_admin', 'support_tech', 'web_inquiries_viewer'], {
-    message: 'Role must be one of: owner, inventory_admin, support_tech, web_inquiries_viewer',
+  @IsEnum(['owner', 'inventory_admin', 'support_tech', 'web_inquiries_viewer', 'branch_supervisor'], {
+    message: 'Role must be one of: owner, inventory_admin, support_tech, web_inquiries_viewer, branch_supervisor',
   })
-  role: AdminRole;
+  role: BusinessControlRole;
 
   @IsArray()
   @IsOptional()

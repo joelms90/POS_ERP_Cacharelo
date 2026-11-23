@@ -1,6 +1,6 @@
 import { IsArray, IsEmail, IsEnum, IsOptional, IsString, Length, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import type { AdminRole } from '../../auth/roles';
+import type { BusinessControlRole } from '../../auth/roles';
 import { AdminBusinessAccessDto } from './create-admin-user.dto';
 
 export class UpdateAdminUserDto {
@@ -18,11 +18,11 @@ export class UpdateAdminUserDto {
   @Length(6, 100)
   password?: string;
 
-  @IsEnum(['owner', 'inventory_admin', 'support_tech', 'web_inquiries_viewer'], {
-    message: 'Role must be one of: owner, inventory_admin, support_tech, web_inquiries_viewer',
+  @IsEnum(['owner', 'inventory_admin', 'support_tech', 'web_inquiries_viewer', 'branch_supervisor'], {
+    message: 'Role must be one of: owner, inventory_admin, support_tech, web_inquiries_viewer, branch_supervisor',
   })
   @IsOptional()
-  role?: AdminRole;
+  role?: BusinessControlRole;
 
   @IsArray()
   @IsOptional()

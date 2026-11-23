@@ -22,6 +22,7 @@ import { RequisitionsModule } from './modules/requisitions/requisitions.module';
 import { PrintingModule } from './modules/printing/printing.module';
 import { LogsModule } from './modules/logs/logs.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { SupervisionModule } from './modules/supervision/supervision.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { AuditModule } from './modules/audit/audit.module';
     RequisitionsModule,
     PrintingModule,
     LogsModule,
+    SupervisionModule,
   ],
   controllers: [AppController],
   providers: [AppService],

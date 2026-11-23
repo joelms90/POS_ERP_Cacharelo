@@ -5,7 +5,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 import * as bcrypt from 'bcrypt';
-import { ADMIN_ROLES, UserRole } from '../auth/roles';
+import { BUSINESS_CONTROL_ROLES, UserRole } from '../auth/roles';
 import { BranchesRepository } from '../branches/repositories/branches.repository';
 import { encryptPin, decryptPin } from './utils/pin-crypto';
 
@@ -78,7 +78,7 @@ export class UsersService {
 
   async findBusinessAdmins(businessId: string) {
     const users = await this.usersRepository.findAll();
-    const adminUsers = users.filter((user) => ADMIN_ROLES.includes(user.role as any));
+    const adminUsers = users.filter((user) => BUSINESS_CONTROL_ROLES.includes(user.role as any));
     const accessRows = await this.usersRepository.findAdminAccessForUsers(
       adminUsers.map((user) => user.id),
     );
@@ -94,8 +94,8 @@ export class UsersService {
     if (!createUserDto.businessId) {
       throw new BadRequestException('businessId is required');
     }
-    if (!ADMIN_ROLES.includes(createUserDto.role as any)) {
-      throw new BadRequestException('role must be one of ADMIN_ROLES');
+    if (!BUSINESS_CONTROL_ROLES.includes(createUserDto.role as any)) {
+      throw new BadRequestException('role must be one of BUSINESS_CONTROL_ROLES');
     }
     if (!createUserDto.email || !createUserDto.password) {
       throw new BadRequestException('email and password are required for Business Control admins');
@@ -200,11 +200,11 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
-    if (!ADMIN_ROLES.includes(user.role as any)) {
+    if (!BUSINESS_CONTROL_ROLES.includes(user.role as any)) {
       throw new BadRequestException('User is not a Business Control admin');
     }
-    if (updateUserDto.role && !ADMIN_ROLES.includes(updateUserDto.role as any)) {
-      throw new BadRequestException('role must be one of ADMIN_ROLES');
+    if (updateUserDto.role && !BUSINESS_CONTROL_ROLES.includes(updateUserDto.role as any)) {
+      throw new BadRequestException('role must be one of BUSINESS_CONTROL_ROLES');
     }
     const { businessAccess, ...userUpdates } = updateUserDto;
     const updated = await this.update(id, {
@@ -240,7 +240,7 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
-    if (!ADMIN_ROLES.includes(user.role as any)) {
+    if (!BUSINESS_CONTROL_ROLES.includes(user.role as any)) {
       throw new BadRequestException('User is not a Business Control admin');
     }
     if (user.role === 'owner' && user.businessId) {
@@ -276,7 +276,7 @@ export class UsersService {
         role: access.role,
       }));
 
-    if (businessAccess.length === 0 && user.businessId && ADMIN_ROLES.includes(user.role as any)) {
+    if (businessAccess.length === 0 && user.businessId && BUSINESS_CONTROL_ROLES.includes(user.role as any)) {
       businessAccess.push({
         businessId: user.businessId,
         role: user.role,
@@ -301,8 +301,8 @@ export class UsersService {
         : [];
     const unique = new Map<string, { businessId: string; role: string }>();
     for (const item of source) {
-      if (!ADMIN_ROLES.includes(item.role as any)) {
-        throw new BadRequestException('businessAccess role must be one of ADMIN_ROLES');
+      if (!BUSINESS_CONTROL_ROLES.includes(item.role as any)) {
+        throw new BadRequestException('businessAccess role must be one of BUSINESS_CONTROL_ROLES');
       }
       unique.set(item.businessId, {
         businessId: item.businessId,
