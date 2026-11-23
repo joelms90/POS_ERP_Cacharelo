@@ -1,8 +1,8 @@
 # Feature Specification: Supervisor de Sucursal — Fase 1: Aprobación de Cortes Z e Ingresos/Egresos de caja
 
 **Feature Branch**: `019-supervisor-sucursal`
-**Created**: 2026-11-22
-**Status**: Propuesta (pendiente de decisión del dueño — NO implementado)
+**Created**: 2026-11-22 · **Updated**: 2026-11-22 (decisiones del dueño aplicadas)
+**Status**: Propuesta (NO implementado). Decisiones D-1, D-3, D-10 y D-11 resueltas; quedan supuestos por confirmar (§15).
 **Input**: [brief.md](brief.md) — pedido del dueño: rol "supervisor de sucursal"; lo primero que debe tener es (1) **aprobar cortes Z** y (2) **aprobar ingresos y egresos de caja**.
 
 ---
@@ -13,28 +13,28 @@ Hoy el sistema **registra** el dinero de caja pero nadie lo **valida**:
 
 | Situación actual (verificada en código) | Consecuencia |
 |---|---|
-| El Corte Z (`POST /cash-shifts/:id/close`) cierra el turno en un solo paso: guarda conteo, denominaciones, notas y `close_snapshot`. `cash_shifts.status` solo tiene `open`/`closed`. | Un faltante de $850 queda "cerrado" igual que un corte perfecto. No hay revisión, ni aceptación, ni responsable de aceptarlo. |
-| Los ingresos/egresos (`POST /cash-shifts/:id/transactions`) se aplican de inmediato al `cash_drawer_amount`. | Un retiro de $5,000 "Gasto operativo" entra sin autorización de nadie. |
+| El Corte Z (`POST /cash-shifts/:id/close`) cierra el turno en un solo paso: guarda conteo, denominaciones, notas y `close_snapshot`. `cash_shifts.status` solo tiene `open`/`closed`. | Un faltante de $850 queda "cerrado" igual que un corte perfecto. No hay revisión ni responsable de aceptarlo. |
+| Los ingresos/egresos (`POST /cash-shifts/:id/transactions`) se aplican de inmediato al `cash_drawer_amount`. | Un retiro de $5,000 "Gasto operativo" entra sin que nadie lo revise. |
 | `cash_transactions` **no guarda quién** registró el movimiento (no hay `created_by`), solo `type`, `amount`, `reason`, `created_at`. | Imposible auditar quién sacó el dinero si hubo cambio de operador en la terminal. |
-| La categoría del movimiento ("Gasto operativo", "Entrega a encargado / Retiro parcial", …) se concatena al texto libre de `reason` en Flutter. | No se puede filtrar ni poner reglas por tipo de movimiento. |
-| El turno abierto >24 h se **cierra automáticamente** al abrir uno nuevo (`ShiftsService.openShift`), sin conteo. | Cortes sin arqueo pasan desapercibidos. |
-| Los roles existentes son `owner` (todo) y `branch_operator` (opera **una** sucursal). No hay nivel intermedio. | El dueño es el único que podría revisar, y no hay pantalla para hacerlo. |
+| La categoría del movimiento ("Gasto operativo", "Entrega a encargado / Retiro parcial", …) se concatena al texto libre de `reason` en Flutter. | No se puede filtrar ni revisar por tipo de movimiento. |
+| Los roles existentes son `owner` (todo) y `branch_operator` (opera **una** sucursal). No hay nivel intermedio. | Solo el dueño podría revisar, y no hay pantalla para hacerlo. |
 
-El dueño necesita que una persona de confianza **verifique, controle, autorice y corrija desviaciones** de caja sin ser el cajero que las genera y sin tener los permisos totales de `owner`.
+El dueño necesita que **todo** corte Z e ingreso/egreso pase por una cadena de aprobación: primero el operador de la sucursal y después un supervisor de sus sucursales asignadas o un administrador.
 
 ## 2. Alcance
 
 ### Fase 1 (esta propuesta)
-1. Nuevo rol **`branch_supervisor`** ("Supervisor de sucursal") con asignación explícita a una o más sucursales.
-2. **Aprobación de Cortes Z**: todo Corte Z queda en revisión; el supervisor lo aprueba, lo rechaza (pide reconteo) o lo aprueba con ajuste.
-3. **Aprobación de ingresos y egresos de caja** con umbrales configurables: autorización previa (montos altos) y revisión posterior (resto).
-4. **Política de umbrales** configurable por negocio con override por sucursal (solo `owner` la edita).
+1. Nuevo rol **`branch_supervisor`** ("Supervisor de sucursal") que cubre **varias sucursales asignadas** (D-1 resuelta).
+2. **Cadena de aprobación de dos niveles** para **cada** Corte Z y **cada** ingreso/egreso, sin umbrales de monto (D-3 resuelta):
+   - **Nivel 1:** operador de sucursal (`branch_operator`) de esa sucursal.
+   - **Nivel 2:** supervisor asignado a la sucursal **o** administrador del Admin web.
+3. **Bandeja de aprobaciones en el Admin web** (https://cacharelo-central.web.app/) para que supervisores y administradores aprueben/rechacen desde la interfaz (D-10 resuelta).
+4. **Bandeja "Por aprobar" en el POS Flutter** para el operador de sucursal (nivel 1).
 5. **Bitácora de auditoría** inmutable: usuario, rol, fecha, motivo, valores antes/después, origen.
-6. **Bandeja de aprobaciones** en Admin web + avisos en POS Flutter.
-7. Matriz de permisos cajero / encargado / supervisor / owner para lo anterior.
+6. Matriz de permisos cajero / operador / supervisor / administrador.
 
 ### Fuera de alcance de Fase 1 (ver §11)
-Dashboard multi-sucursal con KPIs, autorización de descuentos/cancelaciones/devoluciones, ajustes de inventario, requisiciones, arqueos sorpresa, personal/asistencia, metas de venta.
+Umbrales configurables (auto-aprobación, autorización previa, PIN en sitio), tratamiento de turnos auto-cerrados >24 h (D-11), dashboard multi-sucursal con KPIs, autorización de descuentos/cancelaciones/devoluciones, ajustes de inventario, requisiciones, arqueos sorpresa, personal/asistencia, metas de venta.
 
 ## 3. Glosario
 
@@ -42,8 +42,9 @@ Dashboard multi-sucursal con KPIs, autorización de descuentos/cancelaciones/dev
 - **Corte Z**: cierre definitivo de turno con conteo físico (`actualAmount`, `denominationCounts`).
 - **Diferencia**: `contado − esperado`, donde `esperado = fondo inicial + ventas efectivo + ingresos − egresos` (`ShiftsService.buildShiftReport`). Negativa = faltante, positiva = sobrante.
 - **Movimiento de caja**: ingreso (`cash-in`) o egreso (`cash-out`) manual.
-- **Autorización previa**: el movimiento no afecta la caja hasta que un supervisor lo autoriza.
-- **Revisión posterior**: el movimiento afecta la caja de inmediato y el supervisor lo valida después.
+- **Nivel 1 (N1)**: aprobación del operador de sucursal.
+- **Nivel 2 (N2)**: aprobación del supervisor asignado o de un administrador.
+- **Administrador**: usuario del Admin web con rol `owner`; qué otros roles de administrador entran es el supuesto S-2.
 
 ## 4. Flujos actuales vs propuestos
 
@@ -52,36 +53,39 @@ Dashboard multi-sucursal con KPIs, autorización de descuentos/cancelaciones/dev
 **Actual**
 ```
 open ──(Corte Z del cajero)──▶ closed          (fin; nadie revisa)
-open ──(otro turno abre, >24h)──▶ closed       (auto-cierre sin conteo)
 ```
 
-**Propuesto** — se separa el ciclo operativo (`status`, sin cambios) del ciclo de revisión (`review_status`, nuevo):
+**Propuesto**: el ciclo operativo (`status`, sin cambios) se separa del ciclo de revisión (`review_status`, nuevo):
 
 ```
-status:         open ───────────── Corte Z ─────────────▶ closed
-review_status:  no_aplica                                  │
-                                                           ▼
-                         ┌──── |diferencia| ≤ umbral_auto y sin movimientos pendientes
-                         │          ──▶ aprobado_auto
-                         └──── en otro caso ──▶ pendiente_aprobacion
-                                                    │
-         ┌──────────────────────┬───────────────────┼─────────────────────────┐
-         ▼                      ▼                   ▼                         ▼
-     aprobado          aprobado_con_ajuste     rechazado ──(reconteo cajero/   (owner) reabierto
-   (supervisor)        (supervisor corrige      │        encargado)──▶ pendiente_aprobacion
-                        conteo, motivo oblig.)  └─ reconteos acotados (máx. configurable)
+status:        open ────────── Corte Z ──────────▶ closed
+review_status: no_aplica                             │
+                                                     ▼
+                                           pendiente_operador   (N1)
+                                    aprueba │            │ rechaza
+                                            ▼            ▼
+                                 pendiente_supervisor   rechazado ──reconteo──▶ pendiente_operador
+                                   (N2: supervisor         ▲
+                                    o administrador)       │
+                         aprueba │   ajusta │   rechaza ───┘
+                                 ▼          ▼
+                             aprobado   aprobado_con_ajuste
+                                 │
+                       (owner) reabierto ──▶ pendiente_supervisor
 ```
 
 Reglas:
-- **CZ-01** El Corte Z se sigue haciendo exactamente igual en la terminal (no se bloquea la operación). Al cerrar, el servidor calcula `review_status` según la política vigente y la guarda junto con el `policy_snapshot` usado.
-- **CZ-02** `rechazado` **no reabre el turno** (el efectivo ya salió del cajón y puede haber otro turno abierto). Rechazar = "el conteo no se acepta, recuenta". El cajero o encargado de esa sucursal registra un **reconteo** (`actualAmount`, denominaciones, nota) → vuelve a `pendiente_aprobacion`. El `close_snapshot` original **nunca se sobrescribe**; cada reconteo queda como versión en la bitácora.
-- **CZ-03** `aprobado_con_ajuste`: el supervisor registra el monto final aceptado y un motivo obligatorio (p. ej. "billete de $500 hallado en sobre de propinas"). La diferencia oficial pasa a ser la del ajuste; la original queda en bitácora (antes/después).
-- **CZ-04** Un Corte Z no puede aprobarse mientras tenga movimientos de caja en `pendiente_aprobacion` (se resuelven primero; la UI los muestra en el mismo detalle).
-- **CZ-05** Los turnos **auto-cerrados** (>24 h) siempre entran como `pendiente_aprobacion` con bandera `auto_closed=true`, sin importar el umbral, porque no tienen conteo.
-- **CZ-06** Nadie aprueba su propio corte (`closed_by == actor` → 403), aunque tenga el rol de supervisor. Extiende la regla existente BR-ROLE-003 (no auto-aprobación de requisiciones). `owner` puede hacer *override* con motivo obligatorio.
-- **CZ-07** Aprobado/rechazado requiere la versión vigente del turno (`version`); si otro supervisor actuó antes, responde 409 y la UI recarga.
-- **CZ-08** Abrir el siguiente turno **no** depende de que el corte anterior esté aprobado (continuidad operativa). Ver decisión abierta D-4.
-- **CZ-09** Turnos cerrados antes del despliegue quedan con `review_status = no_aplica` (históricos; no inundan la bandeja).
+- **CZ-01** El Corte Z se sigue haciendo igual en la terminal y no bloquea la operación. Al cerrar, el servidor deja el turno en `review_status = pendiente_operador` y lo registra en la bitácora.
+- **CZ-02** **Nivel 1**: un operador de sucursal (`branch_operator`) de **esa** sucursal aprueba (→ `pendiente_supervisor`) o rechaza (→ `rechazado`, motivo obligatorio).
+- **CZ-03** **Nivel 2**: un supervisor asignado a la sucursal o un administrador aprueba (→ `aprobado`), aprueba con ajuste (→ `aprobado_con_ajuste`: monto final aceptado + motivo obligatorio) o rechaza (→ `rechazado`, motivo obligatorio). Que el nivel 2 sea obligatorio para todos los cortes es el supuesto **S-1**.
+- **CZ-04** `rechazado` **no reabre el turno**, porque el efectivo ya salió del cajón y puede haber otro turno abierto. El cajero o el operador de la sucursal registra un **reconteo** (`actualAmount`, denominaciones, nota) y el corte vuelve a `pendiente_operador`. Que un rechazo de N2 reinicie la cadena desde N1 es el supuesto **S-5**.
+- **CZ-05** El `close_snapshot` original **nunca se sobrescribe**; cada reconteo o ajuste queda como versión en la bitácora (antes/después).
+- **CZ-06** Un nivel no puede aprobar un Corte Z mientras haya movimientos del mismo turno pendientes **en ese nivel**. La UI los muestra en el mismo detalle para resolverlos primero.
+- **CZ-07** Nadie aprueba su propio corte (`closed_by == actor` → 403). Extiende la regla existente BR-ROLE-003 (no auto-aprobación de requisiciones). El caso en que quien cerró es el propio operador de sucursal es el supuesto **S-3**.
+- **CZ-08** Aprobar o rechazar requiere la versión vigente del turno (`version`). Si otra persona actuó antes, el servidor responde 409 y la UI recarga.
+- **CZ-09** Abrir el siguiente turno **no** depende de que el corte anterior esté aprobado (continuidad operativa; ver D-4).
+- **CZ-10** Los turnos cerrados antes del despliegue quedan `no_aplica` (históricos; no llenan la bandeja).
+- **CZ-11** Los turnos **auto-cerrados** por el sistema (>24 h) **no entran a este flujo en Fase 1** (D-11). Quedan `no_aplica`; ver R-7.
 
 ### 4.2 Ingresos y egresos de caja
 
@@ -90,181 +94,184 @@ Reglas:
 cajero ──POST transactions──▶ se aplica al cajón (sin actor, sin aprobación)
 ```
 
-**Propuesto** — dos umbrales por tipo (ingreso / egreso) y categoría:
+**Propuesto**: **cada** movimiento, sin importar el monto, pasa por la misma cadena:
 
-| Monto (por movimiento) | Estado inicial | Afecta el efectivo esperado | Qué hace el supervisor |
-|---|---|---|---|
-| `< umbral_revision` | `aprobado_auto` | Sí, de inmediato | Nada (visible en bitácora/reportes) |
-| `≥ umbral_revision` y `< umbral_autorizacion` | `pendiente_revision` | Sí, de inmediato (el dinero ya se movió) | Valida o **objeta** después |
-| `≥ umbral_autorizacion` | `pendiente_autorizacion` | **No**, hasta autorizar | Autoriza o rechaza **antes** de que se mueva el dinero |
-
-Transiciones:
 ```
-pendiente_autorizacion ──autorizar──▶ autorizado   (ahora sí afecta la caja)
-                       ──rechazar───▶ rechazado    (nunca afectó la caja)
-                       ──cajero cancela─▶ cancelado
-pendiente_revision     ──validar────▶ aprobado
-                       ──objetar────▶ objetado     (sigue en la caja; queda como incidencia
-                                                    imputable al turno/cajero, motivo obligatorio)
+registrado ──▶ pendiente_operador (N1) ──aprueba──▶ pendiente_supervisor (N2) ──aprueba──▶ aprobado
+                    │       │                               │
+                    │       └──rechaza──▶ rechazado ◀──rechaza┘
+                    └──creador cancela──▶ cancelado
 ```
 
 Reglas:
-- **MV-01** Todo movimiento guarda `created_by`, categoría estructurada, motivo libre y `client_uuid` (idempotencia: reintentos no duplican).
-- **MV-02** Categorías iniciales = las que ya usa Flutter: Ingresos `aporte_cambio`, `reposicion_fondo`, `correccion`, `otro_ingreso`; Egresos `gasto_operativo`, `entrega_encargado`, `transferencia_caja`, `correccion`, `otro_egreso`. La política puede marcar categorías que **siempre** requieren autorización (p. ej. `correccion`) o que exigen nota.
-- **MV-03** **Autorización en sitio**: si el supervisor está físicamente en la sucursal, captura su PIN en la terminal del cajero y el movimiento nace `autorizado` (método `pin_en_sitio`). Si no, queda `pendiente_autorizacion` y el supervisor autoriza desde Admin web (método `remoto`); el POS recibe el resultado.
-- **MV-04** Un egreso que dejaría el efectivo esperado en negativo se rechaza en el servidor (hoy solo Flutter lo "clampa" a 0 en pantalla).
-- **MV-05** `pendiente_autorizacion` expira al cerrar el turno (pasa a `cancelado` automáticamente) para no colgar un Corte Z.
-- **MV-06** Nadie autoriza/valida su propio movimiento. `owner` puede con motivo.
-- **MV-07** Un movimiento objetado aparece en el detalle del Corte Z y en el reporte del cajero; no altera montos (el dinero sí se movió) pero cuenta en el KPI "incidencias de caja".
+- **MV-01** Todo movimiento guarda `created_by`, categoría estructurada, motivo libre y `client_uuid` (idempotencia: un reintento no lo duplica).
+- **MV-02** Categorías iniciales = las que ya usa Flutter. Ingresos: `aporte_cambio`, `reposicion_fondo`, `correccion`, `otro_ingreso`. Egresos: `gasto_operativo`, `entrega_encargado`, `transferencia_caja`, `correccion`, `otro_egreso`.
+- **MV-03** Efecto en caja: el movimiento **cuenta en el efectivo esperado desde que se registra**, porque refleja el dinero que físicamente entró o salió. La aprobación valida; un `rechazado` sigue contando, pero queda como **incidencia** del turno y del cajero con motivo obligatorio. Un `cancelado` (solo mientras está `pendiente_operador`, solo por su creador) deja de contar. Este comportamiento es el supuesto **S-4**.
+- **MV-04** **Nivel 1** por un operador de la sucursal; **Nivel 2** por un supervisor asignado o un administrador (obligatoriedad = supuesto **S-1**).
+- **MV-05** Un egreso que dejaría el efectivo esperado en negativo se rechaza en el servidor. Hoy solo Flutter lo recorta a 0 en pantalla.
+- **MV-06** Nadie aprueba su propio movimiento (ver **S-3** cuando el autor es el operador).
+- **MV-07** Los movimientos pendientes se muestran en el detalle del Corte Z del turno (CZ-06).
 
-## 5. Umbrales configurables
+## 5. Umbrales configurables — fase futura
 
-Política por negocio (`cash_approval_policies`), con override opcional por sucursal. Solo `owner` la modifica; cada cambio queda en bitácora con antes/después.
-
-| Parámetro | Default propuesto | Significado |
-|---|---|---|
-| `corte_z_auto_approve_max_diff` | $0.00 (todo a revisión) | \|diferencia\| hasta la que el Corte Z se aprueba solo. Sugerencia de arranque: $20. |
-| `corte_z_max_recounts` | 2 | Reconteos permitidos antes de que sólo `owner` pueda resolver. |
-| `cash_in_review_min` / `cash_out_review_min` | $0.00 / $0.00 | Desde qué monto un movimiento va a revisión posterior. |
-| `cash_in_authorization_min` / `cash_out_authorization_min` | sin límite / $2,000 | Desde qué monto requiere autorización previa. |
-| `categories_always_authorize` | `[correccion]` | Categorías que siempre requieren autorización previa. |
-| `categories_require_note` | `[gasto_operativo, otro_egreso, otro_ingreso, correccion]` | Nota libre obligatoria. |
-| `allow_pin_in_situ` | `true` | Permite autorización con PIN del supervisor en la terminal. |
-| `pending_sla_hours` | 24 | Horas tras las cuales un pendiente se marca "vencido" y se escala al owner. |
-
-Los montos son ejemplos; el dueño debe fijarlos (D-3). El servidor guarda en cada corte/movimiento el `policy_snapshot` aplicado, para que un cambio de política no reinterprete el pasado.
+Por decisión del dueño (D-3) **no hay umbrales de monto en Fase 1**: todo pasa por N1 y N2. Se conserva como diseño futuro, sin montos definidos:
+- auto-aprobación de cortes con diferencia pequeña;
+- revisión posterior vs autorización previa de movimientos según monto o categoría;
+- autorización con PIN del supervisor en la terminal;
+- límite de reconteos y SLA de pendientes;
+- política por negocio con override por sucursal, editable solo por owner y auditada.
 
 ## 6. Bitácora de auditoría
 
 Tabla append-only `audit_log` (genérica, reutilizable por fases posteriores: descuentos, cancelaciones, inventario).
 
-Cada evento registra: `business_id`, `branch_id`, `entity_type` (`cash_shift`, `cash_transaction`, `cash_approval_policy`, `supervisor_assignment`), `entity_id`, `action` (`corte_z_cerrado`, `corte_z_aprobado`, `corte_z_rechazado`, `corte_z_reconteo`, `corte_z_ajustado`, `movimiento_creado`, `movimiento_autorizado`, `movimiento_rechazado`, `movimiento_validado`, `movimiento_objetado`, `politica_actualizada`, `asignacion_actualizada`, `override_owner`), `actor_id`, `actor_role` (rol activo con el que actuó), `reason`, `before` (jsonb), `after` (jsonb), `source` (`admin_web`, `pos`, `system`), `device_id`, `authorization_method`, `created_at` (servidor).
+Cada evento registra: `business_id`, `branch_id`, `entity_type` (`cash_shift`, `cash_transaction`, `supervisor_assignment`), `entity_id`, `action`, `approval_level` (`n1`, `n2`, `owner`), `actor_id`, `actor_role` (rol activo con el que actuó), `reason`, `before` (jsonb), `after` (jsonb), `source` (`admin_web`, `pos`, `system`), `device_id` y `created_at` (servidor).
+
+Valores de `action`: `corte_z_cerrado`, `corte_z_aprobado`, `corte_z_rechazado`, `corte_z_reconteo`, `corte_z_ajustado`, `corte_z_reabierto`, `movimiento_creado`, `movimiento_aprobado`, `movimiento_rechazado`, `movimiento_cancelado`, `asignacion_actualizada`.
 
 Reglas:
-- **AU-01** Sin `UPDATE`/`DELETE`: la app solo inserta; la migración propone revocar esos privilegios al usuario de la app sobre la tabla (o trigger que lo impida).
-- **AU-02** Se escribe **en la misma transacción** que el cambio de estado (si falla la bitácora, falla la aprobación).
-- **AU-03** Motivo obligatorio en: rechazar, ajustar, objetar, override de owner, cambio de política. Opcional en aprobar.
-- **AU-04** Consultable por supervisor (sus sucursales) y owner (todo); filtros por sucursal, entidad, actor, acción y rango de fechas. Exportable a CSV (patrón existente en ReportsPage).
-- **AU-05** "Eliminar registros financieros" **no existe** para ningún rol (ver matriz).
+- **AU-01** Sin `UPDATE`/`DELETE`: la app solo inserta. La migración propone revocar esos privilegios al usuario de la app sobre la tabla (o un trigger que lo impida).
+- **AU-02** Se escribe **en la misma transacción** que el cambio de estado: si falla la bitácora, falla la aprobación.
+- **AU-03** Motivo obligatorio en: rechazar, ajustar, reabrir. Opcional en aprobar.
+- **AU-04** Consultable por el supervisor (sus sucursales) y por administradores; filtros por sucursal, entidad, actor, acción y rango de fechas. Exportable a CSV (patrón existente en ReportsPage).
+- **AU-05** "Eliminar registros financieros" **no existe** para ningún rol.
 
 ## 7. Matriz de permisos (Fase 1)
 
-✅ permitido · 🔸 solo su sucursal/su caja · 🔹 solo sucursales asignadas · ❌ no
+✅ permitido · 🔸 solo su sucursal/su caja · 🔹 solo sucursales asignadas · ❌ no · ❓ supuesto a confirmar
 
-| Acción | Cajero | Encargado (`branch_operator`) | Supervisor (`branch_supervisor`) | Owner |
+| Acción | Cajero | Operador de sucursal (`branch_operator`) | Supervisor (`branch_supervisor`) | Administrador (owner; otros = S-2) |
 |---|---|---|---|---|
-| Abrir turno / Corte X / Corte Z de su caja | 🔸 | 🔸 | ❌ (no opera caja) ¹ | ✅ |
+| Abrir turno / Corte X / Corte Z de su caja | 🔸 | 🔸 | ❌ ¹ | ✅ |
 | Registrar ingreso/egreso en su turno | 🔸 | 🔸 | ❌ | ✅ |
-| Cancelar su movimiento `pendiente_autorizacion` | 🔸 | 🔸 | — | ✅ |
-| Registrar reconteo de Corte Z rechazado | 🔸 (su turno) | 🔸 (turnos de su sucursal) | ❌ | ✅ |
+| Cancelar su movimiento `pendiente_operador` | 🔸 | 🔸 | — | — |
+| Registrar reconteo de Corte Z rechazado | 🔸 (su turno) | 🔸 (turnos de su sucursal) | ❌ | ❌ |
 | Ver cortes y movimientos de la sucursal | 🔸 (los suyos) | 🔸 | 🔹 | ✅ |
-| Aprobar / rechazar / ajustar Corte Z | ❌ | ❌ ² | 🔹 (no propios) | ✅ (override con motivo) |
-| Autorizar / rechazar movimiento (previo) | ❌ | ❌ ² | 🔹 remoto o PIN en sitio | ✅ |
-| Validar / objetar movimiento (posterior) | ❌ | ❌ | 🔹 | ✅ |
-| Reabrir un Corte Z aprobado | ❌ | ❌ | ❌ | ✅ con motivo |
+| **Nivel 1**: aprobar / rechazar Corte Z | ❌ | 🔸 (no propios, S-3) | ❌ | ❓ S-6 |
+| **Nivel 1**: aprobar / rechazar movimiento | ❌ | 🔸 (no propios, S-3) | ❌ | ❓ S-6 |
+| **Nivel 2**: aprobar / rechazar / ajustar Corte Z | ❌ | ❌ | 🔹 (no propios) | ✅ desde Admin web |
+| **Nivel 2**: aprobar / rechazar movimiento | ❌ | ❌ | 🔹 (no propios) | ✅ desde Admin web |
+| Reabrir un Corte Z aprobado | ❌ | ❌ | ❌ | owner, con motivo |
 | Ver bitácora de auditoría | ❌ | ❌ | 🔹 | ✅ |
-| Editar umbrales / política | ❌ | ❌ | ❌ (solo lectura) | ✅ |
-| Asignar supervisores a sucursales | ❌ | ❌ | ❌ | ✅ |
-| Crear sucursales / modificar permisos de administradores | ❌ | ❌ | ❌ | ✅ |
+| Asignar supervisores a sucursales | ❌ | ❌ | ❌ | owner |
+| Crear sucursales / modificar permisos de administradores | ❌ | ❌ | ❌ | owner |
 | Eliminar registros financieros | ❌ | ❌ | ❌ | ❌ |
 
-¹ Si una persona es supervisor y también cajero, usa roles distintos (multi-rol existente, `users.roles`) y CZ-06/MV-06 le impiden aprobar lo que hizo con el rol de cajero.
-² Ver D-2: opción de que el encargado haga una **primera revisión** (sin aprobación final) en sucursales sin supervisor.
+¹ Si una persona tiene el rol de supervisor y también el de cajero (multi-rol existente, `users.roles`), CZ-07/MV-06 le impiden aprobar lo que hizo con el rol de cajero.
 
-Propuesta para fases siguientes (tabla del brief): ver ventas de sus sucursales ✅🔹 · consultar cortes y arqueos ✅🔹 (Fase 1) · autorizar descuentos excepcionales y cancelaciones/devoluciones ✅🔹 con umbral (Fase 3) · revisar/aprobar requisiciones ✅🔹 solo **primer visto bueno**, la aprobación de almacén sigue en `warehouse_purchasing_operator` (Fase 3) · autorizar ajustes de inventario ✅🔹 con umbral (Fase 3) · consultar movimientos y auditorías ✅🔹 (Fase 1) · crear sucursales ❌ · modificar permisos de administradores ❌ · eliminar registros financieros ❌.
+Propuesta para fases siguientes (tabla del brief):
+- Ver ventas de sus sucursales: ✅🔹.
+- Consultar cortes y arqueos: ✅🔹 (Fase 1).
+- Autorizar descuentos excepcionales y cancelaciones/devoluciones: ✅🔹 (Fase 3).
+- Revisar/aprobar requisiciones: ✅🔹 solo **primer visto bueno**; la aprobación de almacén sigue en `warehouse_purchasing_operator` (Fase 3).
+- Autorizar ajustes de inventario: ✅🔹 (Fase 3).
+- Consultar movimientos y auditorías: ✅🔹 (Fase 1).
+- Crear sucursales: ❌. Modificar permisos de administradores: ❌. Eliminar registros financieros: ❌.
 
 ## 8. Notificaciones
 
 | Evento | Quién se entera | Canal Fase 1 |
 |---|---|---|
-| Corte Z en `pendiente_aprobacion` | Supervisores asignados a la sucursal | Bandeja Admin web con contador (polling 60 s) |
-| Movimiento `pendiente_autorizacion` | Supervisores asignados | Bandeja + contador; en el POS el cajero ve "Esperando autorización" |
-| Autorizado / rechazado / corte rechazado | Terminal(es) de la sucursal | Evento WebSocket `approval_resolved` al cuarto de la sucursal (gateway existente) + refresco al reconectar |
-| Pendiente vence SLA | Owner | Bandeja owner (marcado "vencido") |
-| Diferencia > umbral alto (p. ej. $500) | Supervisor + owner | Bandeja, resaltado rojo |
+| Corte Z o movimiento en `pendiente_operador` | Operadores de la sucursal | Evento WebSocket `approval_requested` al cuarto de la sucursal (gateway existente) + contador en la pestaña Caja del POS |
+| Pendiente en `pendiente_supervisor` | Supervisores asignados y administradores | Bandeja del Admin web con contador (polling 60 s) |
+| Aprobado / rechazado (N1 o N2) | Terminal(es) de la sucursal | Evento WebSocket `approval_resolved` + refresco al reconectar |
 
-Fase 2+: push en móvil / correo / WhatsApp (decisión D-6). El gateway hoy registra clientes **por sucursal** (`sync.gateway.ts`); para notificar al supervisor en tiempo real se propone un cuarto `user:{id}` en Fase 2; en Fase 1 basta polling.
+Fase 2+: push en móvil / correo / WhatsApp (D-6). El gateway hoy registra clientes **por sucursal** (`sync.gateway.ts`), lo que sirve para N1. Para N2 en tiempo real se propone un cuarto `user:{id}` en Fase 2; en Fase 1 basta el polling.
 
 ## 9. Offline en POS Flutter
 
 Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en línea** (`app_state.dart`: `http.post` con timeout; sin cola). Solo el turno activo se cachea en `SecureStorageService`.
 
 Propuesta Fase 1:
-- **OF-01** Los movimientos bajo `umbral_autorizacion` se pueden registrar offline: se encolan con `client_uuid` (mismo patrón que `_pendingSaleSyncJobs`), se muestran como "pendiente de sincronizar" y el servidor asigna el estado de aprobación al sincronizar. El `client_uuid` evita duplicados.
-- **OF-02** Movimientos que requieren autorización previa **offline**: solo con PIN del supervisor en sitio validado contra credenciales cacheadas (patrón `verifyOfflineCredentials`). Se marca `authorization_method = pin_offline`; al sincronizar, el servidor re-valida que el supervisor esté asignado a la sucursal y activo. Si no pasa, el movimiento queda `pendiente_revision` con alerta. Si `allow_pin_in_situ = false` o no hay supervisor, el movimiento no se puede hacer offline.
-- **OF-03** El Corte Z sigue siendo en línea en Fase 1 (decisión conservadora: el cálculo del esperado depende de pagos en servidor). Ver D-5.
-- **OF-04** **Aprobar/rechazar nunca es offline**: lo decide el servidor.
-- **OF-05** Requiere que el PIN de supervisores asignados se cachee (hash) en las terminales de sus sucursales. Riesgo aceptado y documentado; el PIN del supervisor debe ser distinto y rotable.
+- **OF-01** Los movimientos se pueden registrar offline: se encolan con `client_uuid` (mismo patrón que `_pendingSaleSyncJobs`), se muestran como "pendiente de sincronizar" y nacen `pendiente_operador` al llegar al servidor. El `client_uuid` evita duplicados.
+- **OF-02** El Corte Z sigue siendo en línea en Fase 1 (el cálculo del esperado depende de pagos en el servidor). Ver D-5.
+- **OF-03** **Aprobar o rechazar nunca es offline** (ni N1 ni N2): lo decide el servidor. La bandeja del operador muestra el último estado cacheado y deshabilita las acciones sin conexión.
 
 ## 10. Requisitos funcionales
 
-- **FR-001** El sistema MUST incorporar el rol `branch_supervisor` al catálogo canónico de roles, con alcance por sucursales asignadas.
-- **FR-002** El sistema MUST permitir al owner asignar/desasignar sucursales a un supervisor y auditar esas asignaciones.
-- **FR-003** Todo Corte Z cerrado después del despliegue MUST obtener un `review_status` calculado en servidor según la política vigente.
-- **FR-004** El supervisor MUST poder aprobar, rechazar (pidiendo reconteo) o aprobar con ajuste un Corte Z de sus sucursales, con motivo obligatorio en rechazo/ajuste.
-- **FR-005** El sistema MUST conservar intacto el `close_snapshot` original y registrar cada reconteo/ajuste como versión en la bitácora.
-- **FR-006** Todo movimiento de caja MUST registrar actor, categoría, motivo, `client_uuid` y estado de aprobación.
-- **FR-007** Movimientos sobre umbral de autorización MUST no afectar el efectivo esperado hasta ser autorizados.
+- **FR-001** El sistema MUST incorporar el rol `branch_supervisor` al catálogo canónico de roles, con alcance por sucursales asignadas (varias por supervisor).
+- **FR-002** El sistema MUST permitir al owner asignar y desasignar sucursales a un supervisor, y auditar esas asignaciones.
+- **FR-003** Todo Corte Z cerrado manualmente después del despliegue MUST quedar en `pendiente_operador`.
+- **FR-004** Todo ingreso/egreso registrado después del despliegue MUST quedar en `pendiente_operador`, sin importar el monto.
+- **FR-005** Un operador de sucursal MUST poder aprobar o rechazar (N1), desde el POS, cortes y movimientos de su sucursal que no sean suyos.
+- **FR-006** Un supervisor (sucursales asignadas) o un administrador MUST poder aprobar, rechazar o ajustar (N2) desde la bandeja del Admin web.
+- **FR-007** El sistema MUST conservar intacto el `close_snapshot` original y registrar cada reconteo o ajuste como versión en la bitácora.
 - **FR-008** El sistema MUST impedir la auto-aprobación de cortes y movimientos, también vía peticiones directas.
-- **FR-009** Toda transición de aprobación MUST escribir un evento en `audit_log` en la misma transacción, con antes/después.
-- **FR-010** Las autorizaciones MUST validarse en servidor (BR-ROLE-004); Admin y POS solo ocultan acciones.
-- **FR-011** El POS MUST mostrar al cajero el estado de sus movimientos y del Corte Z (pendiente/aprobado/rechazado) y permitir el reconteo cuando se rechace.
-- **FR-012** El owner MUST poder configurar los umbrales por negocio y por sucursal.
+- **FR-009** Toda transición de aprobación MUST escribir un evento en `audit_log` en la misma transacción, con nivel, antes y después.
+- **FR-010** Las autorizaciones MUST validarse en el servidor (BR-ROLE-004); Admin y POS solo ocultan acciones.
+- **FR-011** El POS MUST mostrar al cajero el estado de sus movimientos y de su Corte Z, y permitir el reconteo cuando se rechace.
 
 ## 11. Fases posteriores
 
 | Fase | Contenido | Reutiliza |
 |---|---|---|
 | **2 — Dashboard de supervisión** | Vista "todas mis sucursales, hoy": ventas totales, sucursales abiertas X/Y (turno abierto), diferencias de caja acumuladas, alertas pendientes (cortes + movimientos + inventario), ventas por sucursal, "N sucursales requieren revisión". Notificaciones push/tiempo real. | `GET /reports/sales-dashboard`, `inventory_alerts`, `cash_shifts`, bandeja de Fase 1 |
-| **3 — Autorizaciones operativas** | Descuentos excepcionales, cancelaciones/devoluciones (hoy `orders.cancelled_by/cancellation_reason` sin aprobación), ajustes de inventario, primer visto bueno de requisiciones. Todo sobre el mismo motor de políticas + `audit_log`. | Motor de umbrales y bitácora de Fase 1 |
-| **4 — KPIs del supervisor** | Ventas vs meta (requiere tabla de metas), diferencias de caja (faltantes/sobrantes), merma (`inventory_movements` tipo merma), cancelaciones/devoluciones (frecuencia, monto, motivo), disponibilidad de productos esenciales (`branch_stock_thresholds`), productividad (ventas por empleado/turno), cumplimiento operativo (requiere checklists de inspección). | `reports.service`, `stock_ledger`, `audit_log` |
+| **2b — Umbrales y auto-cierre** | Umbrales configurables (§5); tratamiento de turnos auto-cerrados >24 h (R-7). | Cadena de aprobación de Fase 1 |
+| **3 — Autorizaciones operativas** | Descuentos excepcionales, cancelaciones/devoluciones (hoy `orders.cancelled_by/cancellation_reason` sin aprobación), ajustes de inventario, primer visto bueno de requisiciones. Todo sobre la misma cadena + `audit_log`. | Cadena y bitácora de Fase 1 |
+| **4 — KPIs del supervisor** | Ventas vs meta (requiere tabla de metas), diferencias de caja (faltantes/sobrantes), merma (`inventory_movements` tipo merma), cancelaciones/devoluciones (frecuencia, monto, motivo), disponibilidad de productos esenciales (`branch_stock_thresholds`), productividad (ventas por empleado/turno), cumplimiento operativo (requiere checklists de inspección), movimientos rechazados por cajero. | `reports.service`, `stock_ledger`, `audit_log` |
 | **5 — Operación de campo** | Arqueo sorpresa (Corte X firmado por supervisor), checklists de visita/inspección, asistencia del personal. | Corte X existente |
 
 ## 12. Criterios de éxito
 
-- **SC-001** 100 % de los Cortes Z posteriores al despliegue tienen `review_status` distinto de `no_aplica`.
+- **SC-001** 100 % de los Cortes Z cerrados manualmente después del despliegue tienen `review_status` distinto de `no_aplica`.
 - **SC-002** 0 movimientos de caja sin `created_by` después del despliegue.
-- **SC-003** Un intento de auto-aprobación vía HTTP directo devuelve 403 (test de autorización).
-- **SC-004** Cada aprobación/rechazo/ajuste tiene exactamente un evento en `audit_log` con antes/después.
-- **SC-005** El supervisor ve en la bandeja solo sucursales asignadas (test con dos supervisores).
-- **SC-006** Un cajero sin conexión puede seguir registrando movimientos bajo umbral y cerrar operaciones de venta sin bloqueo.
+- **SC-003** Un intento de auto-aprobación, o de aprobar N2 antes de N1, vía HTTP directo devuelve 403/409 (test de autorización).
+- **SC-004** Cada aprobación, rechazo o ajuste tiene exactamente un evento en `audit_log` con nivel, antes y después.
+- **SC-005** El supervisor ve en la bandeja solo sus sucursales asignadas (test con dos supervisores); el administrador ve todas las de su negocio.
+- **SC-006** Un cajero sin conexión puede seguir registrando movimientos y vendiendo sin bloqueo.
 
 ## 13. Riesgos detectados en el código actual
 
 | # | Riesgo | Evidencia | Mitigación propuesta |
 |---|---|---|---|
-| R-1 | **Endpoints de reportes de caja sin guard** | En `reports.controller.ts`, `GET /reports/cash-shifts`, `/reports/sales/payment-methods`, `/reports/sales/products`, `/reports/inventory/existence` y `/reports/inventory/kardex` no tienen `@UseGuards` (no hay guard a nivel de clase ni `APP_GUARD` global). Cualquiera con un `businessId` puede listar cortes, ventas e inventario. | Corregir **antes** de Fase 1 (cambio pequeño, independiente): `JwtAuthGuard + RolesGuard + assertScope`. |
+| R-1 | **Endpoints de reportes sin guard** | En `reports.controller.ts`, `GET /reports/cash-shifts`, `/reports/sales/payment-methods`, `/reports/sales/products`, `/reports/inventory/existence` y `/reports/inventory/kardex` no tienen `@UseGuards` (no hay guard a nivel de clase ni `APP_GUARD` global). Cualquiera con un `businessId` puede listar cortes, ventas e inventario. | Corregir **antes** de Fase 1 (cambio pequeño e independiente): `JwtAuthGuard + RolesGuard + assertScope`. |
 | R-2 | Añadir el supervisor a `ADMIN_ROLES` le daría acceso a **todas** las sucursales | `reports.service.ts:613` trata cualquier rol de `ADMIN_ROLES` como sin restricción de sucursal en el reporte de auditoría; `users.service.ts` usa `ADMIN_ROLES` para el alta de administradores. | Nuevo grupo `SUPERVISION_ROLES`; el alcance se resuelve siempre con `supervisor_branch_assignments`, nunca por pertenecer a un grupo. |
-| R-3 | `RolesGuard` deja pasar a `owner` siempre | `roles.guard.ts` | Correcto para owner, pero las reglas de "no auto-aprobación" deben vivir en el servicio, no en el guard. |
-| R-4 | Admin web decide pestañas por `user.role` (primer rol) | `App.tsx` `roleTabs[user?.role]` | Calcular pestañas con la unión de `user.roles` o con rol activo elegido. |
+| R-3 | `RolesGuard` deja pasar a `owner` siempre | `roles.guard.ts` | Correcto para owner, pero las reglas de nivel y de no auto-aprobación deben vivir en el servicio, no en el guard. |
+| R-4 | Admin web decide pestañas por `user.role` (primer rol) | `App.tsx` `roleTabs[user?.role]` | Calcular pestañas con la unión de `user.roles` o con el rol activo elegido. |
 | R-5 | Movimientos sin idempotencia ni actor | `cash_transactions` sin `created_by`/`client_uuid`; Flutter reintenta por timeout | Columnas nuevas (data-model) y `ON CONFLICT (client_uuid)`. |
-| R-6 | Egresos pueden dejar el cajón negativo en servidor | `ShiftsService.createTransaction` resta sin validar; Flutter solo hace `max(0, …)` | MV-04. |
-| R-7 | Auto-cierre >24 h sin conteo | `ShiftsService.openShift` | CZ-05. |
-| R-8 | PIN del supervisor cacheado en terminales (offline) | OF-05 | PIN propio, rotación, revalidación al sincronizar, opción de desactivar. |
-| R-9 | Migraciones fuera del journal de Drizzle | `AGENTS.md` (caveat `admin_business_access`) | Script idempotente (`IF NOT EXISTS`) como en `idempotent-deploy-migrations.ts`, coordinado en `workspaces.md`. |
-| R-10 | Dos supervisores actúan a la vez | — | Concurrencia optimista con `version` (CZ-07). |
+| R-6 | Egresos pueden dejar el cajón negativo en el servidor | `ShiftsService.createTransaction` resta sin validar; Flutter solo hace `max(0, …)` | MV-05. |
+| R-7 | **Auto-cierre >24 h sin conteo (fuera de Fase 1 por D-11)** | `ShiftsService.openShift` cierra el turno sin `close_snapshot` ni conteo; `cash_drawer_amount` no incluye ventas en efectivo, así que el Corte Z de esos turnos muestra un **faltante falso ≈ ventas en efectivo**. | Fase 2b: marcar `auto_closed`, enviarlos a revisión y mostrar la diferencia como "sin conteo". En Fase 1 quedan `no_aplica` y fuera de la bandeja; conviene advertirlo al dueño al leer reportes. |
+| R-8 | Carga operativa: **todo** pasa por dos niveles sin umbral | D-3 | Medir volumen de pendientes las primeras semanas; los umbrales (§5) son la palanca para reducirlo. |
+| R-9 | Sucursal sin operador disponible, o donde el operador es quien cierra | — | Supuestos S-3 y S-6. |
+| R-10 | Migraciones fuera del journal de Drizzle | `AGENTS.md` (caveat `admin_business_access`) | Script idempotente (`IF NOT EXISTS`) como en `idempotent-deploy-migrations.ts`, coordinado en `workspaces.md`. |
+| R-11 | Dos aprobadores actúan a la vez | — | Concurrencia optimista con `version` (CZ-08). |
 
 ## 14. Qué se reutiliza del código existente
 
-- `ShiftsService.buildShiftReport` / `getCorteReport` y `cash_shifts.close_snapshot`: base del detalle que revisa el supervisor (esperado, contado, diferencia, movimientos, denominaciones).
+- `ShiftsService.buildShiftReport` / `getCorteReport` y `cash_shifts.close_snapshot`: base del detalle que revisan N1 y N2 (esperado, contado, diferencia, movimientos, denominaciones).
 - `GET /reports/cash-shifts` y `GET /reports/cash-shifts/:id/audit`: listado y detalle; se agregan `review_status` y filtros.
-- Admin `ReportsPage.tsx` → pestaña "Cortes de Caja" (tabla, badge de discrepancia, modal de auditoría, export CSV): se extiende con columna de estado y botones de acción.
-- `RequisitionsApprovalPage.tsx`: patrón de bandeja aprobar/rechazar y badges de estado.
+- Admin `ReportsPage.tsx`, pestaña "Cortes de Caja" (tabla, badge de discrepancia, modal de auditoría, export CSV): se extiende con columna de estado.
+- `RequisitionsApprovalPage.tsx`: patrón de bandeja aprobar/rechazar y badges de estado para la nueva bandeja del Admin web.
 - Regla BR-ROLE-003 (no auto-aprobación) y su patrón en `requisitions.service.ts`.
 - Multi-rol (`users.roles`, spec 013), `admin_business_access`, `assertBusinessAccess`, `RolesGuard`, `roleTabs`.
-- Flutter: diálogos de ingreso/retiro y Corte Z en `encargado_caja_tab.dart` y `cashier/shift_control_panel.dart`; cola offline (`_pendingSaleSyncJobs`) y `verifyOfflineCredentials`.
-- `sync.gateway.ts` (cuartos por sucursal) para avisar resultados a las terminales.
+- Flutter: diálogos de ingreso/retiro y Corte Z en `encargado_caja_tab.dart` y `cashier/shift_control_panel.dart`; cola offline (`_pendingSaleSyncJobs`).
+- `sync.gateway.ts` (cuartos por sucursal) para avisar al operador (N1) y a las terminales.
 
-## 15. Decisiones abiertas para el dueño
+## 15. Decisiones del dueño y supuestos
 
-| # | Decisión | Opciones | Recomendación |
+### 15.1 Decisiones
+
+| # | Decisión | Estado | Resolución |
 |---|---|---|---|
-| **D-1** | ¿Supervisor de **varias sucursales asignadas** o **uno dentro de cada sucursal**? | (a) Varias sucursales por supervisor; (b) uno por sucursal. | **(a) Varias sucursales, modelado como asignaciones N:N** (`supervisor_branch_assignments`). Razones: coincide con la definición del brief ("supervisa varias sucursales"); el rol "dentro de la sucursal" ya existe y es el encargado (`branch_operator`); una persona que aprueba los cortes de la sucursal donde trabaja a diario pierde independencia (control débil); el modelo N:N cubre el caso "uno por sucursal" asignando una sola sucursal, sin rediseño. Además una sucursal puede tener 2 supervisores (titular y suplente) para vacaciones. |
-| **D-2** | En sucursales sin supervisor asignado, ¿quién aprueba? | (a) Owner; (b) el encargado hace primera revisión y owner aprueba; (c) se aprueba automáticamente. | **(a) Owner**, con la bandeja de owner. (b) se puede añadir después. (c) anula el control. |
-| **D-3** | Montos de umbrales iniciales (diferencia auto-aprobable, montos de revisión y autorización de egresos/ingresos). | Ver §5. | Arrancar con: Corte Z auto ≤ $20; egresos ≥ $500 revisión, ≥ $2,000 autorización previa; ingresos solo revisión ≥ $1,000; ajustar tras 2 semanas con datos reales. |
-| **D-4** | ¿Bloquear la apertura del siguiente turno si el Corte Z anterior está rechazado/pendiente? | Sí / No / Solo si rechazado y vencido. | **No bloquear** en Fase 1 (no detener ventas); escalar al owner por SLA. |
-| **D-5** | ¿Permitir Corte Z offline? | Sí (cola, el servidor recalcula) / No. | **No en Fase 1.** Revisar en Fase 2 si hay sucursales con conectividad mala. |
-| **D-6** | Canal de notificación al supervisor fuera de la app. | Solo bandeja / push / correo / WhatsApp. | Bandeja en Fase 1; push o WhatsApp en Fase 2 según uso real. |
-| **D-7** | ¿El supervisor puede autorizar con PIN en la terminal (en sitio) o solo desde su sesión? | PIN en sitio sí/no. | **Sí**, desactivable por política; cada uso queda en bitácora con dispositivo. |
-| **D-8** | ¿Un faltante aprobado se registra como adeudo del cajero? | Solo registro / adeudo formal. | Solo registro en Fase 1 (KPI de diferencias); adeudo formal requiere política laboral del dueño. |
-| **D-9** | ¿El supervisor también puede ver ventas en vivo de sus sucursales desde Fase 1? | Sí / esperar a Fase 2. | Solo lo necesario para revisar el corte en Fase 1; dashboard completo en Fase 2. |
+| **D-1** | ¿Supervisor de varias sucursales asignadas o uno por sucursal? | ✅ **RESUELTA** (2026-11-22) | **Varias sucursales asignadas.** Modelo N:N `supervisor_branch_assignments`. |
+| **D-2** | En sucursales sin supervisor asignado, ¿quién aprueba el nivel 2? | ✅ **RESUELTA por D-10** | Los administradores del Admin web pueden aprobar N2 de cualquier sucursal de su negocio. |
+| **D-3** | Umbrales de monto iniciales. | ✅ **RESUELTA** (2026-11-22) | **Sin umbrales en Fase 1.** Todo corte Z y todo ingreso/egreso lo aprueba primero el operador de sucursal y después un supervisor o administrador. Los umbrales quedan como fase futura (§5). |
+| **D-4** | ¿Bloquear la apertura del siguiente turno si el Corte Z anterior está pendiente o rechazado? | Abierta | Recomendación: **no bloquear**. |
+| **D-5** | ¿Permitir Corte Z offline? | Abierta | Recomendación: **no en Fase 1**. |
+| **D-6** | Canal de notificación fuera de la app. | Abierta | Recomendación: bandeja en Fase 1; push o WhatsApp en Fase 2. |
+| **D-7** | ¿Autorización con PIN del supervisor en la terminal? | Pospuesta | Sin umbrales/autorización previa ya no aplica a Fase 1; pasa a §5. |
+| **D-8** | ¿Un faltante aprobado se registra como adeudo del cajero? | Abierta | Recomendación: solo registro en Fase 1. |
+| **D-9** | ¿El supervisor ve ventas en vivo desde Fase 1? | Abierta | Recomendación: esperar al dashboard de Fase 2. |
+| **D-10** | ¿Los administradores aprueban desde el Admin web? | ✅ **RESUELTA** (2026-11-22) | **Sí.** Los administradores de https://cacharelo-central.web.app/ aprueban y rechazan cortes Z e ingresos/egresos desde la interfaz. La bandeja de aprobaciones del Admin web entra en Fase 1. |
+| **D-11** | ¿Tratar los turnos auto-cerrados (>24 h) en Fase 1? | ✅ **RESUELTA** (2026-11-22) | **No por ahora.** Queda en riesgos (R-7) y en la Fase 2b. |
+
+### 15.2 Supuestos a confirmar con el dueño (no se inventan reglas)
+
+| # | Supuesto adoptado en esta propuesta | Qué hay que confirmar |
+|---|---|---|
+| **S-1** | El nivel 2 es **obligatorio para todo**: un corte o movimiento solo queda `aprobado` tras N2. | ¿Hay casos donde la aprobación del operador basta? Si los hay, `pendiente_supervisor` se omitiría para ellos, y la regla de cuáles falta definirla. |
+| **S-2** | "Administrador" = `owner`. | ¿También aprueban `inventory_admin` y/o `support_tech`? (`web_inquiries_viewer` se asume que no). |
+| **S-3** | Si quien cerró el corte o registró el movimiento es el propio operador de sucursal, N1 lo hace **otro** operador de la misma sucursal. | ¿Y si no hay otro operador? Opciones: pasa directo a N2, o el operador puede aprobar lo suyo en N1. |
+| **S-4** | El movimiento cuenta en el efectivo esperado desde que se registra; un rechazo lo deja como incidencia, no lo descuenta. | ¿O el dinero no debe moverse hasta que N1 apruebe (autorización previa)? |
+| **S-5** | Un rechazo en N2 exige reconteo y reinicia la cadena desde N1. | ¿O el reconteo tras un rechazo de N2 vuelve directo a N2? |
+| **S-6** | Los administradores actúan en N2; no sustituyen al operador en N1. | ¿El administrador (o el supervisor) puede aprobar N1 cuando el operador no está, o saltarse N1? |
