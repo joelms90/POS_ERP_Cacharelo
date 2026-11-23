@@ -59,7 +59,7 @@ export function tabsForUser(user: { role?: string; roles?: string[] } | null | u
 
 function App() {
   const { isAuthenticated, isLoading, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<AdminTab>('personal');
+  const [requestedTab, setRequestedTab] = useState<AdminTab>('personal');
   const [activeBusinessId, setActiveBusinessId] = useState<string>(() => {
     try {
       const saved = localStorage.getItem('BC-Active-Business');
@@ -70,6 +70,7 @@ function App() {
   });
   const [globalError, setGlobalError] = useState<string | null>(null);
   const allowedTabs = useMemo(() => tabsForUser(user), [user]);
+  const activeTab = allowedTabs.includes(requestedTab) ? requestedTab : allowedTabs[0];
   const isSupervisorOnly = Boolean(
     (user?.roles ?? [user?.role]).includes('branch_supervisor') && !(user?.roles ?? [user?.role]).includes('owner'),
   );
@@ -114,10 +115,10 @@ function App() {
   const supervisorBusinessBranches = supervisorBranches?.filter((branch) => branch.businessId === activeBusinessId) ?? null;
 
   useEffect(() => {
-    if (!allowedTabs.includes(activeTab)) {
-      setActiveTab(allowedTabs[0]);
+    if (!allowedTabs.includes(requestedTab)) {
+      setRequestedTab(allowedTabs[0]);
     }
-  }, [activeTab, allowedTabs]);
+  }, [requestedTab, allowedTabs]);
 
   useEffect(() => {
     if (allowedBusinessIds?.length && !allowedBusinessIds.includes(activeBusinessId)) {
@@ -171,7 +172,7 @@ function App() {
     <>
       <AdminLayout 
         activeTab={activeTab} 
-        onTabChange={setActiveTab as any}
+        onTabChange={setRequestedTab as any}
         activeBusinessId={activeBusinessId}
         onBusinessChange={setActiveBusinessId}
         allowedTabs={allowedTabs}
@@ -208,12 +209,12 @@ function App() {
           )
         )}
         {activeTab === 'approvals' && user && <ApprovalsPage businessId={activeBusinessId} currentUserId={user.id} />}
-        {activeTab === 'notifications' && <NotificationsPage onNavigateTab={(tab) => setActiveTab(tab as AdminTab)} />}
+        {activeTab === 'notifications' && <NotificationsPage onNavigateTab={(tab) => setRequestedTab(tab as AdminTab)} />}
         {activeTab === 'debts' && <DebtsPage businessId={activeBusinessId} />}
         {activeTab === 'audit-log' && <AuditLogPage businessId={activeBusinessId} />}
         {activeTab === 'supervisors' && <SupervisorsPage businessId={activeBusinessId} />}
         {activeTab === 'tickets' && <TicketsPage businessId={activeBusinessId} />}
-        {activeTab === 'mesas' && <MesasActivasPage businessId={activeBusinessId} onNavigateTab={(tab) => setActiveTab(tab as any)} />}
+        {activeTab === 'mesas' && <MesasActivasPage businessId={activeBusinessId} onNavigateTab={(tab) => setRequestedTab(tab as any)} />}
         {activeTab === 'ticket-settings' && <TicketSettingsPage businessId={activeBusinessId} />}
         {activeTab === 'pos-simulator' && <PosSimulatorPage businessId={activeBusinessId} />}
       </AdminLayout>

@@ -39,13 +39,16 @@ C-1 and C-2 are constants in `apps/sync_api/src/modules/supervision/cash-approva
 - **Backend:** `npx tsc --noEmit` and `npm run build` OK. `npx jest`: 262 passed, 18 skipped (the integration suite), stable over 20 consecutive full runs.
 - **Integration (real DB):** `SUPERVISION_IT_DATABASE_URL=postgres://pos_user:pos_password@localhost:5432/pos_dev npx jest src/modules/supervision/supervision.integration.spec.ts` → 18/18. It covers the full chain over HTTP, reversals, immutability triggers, reports, the opening block and unblock, and C-1. It creates an isolated business and deletes it afterwards.
 - **Local migration:** `scripts/idempotent-deploy-migrations.ts` ran twice against the local docker DB only. Historical net cash was unchanged (`cash_effect` = legacy sum), and the triggers were verified.
-- **Admin:** `npx tsc --noEmit` and `vite build` OK. **Not exercised in a browser** against a running backend.
+- **Admin:** `npx tsc --noEmit` and `vite build` OK. `e2e/supervision-approvals.spec.ts` passes against the local stack: a supervisor approves the pending movement and the Corte Z at N1, then the owner approves N2; the test verifies the final status, both approvers and the movement status through the API. `e2e/navigation.spec.ts` still passes.
+  - Seed: `apps/sync_api/scripts/seed-supervision-e2e.ts` (`npm run db:seed-supervision-e2e`) idempotently creates the E2E owner (`owner.e2e@cacharelo.com`), supervisor (`supervisor.e2e@cacharelo.com`), branch, assignment and a pending Corte Z with a pending cash-in on the local Cafetería business. It refuses to run against a non-local DB unless `E2E_ALLOW_REMOTE_DB=1`.
+  - Run: `cd apps/business_control_tauri && pnpm test:e2e -- e2e/supervision-approvals.spec.ts` (the Playwright config starts API :3000 and Vite :1420; use `BASE_URL`/`E2E_API_URL` to target another local port).
+  - Bug fixed while testing: the supervisor used to mount the `personal` tab for one render before the tab guard kicked in; its `/users` call returned 401 and the frontend logged the session out. `App.tsx` now derives the effective tab from `allowedTabs` before rendering.
 - **POS:** `flutter test` → the same 15 failures as baseline `main`, none new; the 6 new tests in `test/ui/pending_approvals_view_test.dart` pass. `flutter analyze` is clean on every touched file; the project run exits 0 with 154 pre-existing infos/warnings.
 
 ## 5. Not done / known gaps
 
 1. **Done since the first handoff:** POS offline queue (T306) and legacy `X-Admin-Token` access to the guarded reports. The `pubspec.yaml` version (now `1.0.1+43`, bumped by the repo pre-commit hook) does not conflict: `main` is still on `+41`.
-2. **Still pending:** an Admin E2E browser test against the local stack. `playwright.config.ts` already starts the API on :3000 and vite on :1420, and Chromium is installed. What is missing: seeding an owner and a supervisor with an email and password, plus `e2e/supervision-approvals.spec.ts`.
+2. **Done since the last handoff:** Admin E2E browser test against the local stack (`e2e/supervision-approvals.spec.ts`), plus the local seed script and the supervisor tab/session bug fix described in §4.
 3. **Lint:** about 30 `no-unsafe-*` warnings in the new backend files (lint is not part of `make check-all`).
 4. **Data-reset scripts:** they opt in with `set_config('app.allow_cash_ledger_purge','on',…)`. This is intended, not a defect.
 
