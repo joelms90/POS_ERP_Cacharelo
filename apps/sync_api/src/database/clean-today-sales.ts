@@ -107,6 +107,8 @@ async function cleanTodaySales() {
       if (todayShiftIds.length > 0) {
         // 7. Delete cash transactions from today's shifts
         console.log('Deleting cash transactions from today\'s shifts...');
+        // cash_transactions is an append-only ledger (spec 019); data resets opt in explicitly.
+        await tx.execute(sql`SELECT set_config('app.allow_cash_ledger_purge', 'on', true)`);
         await tx.execute(sql`
           DELETE FROM ${schema.cashTransactions}
           WHERE shift_id IN (${sql.join(todayShiftIds.map(id => sql`${id}`), sql`, `)})

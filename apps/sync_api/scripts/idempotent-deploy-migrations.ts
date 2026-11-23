@@ -1,4 +1,5 @@
 import { APP_LOGS_TABLE_SQL } from '../src/modules/logs/app-logs.sql';
+import { SUPERVISOR_CASH_APPROVALS_SQL } from '../src/modules/supervision/supervision.sql';
 import { Client } from 'pg';
 
 async function main() {
@@ -499,6 +500,12 @@ async function main() {
     // LogsService also ensures this lazily, so deploy order does not matter.
     await client.query(APP_LOGS_TABLE_SQL);
     console.log('app_logs table ensured.');
+
+    // 21. Spec 019 — supervisor de sucursal: cash approval chain, append-only
+    // cash ledger (reversals), supervisor assignments, cashier debts,
+    // notifications and audit_log.
+    await client.query(SUPERVISOR_CASH_APPROVALS_SQL);
+    console.log('Supervisor cash approvals schema ensured.');
 
     console.log('✅ Idempotent migrations executed successfully!');
   } catch (error) {

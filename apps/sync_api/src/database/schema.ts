@@ -1127,7 +1127,8 @@ export const cashierDebts = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     businessId: uuid('business_id').references(() => businesses.id).notNull(),
     branchId: uuid('branch_id').references(() => branches.id).notNull(),
-    shiftId: uuid('shift_id').references(() => cashShifts.id).notNull(),
+    // Cascade so the existing data-reset scripts can still purge shifts.
+    shiftId: uuid('shift_id').references(() => cashShifts.id, { onDelete: 'cascade' }).notNull(),
     cashierId: uuid('cashier_id').references(() => users.id).notNull(),
     amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
     status: varchar('status', { length: 20 }).default('vigente').notNull(), // vigente | anulado

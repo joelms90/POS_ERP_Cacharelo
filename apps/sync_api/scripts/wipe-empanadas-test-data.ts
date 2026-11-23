@@ -81,6 +81,8 @@ async function main() {
       }
 
       // Cash shifts & transactions
+      // cash_transactions is an append-only ledger (spec 019); data resets opt in explicitly.
+      await client.query(`SELECT set_config('app.allow_cash_ledger_purge', 'on', false)`);
       const ctDel = await client.query(
         `DELETE FROM cash_transactions WHERE shift_id IN (SELECT id FROM cash_shifts WHERE branch_id = ANY($1::uuid[]))`,
         [branchIds]

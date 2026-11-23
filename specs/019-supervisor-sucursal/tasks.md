@@ -21,8 +21,8 @@ Leyenda: `[ ]` pendiente · `[x]` hecho · `[~]` parcial / diferido (con nota)
 ### 1.1 Modelo y migración
 - [x] T101 Rol `branch_supervisor` (`SUPERVISION_ROLES`, `BRANCH_SUPERVISOR_ROLE`, `CASH_APPROVAL_ADMIN_ROLES = ['owner']`), fuera de `ADMIN_ROLES`.
 - [x] T102 `schema.ts`: columnas de revisión en `cash_shifts`; ledger en `cash_transactions` (`entry_kind`, `reverses/replaces_transaction_id`, `cash_effect` generada, `approval_status`, …); tablas `supervisor_branch_assignments`, `cashier_debts`, `notifications`, `audit_log`.
-- [ ] T103 Migración SQL `0022_supervisor_cash_approvals.sql` + bloque idempotente en `scripts/idempotent-deploy-migrations.ts` (incluye triggers de inmutabilidad de `cash_transactions` y `audit_log`).
-- [ ] T104 Aplicar la migración **solo** en la base local de Docker y verificar el esquema.
+- [x] T103 Migración SQL `0022_supervisor_cash_approvals.sql` + bloque idempotente en `scripts/idempotent-deploy-migrations.ts` (incluye triggers de inmutabilidad de `cash_transactions` y `audit_log`).
+- [x] T104 Aplicar la migración **solo** en la base local de Docker y verificar el esquema. (Dos corridas OK; neto histórico sin cambios; triggers verificados.)
 
 ### 1.2 Reglas puras (sin BD)
 - [ ] T110 `cash-approval.config.ts`: C-1 (`N2_MUST_DIFFER_FROM_N1`), C-2 (`OIS_CLOSE_BLOCKS_OPENING_UNTIL_N1`), `ENFORCE_OPEN_BLOCK` (variable de entorno).

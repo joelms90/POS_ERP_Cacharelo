@@ -78,6 +78,8 @@ async function cleanAllSalesHistory() {
 
       // 7. Delete all cash transactions
       console.log('Deleting all cash transactions...');
+      // cash_transactions is an append-only ledger (spec 019); data resets opt in explicitly.
+      await tx.execute(sql`SELECT set_config('app.allow_cash_ledger_purge', 'on', true)`);
       await tx.execute(sql`DELETE FROM ${schema.cashTransactions}`);
 
       // 8. Delete all cash shifts
