@@ -27,6 +27,7 @@
     "db:query-tickets-hoy": "ts-node src/database/query-tickets-hoy.ts",
     "db:pull-prod": "./scripts/sync-db-from-prod.sh",
     "db:import-excel": "tsx scripts/import-excel-inventories.ts",
+    "db:seed-supervision-e2e": "tsx scripts/seed-supervision-e2e.ts",
     "migrate": "tsx scripts/run-migrations.ts"
   },
   "dependencies": {

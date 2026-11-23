@@ -12,6 +12,7 @@ import {
   index,
   uniqueIndex,
   bigserial,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -375,6 +376,27 @@ export const cashShifts = pgTable('cash_shifts', {
   denominationCounts: jsonb('denomination_counts'),
   closeNotes: text('close_notes'),
   closeSnapshot: jsonb('close_snapshot'),
+  // ---- Spec 019: approval chain (N1 -> N2) ----
+  // no_aplica | pendiente_n1 | rechazado_n1 | pendiente_n2 | rechazado_n2 | aprobado | aprobado_con_ajuste
+  reviewStatus: varchar('review_status', { length: 30 }).default('no_aplica').notNull(),
+  clientUuid: varchar('client_uuid', { length: 120 }),
+  closedBy: uuid('closed_by').references(() => users.id),
+  closedOffline: boolean('closed_offline').default(false).notNull(),
+  localExpectedCash: decimal('local_expected_cash', { precision: 10, scale: 2 }),
+  n1ResolverRole: varchar('n1_resolver_role', { length: 30 }), // branch_operator | branch_supervisor
+  operatorReviewedBy: uuid('operator_reviewed_by').references(() => users.id),
+  operatorReviewedAt: timestamp('operator_reviewed_at', { withTimezone: true }),
+  operatorNotes: text('operator_notes'),
+  reviewedBy: uuid('reviewed_by').references(() => users.id),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  reviewNotes: text('review_notes'),
+  approvedAmount: decimal('approved_amount', { precision: 10, scale: 2 }),
+  approvedDifference: decimal('approved_difference', { precision: 10, scale: 2 }),
+  approvalSnapshot: jsonb('approval_snapshot'),
+  recountCount: integer('recount_count').default(0).notNull(),
+  openBlockOverriddenBy: uuid('open_block_overridden_by').references(() => users.id),
+  openBlockOverriddenAt: timestamp('open_block_overridden_at', { withTimezone: true }),
+  openBlockOverrideReason: text('open_block_override_reason'),
   version: integer('version').default(1).notNull(),
 });
 
@@ -389,6 +411,25 @@ export const cashTransactions = pgTable('cash_transactions', {
   createdAt: timestamp('created_at', { withTimezone: true })
     .defaultNow()
     .notNull(),
+  // ---- Spec 019: append-only cash ledger ----
+  clientUuid: varchar('client_uuid', { length: 120 }),
+  createdBy: uuid('created_by').references(() => users.id),
+  category: varchar('category', { length: 40 }),
+  // movimiento | reverso | ajuste
+  entryKind: varchar('entry_kind', { length: 20 }).default('movimiento').notNull(),
+  reversesTransactionId: uuid('reverses_transaction_id').references((): AnyPgColumn => cashTransactions.id),
+  replacesTransactionId: uuid('replaces_transaction_id').references((): AnyPgColumn => cashTransactions.id),
+  cashEffect: decimal('cash_effect', { precision: 10, scale: 2 }).generatedAlwaysAs(
+    sql`(CASE WHEN type = 'cash-in' THEN amount ELSE -amount END) * (CASE WHEN entry_kind = 'reverso' THEN -1 ELSE 1 END)`,
+  ),
+  // aprobado_historico | pendiente_n1 | aprobado | rechazado | cancelado | ajustado | no_aplica
+  approvalStatus: varchar('approval_status', { length: 30 }).default('aprobado_historico').notNull(),
+  reviewedBy: uuid('reviewed_by').references(() => users.id),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  reviewReason: text('review_reason'),
+  reviewLevel: varchar('review_level', { length: 10 }),
+  deviceId: varchar('device_id', { length: 255 }),
+  version: integer('version').default(1).notNull(),
 });
 
 export const deviceSyncCheckpoints = pgTable('device_sync_checkpoints', {
@@ -1055,4 +1096,100 @@ export const branchProducts = pgTable(
     idxBranch: index('idx_branch_products_branch').on(table.branchId),
     idxProduct: index('idx_branch_products_product').on(table.productId),
   }),
+);
+
+// ==========================================
+// Spec 019 — Supervisor de sucursal (cash approvals)
+// ==========================================
+
+export const supervisorBranchAssignments = pgTable(
+  'supervisor_branch_assignments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    businessId: uuid('business_id').references(() => businesses.id).notNull(),
+    userId: uuid('user_id').references(() => users.id).notNull(),
+    branchId: uuid('branch_id').references(() => branches.id).notNull(),
+    assignedBy: uuid('assigned_by').references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('unq_sba_user_branch_active')
+      .on(table.userId, table.branchId)
+      .where(sql`${table.revokedAt} IS NULL`),
+    index('idx_sba_branch').on(table.branchId),
+  ],
+);
+
+export const cashierDebts = pgTable(
+  'cashier_debts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    businessId: uuid('business_id').references(() => businesses.id).notNull(),
+    branchId: uuid('branch_id').references(() => branches.id).notNull(),
+    // Cascade so the existing data-reset scripts can still purge shifts.
+    shiftId: uuid('shift_id').references(() => cashShifts.id, { onDelete: 'cascade' }).notNull(),
+    cashierId: uuid('cashier_id').references(() => users.id).notNull(),
+    amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+    status: varchar('status', { length: 20 }).default('vigente').notNull(), // vigente | anulado
+    generatedBy: uuid('generated_by').references(() => users.id),
+    generatedAt: timestamp('generated_at', { withTimezone: true }).defaultNow().notNull(),
+    voidedBy: uuid('voided_by').references(() => users.id),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    version: integer('version').default(1).notNull(),
+  },
+  (table) => [
+    uniqueIndex('unq_cashier_debt_shift_active')
+      .on(table.shiftId)
+      .where(sql`${table.status} <> 'anulado'`),
+    index('idx_cashier_debts_cashier').on(table.cashierId, table.status),
+  ],
+);
+
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    businessId: uuid('business_id').references(() => businesses.id).notNull(),
+    branchId: uuid('branch_id').references(() => branches.id),
+    recipientUserId: uuid('recipient_user_id').references(() => users.id).notNull(),
+    type: varchar('type', { length: 40 }).notNull(),
+    requiresAction: boolean('requires_action').default(false).notNull(),
+    entityType: varchar('entity_type', { length: 40 }).notNull(),
+    entityId: uuid('entity_id').notNull(),
+    title: varchar('title', { length: 150 }).notNull(),
+    body: text('body'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    readAt: timestamp('read_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('idx_notifications_recipient').on(table.recipientUserId, table.readAt, table.createdAt),
+    index('idx_notifications_branch').on(table.branchId, table.createdAt),
+  ],
+);
+
+export const auditLog = pgTable(
+  'audit_log',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    businessId: uuid('business_id').references(() => businesses.id).notNull(),
+    branchId: uuid('branch_id').references(() => branches.id),
+    entityType: varchar('entity_type', { length: 40 }).notNull(),
+    entityId: uuid('entity_id').notNull(),
+    action: varchar('action', { length: 40 }).notNull(),
+    approvalLevel: varchar('approval_level', { length: 10 }),
+    actorId: uuid('actor_id').references(() => users.id),
+    actorRole: varchar('actor_role', { length: 50 }),
+    reason: text('reason'),
+    before: jsonb('before'),
+    after: jsonb('after'),
+    source: varchar('source', { length: 20 }).notNull(), // admin_web | pos | system
+    deviceId: varchar('device_id', { length: 255 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_audit_log_entity').on(table.entityType, table.entityId, table.createdAt),
+    index('idx_audit_log_branch').on(table.branchId, table.createdAt),
+    index('idx_audit_log_actor').on(table.actorId, table.createdAt),
+  ],
 );

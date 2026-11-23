@@ -1,15 +1,19 @@
 import { Controller, Post, Get, Body, Param, Query, HttpCode, HttpStatus, UseGuards, Req, ForbiddenException } from '@nestjs/common';
-import { ShiftsService } from './shifts.service';
+import { ShiftsService, ShiftActor } from './shifts.service';
 import { OpenShiftDto } from './dto/open-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { RecountShiftDto } from './dto/recount-shift.dto';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CASHIER_ROLE, BRANCH_OPERATOR_ROLE } from '../auth/roles';
 
-type ShiftRequest = { user?: { sub?: string; branchId?: string; businessId?: string } };
+type ShiftRequest = {
+  user?: { sub?: string; branchId?: string; businessId?: string; role?: string; roles?: string[] };
+  headers?: Record<string, string | string[] | undefined>;
+};
 
 @Controller('cash-shifts')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -63,7 +67,7 @@ export class ShiftsController {
     @Req() req: ShiftRequest,
   ) {
     await this.ownedShift(id, req);
-    return this.shiftsService.createTransaction(id, createTransactionDto);
+    return this.shiftsService.createTransaction(id, createTransactionDto, this.actor(req));
   }
 
   @Post(':id/close')
@@ -74,7 +78,33 @@ export class ShiftsController {
     @Req() req: ShiftRequest,
   ) {
     await this.ownedShift(id, req);
-    return this.shiftsService.closeShift(id, closeShiftDto);
+    return this.shiftsService.closeShift(id, closeShiftDto, this.actor(req));
+  }
+
+  /**
+   * Spec 019: new count after a Corte Z rejection. The shift may belong to another
+   * cashier of the same branch (OIS recount after an N2 rejection), so this route
+   * checks the branch here and the author/role rules in the service.
+   */
+  @Post(':id/recount')
+  @HttpCode(HttpStatus.OK)
+  async recount(@Param('id') id: string, @Body() dto: RecountShiftDto, @Req() req: ShiftRequest) {
+    const scope = this.scope(req);
+    const shift = await this.shiftsService.getShiftById(id);
+    if (shift.branchId !== scope.branchId) {
+      throw new ForbiddenException('Solo puedes acceder a tu caja y sucursal.');
+    }
+    return this.shiftsService.recountShift(id, dto, { ...this.actor(req), branchId: scope.branchId });
+  }
+
+  private actor(req: ShiftRequest): ShiftActor {
+    const device = req.headers?.['x-device-id'];
+    return {
+      id: req.user!.sub!,
+      role: req.user?.role,
+      roles: req.user?.roles,
+      deviceId: (Array.isArray(device) ? device[0] : device) ?? null,
+    };
   }
 
   private scope(req: ShiftRequest, branchId?: string, cashierId?: string) {

@@ -18,6 +18,8 @@ class SecureStorageService {
   static const String _usersCacheKey = 'cached_offline_users';
   static const String _pendingSaleSyncJobsKey = 'pending_sale_sync_jobs';
   static const String _pendingOrderSyncJobsKey = 'pending_order_sync_jobs';
+  // Spec 019 (D-5): offline cash movements and Corte Z, sent in order.
+  static const String _pendingCashJobsKey = 'pending_cash_jobs';
   static const String _readyPickupOrdersKey = 'ready_pickup_orders';
   static const String _ticketFiscalConfigKey = 'ticket_fiscal_config';
   static const String _pendingRequisitionsKey = 'pending_requisitions_list';
@@ -336,6 +338,25 @@ class SecureStorageService {
     await _write(_pendingSaleSyncJobsKey, jsonEncode(jobs));
   }
 
+  Future<List<Map<String, dynamic>>> getPendingCashJobs() async {
+    final jobsJson = await _read(_pendingCashJobsKey);
+    if (jobsJson == null || jobsJson.isEmpty) return [];
+    try {
+      final List<dynamic> decoded = jsonDecode(jobsJson);
+      return decoded
+          .whereType<Map>()
+          .map((job) => Map<String, dynamic>.from(job))
+          .toList();
+    } catch (e) {
+      debugPrint('Error reading pending cash jobs: $e');
+      return [];
+    }
+  }
+
+  Future<void> savePendingCashJobs(List<Map<String, dynamic>> jobs) async {
+    await _write(_pendingCashJobsKey, jsonEncode(jobs));
+  }
+
   Future<List<Map<String, dynamic>>> getPendingOrderSyncJobs() async {
     final jobsJson = await _read(_pendingOrderSyncJobsKey);
     if (jobsJson == null || jobsJson.isEmpty) return [];
@@ -528,6 +549,7 @@ class SecureStorageService {
     await clearSavedPrinter();
     await _delete(_pendingSaleSyncJobsKey);
     await _delete(_pendingOrderSyncJobsKey);
+    await _delete(_pendingCashJobsKey);
     await _delete(_readyPickupOrdersKey);
     await _delete(_ticketFiscalConfigKey);
     await _delete(_pendingRequisitionsKey);

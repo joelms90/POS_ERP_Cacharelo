@@ -3,6 +3,7 @@ import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
 import { eq, and, desc } from 'drizzle-orm';
+import type { DbExecutor } from '../../audit/db-executor';
 
 @Injectable()
 export class ShiftsRepository {
@@ -40,8 +41,17 @@ export class ShiftsRepository {
     return results[0] || null;
   }
 
-  async findById(id: string) {
+  async findByClientUuid(clientUuid: string) {
     const results = await this.db
+      .select()
+      .from(schema.cashShifts)
+      .where(eq(schema.cashShifts.clientUuid, clientUuid))
+      .limit(1);
+    return results[0] || null;
+  }
+
+  async findById(id: string, exec: DbExecutor = this.db) {
+    const results = await exec
       .select()
       .from(schema.cashShifts)
       .where(eq(schema.cashShifts.id, id));
@@ -56,8 +66,8 @@ export class ShiftsRepository {
     return results[0];
   }
 
-  async update(id: string, updates: Partial<typeof schema.cashShifts.$inferInsert>) {
-    const results = await this.db
+  async update(id: string, updates: Partial<typeof schema.cashShifts.$inferInsert>, exec: DbExecutor = this.db) {
+    const results = await exec
       .update(schema.cashShifts)
       .set({
         ...updates,

@@ -6,11 +6,12 @@ import { JwtModule } from '@nestjs/jwt';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { JwtOrAdminTokenGuard } from '../auth/guards/jwt-or-admin-token.guard';
 
 @Module({
   imports: [DatabaseModule, JwtModule.register({})],
   controllers: [ReportsController],
-  providers: [ReportsService, AdminGuard, JwtAuthGuard, RolesGuard],
+  providers: [ReportsService, AdminGuard, JwtAuthGuard, JwtOrAdminTokenGuard, RolesGuard],
   exports: [ReportsService],
 })
 export class ReportsModule {}

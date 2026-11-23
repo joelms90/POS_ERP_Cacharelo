@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../common/colors.dart';
+import '../encargado/pending_approvals_view.dart';
 import '../common/app_state.dart';
 
 class ShiftControlPanel extends StatefulWidget {
@@ -136,6 +137,13 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
     const divider = '----------------------------------------';
     const doubleDivider = '========================================';
 
+    // Spec 019 D-5: closed without connection; expected cash is an estimate.
+    if (report['provisional'] == true) {
+      buffer.writeln(doubleDivider);
+      buffer.writeln('*** PROVISIONAL - SIN SINCRONIZAR ***');
+      buffer.writeln('El esperado se recalcula al reconectar.');
+    }
+
     final shiftId =
         (shiftInfo['id'] ?? widget.state.activeShiftId ?? '').toString();
     final folio =
@@ -246,8 +254,21 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
         if (raw is! Map) continue;
         final movement = Map<String, dynamic>.from(raw);
         final rawType = movement['type']?.toString().toLowerCase() ?? '';
-        final isAdd = rawType == 'cash-in';
-        final typeLabel = isAdd ? 'Ingreso' : 'Retiro';
+        // Spec 019: ledger entries (reversals/adjustments) and approval status.
+        final entryKind = movement['entryKind']?.toString() ?? 'movimiento';
+        final effect = movement['cashEffect'] is num
+            ? (movement['cashEffect'] as num).toDouble()
+            : null;
+        final isAdd = effect != null ? effect >= 0 : rawType == 'cash-in';
+        final typeLabel = entryKind == 'reverso'
+            ? 'Reverso'
+            : entryKind == 'ajuste'
+                ? 'Ajuste'
+                : (rawType == 'cash-in' ? 'Ingreso' : 'Retiro');
+        final statusLabel = entryKind == 'movimiento'
+            ? AppState.movementStatusLabel(
+                movement['approvalStatus']?.toString())
+            : '';
         final sign = isAdd ? '+' : '-';
         String reason = (movement['reason']?.toString() ?? 'Manual').trim();
         reason = reason
@@ -260,7 +281,11 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
           reason = isAdd ? 'Ingreso general' : 'Retiro general';
         }
         final amt = '$sign\$${_money(movement['amount']).toStringAsFixed(2)}';
-        buffer.writeln(widget.state.formatRow('$typeLabel · $reason', amt));
+        final statusSuffix = statusLabel.isEmpty || statusLabel == 'Histórico'
+            ? ''
+            : ' [$statusLabel]';
+        buffer.writeln(
+            widget.state.formatRow('$typeLabel · $reason$statusSuffix', amt));
       }
     }
 
@@ -349,8 +374,10 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
       final String reason =
           userNote.isEmpty ? category : '$category: $userNote';
       final bool success = isAdd
-          ? await widget.state.addCashDrop(amount, reason: reason)
-          : await widget.state.removeCashDrop(amount, reason: reason);
+          ? await widget.state.addCashDrop(amount,
+              reason: reason, category: AppState.cashCategoryCode(category))
+          : await widget.state.removeCashDrop(amount,
+              reason: reason, category: AppState.cashCategoryCode(category));
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -365,7 +392,8 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
             SnackBar(
               backgroundColor: EmpireColors.successGreen,
               content: Text(
-                'Transacción de caja realizada: \$${amount.toStringAsFixed(2)}',
+                'Transacción de caja realizada: \$${amount.toStringAsFixed(2)}'
+                '${widget.state.lastMovementApprovalStatus == 'pendiente_n1' ? ' · pendiente de aprobación' : widget.state.lastMovementApprovalStatus == 'pendiente_sync' ? ' · guardado sin conexión, se enviará al reconectar' : ''}',
               ),
             ),
           );
@@ -772,14 +800,38 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
               ),
             ),
             content: SingleChildScrollView(
-              child: Text(
-                reportDetails,
-                style: const TextStyle(
-                  color: EmpireColors.textPrimary,
-                  fontFamily: 'monospace',
-                  fontSize: 13,
-                  height: 1.6,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Spec 019: every Corte Z now waits for approval.
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: EmpireColors.champagneGold.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: EmpireColors.champagneGold),
+                    ),
+                    child: Text(
+                      'Estado: ${AppState.shiftReviewLabel(widget.state.lastClosedShiftReviewStatus)}',
+                      style: const TextStyle(
+                        color: EmpireColors.champagneGold,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    reportDetails,
+                    style: const TextStyle(
+                      color: EmpireColors.textPrimary,
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                      height: 1.6,
+                    ),
+                  ),
+                ],
               ),
             ),
             actions: [
@@ -1290,6 +1342,14 @@ class _ShiftControlPanelState extends State<ShiftControlPanel> {
             ElevatedButton(
               onPressed: _openShift,
               child: const Text('ABRIR TURNO / CAJA'),
+            ),
+            // Spec 019: review state of my cortes and recount when rejected.
+            Flexible(
+              child: PendingApprovalsView(
+                state: widget.state,
+                mode: ApprovalsViewMode.cashier,
+                compact: true,
+              ),
             ),
           ],
         ),

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../common/app_state.dart';
 import '../common/colors.dart';
+import 'pending_approvals_view.dart';
 
 class EncargadoCajaTab extends StatefulWidget {
   final AppState state;
@@ -16,7 +17,8 @@ class EncargadoCajaTab extends StatefulWidget {
 }
 
 class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
-  int _activeSubView = 0; // 0: Control de Caja, 1: Órdenes Cobradas
+  int _activeSubView =
+      0; // 0: Control de Caja, 1: Órdenes Cobradas, 2: Por aprobar (spec 019)
   bool _loadingTickets = false;
   List<Map<String, dynamic>> _tickets = [];
   String _selectedPaymentFilter = 'TODOS'; // 'TODOS', 'cash', 'card'
@@ -51,6 +53,8 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.state.checkActiveShift();
       _loadTickets();
+      // Spec 019: badge with the N1 items this operator can resolve.
+      unawaited(widget.state.fetchCashApprovals());
     });
   }
 
@@ -165,6 +169,13 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
     const divider = '----------------------------------------';
     const doubleDivider = '========================================';
 
+    // Spec 019 D-5: closed without connection; expected cash is an estimate.
+    if (report['provisional'] == true) {
+      buffer.writeln(doubleDivider);
+      buffer.writeln('*** PROVISIONAL - SIN SINCRONIZAR ***');
+      buffer.writeln('El esperado se recalcula al reconectar.');
+    }
+
     final shiftId =
         (shiftInfo['id'] ?? widget.state.activeShiftId ?? '').toString();
     final folio =
@@ -278,8 +289,21 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
         if (raw is! Map) continue;
         final movement = Map<String, dynamic>.from(raw);
         final rawType = movement['type']?.toString().toLowerCase() ?? '';
-        final isAdd = rawType == 'cash-in';
-        final typeLabel = isAdd ? 'Ingreso' : 'Retiro';
+        // Spec 019: ledger entries (reversals/adjustments) and approval status.
+        final entryKind = movement['entryKind']?.toString() ?? 'movimiento';
+        final effect = movement['cashEffect'] is num
+            ? (movement['cashEffect'] as num).toDouble()
+            : null;
+        final isAdd = effect != null ? effect >= 0 : rawType == 'cash-in';
+        final typeLabel = entryKind == 'reverso'
+            ? 'Reverso'
+            : entryKind == 'ajuste'
+                ? 'Ajuste'
+                : (rawType == 'cash-in' ? 'Ingreso' : 'Retiro');
+        final statusLabel = entryKind == 'movimiento'
+            ? AppState.movementStatusLabel(
+                movement['approvalStatus']?.toString())
+            : '';
         final sign = isAdd ? '+' : '-';
         String reason = (movement['reason']?.toString() ?? 'Manual').trim();
         reason = reason
@@ -292,7 +316,11 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
           reason = isAdd ? 'Ingreso general' : 'Retiro general';
         }
         final amt = '$sign\$${_money(movement['amount']).toStringAsFixed(2)}';
-        buffer.writeln(widget.state.formatRow('$typeLabel · $reason', amt));
+        final statusSuffix = statusLabel.isEmpty || statusLabel == 'Histórico'
+            ? ''
+            : ' [$statusLabel]';
+        buffer.writeln(
+            widget.state.formatRow('$typeLabel · $reason$statusSuffix', amt));
       }
     }
 
@@ -342,6 +370,12 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
           );
         }
       } else {
+        // Spec 019 D-4: the previous Corte Z still awaits N1 → show the inbox.
+        if (mounted &&
+            widget.state.lastShiftErrorCode ==
+                'OPENING_BLOCKED_PENDING_CORTE') {
+          setState(() => _activeSubView = 2);
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -379,8 +413,10 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
       final String reason =
           userNote.isEmpty ? category : '$category: $userNote';
       final bool success = isAdd
-          ? await widget.state.addCashDrop(amount, reason: reason)
-          : await widget.state.removeCashDrop(amount, reason: reason);
+          ? await widget.state.addCashDrop(amount,
+              reason: reason, category: AppState.cashCategoryCode(category))
+          : await widget.state.removeCashDrop(amount,
+              reason: reason, category: AppState.cashCategoryCode(category));
 
       if (mounted) Navigator.of(context).pop();
 
@@ -393,7 +429,8 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
             SnackBar(
               backgroundColor: EmpireColors.successGreen,
               content: Text(
-                'Transacción de caja realizada: \$${amount.toStringAsFixed(2)}',
+                'Transacción de caja realizada: \$${amount.toStringAsFixed(2)}'
+                '${widget.state.lastMovementApprovalStatus == 'pendiente_n1' ? ' · pendiente de aprobación' : widget.state.lastMovementApprovalStatus == 'pendiente_sync' ? ' · guardado sin conexión, se enviará al reconectar' : ''}',
               ),
             ),
           );
@@ -1295,14 +1332,38 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
               ),
             ),
             content: SingleChildScrollView(
-              child: Text(
-                reportDetails,
-                style: const TextStyle(
-                  color: EmpireColors.textPrimary,
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                  height: 1.5,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Spec 019: every Corte Z now waits for approval.
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: EmpireColors.champagneGold.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: EmpireColors.champagneGold),
+                    ),
+                    child: Text(
+                      'Estado: ${AppState.shiftReviewLabel(widget.state.lastClosedShiftReviewStatus)}',
+                      style: const TextStyle(
+                        color: EmpireColors.champagneGold,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    reportDetails,
+                    style: const TextStyle(
+                      color: EmpireColors.textPrimary,
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
               ),
             ),
             actions: [
@@ -1623,7 +1684,9 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
               Expanded(
                 child: _activeSubView == 0
                     ? _buildControlDeCajaView()
-                    : _buildOrdenesCobradasView(),
+                    : _activeSubView == 1
+                        ? _buildOrdenesCobradasView()
+                        : PendingApprovalsView(state: widget.state),
               ),
             ],
           ),
@@ -1669,6 +1732,13 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
                       label: isCompact
                           ? 'Cobradas (${_tickets.length})'
                           : 'Órdenes Cobradas (${_tickets.length})',
+                    ),
+                    _buildSegmentButton(
+                      index: 2,
+                      icon: Icons.fact_check_outlined,
+                      label: isCompact
+                          ? 'Aprobar (${widget.state.pendingApprovalsCount})'
+                          : 'Por aprobar (${widget.state.pendingApprovalsCount})',
                     ),
                   ],
                 ),
@@ -1729,6 +1799,7 @@ class _EncargadoCajaTabState extends State<EncargadoCajaTab> {
                 onPressed: () {
                   widget.state.checkActiveShift();
                   _loadTickets();
+                  unawaited(widget.state.fetchCashApprovals());
                 },
               ),
             ],

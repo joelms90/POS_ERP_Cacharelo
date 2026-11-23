@@ -167,6 +167,8 @@ async function main() {
       await tx.execute(sql`DELETE FROM kitchen_tickets`);
       await tx.execute(sql`DELETE FROM order_items`);
       await tx.execute(sql`DELETE FROM payments`);
+      // cash_transactions is an append-only ledger (spec 019); data resets opt in explicitly.
+      await tx.execute(sql`SELECT set_config('app.allow_cash_ledger_purge', 'on', true)`);
       await tx.execute(sql`DELETE FROM cash_transactions`);
       await tx.execute(sql`DELETE FROM cash_shifts`);
       await tx.execute(sql`DELETE FROM orders`);
