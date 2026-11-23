@@ -1,11 +1,11 @@
 {
-    "name": "pos_flutter",
-    "short_name": "pos_flutter",
+    "name": "Cacharelo POS",
+    "short_name": "Cacharelo POS",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Punto de venta Cacharelo.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

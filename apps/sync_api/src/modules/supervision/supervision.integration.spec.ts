@@ -257,7 +257,7 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     expect(count.body.requiresAction).toBeGreaterThanOrEqual(2);
   });
 
-  it('N1 rules: no self-approval, no supervisor/owner substitution (S-6), stale version → 409, pending movements → 422', async () => {
+  it('single-level rules: no self-approval, stale version → 409, pending movements → 422', async () => {
     const shift = await shiftRow(state.shiftA);
     const approve = (tok: string, version = shift.version) =>
       http()
@@ -265,8 +265,8 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
         .auth(tok, { type: 'bearer' })
         .send({ version });
     await approve(as.cashier()).expect(403);
-    await approve(as.supervisor()).expect(403);
-    await approve(as.owner()).expect(403);
+    await approve(as.supervisor()).expect(422); // the pending movement blocks final approval
+    await approve(as.owner()).expect(422);
     await approve(as.ois(), shift.version + 7).expect(422); // pending movement checked before version
     // OIS approves the cashier's movement (S-1: final at N1).
     const mv = await http()
@@ -278,21 +278,6 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     await approve(as.ois(), shift.version + 7).expect(409);
   });
 
-  it('OIS approves N1 → pendiente_n2; the OIS cannot act at N2', async () => {
-    const shift = await shiftRow(state.shiftA);
-    const res = await http()
-      .post(`/supervision/cash-shifts/${state.shiftA}/approve`)
-      .auth(as.ois(), { type: 'bearer' })
-      .send({ version: shift.version, reason: 'Conteo verificado' })
-      .expect(200);
-    expect(res.body.reviewStatus).toBe('pendiente_n2');
-    await http()
-      .post(`/supervision/cash-shifts/${state.shiftA}/approve`)
-      .auth(as.ois2(), { type: 'bearer' })
-      .send({ version: res.body.version })
-      .expect(403);
-  });
-
   it('inbox: the assigned supervisor sees the corte as actionable; a foreign supervisor sees nothing and cannot open it', async () => {
     const mine = await http()
       .get('/supervision/approvals?type=corte_z')
@@ -300,9 +285,9 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       .expect(200);
     const item = mine.body.cortes.find((c: any) => c.id === state.shiftA);
     expect(item).toMatchObject({
-      reviewStatus: 'pendiente_n2',
+      reviewStatus: 'pendiente_n1',
       canAct: true,
-      level: 'n2',
+      level: 'n1',
     });
     const foreign = await http()
       .get('/supervision/approvals')
@@ -366,7 +351,7 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       .expect(200);
     expect(audit.body.summary.expectedCash).toBe(200);
     expect(audit.body.review).toMatchObject({
-      reviewStatus: 'pendiente_n2',
+      reviewStatus: 'pendiente_n1',
       expectedAtClose: 200,
       postCloseAdjustment: 800,
       adjustedExpected: 1000,
@@ -376,7 +361,7 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     });
     const list = await http()
       .get(`/reports/cash-shifts?businessId=${businessId}`)
-      .auth(as.supervisor(), { type: 'bearer' })
+      .auth(as.owner(), { type: 'bearer' })
       .expect(200);
     expect(list.body.find((r: any) => r.id === state.shiftA)).toMatchObject({
       adjustedDifference: -800,
@@ -399,7 +384,7 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     ).rejects.toThrow(/append-only/);
   });
 
-  it('N2 rejection → recount by the OIS goes straight back to N2 (S-5)', async () => {
+  it('rejection at the single level → recount returns to pending approval', async () => {
     let row = await shiftRow(state.shiftA);
     await http()
       .post(`/supervision/cash-shifts/${state.shiftA}/reject`)
@@ -413,18 +398,18 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       .expect(200);
     const recount = await http()
       .post(`/cash-shifts/${state.shiftA}/recount`)
-      .auth(as.ois(), { type: 'bearer' })
+      .auth(as.cashier(), { type: 'bearer' })
       .send({ actualAmount: '250.00', notes: 'Se encontraron $50 en el sobre' })
       .expect(200);
     expect(recount.body).toMatchObject({
-      reviewStatus: 'pendiente_n2',
+      reviewStatus: 'pendiente_n1',
       recountCount: 1,
     });
     row = await shiftRow(state.shiftA);
     expect(Number(row.cash_drawer_amount)).toBe(250);
   });
 
-  it('N2 approval freezes the official figures and creates the cashier debt (D-8)', async () => {
+  it('final approval freezes the official figures and creates the cashier debt (D-8)', async () => {
     const row = await shiftRow(state.shiftA);
     const res = await http()
       .post(`/supervision/cash-shifts/${state.shiftA}/approve`)
@@ -467,7 +452,7 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       .expect(409);
   });
 
-  it('owner reopens: corte back to N2 and the debt is voided; the supervisor cannot reopen', async () => {
+  it('owner reopens: corte back to pending approval and the debt is voided; the supervisor cannot reopen', async () => {
     await http()
       .post(`/supervision/cash-shifts/${state.shiftA}/reopen`)
       .auth(as.supervisor(), { type: 'bearer' })
@@ -478,7 +463,7 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       .auth(as.owner(), { type: 'bearer' })
       .send({ reason: 'Apareció el comprobante del gasto' })
       .expect(200);
-    expect(res.body.reviewStatus).toBe('pendiente_n2');
+    expect(res.body.reviewStatus).toBe('pendiente_n1');
     const debts = await query(
       'SELECT status FROM cashier_debts WHERE shift_id = $1',
       [state.shiftA],
@@ -496,7 +481,6 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     const actions = res.body.map((e: any) => e.action).reverse();
     expect(actions).toEqual([
       'corte_z_cerrado',
-      'corte_z_aprobado',
       'corte_z_rechazado',
       'corte_z_reconteo',
       'corte_z_aprobado',
@@ -505,7 +489,7 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     expect(
       res.body.find((e: any) => e.action === 'corte_z_rechazado'),
     ).toMatchObject({
-      approvalLevel: 'n2',
+      approvalLevel: 'n1',
       actorId: ids.supervisor,
       reason: 'Recontar el sobre de gastos',
     });
@@ -516,8 +500,16 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
 
   // --- OIS-authored corte: S-3, C-1 and the opening block (D-4, C-2, P-2) ----------------------
 
-  it('S-3: a corte closed by the OIS is resolved at N1 by the supervisor; C-1: the same supervisor cannot do N2', async () => {
+  it('OIS-authored corte: the supervisor resolves the single level and can adjust; opening waits for approval', async () => {
     process.env.CASH_APPROVALS_ENFORCE_OPEN_BLOCK = 'true';
+    // The previous test reopened shiftA; finalize it again so branch A is not blocked.
+    const reopened = await shiftRow(state.shiftA);
+    await http()
+      .post(`/supervision/cash-shifts/${state.shiftA}/approve`)
+      .auth(as.supervisor(), { type: 'bearer' })
+      .send({ version: reopened.version })
+      .expect(200);
+
     const opened = await http()
       .post('/cash-shifts')
       .auth(as.ois(), { type: 'bearer' })
@@ -535,7 +527,7 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       n1_resolver_role: 'branch_supervisor',
     });
 
-    // D-4 + C-2: the branch cannot open a new shift until N1.
+    // D-4 + C-2: the branch cannot open a new shift until the single approval.
     const blocked = await http()
       .post('/cash-shifts')
       .auth(as.cashier(), { type: 'bearer' })
@@ -543,37 +535,35 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       .expect(409);
     expect(blocked.body.code).toBe('OPENING_BLOCKED_PENDING_CORTE');
 
-    // Another OIS cannot resolve N1 of an OIS corte; the owner cannot either (S-6).
+    // The author cannot approve their own corte.
     await http()
       .post(`/supervision/cash-shifts/${state.shiftB}/approve`)
-      .auth(as.ois2(), { type: 'bearer' })
+      .auth(as.ois(), { type: 'bearer' })
       .send({ version: row.version })
       .expect(403);
-    await http()
-      .post(`/supervision/cash-shifts/${state.shiftB}/approve`)
+    const ownerView = await http()
+      .get(`/supervision/cash-shifts/${state.shiftB}`)
       .auth(as.owner(), { type: 'bearer' })
-      .send({ version: row.version })
-      .expect(403);
-    const n1 = await http()
-      .post(`/supervision/cash-shifts/${state.shiftB}/approve`)
-      .auth(as.supervisor(), { type: 'bearer' })
-      .send({ version: row.version })
       .expect(200);
-    expect(n1.body.reviewStatus).toBe('pendiente_n2');
-    await http()
-      .post(`/supervision/cash-shifts/${state.shiftB}/approve`)
+    expect(ownerView.body.permissions).toMatchObject({
+      level: 'n1',
+      canApprove: true,
+      canReject: true,
+      canAdjust: true,
+    });
+    const adjusted = await http()
+      .post(`/supervision/cash-shifts/${state.shiftB}/adjust`)
       .auth(as.supervisor(), { type: 'bearer' })
-      .send({ version: n1.body.version })
-      .expect(403);
-    const n2 = await http()
-      .post(`/supervision/cash-shifts/${state.shiftB}/approve`)
-      .auth(as.supervisor2(), { type: 'bearer' })
-      .send({ version: n1.body.version })
+      .send({
+        version: row.version,
+        reason: 'Ajuste del supervisor en el nivel único',
+        approvedAmount: '500.00',
+      })
       .expect(200);
-    expect(n2.body.reviewStatus).toBe('aprobado');
+    expect(adjusted.body.reviewStatus).toBe('aprobado_con_ajuste');
     row = await shiftRow(state.shiftB);
-    expect(row.operator_reviewed_by).toBe(ids.supervisor);
-    expect(row.reviewed_by).toBe(ids.supervisor2);
+    expect(row.operator_reviewed_by).toBeNull();
+    expect(row.reviewed_by).toBe(ids.supervisor);
   });
 
   it('P-2: the owner unblocks the opening without approving the pending corte', async () => {
@@ -612,12 +602,32 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       .expect(201);
   });
 
-  it('lists only the branches a supervisor can see', async () => {
+  it('lists only the branches a supervisor can see; the owner sees every branch', async () => {
     const res = await http()
       .get('/supervision/branches')
       .auth(as.supervisor(), { type: 'bearer' })
       .expect(200);
     expect(res.body.map((b: any) => b.id)).toEqual([branchA]);
+
+    const otherBusinessId = randomUUID();
+    const globalOwnerToken = jwt.sign(
+      {
+        sub: ids.owner,
+        role: 'owner',
+        roles: ['owner'],
+        branchId: null,
+        businessId: otherBusinessId,
+        businessAccess: [{ businessId: otherBusinessId, role: 'owner' }],
+      },
+      { secret: process.env.JWT_SECRET || 'dev_jwt_secret_key' },
+    );
+    const ownerRes = await http()
+      .get('/supervision/branches')
+      .auth(globalOwnerToken, { type: 'bearer' })
+      .expect(200);
+    expect(ownerRes.body.map((b: any) => b.id)).toEqual(
+      expect.arrayContaining([branchA, branchB]),
+    );
   });
 
   it('D-5: an offline queue syncs movements with their real time and an idempotent offline close', async () => {
@@ -676,6 +686,25 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     expect(foreign.branches.map((b: any) => b.branchId).sort()).toEqual(
       [branchA, branchB].sort(),
     );
+
+    // The owner is global: a stale/other active business must not hide the
+    // supervisor assignments of another business from the admin.
+    const otherBusinessId = randomUUID();
+    const globalOwnerToken = jwt.sign(
+      {
+        sub: ids.owner,
+        role: 'owner',
+        roles: ['owner'],
+        branchId: null,
+        businessId: otherBusinessId,
+        businessAccess: [{ businessId: otherBusinessId, role: 'owner' }],
+      },
+      { secret: process.env.JWT_SECRET || 'dev_jwt_secret_key' },
+    );
+    await http()
+      .get(`/supervision/assignments?businessId=${businessId}`)
+      .auth(globalOwnerToken, { type: 'bearer' })
+      .expect(200);
   });
 
   it('notifications can be marked read', async () => {

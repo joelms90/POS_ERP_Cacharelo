@@ -1,16 +1,17 @@
 /**
  * Spec 019 — tunables of the cash approval chain.
  *
- * C-1 and C-2 are proposals that the owner still has to confirm
+ * C-1 was confirmed by the owner on 2026-11-23. C-2 is still to be confirmed
  * (specs/019-supervisor-sucursal/spec.md §15.2). Change them here.
  */
 export const CASH_APPROVAL_CONFIG = {
   /**
-   * C-1 (por confirmar): N1 and N2 of the same Corte Z must be different people.
-   * When the supervisor resolved N1 of an OIS-closed corte, N2 is done by the
-   * owner or another supervisor assigned to the branch.
+   * C-1 (confirmed 2026-11-23): the supervisor who resolved N1 of an OIS-closed
+   * corte may also resolve N2 (approve or adjust) without waiting for the owner.
+   * Every N1/N2 action stays in the audit log so the owner can review it later.
+   * Self-approval (closed_by == actor) remains forbidden.
    */
-  n2MustDifferFromN1: true,
+  n2MustDifferFromN1: false,
 
   /**
    * C-2 (por confirmar): a Corte Z closed by the OIS (whose N1 is resolved by the

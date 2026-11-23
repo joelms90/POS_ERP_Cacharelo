@@ -42,8 +42,8 @@ export const roleTabs: Record<string, AdminTab[]> = {
   warehouse_purchasing_operator: ['inventory-dashboard', 'warehouse-inventory', 'receipts', 'warehouses', 'providers', 'transfers', 'purchase-orders', 'requisitions', 'help'],
   branch_operator: ['requisitions', 'help'],
   web_inquiries_viewer: ['inquiries'],
-  // Spec 019: approves Corte Z (N2) and supervises cash of assigned branches; sees their sales.
-  branch_supervisor: ['approvals', 'notifications', 'reports', 'debts', 'audit-log', 'help'],
+  // Spec 019: reviews cash and cortes of assigned branches only.
+  branch_supervisor: ['approvals', 'notifications', 'debts', 'audit-log'],
 };
 
 /** Tabs for every role the user holds (spec 019 R-4), in first-seen order. */
@@ -210,7 +210,7 @@ function App() {
             <div className="p-8 text-center text-text-secondary text-sm">No tienes sucursales asignadas en este negocio.</div>
           )
         )}
-        {activeTab === 'approvals' && user && <ApprovalsPage businessId={activeBusinessId} currentUserId={user.id} />}
+        {activeTab === 'approvals' && user && <ApprovalsPage />}
         {activeTab === 'notifications' && <NotificationsPage onNavigateTab={(tab) => setRequestedTab(tab as AdminTab)} />}
         {activeTab === 'debts' && <DebtsPage businessId={activeBusinessId} />}
         {activeTab === 'audit-log' && <AuditLogPage businessId={activeBusinessId} />}

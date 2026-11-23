@@ -115,12 +115,12 @@ class _PendingApprovalsViewState extends State<PendingApprovalsView> {
     final reason = await _askReason(
       title: approve
           ? (kind == 'corte'
-              ? 'Aprobar Corte Z (nivel 1)'
+              ? 'Aprobar Corte Z'
               : 'Aprobar movimiento')
           : (kind == 'corte' ? 'Rechazar Corte Z' : 'Rechazar movimiento'),
       impact: approve
           ? (kind == 'corte'
-              ? 'El Corte Z pasará al supervisor (nivel 2). Si bloqueaba la apertura de caja, la sucursal podrá abrir el siguiente turno.'
+              ? 'Aprobación final: las cifras quedan congeladas y la sucursal podrá abrir el siguiente turno.'
               : 'El movimiento queda aprobado; ya cuenta en caja desde que se registró.')
           : (kind == 'corte'
               ? 'Quien hizo el Corte Z deberá recontar. La apertura del siguiente turno seguirá bloqueada mientras tanto.'
@@ -218,8 +218,8 @@ class _PendingApprovalsViewState extends State<PendingApprovalsView> {
               children: [
                 Text(
                   corte['reviewStatus'] == 'rechazado_n2'
-                      ? 'El nuevo conteo regresa directo al supervisor (nivel 2).'
-                      : 'El nuevo conteo regresa al operador de sucursal (nivel 1).',
+                      ? 'El nuevo conteo regresa directo a la revisión final.'
+                      : 'El nuevo conteo regresa a revisión.',
                   style: const TextStyle(color: EmpireColors.textPrimary),
                 ),
                 const SizedBox(height: 12),

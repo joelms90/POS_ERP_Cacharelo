@@ -2755,11 +2755,11 @@ class AppState extends ChangeNotifier {
   static String shiftReviewLabel(String? status) {
     switch (status) {
       case 'pendiente_n1':
-        return 'Pendiente de aprobación (nivel 1)';
+        return 'Pendiente de aprobación';
       case 'rechazado_n1':
         return 'Rechazado — recontar';
       case 'pendiente_n2':
-        return 'Pendiente de supervisor (nivel 2)';
+        return 'Pendiente nivel 2 (histórico)';
       case 'rechazado_n2':
         return 'Rechazado por supervisor — recontar';
       case 'aprobado':

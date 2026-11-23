@@ -22,8 +22,8 @@ import {
 
 type ReportRequest = { user?: { sub?: string; branchId?: string; businessId?: string; businessAccess?: Array<{ businessId?: string; role?: string }>; role?: string; roles?: string[]; legacyAdmin?: boolean } };
 const REPORT_ADMIN_ROLES = [OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE];
-// Spec 019 D-9/P-3: supervisors see sales and cash reports of their assigned branches.
-const SALES_REPORT_ROLES = [...REPORT_ADMIN_ROLES, BRANCH_SUPERVISOR_ROLE];
+// Supervisors work from the supervision inbox; sales reports stay with admins.
+const SALES_REPORT_ROLES = [...REPORT_ADMIN_ROLES];
 const INVENTORY_REPORT_ROLES = [...REPORT_ADMIN_ROLES, WAREHOUSE_PURCHASING_OPERATOR_ROLE];
 
 @Controller('reports')

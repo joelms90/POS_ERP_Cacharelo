@@ -105,12 +105,13 @@ describe('cash approval rules', () => {
       );
     });
 
-    it('S-6: supervisor and owner do not replace the OIS on cashier items', () => {
+    it('lets the assigned supervisor or owner resolve cashier items at the single level', () => {
+      expect(() => assertCanResolveN1(supervisor, cashierItem)).not.toThrow();
+      expect(() => assertCanResolveN1(owner, cashierItem)).not.toThrow();
       expectRule(
-        () => assertCanResolveN1(supervisor, cashierItem),
+        () => assertCanResolveN1(unassignedSupervisor, cashierItem),
         'forbidden',
       );
-      expectRule(() => assertCanResolveN1(owner, cashierItem), 'forbidden');
     });
 
     it('nobody resolves their own item', () => {
@@ -120,10 +121,11 @@ describe('cash approval rules', () => {
       );
     });
 
-    it('S-3: the assigned supervisor resolves N1 of OIS items; another OIS and the owner cannot', () => {
+    it('lets the branch OIS, assigned supervisor or owner resolve OIS items', () => {
+      expect(() => assertCanResolveN1(otherOis, oisItem)).not.toThrow();
       expect(() => assertCanResolveN1(supervisor, oisItem)).not.toThrow();
-      expectRule(() => assertCanResolveN1(otherOis, oisItem), 'forbidden');
-      expectRule(() => assertCanResolveN1(owner, oisItem), 'forbidden');
+      expect(() => assertCanResolveN1(owner, oisItem)).not.toThrow();
+      expectRule(() => assertCanResolveN1(foreignOis, oisItem), 'forbidden');
       expectRule(
         () => assertCanResolveN1(unassignedSupervisor, oisItem),
         'forbidden',
@@ -158,21 +160,33 @@ describe('cash approval rules', () => {
       );
     });
 
-    it('C-1: N2 must differ from the N1 approver (configurable)', () => {
+    it('C-1: N2 may be resolved by the N1 approver (configurable)', () => {
       const oisShift = {
         branchId: 'b1',
         closedBy: 'ois-1',
         operatorReviewedBy: 'sup-1',
       };
-      expectRule(() => assertCanResolveN2(supervisor, oisShift), 'forbidden');
-      expect(() => assertCanResolveN2(otherSupervisor, oisShift)).not.toThrow();
-      expect(() => assertCanResolveN2(owner, oisShift)).not.toThrow();
+      const mustDiffer = {
+        n2MustDifferFromN1: true,
+        oisCloseBlocksOpeningUntilN1: true,
+      };
+      expectRule(
+        () => assertCanResolveN2(supervisor, oisShift, mustDiffer),
+        'forbidden',
+      );
+      expect(() =>
+        assertCanResolveN2(otherSupervisor, oisShift, mustDiffer),
+      ).not.toThrow();
+      expect(() =>
+        assertCanResolveN2(owner, oisShift, mustDiffer),
+      ).not.toThrow();
       expect(() =>
         assertCanResolveN2(supervisor, oisShift, {
+          ...mustDiffer,
           n2MustDifferFromN1: false,
-          oisCloseBlocksOpeningUntilN1: true,
         }),
       ).not.toThrow();
+      expect(() => assertCanResolveN2(supervisor, oisShift)).not.toThrow();
     });
   });
 
@@ -188,7 +202,8 @@ describe('cash approval rules', () => {
 
   describe('Corte Z state machine', () => {
     it.each([
-      ['pendiente_n1', 'approve_n1', 'pendiente_n2'],
+      ['pendiente_n1', 'approve_n1', 'aprobado'],
+      ['pendiente_n1', 'adjust_n1', 'aprobado_con_ajuste'],
       ['pendiente_n1', 'reject_n1', 'rechazado_n1'],
       ['rechazado_n1', 'recount', 'pendiente_n1'],
       ['pendiente_n2', 'approve_n2', 'aprobado'],
@@ -196,8 +211,8 @@ describe('cash approval rules', () => {
       ['pendiente_n2', 'reject_n2', 'rechazado_n2'],
       ['rechazado_n2', 'recount', 'pendiente_n2'], // S-5: straight back to N2
       ['rechazado_n2', 'adjust_n2', 'aprobado_con_ajuste'],
-      ['aprobado', 'reopen', 'pendiente_n2'],
-      ['aprobado_con_ajuste', 'reopen', 'pendiente_n2'],
+      ['aprobado', 'reopen', 'pendiente_n1'],
+      ['aprobado_con_ajuste', 'reopen', 'pendiente_n1'],
     ] as const)('%s --%s--> %s', (from, action, to) => {
       expect(nextShiftStatus(from, action)).toBe(to);
     });

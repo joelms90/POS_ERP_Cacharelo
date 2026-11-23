@@ -93,6 +93,34 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
   ];
 
   const canSee = (tab: AdminTab) => allowedTabs.includes(tab);
+  const operationsTabs: AdminTab[] = [
+    'administrators',
+    'personal',
+    'branches',
+    'ticket-settings',
+    'pos-simulator',
+    'inquiries',
+    'logs',
+    'tickets',
+    'mesas',
+  ];
+  const catalogTabs: AdminTab[] = [
+    'inventory',
+    'inventory-dashboard',
+    'branch-catalog',
+    'warehouse-inventory',
+    'categories',
+    'assembly',
+    'receipts',
+    'warehouses',
+    'providers',
+    'transfers',
+    'purchase-orders',
+    'requisitions',
+    'reports',
+  ];
+  const showOperations = operationsTabs.some(canSee);
+  const showCatalog = catalogTabs.some(canSee);
   const businessOptions = [
     { value: 'd3b07384-d113-4a0e-a555-e5b12824bf01', label: 'Cafetería' },
     { value: 'e00079b3-16f2-4ac7-9cd3-0bb10335cb4d', label: 'Cafetería Jáltipan' },
@@ -168,11 +196,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
             )}
 
             {/* Group: Operaciones */}
+            {showOperations && (
             <div className="px-3 py-1.5 mt-1 select-none">
               <span className="text-[10px] font-bold text-aged-bronze uppercase tracking-widest">
                 Operaciones y Local
               </span>
             </div>
+            )}
 
             {canSee('administrators') && (
             <button
@@ -321,11 +351,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
             )}
 
             {/* Group: Catálogo & Inventario */}
+            {showCatalog && (
             <div className="px-3 py-1.5 mt-3 select-none">
               <span className="text-[10px] font-bold text-aged-bronze uppercase tracking-widest">
                 Catálogo e Inventario
               </span>
             </div>
+            )}
 
             {canSee('inventory') && (
             <button
@@ -643,6 +675,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
                 )}
               </button>
             )}
+            {canSee('help') && (
             <button
               onClick={() => handleTabClick('help')}
               className={`p-2 rounded-full border transition-all duration-300 ${
@@ -656,6 +689,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </button>
+            )}
 
             <StatusIndicator
               apiOnline={health.apiOnline}

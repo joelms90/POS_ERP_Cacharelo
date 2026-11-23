@@ -2438,9 +2438,9 @@ export interface AppNotification {
 
 export const SHIFT_REVIEW_LABELS: Record<ShiftReviewStatus, string> = {
   no_aplica: 'Sin revisión',
-  pendiente_n1: 'Pendiente nivel 1',
-  rechazado_n1: 'Rechazado nivel 1 · recontar',
-  pendiente_n2: 'Pendiente nivel 2',
+  pendiente_n1: 'Pendiente de aprobación',
+  rechazado_n1: 'Rechazado · recontar',
+  pendiente_n2: 'Pendiente nivel 2 (histórico)',
   rechazado_n2: 'Rechazado nivel 2 · recontar',
   aprobado: 'Aprobado',
   aprobado_con_ajuste: 'Aprobado con ajuste',

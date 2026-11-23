@@ -21,7 +21,7 @@ import type { DbExecutor } from '../audit/db-executor';
 import { AuditLogService } from '../audit/audit-log.service';
 import { NotificationsService } from '../audit/notifications.service';
 import { SupervisorScopeService } from '../audit/supervisor-scope.service';
-import { BRANCH_OPERATOR_ROLE, BRANCH_SUPERVISOR_ROLE } from '../auth/roles';
+import { BRANCH_OPERATOR_ROLE } from '../auth/roles';
 import {
   ApprovalRuleError,
   cashEffect,
@@ -43,7 +43,7 @@ export interface ShiftActor {
 }
 
 export const OPEN_BLOCKED_MESSAGE =
-  'El Corte Z anterior de esta sucursal debe ser aprobado (nivel 1) antes de abrir un nuevo turno.';
+  'El Corte Z anterior de esta sucursal debe ser aprobado antes de abrir un nuevo turno.';
 
 @Injectable()
 export class ShiftsService {
@@ -367,7 +367,7 @@ export class ShiftsService {
           requiresAction: true,
           entityType: 'cash_shift',
           entityId: shiftId,
-          title: `Corte Z por aprobar (nivel 1) · ${branch.name}`,
+          title: `Corte Z por aprobar · ${branch.name}`,
           body: `Diferencia: $${(report.summary.cashDifference ?? 0).toFixed(2)}`,
         });
       }
@@ -393,7 +393,7 @@ export class ShiftsService {
     const roles = normalizeRoles(actor.roles, actor.role);
     const author = shift.closedBy ?? shift.cashierId;
     if (shift.reviewStatus === 'rechazado_n1' && actor.id !== author) {
-      throw new ForbiddenException('El reconteo tras un rechazo de nivel 1 lo registra quien hizo el Corte Z.');
+      throw new ForbiddenException('El reconteo tras un rechazo lo registra quien hizo el Corte Z.');
     }
     if (
       shift.reviewStatus === 'rechazado_n2' &&
@@ -459,7 +459,7 @@ export class ShiftsService {
           requiresAction: true,
           entityType: 'cash_shift',
           entityId: shiftId,
-          title: `Reconteo de Corte Z por aprobar (${next === 'pendiente_n2' ? 'nivel 2' : 'nivel 1'}) · ${branch.name}`,
+          title: `Reconteo de Corte Z por aprobar${next === 'pendiente_n2' ? ' (nivel 2)' : ''} · ${branch.name}`,
           body: `Nuevo conteo: $${counted.toFixed(2)}`,
         });
       }
@@ -644,11 +644,15 @@ export class ShiftsService {
     };
   }
 
-  private async n1Recipients(branchId: string, businessId: string, n1ResolverRole: string) {
+  private async n1Recipients(branchId: string, businessId: string, _n1ResolverRole: string) {
     if (!this.scope) return [];
-    return n1ResolverRole === BRANCH_SUPERVISOR_ROLE
-      ? this.scope.supervisorsOf(branchId)
-      : this.scope.operatorsOf(branchId, businessId);
+    return Array.from(
+      new Set([
+        ...(await this.scope.operatorsOf(branchId, businessId)),
+        ...(await this.scope.supervisorsOf(branchId)),
+        ...(await this.scope.ownersOf(businessId)),
+      ]),
+    );
   }
 
   private async recordOpeningBlocked(lastShift: any, attemptedBy: string) {
@@ -677,7 +681,7 @@ export class ShiftsService {
         entityType: 'cash_shift',
         entityId: lastShift.id,
         title: `Apertura de caja bloqueada · ${branch.name}`,
-        body: 'El Corte Z anterior espera la aprobación de nivel 1.',
+        body: 'El Corte Z anterior espera aprobación.',
       });
     });
   }

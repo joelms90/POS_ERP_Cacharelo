@@ -107,7 +107,7 @@ void main() {
 
     await tester.tap(find.text('APROBAR').first);
     await tester.pumpAndSettle();
-    expect(find.textContaining('pasará al supervisor'), findsOneWidget);
+    expect(find.textContaining('Aprobación final'), findsOneWidget);
     await tester.tap(find.text('CONFIRMAR'));
     await tester.pumpAndSettle();
 
@@ -163,7 +163,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('APROBAR'), findsNothing);
-    expect(find.text('Pendiente de supervisor (nivel 2)'), findsOneWidget);
+    expect(find.text('Pendiente nivel 2 (histórico)'), findsOneWidget);
   });
 
   testWidgets('cashier compact view renders nothing without own cortes',
@@ -193,7 +193,7 @@ void main() {
     expect(find.text('Rechazado por supervisor — recontar'), findsOneWidget);
     await tester.tap(find.text('RECONTAR'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('directo al supervisor'), findsOneWidget);
+    expect(find.textContaining('revisión final'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField).first, '1000');
     await tester.pumpAndSettle();
@@ -211,7 +211,7 @@ void main() {
     expect(AppState.cashCategoryCode('Otro retiro'), 'otro_egreso');
     expect(AppState.cashCategoryCode('Desconocida'), isNull);
     expect(AppState.shiftReviewLabel('pendiente_n1'),
-        'Pendiente de aprobación (nivel 1)');
+        'Pendiente de aprobación');
     expect(AppState.movementStatusLabel('rechazado'), 'Rechazado');
   });
 }

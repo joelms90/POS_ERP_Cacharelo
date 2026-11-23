@@ -6,7 +6,7 @@ Reglas de ejecución (dueño, 2026-11-22):
 - Solo en local: sin push, sin deploy, sin staging ni producción.
 - Migraciones solo contra el Postgres de Docker local (`postgres://pos_user:pos_password@localhost:5432/pos_dev`).
 - Commits pequeños por paso; sin merge a `main`.
-- C-1 y C-2 se implementan como constantes configurables y siguen "por confirmar".
+- C-1 y C-2 se implementan como constantes configurables. C-1 confirmada el 2026-11-23 (el mismo supervisor puede resolver N2; el owner audita); C-2 sigue por confirmar.
 
 Leyenda: `[ ]` pendiente · `[x]` hecho · `[~]` parcial / diferido (con nota)
 
