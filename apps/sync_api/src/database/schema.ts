@@ -1023,6 +1023,56 @@ export const businessInventorySettings = pgTable('business_inventory_settings', 
   updatedBy: uuid('updated_by').references(() => users.id),
 });
 
+// Owner Copilot audit records deliberately store redacted payloads only.  The
+// append-only rows make both automated reads and proposed writes reviewable.
+export const ownerCopilotConversations = pgTable('owner_copilot_conversations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: uuid('owner_id').references(() => users.id).notNull(),
+  businessId: uuid('business_id').references(() => businesses.id).notNull(),
+  branchId: uuid('branch_id').references(() => branches.id),
+  correlationId: varchar('correlation_id', { length: 80 }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  idxOwnerBusiness: index('idx_owner_copilot_conversation_owner_business').on(table.ownerId, table.businessId),
+  idxCorrelation: index('idx_owner_copilot_conversation_correlation').on(table.correlationId),
+}));
+
+export const ownerCopilotMessages = pgTable('owner_copilot_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  conversationId: uuid('conversation_id').references(() => ownerCopilotConversations.id).notNull(),
+  role: varchar('role', { length: 20 }).notNull(),
+  redactedContent: text('redacted_content').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({ idxConversation: index('idx_owner_copilot_message_conversation').on(table.conversationId) }));
+
+export const ownerCopilotToolRuns = pgTable('owner_copilot_tool_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  conversationId: uuid('conversation_id').references(() => ownerCopilotConversations.id).notNull(),
+  toolName: varchar('tool_name', { length: 80 }).notNull(),
+  inputRedacted: jsonb('input_redacted').notNull(),
+  outputRedacted: jsonb('output_redacted'),
+  status: varchar('status', { length: 20 }).notNull(),
+  entityType: varchar('entity_type', { length: 80 }),
+  entityId: varchar('entity_id', { length: 120 }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({ idxConversation: index('idx_owner_copilot_tool_conversation').on(table.conversationId) }));
+
+export const ownerCopilotConfirmations = pgTable('owner_copilot_confirmations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  conversationId: uuid('conversation_id').references(() => ownerCopilotConversations.id).notNull(),
+  ownerId: uuid('owner_id').references(() => users.id).notNull(),
+  businessId: uuid('business_id').references(() => businesses.id).notNull(),
+  branchId: uuid('branch_id').references(() => branches.id),
+  actionType: varchar('action_type', { length: 80 }).notNull(),
+  tokenHash: varchar('token_hash', { length: 128 }).notNull(),
+  payloadRedacted: jsonb('payload_redacted').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+  consumedAt: timestamp('consumed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({ idxConfirmationToken: uniqueIndex('idx_owner_copilot_confirmation_token').on(table.tokenHash) }));
+
 // Per-branch catalog: overrides which products a branch can sell (e.g. sell an
 // insumo at a retail branch, or hide a finished good from a specific branch).
 export const branchProducts = pgTable(

@@ -778,8 +778,8 @@ owner-copilot-admin: admin-dev-local
 
 owner-copilot-test:
 	@echo "Running focused Owner Business Copilot checks..."
-	cd apps/sync_api && npm test -- --runInBand owner-copilot
-	cd apps/business_control_tauri && pnpm test -- --run OwnerCopilot
+	cd apps/sync_api && npm test -- --runInBand --watchman=false owner-copilot
+	cd apps/business_control_tauri && pnpm build
 
 admin-test-e2e:
 	@echo "Running Playwright E2E tests for Admin Dashboard..."

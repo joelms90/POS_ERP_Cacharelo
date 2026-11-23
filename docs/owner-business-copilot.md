@@ -17,7 +17,7 @@ Open the admin dashboard, sign in with a real owner account, and select **Copilo
 make owner-copilot-test
 ```
 
-This feature adds an audit migration but does not run it. Do not deploy or run migrations as part of local verification.
+The focused command runs the backend safety suite and the admin production type/build check. A mocked Playwright core-state test lives in `e2e/navigation.spec.ts`; run it only against an intentionally prepared local test environment because the legacy E2E server bootstrap attempts its own migrations. This feature adds an audit migration but does not run it. Do not deploy or run migrations as part of local verification.
 
 ## Security boundary
 

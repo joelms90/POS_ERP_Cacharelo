@@ -21,6 +21,7 @@ import { PurchaseOrdersModule } from './modules/purchase-orders/purchase-orders.
 import { RequisitionsModule } from './modules/requisitions/requisitions.module';
 import { PrintingModule } from './modules/printing/printing.module';
 import { LogsModule } from './modules/logs/logs.module';
+import { OwnerCopilotModule } from './modules/owner-copilot/owner-copilot.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { LogsModule } from './modules/logs/logs.module';
     RequisitionsModule,
     PrintingModule,
     LogsModule,
+    OwnerCopilotModule,
   ],
   controllers: [AppController],
   providers: [AppService],

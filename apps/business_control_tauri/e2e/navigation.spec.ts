@@ -22,6 +22,7 @@ test.describe('Admin Console E2E Navigation', () => {
 
   test('should login and navigate to all navigation sections without error', async ({ page }) => {
     const sections = [
+      { name: 'Copiloto', id: 'copilot' },
       { name: 'Administradores', id: 'administrators' },
       { name: 'Personal (PINs)', id: 'personal' },
       { name: 'Sucursales', id: 'branches' },
@@ -72,6 +73,31 @@ test.describe('Admin Console E2E Navigation', () => {
     await expect(page.getByText('Tarjeta')).toBeVisible();
     await expect(page.getByText('Corte X')).toBeVisible();
     await expect(page.getByText('Corte Z')).toBeVisible();
+  });
+
+  test('renders Copiloto suggestions, tool activity and a confirmation proposal', async ({ page }) => {
+    await page.route('**/api/owner-copilot/chat', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          conversationId: 'copilot-e2e',
+          message: {
+            id: 'assistant-e2e', role: 'assistant', createdAt: new Date().toISOString(),
+            content: 'Las ventas se mantienen estables.',
+            toolRuns: [{ tool: 'sales_summary', status: 'completed', summary: 'Resumen del día consultado.' }],
+            sources: [{ label: 'Reporte de ventas', href: '/reports' }],
+            actionProposal: { title: 'Crear borrador', summary: 'No se ejecutará sin confirmación.', confirmationToken: 'confirmation-e2e', expiresAt: new Date(Date.now() + 60000).toISOString() },
+          },
+        }),
+      });
+    });
+    await page.locator('aside nav button', { hasText: 'Copiloto' }).click();
+    await expect(page.getByTestId('owner-copilot-page')).toBeVisible();
+    await expect(page.getByText('¿Cómo van las ventas de hoy?')).toBeVisible();
+    await page.getByText('¿Cómo van las ventas de hoy?').click();
+    await expect(page.getByText('sales_summary')).toBeVisible();
+    await expect(page.getByText('Fuente: Reporte de ventas')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Confirmar acción' })).toBeVisible();
   });
 
   test('should switch businesses and retain navigation functionality', async ({ page }) => {

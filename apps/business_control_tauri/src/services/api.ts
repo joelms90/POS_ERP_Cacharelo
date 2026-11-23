@@ -667,7 +667,12 @@ export const api = {
   }): Promise<OwnerCopilotResponse> {
     return apiRequest<OwnerCopilotResponse>('/owner-copilot/chat', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        prompt: payload.message,
+        businessId: payload.businessId,
+        branchId: payload.branchId,
+        conversationId: payload.conversationId,
+      }),
     });
   },
 
