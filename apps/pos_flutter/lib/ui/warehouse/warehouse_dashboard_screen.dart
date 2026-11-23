@@ -83,6 +83,59 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
     }
   }
 
+  Future<void> _triggerSync() async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: EmpireColors.obsidian,
+              ),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'Sincronizando datos con el servidor...',
+              style: TextStyle(
+                color: EmpireColors.obsidian,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: EmpireColors.champagneGold,
+        duration: Duration(milliseconds: 1500),
+      ),
+    );
+
+    final bool success = await widget.state.syncAllData();
+    // Reload the warehouse lists so the screen reflects the fresh server state.
+    if (mounted) await _loadInitialData();
+    if (!mounted) return;
+
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'Sincronización completa con éxito.'
+              : 'Sincronización incompleta. Revise su conexión de red.',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor:
+            success ? EmpireColors.successGreen : EmpireColors.errorRed,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   void _logout() {
     widget.state.logout();
     Navigator.of(context).pushReplacement(
@@ -1992,10 +2045,47 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                   ],
                 ),
                 const SizedBox(width: 10),
-                IconButton(
-                  onPressed: _logout,
-                  icon: const Icon(Icons.logout, color: EmpireColors.errorRed),
-                  tooltip: 'Cerrar sesión',
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.settings,
+                      color: EmpireColors.champagneGold),
+                  tooltip: 'Configuración',
+                  color: EmpireColors.onyxSurface,
+                  surfaceTintColor: Colors.transparent,
+                  offset: const Offset(0, 40),
+                  onSelected: (value) {
+                    if (value == 'logout') {
+                      _logout();
+                    } else if (value == 'sync') {
+                      _triggerSync();
+                    }
+                  },
+                  itemBuilder: (BuildContext context) => const [
+                    PopupMenuItem<String>(
+                      value: 'sync',
+                      child: Row(children: [
+                        Icon(Icons.sync,
+                            color: EmpireColors.champagneGold, size: 18),
+                        SizedBox(width: 8),
+                        Text('Sincronizar Datos',
+                            style: TextStyle(
+                                color: EmpireColors.textPrimary,
+                                fontSize: 13)),
+                      ]),
+                    ),
+                    PopupMenuDivider(height: 1),
+                    PopupMenuItem<String>(
+                      value: 'logout',
+                      child: Row(children: [
+                        Icon(Icons.logout,
+                            color: EmpireColors.errorRed, size: 18),
+                        SizedBox(width: 8),
+                        Text('Cerrar Sesión',
+                            style: TextStyle(
+                                color: EmpireColors.textPrimary,
+                                fontSize: 13)),
+                      ]),
+                    ),
+                  ],
                 ),
               ],
             ),
