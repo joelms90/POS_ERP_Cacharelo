@@ -2,7 +2,7 @@
 
 **Feature Branch**: `019-supervisor-sucursal`
 **Created**: 2026-11-22 · **Updated**: 2026-11-22 (segunda ronda de decisiones del dueño)
-**Status**: Propuesta (NO implementado). Todas las decisiones (D-1 a D-11) y supuestos (S-1 a S-6) están resueltos. Quedan 3 detalles menores por confirmar (§15.3).
+**Status**: Propuesta (NO implementado). Todas las decisiones (D-1 a D-11), supuestos (S-1 a S-6) y detalles (P-1 a P-3) están resueltos (3.ª ronda, 2026-11-22: notificaciones por REST en lugar de push, adeudo solo auditado, desbloqueo de emergencia del owner, supervisor ve ventas).
 **Input**: [brief.md](brief.md) — pedido del dueño: rol "supervisor de sucursal"; lo primero que debe tener es (1) **aprobar cortes Z** y (2) **aprobar ingresos y egresos de caja**.
 
 ---
@@ -31,12 +31,13 @@ Hoy el sistema **registra** el dinero de caja pero nadie lo **valida**:
 3. **Bloqueo de apertura**: no se abre el siguiente turno de la sucursal mientras el OIS no haya aprobado el Corte Z anterior (D-4).
 4. **Corte Z sin conexión** en el POS Flutter (D-5).
 5. **Adeudo formal del cajero** por faltante aprobado (D-8).
-6. **Bandejas de aprobación**: Admin web (supervisor y owner, D-10) y POS (OIS), más **notificaciones push en celular** (D-6).
-7. **Vista del supervisor limitada a caja**: ve lo que hicieron el cajero y el OIS en caja (cortes, movimientos, bitácora) de sus sucursales. **No** ve ventas en vivo (D-9).
-8. **Bitácora de auditoría** inmutable: usuario, rol, fecha, motivo, valores antes/después.
+6. **Bandejas de aprobación**: Admin web (supervisor y owner, D-10) y POS (OIS), más **notificaciones guardadas y consultables por REST**, con una sección **"Notificaciones"** en el Admin web (https://cacharelo-central.web.app/) que ve el supervisor (D-6).
+7. **Visibilidad del supervisor** en sus sucursales asignadas: ve lo que hicieron el cajero y el OIS en caja (cortes, movimientos, bitácora) y **también ve las ventas**, mediante los reportes existentes limitados a sus sucursales (D-9, P-3). Lo que **revisa y aprueba** en Fase 1 es solo caja.
+8. **Desbloqueo de emergencia (owner)**: si el OIS no está, el owner puede permitir la apertura del siguiente turno, con motivo y registro en la bitácora (P-2).
+9. **Bitácora de auditoría** inmutable: usuario, rol, fecha, motivo, valores antes/después.
 
 ### Fuera de alcance de Fase 1 (ver §11)
-Umbrales configurables, tratamiento de turnos auto-cerrados >24 h (D-11), ventas en vivo para el supervisor (D-9), autorización de descuentos/cancelaciones/devoluciones, inventario, requisiciones, arqueos sorpresa, personal.
+Umbrales configurables, tratamiento de turnos auto-cerrados >24 h (D-11), notificaciones push al celular (D-6), gestión de cobro de adeudos (P-1), autorización de descuentos/cancelaciones/devoluciones, inventario, requisiciones, arqueos sorpresa, personal.
 
 ## 3. Glosario
 
@@ -82,9 +83,10 @@ Reglas:
 - **CZ-05** Ningún rechazo reabre el turno (el efectivo ya salió y puede haber otro turno abierto). El `close_snapshot` original **nunca se sobrescribe**; los reconteos y ajustes quedan como versiones en la bitácora.
 - **CZ-06** Un nivel no puede aprobar un corte mientras haya movimientos del mismo turno pendientes de N1 o N2.
 - **CZ-07** Nadie aprueba su propio corte (`closed_by == actor` → 403). Esto extiende BR-ROLE-003.
-- **CZ-08** El supervisor y el owner **no sustituyen al OIS** en N1 (S-6). La única forma de saltar N1 es que el autor sea el OIS (S-3).
+- **CZ-08** El supervisor y el owner **no sustituyen al OIS** en N1 (S-6): cuando un corte espera la aprobación del OIS, no pueden aprobarlo en su lugar, solo actuar después en N2. La única forma de saltar N1 es que el autor sea el OIS (S-3). Desbloquear la apertura (CZ-10b) **no** es aprobar.
 - **CZ-09** Concurrencia: cada acción exige la `version` vigente; si otra persona actuó antes, el servidor responde 409.
 - **CZ-10** **Bloqueo de apertura (D-4)**: no se puede abrir un turno nuevo en la sucursal mientras su último Corte Z esté en `pendiente_operador` o `rechazado_operador`. Cuando el OIS lo aprueba, la sucursal puede abrir aunque el supervisor no haya resuelto N2. Un corte cerrado por el OIS (que no pasa por N1) no bloquea.
+- **CZ-10b** **Desbloqueo de emergencia (P-2)**: si la sucursal está bloqueada y el OIS no está disponible, el **owner** puede desbloquear la apertura con un motivo obligatorio. El corte anterior **sigue** en `pendiente_operador` (el OIS lo aprobará después); solo se permite abrir el turno nuevo. Queda en la bitácora (`apertura_desbloqueada`) y genera una notificación al supervisor de la sucursal.
 - **CZ-11** Al quedar **aprobado** o **aprobado con ajuste** con diferencia final negativa, se genera un **adeudo** a nombre del cajero del turno (§4.3).
 - **CZ-12** Los turnos históricos y los auto-cerrados por el sistema (>24 h) quedan `no_aplica` y no entran al flujo ni bloquean (D-11; ver R-7).
 
@@ -119,9 +121,9 @@ Reglas:
 
 - **AD-01** Al aprobarse en N2 un Corte Z con diferencia final negativa, el sistema crea un adeudo con: cajero del turno, sucursal, turno, monto = |diferencia final|, fecha y aprobador.
 - **AD-02** Si después el owner reabre el corte, el adeudo se anula y se vuelve a generar con la nueva aprobación. Todo queda en la bitácora.
-- **AD-03** El adeudo se ve en el Admin web (supervisor: sus sucursales; owner: todo) y el cajero ve los suyos en el POS.
+- **AD-03** El adeudo se puede consultar en el Admin web (supervisor: sus sucursales; owner: todo) y el cajero ve los suyos en el POS.
 - **AD-04** Los sobrantes no generan adeudo; quedan registrados en el corte.
-- Cómo se liquida (descuento de nómina, pago en caja, condonación) está por confirmar (§15.3, P-1).
+- **AD-05** **El adeudo solo se registra y audita (P-1)**: el sistema no gestiona su cobro ni su liquidación (nómina, pago, condonación). Estados posibles: `vigente` y `anulado` (por reapertura del corte). Cada alta y cada anulación quedan en la bitácora.
 
 ## 5. Umbrales configurables — fase futura
 
@@ -131,11 +133,11 @@ Sin umbrales en Fase 1 (D-3). Para el futuro, sin montos definidos: auto-aprobac
 
 Tabla append-only `audit_log` con `business_id`, `branch_id`, `entity_type` (`cash_shift`, `cash_transaction`, `cashier_debt`, `supervisor_assignment`), `entity_id`, `action`, `approval_level` (`n1`, `n2`, `owner`), `actor_id`, `actor_role`, `reason`, `before`, `after`, `source` (`admin_web`, `pos`, `system`), `device_id` y `created_at` (servidor).
 
-Acciones: `corte_z_cerrado`, `corte_z_aprobado`, `corte_z_rechazado`, `corte_z_reconteo`, `corte_z_ajustado`, `corte_z_reabierto`, `movimiento_creado`, `movimiento_aprobado`, `movimiento_rechazado`, `movimiento_cancelado`, `movimiento_ajustado`, `adeudo_generado`, `adeudo_anulado`, `apertura_bloqueada`, `asignacion_actualizada`.
+Acciones: `corte_z_cerrado`, `corte_z_aprobado`, `corte_z_rechazado`, `corte_z_reconteo`, `corte_z_ajustado`, `corte_z_reabierto`, `movimiento_creado`, `movimiento_aprobado`, `movimiento_rechazado`, `movimiento_cancelado`, `movimiento_ajustado`, `adeudo_generado`, `adeudo_anulado`, `apertura_bloqueada`, `apertura_desbloqueada`, `asignacion_actualizada`.
 
 - **AU-01** Solo inserción: sin `UPDATE`/`DELETE` (revocar privilegios o usar un trigger).
 - **AU-02** Se escribe en la misma transacción que el cambio de estado.
-- **AU-03** El motivo es obligatorio en: rechazar, ajustar, cancelar y reabrir.
+- **AU-03** El motivo es obligatorio en: rechazar, ajustar, cancelar, reabrir y desbloquear apertura.
 - **AU-04** Consultable por el supervisor (sus sucursales) y el owner. Filtros: sucursal, entidad, actor (cajero/OIS), acción y fechas. Exportable a CSV.
 - **AU-05** "Eliminar registros financieros" no existe para ningún rol.
 
@@ -155,32 +157,47 @@ Acciones: `corte_z_cerrado`, `corte_z_aprobado`, `corte_z_rechazado`, `corte_z_r
 | Aprobar/rechazar movimiento hecho por el OIS | ❌ | ❌ | 🔹 | ✅ |
 | Cancelar o ajustar un movimiento (antes de aprobar el corte) | ❌ | ❌ | 🔹 | ✅ |
 | Reabrir un Corte Z aprobado | ❌ | ❌ | ❌ | ✅ con motivo |
+| Desbloquear apertura de turno en emergencia (P-2) | ❌ | ❌ | ❌ | ✅ con motivo |
 | Ver cortes, movimientos y bitácora de caja de cajeros y OIS | 🔸 (los suyos) | 🔸 | 🔹 | ✅ |
-| Ver ventas en vivo | — | (como hoy) | ❌ (D-9) | ✅ |
+| Ver ventas (reportes) | — | (como hoy) | 🔹 (D-9, P-3) | ✅ |
+| Ver notificaciones | 🔸 (las suyas) | 🔸 (las suyas) | 🔹 (sección en el Admin web) | ✅ |
 | Ver adeudos | 🔸 (los suyos) | ❌ | 🔹 | ✅ |
 | Asignar supervisores a sucursales | ❌ | ❌ | ❌ | ✅ |
 | Crear sucursales / modificar permisos de administradores | ❌ | ❌ | ❌ | ✅ |
 | Eliminar registros financieros | ❌ | ❌ | ❌ | ❌ |
 
-El alcance de revisión del supervisor en Fase 1 es **solo caja** (D-9).
+Lo que el supervisor **aprueba** en Fase 1 es **solo caja**; las ventas solo las **consulta** (D-9, P-3).
 
 Para fases siguientes (tabla del brief):
 - Autorizar descuentos, cancelaciones/devoluciones y ajustes de inventario: ✅🔹 (Fase 3).
 - Primer visto bueno de requisiciones: ✅🔹 (Fase 3).
-- Ventas de sus sucursales: por confirmar en la Fase 2 (hoy D-9 = no en vivo).
+- Ventas de sus sucursales: ✅🔹 (consulta desde Fase 1; dashboard con ventas en Fase 2).
 - Crear sucursales, modificar permisos de administradores y eliminar registros financieros: ❌.
 
-## 8. Notificaciones (D-6: push en celular)
+## 8. Notificaciones (D-6: persistentes, consultables por REST)
 
-| Evento | A quién | Canal |
-|---|---|---|
-| Corte Z o movimiento en `pendiente_operador` | OIS de la sucursal | **Push** + evento WebSocket `approval_requested` + contador en la pestaña Caja del POS |
-| Corte Z o movimiento en `pendiente_supervisor` | Supervisores asignados y owner | **Push** + contador en la bandeja del Admin web |
-| Aprobado / rechazado / cancelado / ajustado | Cajero autor y terminal de la sucursal | **Push** al cajero + WebSocket `approval_resolved` |
-| Apertura de turno bloqueada | OIS de la sucursal | **Push** ("Aprueba el Corte Z anterior para abrir caja") |
-| Adeudo generado | Cajero | **Push** + aviso en el POS |
+No hay push en Fase 1. El servidor **guarda** cada notificación en la tabla `notifications` y los clientes las **consultan** por REST:
 
-Push = Firebase Cloud Messaging: Web Push en el Admin web (PWA en Firebase Hosting) y FCM en el POS Flutter (Android y web). Hoy no existe ninguna integración de push en las apps (R-12). La bandeja con contador sigue siendo la fuente de verdad; el push solo avisa.
+- `GET /notifications`, con filtros: no leídas, sucursal, tipo y fechas.
+- `GET /notifications/unread-count`.
+- `POST /notifications/:id/read` y `POST /notifications/read-all`.
+
+| Evento | Destinatarios |
+|---|---|
+| Corte Z o movimiento en `pendiente_operador` | OIS de la sucursal |
+| Corte Z o movimiento en `pendiente_supervisor` | Supervisores asignados y owner (**requiere acción**) |
+| Aprobado / rechazado / cancelado / ajustado | Cajero autor; supervisores asignados (informativa) |
+| Apertura de turno bloqueada | OIS de la sucursal; supervisores asignados y owner |
+| Apertura desbloqueada por el owner | OIS y supervisores asignados |
+| Adeudo generado o anulado | Cajero; supervisores asignados y owner |
+
+Dónde se ven:
+
+- **Admin web**: nueva sección **"Notificaciones"** en https://cacharelo-central.web.app/, con campana y contador de no leídas en el layout (polling cada 60 s). El supervisor ve las de sus sucursales y el owner, todas. Cada notificación enlaza al corte o movimiento correspondiente. Las que requieren acción se resaltan.
+- **POS Flutter**: el OIS y el cajero consultan el mismo endpoint (contador en la pestaña Caja, polling cuando hay conexión).
+- **Tiempo real (opcional)**: los eventos WebSocket existentes (`approval_requested` / `approval_resolved`, cuarto por sucursal) solo sirven para refrescar más rápido. La fuente de verdad es la API REST.
+
+Push al celular queda como mejora futura (R-12).
 
 ## 9. Offline en POS Flutter
 
@@ -205,8 +222,9 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 - **FR-006** El sistema MUST impedir abrir un turno nuevo mientras el último Corte Z de la sucursal esté pendiente o rechazado en N1.
 - **FR-007** El POS MUST permitir el Corte Z sin conexión y sincronizarlo después, con recálculo en el servidor.
 - **FR-008** El sistema MUST generar un adeudo al cajero cuando N2 apruebe un corte con faltante.
-- **FR-009** El sistema MUST enviar notificaciones push a quien deba aprobar y a quien sea afectado por la decisión.
-- **FR-010** El supervisor MUST ver cortes, movimientos y bitácora de caja de cajeros y OIS de sus sucursales, y MUST NOT ver ventas en vivo.
+- **FR-009** El sistema MUST generar notificaciones persistentes, consultables por REST, para quien deba aprobar y para quien sea afectado por la decisión, y el Admin web MUST mostrarlas en una sección "Notificaciones" para el supervisor y el owner.
+- **FR-010** El supervisor MUST ver cortes, movimientos y bitácora de caja de cajeros y OIS de sus sucursales, y las ventas de esas sucursales; MUST NOT ver otras sucursales.
+- **FR-014** El owner MUST poder desbloquear la apertura de turno de una sucursal con motivo, sin aprobar el corte pendiente.
 - **FR-011** El sistema MUST impedir la auto-aprobación y que el supervisor u owner actúen en N1, también vía peticiones directas.
 - **FR-012** Toda transición MUST escribir en `audit_log` en la misma transacción, con nivel, antes y después.
 - **FR-013** Las autorizaciones MUST validarse en el servidor (BR-ROLE-004).
@@ -215,7 +233,7 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 
 | Fase | Contenido |
 |---|---|
-| **2 — Dashboard de supervisión** | Sucursales abiertas X/Y, diferencias de caja acumuladas, pendientes por sucursal, "N sucursales requieren revisión". Las métricas de **ventas** del brief quedan por confirmar por D-9. |
+| **2 — Dashboard de supervisión** | Sucursales abiertas X/Y, diferencias de caja acumuladas, pendientes por sucursal, "N sucursales requieren revisión". **Incluye las métricas de ventas** del brief (ventas totales, ventas por sucursal), limitadas a sus sucursales (P-3). Push al celular (D-6) como mejora opcional. |
 | **2b — Umbrales y auto-cierre** | Umbrales (§5); turnos auto-cerrados >24 h (R-7). |
 | **3 — Autorizaciones operativas** | Descuentos, cancelaciones/devoluciones, ajustes de inventario, primer visto bueno de requisiciones, sobre la misma cadena y la misma bitácora. |
 | **4 — KPIs del supervisor** | Diferencias de caja, adeudos, movimientos rechazados/cancelados por cajero, merma, cancelaciones/devoluciones, disponibilidad de productos, productividad, cumplimiento operativo. |
@@ -230,24 +248,26 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 - **SC-005** Un Corte Z hecho offline se sincroniza sin duplicarse y con el esperado recalculado.
 - **SC-006** Cada transición tiene exactamente un evento en `audit_log`.
 - **SC-007** Un corte aprobado con faltante genera exactamente un adeudo.
-- **SC-008** El supervisor solo ve sus sucursales asignadas y no accede a endpoints de ventas en vivo.
+- **SC-008** El supervisor solo ve datos (caja, ventas, notificaciones) de sus sucursales asignadas.
+- **SC-009** Toda notificación generada se puede consultar por `GET /notifications` y aparece en la sección del Admin web.
+- **SC-010** Un desbloqueo de emergencia permite abrir el turno sin cambiar el estado del corte pendiente y deja un evento en la bitácora.
 
 ## 13. Riesgos
 
 | # | Riesgo | Evidencia | Mitigación |
 |---|---|---|---|
-| R-1 | **Endpoints de reportes sin guard** | `reports.controller.ts`: `cash-shifts`, `sales/payment-methods`, `sales/products`, `inventory/existence` e `inventory/kardex` no tienen `@UseGuards` (no hay guard global). | Corregir antes de Fase 1. Además cierra D-9: hoy un supervisor podría ver ventas por esos endpoints. |
+| R-1 | **Endpoints de reportes sin guard** | `reports.controller.ts`: `cash-shifts`, `sales/payment-methods`, `sales/products`, `inventory/existence` e `inventory/kardex` no tienen `@UseGuards` (no hay guard global). | Corregir antes de Fase 1. Al proteger los endpoints, el alcance del supervisor se limita a sus sucursales asignadas (también en ventas, P-3). |
 | R-2 | Agregar el supervisor a `ADMIN_ROLES` le daría todas las sucursales | `reports.service.ts:613`, `users.service.ts` | Nuevo grupo `SUPERVISION_ROLES` + `supervisor_branch_assignments`. |
 | R-3 | `RolesGuard` deja pasar siempre a `owner` | `roles.guard.ts` | Las reglas de nivel (S-6: owner no actúa en N1) van en el servicio, no en el guard. |
 | R-4 | Admin web decide pestañas por `user.role` | `App.tsx` | Usar la unión de `user.roles`. |
 | R-5 | Movimientos sin idempotencia ni actor | `cash_transactions` | `client_uuid`, `created_by`. |
 | R-6 | Egresos dejan el cajón negativo en el servidor | `ShiftsService.createTransaction` | MV-05. |
 | R-7 | **Auto-cierre >24 h sin conteo (fuera de Fase 1, D-11)** | `openShift` cierra sin conteo; `cash_drawer_amount` no incluye ventas en efectivo, así que el reporte muestra un faltante falso ≈ ventas en efectivo. | Fase 2b. En Fase 1 quedan `no_aplica`, no bloquean y **no generan adeudo** (evita cobrarle al cajero un faltante falso). |
-| R-8 | **Sucursal bloqueada sin poder abrir caja (D-4)** | Si el OIS no está o no tiene conexión, nadie más puede hacer N1 (S-6). | Push al OIS (§8) y mensaje claro en el POS. Confirmar si el owner puede desbloquear en emergencias (§15.3, P-2). |
+| R-8 | **Sucursal bloqueada sin poder abrir caja (D-4)** | Si el OIS no está o no tiene conexión, nadie más puede hacer N1 (S-6). | Notificación al OIS (§8), mensaje claro en el POS y **desbloqueo de emergencia del owner** (CZ-10b, P-2). |
 | R-9 | Corte Z offline con esperado distinto al del servidor | OF-02 | Recalcular en el servidor, mostrar ambos valores y respetar el orden de sincronización (OF-03). |
 | R-10 | **Adeudo generado por error** (ventas no sincronizadas, auto-cierre, ajuste posterior) | AD-01 | Solo se genera tras N2; se anula si el owner reabre; los auto-cerrados se excluyen. |
 | R-11 | Carga operativa: cada movimiento y cada corte requieren aprobación | D-3 | Medir el volumen; los umbrales son la palanca futura. |
-| R-12 | **Push es una integración nueva** | Ni `pubspec.yaml` ni `package.json` tienen Firebase Messaging. | Configurar FCM (claves VAPID, service worker web, permisos Android) y tabla de tokens. |
+| R-12 | **Notificaciones solo por consulta (sin push)** | D-6: notificaciones por REST. Ni `pubspec.yaml` ni `package.json` tienen Firebase Messaging, así que no se agrega esa dependencia. | El aviso depende de que el usuario abra la app: contador con polling (60 s) en el Admin web y en la pestaña Caja del POS. Push queda como mejora futura. |
 | R-13 | Migraciones fuera del journal de Drizzle | `AGENTS.md` | Script idempotente coordinado. |
 | R-14 | Dos aprobadores al mismo tiempo | — | `version` (CZ-09). |
 
@@ -271,10 +291,10 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 | **D-3** | ¿Umbrales de monto? | ✅ RESUELTA | Sin umbrales en Fase 1; todo pasa por la cadena de aprobación. |
 | **D-4** | ¿Bloquear el siguiente turno? | ✅ RESUELTA | **Sí**, hasta que el OIS apruebe (N1) el Corte Z anterior (CZ-10). |
 | **D-5** | ¿Corte Z sin conexión? | ✅ RESUELTA | **Sí** (OF-02, OF-03). |
-| **D-6** | ¿Canal de aviso fuera de la bandeja? | ✅ RESUELTA | **Push en celular** (§8). |
+| **D-6** | ¿Canal de aviso fuera de la bandeja? | ✅ RESUELTA (actualizada) | **Notificaciones persistentes consultables por REST**, visibles para el supervisor y en una sección "Notificaciones" del Admin web. **Sin push** en Fase 1 (§8). |
 | **D-7** | ¿PIN del supervisor en la terminal? | Pospuesta | Fase futura (§5). |
 | **D-8** | ¿Faltante como adeudo del cajero? | ✅ RESUELTA | **Sí**, adeudo formal (§4.3). |
-| **D-9** | ¿Supervisor ve ventas en vivo? | ✅ RESUELTA | **No.** Ve lo que hicieron el cajero y el OIS en **caja**; la revisión es solo de caja. |
+| **D-9** | ¿Supervisor ve ventas? | ✅ RESUELTA (actualizada por P-3) | **Sí**, ve las ventas de sus sucursales (reportes en Fase 1, dashboard en Fase 2). También ve lo que hicieron el cajero y el OIS en caja. Lo que revisa y aprueba es **solo caja**. |
 | **D-10** | ¿Admins aprueban desde el Admin web? | ✅ RESUELTA | Sí; la bandeja del Admin web está en Fase 1 (admin = owner, S-2). |
 | **D-11** | ¿Auto-cierre >24 h en Fase 1? | ✅ RESUELTA | No por ahora (R-7). |
 
@@ -289,10 +309,12 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 | **S-5** | ¿Quién recuenta tras un rechazo de N2? | ✅ RESUELTA | El cajero/OIS registra un nuevo conteo que aprueba el supervisor, **o** el supervisor hace el ajuste. |
 | **S-6** | ¿Supervisor/owner sustituyen al OIS en N1? | ✅ RESUELTA | **No.** |
 
-### 15.3 Detalles menores por confirmar
+### 15.3 Detalles (3.ª ronda)
 
-| # | Pregunta | Propuesta mientras no se confirme |
-|---|---|---|
-| **P-1** | ¿Cómo se liquida un adeudo (descuento de nómina, pago en caja, condonación) y quién lo marca? | Fase 1 solo registra el adeudo como `pendiente`; el owner puede marcarlo `liquidado` o `condonado` con motivo. |
-| **P-2** | Si el OIS no está, ¿puede el owner desbloquear la apertura de turno en una emergencia? (S-6 dice que no sustituye al OIS en N1, pero desbloquear no es aprobar.) | Sin desbloqueo en Fase 1; la sucursal espera al OIS. |
-| **P-3** | ¿Las métricas de ventas del dashboard de la Fase 2 se muestran al supervisor? | Excluidas hasta confirmar (D-9). |
+| # | Pregunta | Estado | Resolución |
+|---|---|---|---|
+| **P-1** | ¿Cómo se liquida un adeudo? | ✅ RESUELTA | **Solo se audita.** El adeudo se registra y queda en la bitácora; el sistema no gestiona su cobro (AD-05). |
+| **P-2** | ¿El owner puede desbloquear la apertura en emergencia? | ✅ RESUELTA | **Sí**, con motivo obligatorio y sin aprobar el corte (CZ-10b). |
+| **P-3** | ¿El supervisor ve ventas? | ✅ RESUELTA | **Sí**, las de sus sucursales asignadas (D-9 actualizada). |
+
+No quedan decisiones abiertas para Fase 1.

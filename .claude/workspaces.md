@@ -11,7 +11,7 @@
 - **Scope**: Propuesta (solo documentación) del rol `branch_supervisor`: Fase 1 = aprobación de Cortes Z e ingresos/egresos de caja, umbrales, bitácora, permisos, offline. Archivos: `specs/019-supervisor-sucursal/{spec,plan,data-model}.md`. Sin código, sin migraciones, sin deploy.
 - **Branch**: `019-supervisor-sucursal` (worktree `.worktrees/supervisor-sucursal`)
 - **Migration Status**: Ninguna ejecutada; `0022_supervisor_cash_approvals` solo propuesta.
-- **Status**: ✅ Propuesta actualizada 2026-11-22 (2ª ronda): D-1..D-11 y S-1..S-6 resueltos — Corte Z en 2 niveles (OIS → supervisor/owner), movimientos en 1 nivel (OIS) con cancelar/ajustar del supervisor, bloqueo de apertura hasta aprobación del OIS, Corte Z offline, adeudo del cajero, push. Pendiente: P-1..P-3 (spec.md §15.3).
+- **Status**: ✅ Propuesta actualizada 2026-11-22 (3.ª ronda): notificaciones persistentes por REST + sección en Admin web (sin push), adeudo solo auditado, desbloqueo de emergencia de apertura por owner, supervisor ve ventas de sus sucursales. Sin decisiones abiertas para Fase 1.
 ### Session: feature-delivery-workflow
 - **Scope**: Add the reusable feature-delivery skill, safe feature lifecycle Make targets, and team-status portability fix. Shared tooling only; no app deployment.
 - **Branch**: `chore/feature-delivery-workflow`
