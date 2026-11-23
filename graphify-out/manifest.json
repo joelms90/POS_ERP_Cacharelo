@@ -286,9 +286,9 @@
     "semantic_hash": "67126b9280dd6db73c40a98c422f7857"
   },
   "apps/business_control_tauri/src/App.tsx": {
-    "mtime": 1795420358.8864486,
-    "seen": 1795420511.9887428,
-    "ast_hash": "edf2879c7dacf6348a7366414995456d",
+    "mtime": 1795421650.7127976,
+    "seen": 1795421682.865519,
+    "ast_hash": "633d94ef74d82cd46e5c38d99742e0fd",
     "semantic_hash": ""
   },
   "apps/business_control_tauri/src/components/atoms/Badge.tsx": {
@@ -358,9 +358,9 @@
     "semantic_hash": "cdfaddfa0b128aa683d1887eec811acf"
   },
   "apps/business_control_tauri/src/components/templates/AdminLayout.tsx": {
-    "mtime": 1795420376.18705,
-    "seen": 1795420511.988759,
-    "ast_hash": "77d694d8d6a6c09f2ff809e956f7c204",
+    "mtime": 1795421650.71311,
+    "seen": 1795421682.865534,
+    "ast_hash": "19eed89fbe258f228320a166e920cd59",
     "semantic_hash": ""
   },
   "apps/business_control_tauri/src/components/templates/AppErrorBoundary.tsx": {
@@ -1530,10 +1530,10 @@
     "semantic_hash": "0643b8609698e96b3abd63c210361a87"
   },
   "apps/pos_flutter/linux/runner/my_application.cc": {
-    "mtime": 1780770184.295541,
-    "seen": 1795402244.0452878,
-    "ast_hash": "7ada9d3fec91f49c8c40effeb66264bd",
-    "semantic_hash": "7ada9d3fec91f49c8c40effeb66264bd"
+    "mtime": 1795421731.3673158,
+    "seen": 1795421749.3019829,
+    "ast_hash": "2f2b1e5c5484bf2f92929da2d7fe5f40",
+    "semantic_hash": ""
   },
   "apps/pos_flutter/linux/runner/my_application.h": {
     "mtime": 1780767985.6695302,
@@ -1572,9 +1572,9 @@
     "semantic_hash": "97d3a20fd20a063c192e886d1822b4a8"
   },
   "apps/pos_flutter/pubspec.yaml": {
-    "mtime": 1795421557.266578,
-    "seen": 1795421560.056949,
-    "ast_hash": "d143d91060550f9948c4b51f9aec819b",
+    "mtime": 1795421804.3832605,
+    "seen": 1795421806.987694,
+    "ast_hash": "e0204582610e72aa3ce5bdf148dbadc6",
     "semantic_hash": ""
   },
   "apps/pos_flutter/scripts/bump-version.js": {
@@ -1668,10 +1668,10 @@
     "semantic_hash": "5eec7c9558646a2e70c3ecd1c8a9178a"
   },
   "apps/pos_flutter/web/manifest.json": {
-    "mtime": 1795419205.7163248,
-    "seen": 1795419369.978837,
-    "ast_hash": "5bb85223c0922289873ab56dabe518ab",
-    "semantic_hash": "5bb85223c0922289873ab56dabe518ab"
+    "mtime": 1795421731.366259,
+    "seen": 1795421749.302013,
+    "ast_hash": "b99a133d76063ff20242c635fa3926fb",
+    "semantic_hash": ""
   },
   "apps/pos_flutter/windows/flutter/generated_plugin_registrant.cc": {
     "mtime": 1790991889.6533806,
@@ -1698,10 +1698,10 @@
     "semantic_hash": "79bea736711adda00c49419a39a4a0b4"
   },
   "apps/pos_flutter/windows/runner/main.cpp": {
-    "mtime": 1780770184.243381,
-    "seen": 1795402244.046101,
-    "ast_hash": "e336dc9de03aa2b280020ad7c7a52bed",
-    "semantic_hash": "e336dc9de03aa2b280020ad7c7a52bed"
+    "mtime": 1795421731.3667228,
+    "seen": 1795421749.3020191,
+    "ast_hash": "24cba38901ab93cffc21b4de4f2098ac",
+    "semantic_hash": ""
   },
   "apps/pos_flutter/windows/runner/resource.h": {
     "mtime": 1780767985.673648,
@@ -3903,9 +3903,9 @@
     "semantic_hash": ""
   },
   "apps/pos_flutter/web/index.html": {
-    "mtime": 1780770184.2672212,
-    "seen": 1795402300.955931,
-    "ast_hash": "de391242837b4a5db7869fb004727096",
+    "mtime": 1795421731.3658736,
+    "seen": 1795421749.302482,
+    "ast_hash": "85a8f2adcc9bdd8b68aa93d1e5c21554",
     "semantic_hash": ""
   },
   "apps/pos_flutter/windows/CMakeLists.txt": {
@@ -6633,9 +6633,9 @@
     "semantic_hash": ""
   },
   "apps/business_control_tauri/e2e/supervision-approvals.spec.ts": {
-    "mtime": 1795421016.5901008,
-    "seen": 1795421196.8237891,
-    "ast_hash": "eb8e2a6aeaad56545fb2a60f15590862",
+    "mtime": 1795421655.4732237,
+    "seen": 1795421682.865504,
+    "ast_hash": "542b4420f79975207eaba697573f8193",
     "semantic_hash": ""
   },
   "apps/business_control_tauri/src/pages/supervision/ApprovalsPage.tsx": {
@@ -6837,9 +6837,9 @@
     "semantic_hash": ""
   },
   "specs/019-supervisor-sucursal/plan.md": {
-    "mtime": 1795421168.0276349,
-    "seen": 1795421196.8248808,
-    "ast_hash": "1639e85178dbbed916c52d588d00f71c",
+    "mtime": 1795421678.0150318,
+    "seen": 1795421682.866611,
+    "ast_hash": "321e64e77f41b4529e67667257f49e57",
     "semantic_hash": ""
   },
   "specs/019-supervisor-sucursal/spec.md": {
