@@ -7,6 +7,13 @@
 ---
 
 ## Currently Active Sessions
+### Session: owner-business-copilot
+- **Scope**: Owner-only chat in the Admin Dashboard with a secure backend gateway, restricted MCP tool policy, confirmations, conversation/tool-call audit trail, and local test commands. No production deployment or migration without explicit approval.
+- **Branch**: `feat/owner-business-copilot`
+- **Apps**: `apps/sync_api/`, `apps/business_control_tauri/`, `apps/mcp_server/`
+- **Migration Status**: None yet; any required audit-table migration will be declared separately before execution.
+- **Status**: 🔄 In progress
+
 ### Session: graphify-knowledge-graph
 - **Scope**: Add the Graphify code knowledge graph (local CLI, project-scoped skills for Claude/Codex/OpenCode/generic agents), `graphify-out/` artifacts, `.graphifyrc`, Make targets, git hooks, and AGENTS.md/CLAUDE.md query-first rules. Shared tooling only; no app deployment, no migrations.
 - **Branch**: `main`
