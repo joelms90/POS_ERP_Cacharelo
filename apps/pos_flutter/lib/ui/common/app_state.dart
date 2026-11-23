@@ -5611,6 +5611,8 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Almacén y Compras "Órdenes de compra": only authorized OCs (por comprar,
+  /// comprada · en camino, recibida en parte). Drafts are never returned.
   Future<List<Map<String, dynamic>>> fetchWarehousePurchaseOrders() async {
     if (!isTerminalConfigured || terminalBusinessId == null) return const [];
     try {
@@ -5618,7 +5620,7 @@ class AppState extends ChangeNotifier {
       final response = await http
           .get(
             Uri.parse(
-                '$baseUrl/purchase-orders?businessId=${Uri.encodeQueryComponent(terminalBusinessId!)}'),
+                '$baseUrl/purchase-orders/purchasing?businessId=${Uri.encodeQueryComponent(terminalBusinessId!)}'),
             headers: await _operatorHeaders(),
           )
           .timeout(const Duration(seconds: 10));
@@ -5627,14 +5629,44 @@ class AppState extends ChangeNotifier {
       if (body is! List) return const [];
       return body
           .map((item) => Map<String, dynamic>.from(item as Map))
-          .where((item) =>
-              item['status'] == 'sent' || item['status'] == 'partially_received')
           .toList();
     } catch (error) {
       debugPrint('Unable to load warehouse purchase orders: $error');
       return const [];
     }
   }
+
+  /// Runs one OC action; null on success or the server's message.
+  Future<String?> _purchaseOrderAction(
+      String poId, String action, Map<String, dynamic> body) async {
+    try {
+      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/purchase-orders/$poId/$action'),
+            headers: await _operatorHeaders(),
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode >= 200 && response.statusCode < 300) return null;
+      return _apiErrorMessage(response, 'No se pudo actualizar la orden de compra.');
+    } catch (error) {
+      debugPrint('Unable to run purchase order action $action: $error');
+      return 'Sin conexión con el servidor. Intenta de nuevo.';
+    }
+  }
+
+  /// Almacén y Compras: bought, on the way to the warehouse.
+  Future<String?> markPurchaseOrderPurchased({
+    required String poId,
+    String? documentNumber,
+    String? notes,
+  }) =>
+      _purchaseOrderAction(poId, 'purchase', {
+        if (documentNumber != null && documentNumber.trim().isNotEmpty)
+          'documentNumber': documentNumber.trim(),
+        if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      });
 
   Future<Map<String, dynamic>?> fetchPurchaseOrderById(String poId) async {
     try {
@@ -5657,58 +5689,26 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<bool> receivePurchaseOrder({
+  /// Entrada: a single count of what arrived and the price paid. Stock updates
+  /// when the server confirms. Differences in quantity or price need [notes].
+  Future<String?> receivePurchaseOrder({
     required String poId,
-    String? warehouseId,
-    String? invoiceNumber,
     required List<Map<String, dynamic>> items,
-    String? receivingNotes,
-  }) async {
-    try {
-      final baseUrl = terminalApiUrl ?? configuredDefaultApiUrl;
-      final combinedNotes = [
-        if (invoiceNumber != null && invoiceNumber.trim().isNotEmpty)
-          'Factura/Remisión: ${invoiceNumber.trim()}',
-        if (receivingNotes != null && receivingNotes.trim().isNotEmpty)
-          receivingNotes.trim(),
-      ].join(' · ');
-
-      final normalizedItems = items.map((it) {
-        final cost = (it['unitCostActual'] ?? it['actualUnitCost'] as num?)?.toDouble() ??
-            double.tryParse((it['unitCostActual'] ?? it['actualUnitCost'])?.toString() ?? '0') ??
-            0.0;
-        final qty = (it['quantityReceived'] as num?)?.toDouble() ??
-            double.tryParse(it['quantityReceived']?.toString() ?? '0') ??
-            0.0;
-        return {
-          'productId': it['productId']?.toString() ?? '',
-          'quantityReceived': qty,
-          'unitCostActual': cost,
-          'actualUnitCost': cost,
-          if (it['rejectionReason'] != null) 'rejectionReason': it['rejectionReason'],
-        };
-      }).toList();
-
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/purchase-orders/$poId/receive'),
-            headers: await _operatorHeaders(),
-            body: jsonEncode({
-              if (warehouseId != null) 'warehouseId': warehouseId,
-              if (invoiceNumber != null && invoiceNumber.trim().isNotEmpty)
-                'invoiceNumber': invoiceNumber.trim(),
-              'items': normalizedItems,
-              'notes': combinedNotes.isNotEmpty ? combinedNotes : 'Recepción de orden de compra',
-              'receivingNotes': combinedNotes.isNotEmpty ? combinedNotes : 'Recepción de orden de compra',
-            }),
-          )
-          .timeout(const Duration(seconds: 15));
-      return response.statusCode >= 200 && response.statusCode < 300;
-    } catch (error) {
-      debugPrint('Unable to receive purchase order: $error');
-      return false;
-    }
-  }
+    String? documentNumber,
+    String? notes,
+  }) =>
+      _purchaseOrderAction(poId, 'receive', {
+        'items': items
+            .map((it) => {
+                  'productId': it['productId']?.toString() ?? '',
+                  'quantityReceived': (it['quantityReceived'] as num).toDouble(),
+                  'unitCostActual': (it['unitCostActual'] as num).toDouble(),
+                })
+            .toList(),
+        if (documentNumber != null && documentNumber.trim().isNotEmpty)
+          'documentNumber': documentNumber.trim(),
+        if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      });
 
   /// Almacén y Bodega "Salidas": only authorized requisitions (approved, on hold,
   /// on the way, delivered awaiting the branch). Unapproved ones are never returned.

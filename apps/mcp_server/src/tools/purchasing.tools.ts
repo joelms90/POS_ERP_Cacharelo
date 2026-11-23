@@ -9,7 +9,7 @@ export function registerPurchasingTools(server: McpServer, client: PosApiClient)
     'get_requisitions',
     'Consulta requisiciones de insumos solicitadas por sucursales a los almacenes centrales.',
     {
-      status: z.enum(['pending', 'pending_approval', 'approved', 'rejected', 'completed']).optional().describe('Filtrar por estado'),
+      status: z.enum(['pending_approval', 'approved', 'standby', 'in_transit', 'delivered', 'completed', 'rejected']).optional().describe('Filtrar por estado'),
       businessId: z.string().optional().describe('ID del negocio (opcional)'),
     },
     async ({ status, businessId }) => {
@@ -31,7 +31,7 @@ export function registerPurchasingTools(server: McpServer, client: PosApiClient)
     'get_purchase_orders',
     'Consulta órdenes de compra emitidas a proveedores para reabastecimiento de almacén.',
     {
-      status: z.enum(['draft', 'sent', 'received', 'partially_received', 'cancelled']).optional().describe('Filtrar por estado'),
+      status: z.enum(['draft', 'authorized', 'purchased', 'partially_received', 'received', 'closed_short', 'cancelled']).optional().describe('Filtrar por estado'),
       businessId: z.string().optional().describe('ID del negocio (opcional)'),
     },
     async ({ status, businessId }) => {

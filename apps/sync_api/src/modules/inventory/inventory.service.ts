@@ -1200,6 +1200,71 @@ export class InventoryService {
     return { success: true };
   }
 
+  /**
+   * One received OC line: recalculate the product's weighted average cost across the
+   * business and add the stock at the OC destination through the ledger. Runs in `tx`.
+   */
+  async applyPurchaseReceiptLine(
+    tx: any,
+    po: { id: string; businessId: string; warehouseId: string | null; branchId: string | null; poNumber: string },
+    item: { productId: string; quantityReceived: number; unitCostActual: number },
+    notes: string,
+    createdById?: string | null,
+  ) {
+    if (!po.warehouseId && !po.branchId) {
+      throw new BadRequestException('La orden de compra no especifica una bodega o sucursal de destino');
+    }
+    const [product] = await tx
+      .select()
+      .from(schema.products)
+      .where(eq(schema.products.id, item.productId))
+      .limit(1);
+    if (!product) {
+      throw new NotFoundException(`Producto con ID ${item.productId} no encontrado`);
+    }
+
+    const currentCost = parseFloat(product.cost || '0');
+    // Sum current stock across all locations of this business
+    const allStocks = await tx
+      .select({ quantity: schema.stockLevels.quantity })
+      .from(schema.stockLevels)
+      .leftJoin(schema.warehouses, eq(schema.stockLevels.warehouseId, schema.warehouses.id))
+      .leftJoin(schema.branches, eq(schema.stockLevels.branchId, schema.branches.id))
+      .where(
+        and(
+          eq(schema.stockLevels.productId, item.productId),
+          sql`(${schema.warehouses.businessId} = ${po.businessId} OR ${schema.branches.businessId} = ${po.businessId})`,
+        ),
+      );
+    const currentStock = allStocks.reduce((acc: number, curr: any) => acc + parseFloat(curr.quantity || '0'), 0);
+    const totalQty = currentStock + item.quantityReceived;
+    let newCost =
+      currentStock > 0 && totalQty > 0
+        ? (currentStock * currentCost + item.quantityReceived * item.unitCostActual) / totalQty
+        : item.unitCostActual;
+    newCost = Math.round(newCost * 100) / 100;
+
+    await tx
+      .update(schema.products)
+      .set({ cost: newCost.toString(), updatedAt: new Date() })
+      .where(eq(schema.products.id, item.productId));
+
+    await this.ledgerService.applyMovement(tx, {
+      businessId: po.businessId,
+      productId: item.productId,
+      quantityDelta: item.quantityReceived,
+      eventType: 'receipt',
+      warehouseId: po.warehouseId || null,
+      branchId: po.branchId || null,
+      unitCost: item.unitCostActual.toString(),
+      referenceType: 'purchase_order',
+      referenceId: po.id,
+      documentNumber: po.poNumber,
+      notes,
+      createdById: createdById ?? null,
+    });
+  }
+
   async processPurchaseOrderReception(
     poId: string,
     items: Array<{
@@ -1245,66 +1310,8 @@ export class InventoryService {
             ),
           );
 
-        // 2. Recalculate average cost
-        const [product] = await tx
-          .select()
-          .from(schema.products)
-          .where(eq(schema.products.id, item.productId))
-          .limit(1);
-
-        if (!product) {
-          throw new NotFoundException(`Producto con ID ${item.productId} no encontrado`);
-        }
-
-        const currentCost = parseFloat(product.cost || '0');
-
-        // Sum current stock across all locations of this business
-        const allStocks = await tx
-          .select({ quantity: schema.stockLevels.quantity })
-          .from(schema.stockLevels)
-          .leftJoin(schema.warehouses, eq(schema.stockLevels.warehouseId, schema.warehouses.id))
-          .leftJoin(schema.branches, eq(schema.stockLevels.branchId, schema.branches.id))
-          .where(
-            and(
-              eq(schema.stockLevels.productId, item.productId),
-              sql`(${schema.warehouses.businessId} = ${businessId} OR ${schema.branches.businessId} = ${businessId})`,
-            ),
-          );
-
-        const currentStock = allStocks.reduce((acc, curr) => acc + parseFloat(curr.quantity || '0'), 0);
-        const totalQty = currentStock + item.quantityReceived;
-
-        let newCost = item.unitCostActual;
-        if (currentStock > 0 && totalQty > 0) {
-          newCost = (currentStock * currentCost + item.quantityReceived * item.unitCostActual) / totalQty;
-        } else {
-          newCost = item.unitCostActual;
-        }
-
-        newCost = Math.round(newCost * 100) / 100;
-
-        await tx
-          .update(schema.products)
-          .set({
-            cost: newCost.toString(),
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.products.id, item.productId));
-
-        // 3. Update stock levels at destination (via ledger)
-        await this.ledgerService.applyMovement(tx, {
-          businessId,
-          productId: item.productId,
-          quantityDelta: item.quantityReceived,
-          eventType: 'receipt',
-          warehouseId: destinationWarehouseId || null,
-          branchId: destinationBranchId || null,
-          unitCost: item.unitCostActual.toString(),
-          referenceType: 'purchase_order',
-          referenceId: poId,
-          documentNumber: po.poNumber,
-          notes: notes || `Recepción de Orden de Compra ${po.poNumber}`,
-        });
+        // 2-3. Average cost + stock at destination
+        await this.applyPurchaseReceiptLine(tx, po, item, notes || `Recepción de Orden de Compra ${po.poNumber}`);
       }
 
       // 5. Update PO status

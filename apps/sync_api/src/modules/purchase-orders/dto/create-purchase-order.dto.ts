@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsUUID, IsOptional, IsArray, ValidateNested, IsNumber, Min } from 'class-validator';
+import { ArrayMinSize, IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PurchaseOrderItemDto {
@@ -7,7 +7,7 @@ export class PurchaseOrderItemDto {
   productId: string;
 
   @IsNumber()
-  @Min(0.01)
+  @Min(0.001)
   quantity: number;
 
   @IsNumber()
@@ -36,11 +36,13 @@ export class CreatePurchaseOrderDto {
   @IsOptional()
   notes?: string;
 
+  /** Ignored: the creator comes from the signed login. Kept for older clients. */
   @IsUUID()
-  @IsNotEmpty()
-  createdBy: string;
+  @IsOptional()
+  createdBy?: string;
 
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => PurchaseOrderItemDto)
   items: PurchaseOrderItemDto[];

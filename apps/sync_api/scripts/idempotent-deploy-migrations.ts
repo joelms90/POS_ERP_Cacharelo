@@ -4,6 +4,7 @@ import {
   REQUISITION_DISPATCH_FLOW_SQL,
   REQUISITION_UNLINKED_LEGACY_REPORT_SQL,
 } from '../src/modules/requisitions/requisitions.sql';
+import { PURCHASE_ORDER_FLOW_SQL } from '../src/modules/purchase-orders/purchase-orders.sql';
 import { Client } from 'pg';
 
 async function main() {
@@ -524,6 +525,11 @@ async function main() {
         unlinked.rows.map((row: any) => row.id).join(', '),
       );
     }
+
+    // 23. Purchase order flow: draft → authorized → purchased → entrada; 'sent' becomes
+    // 'authorized'; append-only purchase_order_receipt_ledger; estimated totals backfilled.
+    await client.query(PURCHASE_ORDER_FLOW_SQL);
+    console.log('Purchase order flow schema ensured.');
 
     console.log('✅ Idempotent migrations executed successfully!');
   } catch (error) {

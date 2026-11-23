@@ -190,12 +190,12 @@ function App() {
         {activeTab === 'inquiries' && <InquiriesPage />}
         {activeTab === 'logs' && <LogsPage />}
         {activeTab === 'warehouses' && <WarehousesPage businessId={activeBusinessId} />}
-        {activeTab === 'receipts' && <ReceiptsPage businessId={activeBusinessId} />}
+        {activeTab === 'receipts' && <ReceiptsPage businessId={activeBusinessId} userRole={user?.role} userRoles={user?.roles} />}
         {activeTab === 'branches' && <BranchesPage businessId={activeBusinessId} />}
         {activeTab === 'categories' && <CategoriesPage businessId={activeBusinessId} />}
         {activeTab === 'assembly' && <AssemblyPage businessId={activeBusinessId} />}
         {activeTab === 'transfers' && <TransfersPage businessId={activeBusinessId} />}
-        {activeTab === 'purchase-orders' && user && <PurchaseOrdersPage businessId={activeBusinessId} userId={user.id} />}
+        {activeTab === 'purchase-orders' && user && <PurchaseOrdersPage businessId={activeBusinessId} userId={user.id} userRole={user.role} userRoles={user.roles} />}
         {activeTab === 'requisitions' && user && <RequisitionsPage businessId={activeBusinessId} userId={user.id} userRole={user.role} userRoles={user.roles} />}
         {activeTab === 'help' && <HelpPage />}
         {activeTab === 'reports' && !isSupervisorOnly && <ReportsPage businessId={activeBusinessId} />}

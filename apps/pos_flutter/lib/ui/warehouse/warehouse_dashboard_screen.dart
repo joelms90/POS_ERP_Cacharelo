@@ -103,7 +103,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                 size: 64, color: EmpireColors.textSecondary),
             const SizedBox(height: 16),
             const Text(
-              'No hay Órdenes de Compra pendientes de recibir',
+              'No hay órdenes de compra autorizadas',
               style: TextStyle(
                 color: EmpireColors.textPrimary,
                 fontSize: 18,
@@ -112,7 +112,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Las órdenes emitidas por el área de Compras aparecerán aquí para su recepción.',
+              'Aquí aparecen las órdenes que el propietario o el administrador de inventario autorizan para comprar.',
               style: TextStyle(color: EmpireColors.textSecondary, fontSize: 13),
               textAlign: TextAlign.center,
             ),
@@ -131,132 +131,224 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
       );
     }
 
+    List<Map<String, dynamic>> withStatus(String status) =>
+        _purchaseOrders.where((po) => po['status'] == status).toList();
+    final toBuy = withStatus('authorized');
+    final onTheWay = withStatus('purchased');
+    final partial = withStatus('partially_received');
+
     return RefreshIndicator(
       onRefresh: _refreshCurrentTab,
       color: EmpireColors.champagneGold,
       backgroundColor: EmpireColors.onyxSurface,
-      child: ListView.separated(
+      child: ListView(
         padding: const EdgeInsets.all(16),
-        itemCount: _purchaseOrders.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final po = _purchaseOrders[index];
-          final poNumber = po['poNumber']?.toString() ?? 'OC-S/N';
-          final provider = po['providerName']?.toString() ??
-              po['provider']?['name']?.toString() ??
-              'Proveedor';
-          final status = po['status']?.toString() ?? 'sent';
-          final rawItems = po['items'] as List? ?? const [];
-          final itemsCount = (po['itemCount'] as num?)?.toInt() ??
-              int.tryParse(po['itemCount']?.toString() ?? '') ??
-              rawItems.length;
-          final orderDate = po['orderDate']?.toString() ?? '';
+        children: [
+          _sectionHeader('Por comprar', toBuy.length, EmpireColors.infoCyan),
+          ...toBuy.map(_buildPurchaseOrderCard),
+          if (toBuy.isEmpty) _emptySectionHint('Nada por comprar.'),
+          const SizedBox(height: 20),
+          _sectionHeader('Comprada · en camino a bodega', onTheWay.length,
+              EmpireColors.champagneGold),
+          ...onTheWay.map(_buildPurchaseOrderCard),
+          if (onTheWay.isEmpty) _emptySectionHint('Ninguna compra en camino.'),
+          const SizedBox(height: 20),
+          _sectionHeader('Recibidas en parte', partial.length,
+              EmpireColors.warningOrange),
+          ...partial.map(_buildPurchaseOrderCard),
+          if (partial.isEmpty) _emptySectionHint('Sin entradas parciales.'),
+        ],
+      ),
+    );
+  }
 
-          return Card(
-            color: EmpireColors.charcoalSurface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Colors.white10),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
+  Widget _buildPurchaseOrderCard(Map<String, dynamic> po) {
+    final poNumber = po['poNumber']?.toString() ?? 'OC-S/N';
+    final provider = po['providerName']?.toString() ??
+        po['provider']?['name']?.toString() ??
+        'Proveedor';
+    final status = po['status']?.toString() ?? 'authorized';
+    final rawItems = po['items'] as List? ?? const [];
+    final orderDate = po['orderDate']?.toString() ?? '';
+    final warehouse = po['warehouseName']?.toString();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        color: EmpireColors.charcoalSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Colors.white10),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: EmpireColors.champagneGold.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(
-                      Icons.local_shipping_outlined,
+                    child: Icon(
+                      status == 'authorized'
+                          ? Icons.shopping_cart_outlined
+                          : Icons.local_shipping_outlined,
                       color: EmpireColors.champagneGold,
-                      size: 28,
+                      size: 24,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Text(
-                              poNumber,
-                              style: const TextStyle(
-                                color: EmpireColors.champagneGold,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: status == 'partially_received'
-                                    ? EmpireColors.warningOrange
-                                        .withOpacity(0.2)
-                                    : EmpireColors.successGreen
-                                        .withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                status == 'partially_received'
-                                    ? 'Recepción Parcial'
-                                    : 'Enviada (Lista para recibir)',
-                                style: TextStyle(
-                                  color: status == 'partially_received'
-                                      ? EmpireColors.warningOrange
-                                      : EmpireColors.successGreen,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
+                        Text(poNumber,
+                            style: const TextStyle(
+                              color: EmpireColors.champagneGold,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            )),
+                        Text('Proveedor: $provider',
+                            style: const TextStyle(
+                              color: EmpireColors.textPrimary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            )),
                         Text(
-                          'Proveedor: $provider',
+                          '${rawItems.length} productos • ${orderDate.split('T').first}'
+                          '${warehouse != null ? ' • Entra a: $warehouse' : ''}',
                           style: const TextStyle(
-                            color: EmpireColors.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$itemsCount productos solicitados • Fecha: ${orderDate.split('T').first}',
-                          style: const TextStyle(
-                            color: EmpireColors.textSecondary,
-                            fontSize: 12,
-                          ),
+                              color: EmpireColors.textSecondary, fontSize: 12),
                         ),
                       ],
                     ),
                   ),
-                  ElevatedButton.icon(
-                    onPressed: () => _openPoReceivingDialog(po),
-                    icon: const Icon(Icons.fact_check_outlined, size: 18),
-                    label: const Text('Recibir Mercancía'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: EmpireColors.champagneGold,
-                      foregroundColor: EmpireColors.obsidian,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
                 ],
               ),
-            ),
-          );
-        },
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: rawItems.map((item) {
+                  final name = item['productName']?.toString() ?? 'Producto';
+                  final unit = item['unit']?.toString() ?? '';
+                  final pending = (_asDouble(item['quantityOrdered']) -
+                          _asDouble(item['quantityReceived']))
+                      .clamp(0.0, double.infinity);
+                  return Chip(
+                    backgroundColor: Colors.black45,
+                    label: Text('$name: ${_fmtQty(pending)} $unit'.trim(),
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 12)),
+                    padding: const EdgeInsets.all(4),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: status == 'authorized'
+                    ? ElevatedButton.icon(
+                        onPressed: () => _markPurchased(po),
+                        icon: const Icon(Icons.shopping_cart_checkout, size: 18),
+                        label: const Text('Marcar Comprada'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: EmpireColors.infoCyan,
+                          foregroundColor: EmpireColors.obsidian,
+                        ),
+                      )
+                    : ElevatedButton.icon(
+                        onPressed: () => _openPoReceivingDialog(po),
+                        icon: const Icon(Icons.fact_check_outlined, size: 18),
+                        label: const Text('Registrar Entrada'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: EmpireColors.champagneGold,
+                          foregroundColor: EmpireColors.obsidian,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
+  }
+
+  Future<void> _markPurchased(Map<String, dynamic> po) async {
+    final ticketController = TextEditingController();
+    final notesController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: EmpireColors.charcoalSurface,
+        title: Text('Comprada · ${po['poNumber'] ?? 'OC'}',
+            style: const TextStyle(color: EmpireColors.champagneGold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+                'La orden queda "en camino a bodega". El inventario se actualiza cuando registres la entrada.',
+                style: TextStyle(color: EmpireColors.textSecondary, fontSize: 12)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ticketController,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: const InputDecoration(
+                labelText: 'Ticket / factura (opcional)',
+                labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
+                filled: true,
+                fillColor: Colors.black26,
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: notesController,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: const InputDecoration(
+                labelText: 'Nota (opcional)',
+                labelStyle: TextStyle(color: Colors.white54, fontSize: 12),
+                hintText: 'Ej. Lo trae el proveedor el jueves',
+                hintStyle: TextStyle(color: Colors.white30, fontSize: 12),
+                filled: true,
+                fillColor: Colors.black26,
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar',
+                style: TextStyle(color: EmpireColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: EmpireColors.infoCyan,
+                foregroundColor: EmpireColors.obsidian),
+            child: const Text('Confirmar compra'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+    final error = await widget.state.markPurchaseOrderPurchased(
+      poId: po['id'].toString(),
+      documentNumber: ticketController.text,
+      notes: notesController.text,
+    );
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    _showResult(error, 'Orden marcada como comprada: va en camino a bodega.');
+    if (error == null) _refreshCurrentTab();
   }
 
   Future<void> _openPoReceivingDialog(Map<String, dynamic> po) async {
@@ -310,6 +402,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
         'unit': item['unit']?.toString() ?? 'pza',
         'ordered': ordered,
         'pending': pending,
+        'estimated': estimatedCost,
         'qtyController': TextEditingController(text: defaultQty),
         'costController':
             TextEditingController(text: estimatedCost.toStringAsFixed(2)),
@@ -338,7 +431,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Recepción de Mercancía · $poNumber',
+                        'Entrada a Bodega · $poNumber',
                         style: const TextStyle(
                           color: EmpireColors.champagneGold,
                           fontWeight: FontWeight.bold,
@@ -442,7 +535,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                                           fontSize: 12))),
                               Padding(
                                   padding: EdgeInsets.all(8),
-                                  child: Text('Pedido',
+                                  child: Text('Pendiente',
                                       style: TextStyle(
                                           color: EmpireColors.textSecondary,
                                           fontWeight: FontWeight.bold,
@@ -456,14 +549,14 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                                           fontSize: 12))),
                               Padding(
                                   padding: EdgeInsets.all(8),
-                                  child: Text('Costo Real (\$)',
+                                  child: Text('Precio pagado (\$)',
                                       style: TextStyle(
                                           color: EmpireColors.textSecondary,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 12))),
                               Padding(
                                   padding: EdgeInsets.all(8),
-                                  child: Text('Merma / Motivo faltante',
+                                  child: Text('Motivo de diferencia',
                                       style: TextStyle(
                                           color: EmpireColors.textSecondary,
                                           fontWeight: FontWeight.bold,
@@ -567,55 +660,61 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                 ),
                 ElevatedButton.icon(
                   onPressed: () async {
-                    final itemsPayload = controllers.map((row) {
-                      final qty = double.tryParse(
-                              (row['qtyController'] as TextEditingController)
-                                  .text) ??
-                          0.0;
-                      final cost = double.tryParse(
-                              (row['costController'] as TextEditingController)
-                                  .text) ??
-                          0.0;
-                      final notes = (row['notesController']
-                              as TextEditingController)
+                    double parse(TextEditingController c) =>
+                        double.tryParse(c.text.trim().replaceAll(',', '.')) ??
+                        -1;
+                    final itemsPayload = <Map<String, dynamic>>[];
+                    final lineNotes = <String>[];
+                    var hasDifference = false;
+                    for (final row in controllers) {
+                      final qty = parse(row['qtyController']);
+                      final cost = parse(row['costController']);
+                      if (qty < 0 || cost < 0) {
+                        _showResult('Revisa las cantidades y precios capturados.', '');
+                        return;
+                      }
+                      if ((qty - (row['pending'] as double)).abs() > 0.0005 ||
+                          (cost - (row['estimated'] as double)).abs() > 0.004) {
+                        hasDifference = true;
+                      }
+                      final note = (row['notesController'] as TextEditingController)
                           .text
                           .trim();
-
-                      return {
+                      if (note.isNotEmpty) lineNotes.add('${row['productName']}: $note');
+                      itemsPayload.add({
                         'productId': row['productId'],
                         'quantityReceived': qty,
                         'unitCostActual': cost,
-                        'actualUnitCost': cost,
-                        if (notes.isNotEmpty) 'rejectionReason': notes,
-                      };
-                    }).toList();
+                      });
+                    }
+                    if (!itemsPayload.any((i) => (i['quantityReceived'] as double) > 0)) {
+                      _showResult('Captura al menos un producto recibido.', '');
+                      return;
+                    }
+                    final notes = [
+                      generalNotesController.text.trim(),
+                      ...lineNotes,
+                    ].where((n) => n.isNotEmpty).join(' · ');
+                    if (hasDifference && notes.isEmpty) {
+                      _showResult(
+                          'Hay diferencias en cantidad o precio: explica el motivo (merma, faltante, cambio de precio…).',
+                          '');
+                      return;
+                    }
 
                     Navigator.of(dialogCtx).pop();
                     setState(() => _isLoading = true);
-
-                    final success = await widget.state.receivePurchaseOrder(
+                    final error = await widget.state.receivePurchaseOrder(
                       poId: poId,
-                      warehouseId: _selectedWarehouseId,
-                      invoiceNumber: invoiceController.text.trim(),
                       items: itemsPayload,
-                      receivingNotes: generalNotesController.text.trim(),
+                      documentNumber: invoiceController.text,
+                      notes: notes,
                     );
-
+                    if (!mounted) return;
                     setState(() => _isLoading = false);
-
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: success
-                              ? EmpireColors.successGreen
-                              : EmpireColors.errorRed,
-                          content: Text(success
-                              ? 'Mercancía ingresada correctamente al inventario de la bodega.'
-                              : 'Error al procesar la recepción de mercancía.'),
-                        ),
-                      );
-                      if (success) _refreshCurrentTab();
-                    }
+                    _showResult(error,
+                        'Entrada registrada: el inventario de la bodega ya se actualizó.');
+                    if (error == null) _refreshCurrentTab();
                   },
                   icon: const Icon(Icons.check_circle_outline),
                   label: const Text('Confirmar Entrada a Bodega'),
@@ -1927,7 +2026,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
             icon: Icon(Icons.move_to_inbox_outlined),
             selectedIcon:
                 Icon(Icons.move_to_inbox, color: EmpireColors.champagneGold),
-            label: 'Entradas (Proveedores)',
+            label: 'Compras y Entradas',
           ),
           NavigationDestination(
             icon: Icon(Icons.outbox_outlined),

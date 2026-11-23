@@ -312,14 +312,48 @@ export interface PurchaseOrderItem {
   productName?: string;
 }
 
+export type PurchaseOrderStatus =
+  | 'draft'
+  | 'authorized'
+  | 'purchased'
+  | 'partially_received'
+  | 'received'
+  | 'cancelled'
+  | 'closed_short';
+
+export interface PurchaseOrderHistory {
+  purchaseOrder: PurchaseOrder;
+  events: Array<{ id: number; action: string; actorName?: string | null; actorRole?: string | null; reason?: string | null; createdAt: string }>;
+  receipts: Array<{
+    id: number;
+    receiptId: string;
+    productName?: string | null;
+    quantityOrdered: string;
+    previouslyReceived: string;
+    quantityReceived: string;
+    pendingAfter: string;
+    quantityDifference: string;
+    unitCostEstimated: string;
+    unitCostActual: string;
+    costDifference: string;
+    note?: string | null;
+    documentNumber?: string | null;
+    actorName?: string | null;
+    createdAt: string;
+  }>;
+}
+
 export interface PurchaseOrder {
   id: string;
   businessId: string;
   providerId: string;
   warehouseId: string;
   poNumber: string;
-  status: 'draft' | 'sent' | 'received' | 'partially_received' | 'cancelled';
+  /** draft → authorized (por comprar) → purchased (en camino) → partially_received → received | cancelled | closed_short */
+  status: PurchaseOrderStatus;
   notes?: string;
+  subtotal?: string;
+  total?: string;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -1698,7 +1732,14 @@ export const api = {
     });
   },
 
-  async updatePurchaseOrder(id: string, data: Partial<PurchaseOrder>): Promise<PurchaseOrder> {
+  /** Drafts only. `items`, when sent, replaces every line. */
+  async updatePurchaseOrder(id: string, data: {
+    providerId?: string;
+    warehouseId?: string;
+    orderNumber?: string;
+    notes?: string;
+    items?: Array<{ productId: string; quantity: number; estimatedUnitCost: number }>;
+  }): Promise<PurchaseOrder> {
     return apiRequest<PurchaseOrder>(`/purchase-orders/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -1711,10 +1752,27 @@ export const api = {
     });
   },
 
-  async markPurchaseOrderAsSent(id: string): Promise<PurchaseOrder> {
-    return apiRequest<PurchaseOrder>(`/purchase-orders/${id}/send`, {
-      method: 'POST',
-    });
+  /** draft → authorized: Almacén y Compras sees it in "Por comprar". */
+  async authorizePurchaseOrder(id: string): Promise<PurchaseOrder> {
+    return apiRequest<PurchaseOrder>(`/purchase-orders/${id}/authorize`, { method: 'POST', body: '{}' });
+  },
+
+  async cancelPurchaseOrder(id: string, reason: string): Promise<PurchaseOrder> {
+    return apiRequest<PurchaseOrder>(`/purchase-orders/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) });
+  },
+
+  /** A partly received OC whose remainder will not arrive. */
+  async closePurchaseOrder(id: string, reason: string): Promise<PurchaseOrder> {
+    return apiRequest<PurchaseOrder>(`/purchase-orders/${id}/close`, { method: 'POST', body: JSON.stringify({ reason }) });
+  },
+
+  /** On behalf of Almacén y Compras (owner / admin inventario need `notes`). */
+  async markPurchaseOrderPurchased(id: string, data: { notes?: string; documentNumber?: string }): Promise<PurchaseOrder> {
+    return apiRequest<PurchaseOrder>(`/purchase-orders/${id}/purchase`, { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  async getPurchaseOrderHistory(id: string): Promise<PurchaseOrderHistory> {
+    return apiRequest<PurchaseOrderHistory>(`/purchase-orders/${id}/history`);
   },
 
   async receivePurchaseOrder(id: string, data: {
@@ -1724,6 +1782,7 @@ export const api = {
       unitCostActual: number;
     }>;
     notes?: string;
+    documentNumber?: string;
   }): Promise<{ success: boolean; status: string; purchaseOrder: PurchaseOrder }> {
     return apiRequest<{ success: boolean; status: string; purchaseOrder: PurchaseOrder }>(`/purchase-orders/${id}/receive`, {
       method: 'POST',

@@ -78,8 +78,9 @@ export class AlertsController {
     return this.alertsService.runAlertEngine(dto.businessId);
   }
 
+  // Only Owner / Admin. Inventario create OCs.
   @Post('auto-purchase-orders')
-  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE)
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE)
   async autoPurchaseOrders(@Body() dto: RefreshDto, @Req() req: any) {
     assertBusinessAccess(req.user, dto.businessId);
     return this.alertsService.runAutoPoEngine(dto.businessId, req.user?.sub);
@@ -98,20 +99,23 @@ export class AlertsController {
     return this.alertsService.generateRequisition(id, req.user);
   }
 
+  // Only Owner / Admin. Inventario create OCs.
   @Post(':id/generate-purchase-order')
-  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE)
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE)
   async generatePurchaseOrder(@Param('id') id: string, @Req() req: any) {
     return this.alertsService.generatePurchaseOrder(id, req.user?.sub);
   }
 
+  // Only Owner / Admin. Inventario create OCs.
   @Post('generate-purchase-orders')
-  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE)
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE)
   async generatePurchaseOrders(@Body() dto: BulkGeneratePoDto, @Req() req: any) {
     return this.alertsService.generatePurchaseOrders(dto.alertIds, req.user?.sub);
   }
 
+  // Only Owner / Admin. Inventario create OCs.
   @Post('generate-purchase-orders-by-products')
-  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE, WAREHOUSE_PURCHASING_OPERATOR_ROLE)
+  @Roles(OWNER_ROLE, INVENTORY_ADMIN_ROLE)
   async generatePurchaseOrdersByProducts(@Body() dto: BulkGeneratePoByProductsDto, @Req() req: any) {
     assertBusinessAccess(req.user, dto.businessId);
     return this.alertsService.generatePurchaseOrdersByProducts(

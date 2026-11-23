@@ -11,6 +11,7 @@ import {
   OPEN_BEFORE_DISPATCH_STATUSES,
   insertRequisition,
 } from '../../requisitions/requisition-flow';
+import { OPEN_PO_STATUSES, recalculatePurchaseOrderTotals } from '../../purchase-orders/purchase-order-flow';
 
 @Injectable()
 export class AlertsService {
@@ -743,6 +744,7 @@ export class AlertsService {
         quantityOrdered: qty.toFixed(3),
         unitCostEstimated: provider.cost,
       });
+      await recalculatePurchaseOrderTotals(tx, po.id);
 
       return { purchaseOrderId: po.id, poNumber: po.poNumber, quantityOrdered: qty };
     });
@@ -914,6 +916,7 @@ export class AlertsService {
             unitCostEstimated: it.cost,
           })),
         );
+        await recalculatePurchaseOrderTotals(tx, po.id);
 
         purchaseOrders.push({ purchaseOrderId: po.id, poNumber, itemCount: group.items.length });
       }
@@ -958,7 +961,7 @@ export class AlertsService {
       .where(
         and(
           eq(schema.purchaseOrders.businessId, businessId),
-          eq(schema.purchaseOrders.status, 'draft'),
+          inArray(schema.purchaseOrders.status, OPEN_PO_STATUSES),
         ),
       );
 
@@ -1019,6 +1022,7 @@ export class AlertsService {
             unitCostEstimated: it.cost,
           })),
         );
+        await recalculatePurchaseOrderTotals(tx, po.id);
 
         created.push(po.id);
       }

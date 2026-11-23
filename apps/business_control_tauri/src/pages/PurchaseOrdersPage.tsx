@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { api, PurchaseOrder, Provider, Warehouse, Product } from '../services/api';
+import { api, PurchaseOrder, Provider, Warehouse, Product, PurchaseOrderHistory } from '../services/api';
 import { Heading } from '../components/atoms/Heading';
 import { Button } from '../components/atoms/Button';
 import { Input } from '../components/atoms/Input';
@@ -10,6 +10,8 @@ import { ToastContainer } from '../components/molecules/ToastNotification';
 interface PurchaseOrdersPageProps {
   businessId: string;
   userId: string;
+  userRole?: string;
+  userRoles?: string[];
 }
 
 interface PurchaseOrderLineItem {
@@ -19,7 +21,10 @@ interface PurchaseOrderLineItem {
   estimatedUnitCost: number;
 }
 
-export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ businessId, userId }) => {
+export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ businessId, userId, userRole, userRoles }) => {
+  // Only Owner / Admin. Inventario create, edit, authorize, cancel and close OCs.
+  const effectiveRoles = (userRoles && userRoles.length > 0 ? userRoles : [userRole || '']).map((r) => r.toLowerCase());
+  const isManager = effectiveRoles.some((r) => r === 'owner' || r === 'inventory_admin');
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -47,6 +52,7 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
 
   const [editingPoId, setEditingPoId] = useState<string | null>(null);
   const [viewingPo, setViewingPo] = useState<PurchaseOrder | null>(null);
+  const [poHistory, setPoHistory] = useState<PurchaseOrderHistory | null>(null);
 
   const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'warning' }>>([]);
 
@@ -225,8 +231,13 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
           providerId,
           warehouseId,
           orderNumber,
-          notes: notes || undefined,
-        } as any);
+          notes: notes || '',
+          items: items.map((it) => ({
+            productId: it.productId,
+            quantity: it.quantity,
+            estimatedUnitCost: it.estimatedUnitCost,
+          })),
+        });
         setPurchaseOrders(purchaseOrders.map((po) => (po.id === editingPoId ? { ...po, ...updated } : po)));
         showToast('Orden de compra actualizada.', 'success');
       } else {
@@ -252,23 +263,46 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
     }
   };
 
-  const handleMarkAsSent = async (id: string) => {
-    if (confirm('¿Marcar esta orden como enviada al proveedor?')) {
-      try {
-        const updated = await api.markPurchaseOrderAsSent(id);
-        setPurchaseOrders(purchaseOrders.map((po) => (po.id === id ? updated : po)));
-        showToast('Orden marcada como enviada.', 'success');
-      } catch (err: any) {
-        showToast(err.message || 'Error al actualizar la orden.', 'error');
-      }
+  const replaceOrder = (updated: PurchaseOrder) =>
+    setPurchaseOrders((prev) => prev.map((po) => (po.id === updated.id ? { ...po, ...updated } : po)));
+
+  const handleAuthorize = async (id: string) => {
+    if (!confirm('¿Autorizar esta orden? Almacén y Compras la verá en "Por comprar" y ya no se podrá editar.')) return;
+    try {
+      replaceOrder(await api.authorizePurchaseOrder(id));
+      showToast('Orden autorizada: ya aparece en Por comprar.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Error al autorizar la orden.', 'error');
+    }
+  };
+
+  /** Cancel (nothing received yet) or close short (partly received). Always with a reason. */
+  const handleCloseOrCancel = async (po: PurchaseOrder) => {
+    const closing = po.status === 'partially_received';
+    const reason = prompt(
+      closing
+        ? 'Motivo para cerrar con faltante (el resto ya no llegará):'
+        : 'Motivo de la cancelación:',
+    );
+    if (reason === null) return;
+    if (!reason.trim()) {
+      showToast('Indica el motivo; queda registrado en la auditoría.', 'warning');
+      return;
+    }
+    try {
+      replaceOrder(closing ? await api.closePurchaseOrder(po.id, reason.trim()) : await api.cancelPurchaseOrder(po.id, reason.trim()));
+      showToast(closing ? 'Orden cerrada con faltante.' : 'Orden cancelada.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'No se pudo actualizar la orden.', 'error');
     }
   };
 
   const handleViewDetails = async (id: string) => {
     try {
       setLoading(true);
-      const po = await api.getPurchaseOrder(id);
-      setViewingPo(po);
+      const history = await api.getPurchaseOrderHistory(id);
+      setViewingPo(history.purchaseOrder);
+      setPoHistory(history);
     } catch (err: any) {
       showToast(err.message || 'Error al cargar detalles de la orden.', 'error');
     } finally {
@@ -316,25 +350,30 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
   };
 
   const getStatusBadge = (status: string) => {
-    const badges = {
-      draft: 'bg-gray-500/20 text-gray-300',
-      sent: 'bg-blue-500/20 text-blue-300',
-      partially_received: 'bg-yellow-500/20 text-yellow-300',
-      received: 'bg-green-500/20 text-green-300',
-      cancelled: 'bg-red-500/20 text-red-300',
+    const meta: Record<string, { label: string; className: string }> = {
+      draft: { label: 'Borrador', className: 'bg-gray-500/20 text-gray-300' },
+      authorized: { label: 'Por comprar', className: 'bg-blue-500/20 text-blue-300' },
+      purchased: { label: 'Comprada · en camino', className: 'bg-cyan-500/20 text-cyan-300' },
+      partially_received: { label: 'Recibida en parte', className: 'bg-yellow-500/20 text-yellow-300' },
+      received: { label: 'Recibida', className: 'bg-green-500/20 text-green-300' },
+      closed_short: { label: 'Cerrada con faltante', className: 'bg-orange-500/20 text-orange-300' },
+      cancelled: { label: 'Cancelada', className: 'bg-red-500/20 text-red-300' },
     };
-    const labels = {
-      draft: 'Borrador',
-      sent: 'Enviada',
-      partially_received: 'Parcial',
-      received: 'Recibida',
-      cancelled: 'Cancelada',
-    };
-    return (
-      <span className={`px-2 py-1 rounded text-xs font-medium ${badges[status as keyof typeof badges] || badges.draft}`}>
-        {labels[status as keyof typeof labels] || status}
-      </span>
-    );
+    const m = meta[status] || { label: status, className: meta.draft.className };
+    return <span className={`px-2 py-1 rounded text-xs font-medium ${m.className}`}>{m.label}</span>;
+  };
+
+  const ACTION_LABELS: Record<string, string> = {
+    created: 'Creada',
+    updated: 'Editada',
+    deleted: 'Borrada',
+    authorized: 'Autorizada (por comprar)',
+    purchased: 'Marcada comprada por Almacén y Compras',
+    purchased_on_behalf: 'Marcada comprada en nombre de Almacén y Compras',
+    received: 'Entrada registrada',
+    received_on_behalf: 'Entrada registrada en nombre de Almacén y Compras',
+    cancelled: 'Cancelada',
+    closed_short: 'Cerrada con faltante',
   };
 
   return (
@@ -348,9 +387,11 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
             <Heading level={2} className="!text-lg sm:!text-2xl !border-none !pb-0 text-champagne-gold">
               Órdenes de Compra
             </Heading>
-            <Button onClick={() => { setIsCreating(true); setOrderNumber(generateOrderNumber()); }} disabled={isCreating}>
-              + Nueva Orden
-            </Button>
+            {isManager && (
+              <Button onClick={() => { setIsCreating(true); setOrderNumber(generateOrderNumber()); }} disabled={isCreating}>
+                + Nueva Orden
+              </Button>
+            )}
           </div>
 
           {error && (
@@ -397,9 +438,11 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                     >
                       <option value="all">Todos los Estados</option>
                       <option value="draft">Borrador</option>
-                      <option value="sent">Enviada</option>
-                      <option value="partially_received">Parcial</option>
+                      <option value="authorized">Por comprar</option>
+                      <option value="purchased">Comprada · en camino</option>
+                      <option value="partially_received">Recibida en parte</option>
                       <option value="received">Recibida</option>
+                      <option value="closed_short">Cerrada con faltante</option>
                       <option value="cancelled">Cancelada</option>
                     </select>
                   </div>
@@ -472,7 +515,16 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
                                   </button>
-                                  {po.status === 'draft' && (
+                                  {isManager && ['authorized', 'purchased', 'partially_received'].includes(po.status) && (
+                                    <button
+                                      onClick={() => handleCloseOrCancel(po)}
+                                      className="text-error-red/80 hover:text-error-red transition-colors text-xs px-2 py-1 rounded hover:bg-error-red/5"
+                                      title={po.status === 'partially_received' ? 'Cerrar con faltante' : 'Cancelar orden'}
+                                    >
+                                      {po.status === 'partially_received' ? 'Cerrar' : 'Cancelar'}
+                                    </button>
+                                  )}
+                                  {isManager && po.status === 'draft' && (
                                     <>
                                       <button
                                         onClick={() => handleStartEdit(po)}
@@ -484,11 +536,11 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                                         </svg>
                                       </button>
                                       <button
-                                        onClick={() => handleMarkAsSent(po.id)}
+                                        onClick={() => handleAuthorize(po.id)}
                                         className="text-blue-400 hover:text-blue-300 transition-colors text-xs px-2 py-1 rounded hover:bg-blue-400/5"
-                                        title="Marcar como enviada"
+                                        title="Autorizar: Almacén y Compras la verá en Por comprar"
                                       >
-                                        Enviar
+                                        Autorizar
                                       </button>
                                       <button
                                         onClick={() => handleDelete(po.id)}
@@ -806,7 +858,7 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                   )}
                 </div>
                 <button
-                  onClick={() => setViewingPo(null)}
+                  onClick={() => { setViewingPo(null); setPoHistory(null); }}
                   className="text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
                 >
                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -848,6 +900,63 @@ export const PurchaseOrdersPage: React.FC<PurchaseOrdersPageProps> = ({ business
                 ) : (
                   <div className="text-center py-8 text-text-secondary/50 text-xs">
                     Esta orden no tiene productos registrados.
+                  </div>
+                )}
+
+                {poHistory && poHistory.receipts.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-champagne-gold mb-2">Entradas</h3>
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="text-[11px] text-text-secondary uppercase border-b border-aged-bronze/30">
+                          <th className="py-2">Fecha</th>
+                          <th className="py-2">Producto</th>
+                          <th className="py-2 text-right">Pendiente</th>
+                          <th className="py-2 text-right">Recibido</th>
+                          <th className="py-2 text-right">Dif.</th>
+                          <th className="py-2 text-right">Precio est. → pagado</th>
+                          <th className="py-2">Nota / folio</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-aged-bronze/20">
+                        {poHistory.receipts.map((r) => {
+                          const pending = Number(r.quantityOrdered) - Number(r.previouslyReceived);
+                          const qtyDiff = Number(r.quantityDifference);
+                          const costDiff = Number(r.costDifference);
+                          return (
+                            <tr key={r.id}>
+                              <td className="py-2 text-text-secondary">{new Date(r.createdAt).toLocaleString('es-MX')}</td>
+                              <td className="py-2 text-text-primary">{r.productName}</td>
+                              <td className="py-2 text-right font-mono">{Math.max(0, pending)}</td>
+                              <td className="py-2 text-right font-mono">{Number(r.quantityReceived)}</td>
+                              <td className={`py-2 text-right font-mono ${qtyDiff !== 0 ? 'text-amber-300' : ''}`}>{qtyDiff > 0 ? `+${qtyDiff}` : qtyDiff}</td>
+                              <td className={`py-2 text-right font-mono ${costDiff !== 0 ? 'text-amber-300' : ''}`}>${r.unitCostEstimated} → ${r.unitCostActual}</td>
+                              <td className="py-2 text-text-secondary">
+                                {[r.note, r.documentNumber ? `Folio ${r.documentNumber}` : null, r.actorName].filter(Boolean).join(' · ') || '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {poHistory && (
+                  <div className="mt-6">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-champagne-gold mb-2">Historial</h3>
+                    <ol className="border-l border-aged-bronze/30 pl-4 space-y-2 text-xs">
+                      {poHistory.events.map((event) => (
+                        <li key={event.id}>
+                          <span className="text-text-primary font-medium">{ACTION_LABELS[event.action] || event.action}</span>
+                          <span className="text-text-secondary"> · {new Date(event.createdAt).toLocaleString('es-MX')} · {event.actorName || 'Sistema'}</span>
+                          {event.reason && <div className="text-text-secondary italic">“{event.reason}”</div>}
+                        </li>
+                      ))}
+                      {poHistory.events.length === 0 && (
+                        <li className="text-text-secondary/60">Sin eventos (orden anterior a la auditoría).</li>
+                      )}
+                    </ol>
                   </div>
                 )}
               </div>

@@ -1,201 +1,94 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PurchaseOrdersService } from './purchase-orders.service';
-import { PurchaseOrdersRepository } from './repositories/purchase-orders.repository';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
-import { InventoryService } from '../inventory/inventory.service';
 
+/**
+ * Role gates (rejected before touching the database). The full flow — locking, stock,
+ * average cost, ledger and audit — is covered against a real database in
+ * purchase-orders.integration.spec.ts.
+ */
 describe('PurchaseOrdersService', () => {
-  let service: PurchaseOrdersService;
-  let repository: PurchaseOrdersRepository;
+  const repository = { findAll: jest.fn(), findByIdWithItems: jest.fn(), findByStatuses: jest.fn() };
+  const db = { transaction: jest.fn() };
+  const service = new PurchaseOrdersService(repository as any, {} as any, db as any, {} as any);
 
-  const mockPurchaseOrdersRepository = {
-    findAll: jest.fn(),
-    findById: jest.fn(),
-    findByIdWithItems: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    updateStatus: jest.fn(),
-    softDelete: jest.fn(),
+  const user = (role: string) => ({ sub: `${role}-1`, roles: [role], businessId: 'bus-1' });
+  const owner = user('owner');
+  const invAdmin = user('inventory_admin');
+  const compras = user('warehouse_purchasing_operator');
+  const support = user('support_tech');
+  const ois = user('branch_operator');
+  const dto = {
+    businessId: 'bus-1',
+    providerId: 'prov',
+    warehouseId: 'wh',
+    orderNumber: 'OC-1',
+    items: [{ productId: 'p', quantity: 1, estimatedUnitCost: 1 }],
   };
 
-  const mockInventoryService = {
-    processPurchaseOrderReception: jest.fn(),
-  };
+  afterEach(() => jest.clearAllMocks());
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PurchaseOrdersService,
-        {
-          provide: PurchaseOrdersRepository,
-          useValue: mockPurchaseOrdersRepository,
-        },
-        {
-          provide: InventoryService,
-          useValue: mockInventoryService,
-        },
-      ],
-    }).compile();
+  describe('who may do what', () => {
+    afterEach(() => expect(db.transaction).not.toHaveBeenCalled());
 
-    service = module.get<PurchaseOrdersService>(PurchaseOrdersService);
-    repository = module.get<PurchaseOrdersRepository>(PurchaseOrdersRepository);
-  });
+    it.each([
+      ['Almacén y Compras', compras],
+      ['Soporte', support],
+      ['OIS', ois],
+    ])('%s cannot create, edit, authorize, cancel or close OCs', async (_, actor) => {
+      await expect(service.create(dto as any, actor)).rejects.toThrow(ForbiddenException);
+      await expect(service.update('po', {}, actor)).rejects.toThrow(ForbiddenException);
+      await expect(service.remove('po', actor)).rejects.toThrow(ForbiddenException);
+      await expect(service.authorize('po', actor)).rejects.toThrow(ForbiddenException);
+      await expect(service.cancel('po', { reason: 'x' }, actor)).rejects.toThrow(ForbiddenException);
+      await expect(service.closeShort('po', { reason: 'x' }, actor)).rejects.toThrow(ForbiddenException);
+    });
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
+    it.each([
+      ['Soporte', support],
+      ['OIS', ois],
+    ])('%s cannot mark purchased or register an entrada', async (_, actor) => {
+      await expect(service.markPurchased('po', {}, actor)).rejects.toThrow(ForbiddenException);
+      await expect(service.receive('po', { items: [] } as any, actor)).rejects.toThrow(ForbiddenException);
+    });
 
-  describe('findAll', () => {
-    it('should return a list of purchase orders', async () => {
-      const orders = [
-        { id: '1', poNumber: 'PO-001', businessId: 'bus-1', status: 'draft' },
-      ];
-      mockPurchaseOrdersRepository.findAll.mockResolvedValue(orders);
+    it.each([
+      ['owner', owner],
+      ['admin inventario', invAdmin],
+    ])('%s acting for Almacén y Compras must give a reason', async (_, actor) => {
+      await expect(service.markPurchased('po', {}, actor)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.receive('po', { items: [{ productId: 'p', quantityReceived: 1, unitCostActual: 1 }] }, actor),
+      ).rejects.toThrow(BadRequestException);
+    });
 
-      const result = await service.findAll('bus-1');
-      expect(result).toEqual(orders);
-      expect(repository.findAll).toHaveBeenCalledWith('bus-1');
+    it('cancel and close short require a reason', async () => {
+      await expect(service.cancel('po', { reason: ' ' }, owner)).rejects.toThrow(BadRequestException);
+      await expect(service.closeShort('po', { reason: '' }, invAdmin)).rejects.toThrow(BadRequestException);
     });
   });
 
-  describe('findOne', () => {
-    it('should return a single purchase order', async () => {
-      const order = { id: '1', poNumber: 'PO-001', businessId: 'bus-1', status: 'draft' };
-      mockPurchaseOrdersRepository.findByIdWithItems.mockResolvedValue(order);
-
-      const result = await service.findOne('1');
-      expect(result).toEqual(order);
-      expect(repository.findByIdWithItems).toHaveBeenCalledWith('1');
+  describe('reads', () => {
+    it('hides drafts and cancelled OCs from Almacén y Compras', async () => {
+      repository.findAll.mockResolvedValue([
+        { id: 'a', status: 'draft' },
+        { id: 'b', status: 'authorized' },
+        { id: 'c', status: 'cancelled' },
+        { id: 'd', status: 'purchased' },
+      ]);
+      expect((await service.findAll('bus-1', compras)).map((o: any) => o.id)).toEqual(['b', 'd']);
+      expect((await service.findAll('bus-1', owner)).map((o: any) => o.id)).toEqual(['a', 'b', 'c', 'd']);
     });
 
-    it('should throw NotFoundException if not found', async () => {
-      mockPurchaseOrdersRepository.findByIdWithItems.mockResolvedValue(null);
-      await expect(service.findOne('999')).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('create', () => {
-    it('should create and return a purchase order', async () => {
-      const dto = {
-        businessId: 'bus-1',
-        providerId: 'prov-1',
-        warehouseId: 'wh-1',
-        orderNumber: 'PO-001',
-        createdBy: 'user-1',
-        items: [{ productId: 'prod-1', quantity: 10, estimatedUnitCost: 5.5 }],
-      };
-      const createdOrder = { id: '1', ...dto, status: 'draft' };
-      mockPurchaseOrdersRepository.create.mockResolvedValue(createdOrder);
-
-      const result = await service.create(dto);
-      expect(result).toEqual(createdOrder);
-      expect(repository.create).toHaveBeenCalledWith(dto);
-    });
-  });
-
-  describe('update', () => {
-    it('should update and return a purchase order', async () => {
-      const existing = { id: '1', poNumber: 'PO-001', businessId: 'bus-1', status: 'draft' };
-      const dto = { notes: 'Updated notes' };
-      const updated = { ...existing, ...dto };
-
-      mockPurchaseOrdersRepository.findById.mockResolvedValue(existing);
-      mockPurchaseOrdersRepository.update.mockResolvedValue(updated);
-
-      const result = await service.update('1', dto);
-      expect(result).toEqual(updated);
-      expect(repository.update).toHaveBeenCalledWith('1', dto);
+    it('Almacén y Compras cannot open a draft', async () => {
+      repository.findByIdWithItems.mockResolvedValue({ id: 'a', businessId: 'bus-1', status: 'draft' });
+      await expect(service.findOne('a', compras)).rejects.toThrow(ForbiddenException);
+      await expect(service.findOne('a', owner)).resolves.toMatchObject({ id: 'a' });
     });
 
-    it('should throw NotFoundException if trying to update non-existing PO', async () => {
-      mockPurchaseOrdersRepository.findById.mockResolvedValue(null);
-      await expect(service.update('999', {})).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('remove', () => {
-    it('should soft delete a purchase order', async () => {
-      const existing = { id: '1', poNumber: 'PO-001', businessId: 'bus-1', status: 'draft' };
-      mockPurchaseOrdersRepository.findById.mockResolvedValue(existing);
-      mockPurchaseOrdersRepository.softDelete.mockResolvedValue(existing);
-
-      const result = await service.remove('1');
-      expect(result).toEqual({ success: true, message: 'Purchase order deleted successfully' });
-      expect(repository.softDelete).toHaveBeenCalledWith('1');
-    });
-
-    it('should throw NotFoundException if trying to delete non-existing PO', async () => {
-      mockPurchaseOrdersRepository.findById.mockResolvedValue(null);
-      await expect(service.remove('999')).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('markAsSent', () => {
-    it('should update status to sent', async () => {
-      const existing = { id: '1', poNumber: 'PO-001', businessId: 'bus-1', status: 'draft' };
-      const updated = { ...existing, status: 'sent' };
-
-      mockPurchaseOrdersRepository.findById.mockResolvedValue(existing);
-      mockPurchaseOrdersRepository.updateStatus.mockResolvedValue(updated);
-
-      const result = await service.markAsSent('1');
-      expect(result).toEqual(updated);
-      expect(repository.updateStatus).toHaveBeenCalledWith('1', 'sent');
-    });
-  });
-
-  describe('receiveOrder', () => {
-    it('should call processPurchaseOrderReception if status is sent', async () => {
-      const existing = {
-        id: '1',
-        poNumber: 'PO-001',
-        businessId: 'bus-1',
-        status: 'sent',
-        items: [{ productId: 'prod-1', quantityOrdered: '10.000', quantityReceived: '0.000', unitCostEstimated: '6.00' }],
-      };
-      const receiptData = {
-        items: [{ productId: 'prod-1', quantityReceived: 10, unitCostActual: 6.0 }],
-        notes: 'Delivered',
-      };
-
-      mockPurchaseOrdersRepository.findById.mockResolvedValue(existing);
-      mockPurchaseOrdersRepository.findByIdWithItems.mockResolvedValue(existing);
-      mockInventoryService.processPurchaseOrderReception.mockResolvedValue({ success: true, status: 'received' });
-
-      const result = await service.receiveOrder('1', receiptData);
-      expect(result).toEqual({ success: true, status: 'received' });
-      expect(mockInventoryService.processPurchaseOrderReception).toHaveBeenCalledWith(
-        '1',
-        receiptData.items,
-        'Delivered\nRecibido por: operador',
+    it('rejects another business', async () => {
+      await expect(service.findAll('bus-2', { ...invAdmin, businessAccess: [{ businessId: 'bus-1' }] })).rejects.toThrow(
+        ForbiddenException,
       );
-    });
-
-    it('should throw BadRequestException if quantity or cost differs without notes', async () => {
-      const existing = {
-        id: '1',
-        poNumber: 'PO-001',
-        businessId: 'bus-1',
-        status: 'sent',
-        items: [{ productId: 'prod-1', quantityOrdered: '10.000', quantityReceived: '0.000', unitCostEstimated: '12.00' }],
-      };
-      const receiptData = {
-        items: [{ productId: 'prod-1', quantityReceived: 10, unitCostActual: 0.0 }],
-      };
-
-      mockPurchaseOrdersRepository.findById.mockResolvedValue(existing);
-      mockPurchaseOrdersRepository.findByIdWithItems.mockResolvedValue(existing);
-
-      await expect(service.receiveOrder('1', receiptData)).rejects.toThrow(
-        'Debes registrar una nota cuando la cantidad o el costo recibido difiere de la orden de compra.',
-      );
-    });
-
-    it('should throw BadRequestException if status is draft', async () => {
-      const existing = { id: '1', poNumber: 'PO-001', businessId: 'bus-1', status: 'draft' };
-      mockPurchaseOrdersRepository.findById.mockResolvedValue(existing);
-
-      await expect(service.receiveOrder('1', { items: [] })).rejects.toThrow(BadRequestException);
     });
   });
 });

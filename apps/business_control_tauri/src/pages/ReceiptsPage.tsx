@@ -7,7 +7,12 @@ import { Autocomplete } from '../components/molecules/Autocomplete';
 
 interface ReceiptsPageProps {
   businessId: string;
+  userRole?: string;
+  userRoles?: string[];
 }
+
+/** An entrada needs the OC to be marked purchased (en camino) first. */
+const isReceivablePo = (po: { status: string }) => po.status === 'purchased' || po.status === 'partially_received';
 
 const BUSINESS_BRANCH_MAP: Record<string, { id: string; name: string }> = {
   'd3b07384-d113-4a0e-a555-e5b12824bf01': { id: 'c4f07384-d113-4a0e-a555-e5b12824bf02', name: 'Sucursal Cacharelo Centro' },
@@ -32,7 +37,12 @@ const UOM_LABELS: Record<string, string> = {
   ml: 'ml',
 };
 
-export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
+export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId, userRole, userRoles }) => {
+  // Owner / Admin. Inventario register OC entradas only on behalf of Almacén y Compras, with a reason.
+  const effectiveRoles = (userRoles && userRoles.length > 0 ? userRoles : [userRole || '']).map((r) => r.toLowerCase());
+  const actsOnBehalf =
+    !effectiveRoles.includes('warehouse_purchasing_operator') &&
+    effectiveRoles.some((r) => r === 'owner' || r === 'inventory_admin');
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [providers, setProviders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -93,9 +103,7 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
       setStockLevels(stockData);
       setReceiptsHistory(histData);
 
-      const receivablePOs = poData.filter(
-        (po) => po.status === 'sent' || po.status === 'partially_received'
-      );
+      const receivablePOs = poData.filter(isReceivablePo);
       setPurchaseOrders(receivablePOs);
 
       if (whData.length > 0) setWarehouseId(whData[0].id);
@@ -286,6 +294,15 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
             );
           });
 
+          if (actsOnBehalf && !notes.trim()) {
+            showToast(
+              'Registras la entrada en nombre de Almacén y Compras: indica el motivo en "Notas / Comentarios".',
+              'warning',
+            );
+            setIsSubmitting(false);
+            return;
+          }
+
           if (hasMismatch && !notes.trim()) {
             showToast(
               'Debes registrar una nota en "Notas / Comentarios" explicando la diferencia de cantidad o costo respecto a la orden.',
@@ -303,6 +320,7 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
             unitCostActual: Number(it.unitCost),
           })),
           notes: notes.trim() || undefined,
+          documentNumber: documentNumber.trim() || undefined,
         };
 
         await api.receivePurchaseOrder(selectedPoId, payload);
@@ -335,9 +353,7 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
       ]);
       setStockLevels(updatedStock);
       setReceiptsHistory(updatedHist);
-      const receivablePOs = poData.filter(
-        (po) => po.status === 'sent' || po.status === 'partially_received'
-      );
+      const receivablePOs = poData.filter(isReceivablePo);
       setPurchaseOrders(receivablePOs);
     } catch (error: any) {
       showToast(error.message || 'Error al guardar la entrada de inventario.', 'error');
@@ -509,6 +525,7 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({ businessId }) => {
                   <input
                     type="text"
                     placeholder="Ej. Entrega matutina"
+                    data-testid="receipt-notes"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     className="w-full bg-charcoal border border-aged-bronze/45 rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-champagne-gold"

@@ -13,7 +13,8 @@ export interface AuditEntry {
     | 'cashier_debt'
     | 'supervisor_assignment'
     | 'branch_requisition'
-    | 'stock_transfer';
+    | 'stock_transfer'
+    | 'purchase_order';
   entityId: string;
   action: string;
   approvalLevel?: 'n1' | 'n2' | 'owner' | null;

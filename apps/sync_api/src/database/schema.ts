@@ -852,7 +852,9 @@ export const purchaseOrders = pgTable('purchase_orders', {
   warehouseId: uuid('warehouse_id').references(() => warehouses.id),
   branchId: uuid('branch_id').references(() => branches.id),
   poNumber: varchar('po_number', { length: 50 }).unique().notNull(),
-  status: varchar('status', { length: 20 }).default('draft').notNull(), // 'draft', 'sent', 'partially_received', 'received', 'cancelled'
+  // draft → authorized ("por comprar") → purchased ("comprada · en camino a bodega")
+  // → partially_received → received | cancelled | closed_short. See purchase-order-flow.ts.
+  status: varchar('status', { length: 20 }).default('draft').notNull(),
   orderDate: timestamp('order_date', { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -900,6 +902,44 @@ export const purchaseOrderItems = pgTable('purchase_order_items', {
     .default('0.00')
     .notNull(),
 });
+
+/**
+ * Append-only trail of every entrada (receipt) of an OC, one row per line per entrada:
+ * what was pending, what arrived and at what price, with the differences. Partial
+ * entradas never overwrite each other here.
+ */
+export const purchaseOrderReceiptLedger = pgTable(
+  'purchase_order_receipt_ledger',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    businessId: uuid('business_id').references(() => businesses.id).notNull(),
+    purchaseOrderId: uuid('purchase_order_id').references(() => purchaseOrders.id).notNull(),
+    itemId: uuid('item_id').references(() => purchaseOrderItems.id).notNull(),
+    productId: uuid('product_id').references(() => products.id).notNull(),
+    receiptId: uuid('receipt_id').notNull(),
+    warehouseId: uuid('warehouse_id').references(() => warehouses.id),
+    branchId: uuid('branch_id').references(() => branches.id),
+    quantityOrdered: decimal('quantity_ordered', { precision: 12, scale: 3 }).notNull(),
+    previouslyReceived: decimal('previously_received', { precision: 12, scale: 3 }).notNull(),
+    quantityReceived: decimal('quantity_received', { precision: 12, scale: 3 }).notNull(),
+    pendingAfter: decimal('pending_after', { precision: 12, scale: 3 }).notNull(),
+    /** quantity_received − pending before this entrada (negative = short, positive = over). */
+    quantityDifference: decimal('quantity_difference', { precision: 12, scale: 3 }).notNull(),
+    unitCostEstimated: decimal('unit_cost_estimated', { precision: 10, scale: 2 }).notNull(),
+    unitCostActual: decimal('unit_cost_actual', { precision: 10, scale: 2 }).notNull(),
+    costDifference: decimal('cost_difference', { precision: 10, scale: 2 }).notNull(),
+    note: text('note'),
+    documentNumber: varchar('document_number', { length: 100 }),
+    actorId: uuid('actor_id').references(() => users.id),
+    actorRole: varchar('actor_role', { length: 50 }),
+    source: varchar('source', { length: 20 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_po_receipt_ledger_po').on(table.purchaseOrderId, table.createdAt),
+    index('idx_po_receipt_ledger_product').on(table.businessId, table.productId, table.createdAt),
+  ],
+);
 
 export const branchRequisitions = pgTable('branch_requisitions', {
   id: uuid('id').primaryKey().defaultRandom(),

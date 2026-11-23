@@ -12,6 +12,12 @@
 - **Branch**: `main`
 - **Status**: 🔄 Set up locally; artifacts pending commit.
 
+### Session: 020-purchase-orders-flow
+- **Scope**: OC lifecycle: owner / admin inventario create + authorize; Almacén y Compras marks purchased and registers the entrada (count + price); append-only `purchase_order_receipt_ledger` + audit. Backend, admin, POS, MCP enums.
+- **Branch**: `020-purchase-orders-flow` (worktree `.worktrees/purchase-orders`)
+- **Migration Status**: ⏳ Step 23 written; not applied anywhere yet (local Docker disk read-only).
+- **Status**: 🔄 Implemented; real-DB integration test pending. Not pushed or deployed.
+
 ### Session: 019-supervisor-sucursal
 - **Scope**: Rol `branch_supervisor`: Fase 1 = aprobación de Cortes Z e ingresos/egresos de caja, bitácora, permisos, offline. Archivos: `specs/019-supervisor-sucursal/*`, backend, Admin y POS.
 - **Branch**: `019-supervisor-sucursal` (worktree `.worktrees/supervisor-sucursal`)

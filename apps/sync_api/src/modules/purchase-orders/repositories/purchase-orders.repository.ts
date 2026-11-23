@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../../database/schema';
-import { eq, and, isNull, inArray, desc } from 'drizzle-orm';
+import { eq, and, isNull, inArray, desc, asc } from 'drizzle-orm';
 
 @Injectable()
 export class PurchaseOrdersRepository {
@@ -79,8 +79,8 @@ export class PurchaseOrdersRepository {
     return results[0] || null;
   }
 
-  async findByIdWithItems(id: string) {
-    const results = await this.db
+  async findByIdWithItems(id: string, exec: Pick<NodePgDatabase<typeof schema>, 'select'> = this.db) {
+    const results = await exec
       .select({
         purchaseOrder: schema.purchaseOrders,
         providerName: schema.providers.name,
@@ -99,7 +99,7 @@ export class PurchaseOrdersRepository {
     const orderRow = results[0];
     if (!orderRow) return null;
 
-    const items = await this.db
+    const items = await exec
       .select({
         purchaseOrderItem: schema.purchaseOrderItems,
         productName: schema.products.name,
@@ -122,82 +122,38 @@ export class PurchaseOrdersRepository {
     };
   }
 
-  async create(data: {
-    businessId: string;
-    providerId: string;
-    warehouseId: string;
-    orderNumber: string;
-    createdBy: string;
-    notes?: string;
-    items: Array<{
-      productId: string;
-      quantity: number;
-      estimatedUnitCost: number;
-    }>;
-  }) {
-    return await this.db.transaction(async (tx) => {
-      // Create purchase order
-      const [order] = await tx
-        .insert(schema.purchaseOrders)
-        .values({
-          businessId: data.businessId,
-          providerId: data.providerId,
-          warehouseId: data.warehouseId,
-          poNumber: data.orderNumber,
-          status: 'draft',
-          notes: data.notes || null,
-          createdBy: data.createdBy,
-        })
-        .returning();
-
-      // Create purchase order items
-      if (data.items && data.items.length > 0) {
-        await tx.insert(schema.purchaseOrderItems).values(
-          data.items.map((item) => ({
-            poId: order.id,
-            productId: item.productId,
-            quantityOrdered: item.quantity.toString(),
-            unitCostEstimated: item.estimatedUnitCost.toString(),
-          })),
-        );
-      }
-
-      const items = data.items && data.items.length > 0
-        ? await tx
-            .select()
-            .from(schema.purchaseOrderItems)
-            .where(eq(schema.purchaseOrderItems.poId, order.id))
-        : [];
-
-      return { ...order, items };
-    });
+  async findByStatuses(businessId: string, statuses: string[]) {
+    const all = await this.findAll(businessId);
+    return all.filter((po) => statuses.includes(po.status));
   }
 
-  async update(id: string, updates: Partial<typeof schema.purchaseOrders.$inferInsert>) {
-    const results = await this.db
-      .update(schema.purchaseOrders)
-      .set({
-        ...updates,
-        updatedAt: new Date(),
+  /** Every entrada line, oldest first, with product and actor names. */
+  async findReceiptLedger(purchaseOrderId: string) {
+    return this.db
+      .select({
+        id: schema.purchaseOrderReceiptLedger.id,
+        receiptId: schema.purchaseOrderReceiptLedger.receiptId,
+        productId: schema.purchaseOrderReceiptLedger.productId,
+        productName: schema.products.name,
+        quantityOrdered: schema.purchaseOrderReceiptLedger.quantityOrdered,
+        previouslyReceived: schema.purchaseOrderReceiptLedger.previouslyReceived,
+        quantityReceived: schema.purchaseOrderReceiptLedger.quantityReceived,
+        pendingAfter: schema.purchaseOrderReceiptLedger.pendingAfter,
+        quantityDifference: schema.purchaseOrderReceiptLedger.quantityDifference,
+        unitCostEstimated: schema.purchaseOrderReceiptLedger.unitCostEstimated,
+        unitCostActual: schema.purchaseOrderReceiptLedger.unitCostActual,
+        costDifference: schema.purchaseOrderReceiptLedger.costDifference,
+        note: schema.purchaseOrderReceiptLedger.note,
+        documentNumber: schema.purchaseOrderReceiptLedger.documentNumber,
+        actorName: schema.users.name,
+        actorRole: schema.purchaseOrderReceiptLedger.actorRole,
+        source: schema.purchaseOrderReceiptLedger.source,
+        createdAt: schema.purchaseOrderReceiptLedger.createdAt,
       })
-      .where(eq(schema.purchaseOrders.id, id))
-      .returning();
-    return results[0];
-  }
-
-  async updateStatus(id: string, status: 'draft' | 'sent' | 'received' | 'cancelled') {
-    return this.update(id, { status });
-  }
-
-  async softDelete(id: string) {
-    const results = await this.db
-      .update(schema.purchaseOrders)
-      .set({
-        deletedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.purchaseOrders.id, id))
-      .returning();
-    return results[0];
+      .from(schema.purchaseOrderReceiptLedger)
+      .leftJoin(schema.products, eq(schema.purchaseOrderReceiptLedger.productId, schema.products.id))
+      .leftJoin(schema.users, eq(schema.purchaseOrderReceiptLedger.actorId, schema.users.id))
+      .where(eq(schema.purchaseOrderReceiptLedger.purchaseOrderId, purchaseOrderId))
+      .orderBy(asc(schema.purchaseOrderReceiptLedger.createdAt), asc(schema.purchaseOrderReceiptLedger.id));
   }
 }

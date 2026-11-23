@@ -20,6 +20,42 @@ class _OutboundAppState extends AppState {
         _req('req-delivered', 'delivered', 'Sucursal Sur', dispatched: 1),
       ];
 
+  final List<String> purchased = [];
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchWarehousePurchaseOrders() async => [
+        _po('po-1', 'authorized', 'OC-001'),
+        _po('po-2', 'purchased', 'OC-002'),
+        _po('po-3', 'partially_received', 'OC-003', received: 4),
+      ];
+
+  @override
+  Future<String?> markPurchaseOrderPurchased(
+      {required String poId, String? documentNumber, String? notes}) async {
+    purchased.add('$poId:${documentNumber ?? ''}');
+    return null;
+  }
+
+  static Map<String, dynamic> _po(String id, String status, String number,
+          {double received = 0}) =>
+      {
+        'id': id,
+        'status': status,
+        'poNumber': number,
+        'providerName': 'Harinas del Sur',
+        'orderDate': '2026-11-23T10:00:00Z',
+        'items': [
+          {
+            'productId': 'p-1',
+            'productName': 'Harina',
+            'unit': 'kg',
+            'quantityOrdered': '10.000',
+            'quantityReceived': received.toStringAsFixed(3),
+            'unitCostEstimated': '10.00',
+          }
+        ],
+      };
+
   @override
   Future<String?> deliverRequisition(
       {required String requisitionId, String? notes}) async {
@@ -71,7 +107,7 @@ void main() {
       expect(find.text('Operaciones de Custodia, Entradas y Salidas'), findsOneWidget);
 
       // Verify 3 distinct navigation tabs
-      expect(find.text('Entradas (Proveedores)'), findsOneWidget);
+      expect(find.text('Compras y Entradas'), findsOneWidget);
       expect(find.text('Salidas (Sucursales)'), findsOneWidget);
       expect(find.text('Inventario de Bodega'), findsOneWidget);
 
@@ -157,6 +193,37 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(appState.delivered, ['req-transit']);
+    });
+
+    testWidgets(
+        'Compras y Entradas shows authorized OCs by step and marks one purchased',
+        (tester) async {
+      tester.view.physicalSize = const Size(1400, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final appState = _OutboundAppState();
+
+      await tester.pumpWidget(
+        MaterialApp(home: WarehouseDashboardScreen(state: appState)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Por comprar (1)'), findsOneWidget);
+      expect(find.text('Comprada · en camino a bodega (1)'), findsOneWidget);
+      expect(find.text('Recibidas en parte (1)'), findsOneWidget);
+      // Pending quantity, not the ordered one, for the partial OC.
+      expect(find.text('Harina: 6 kg'), findsOneWidget);
+      expect(find.text('Marcar Comprada'), findsOneWidget);
+      expect(find.text('Registrar Entrada'), findsNWidgets(2));
+
+      await tester.tap(find.text('Marcar Comprada'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Ticket / factura (opcional)'), 'TK-9');
+      await tester.tap(find.text('Confirmar compra'));
+      await tester.pumpAndSettle();
+
+      expect(appState.purchased, ['po-1:TK-9']);
     });
 
     testWidgets('confirms costs and monetary values are never exposed to warehouse operators',
