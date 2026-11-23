@@ -21,10 +21,12 @@ import { PurchaseOrdersModule } from './modules/purchase-orders/purchase-orders.
 import { RequisitionsModule } from './modules/requisitions/requisitions.module';
 import { PrintingModule } from './modules/printing/printing.module';
 import { LogsModule } from './modules/logs/logs.module';
+import { AuditModule } from './modules/audit/audit.module';
 
 @Module({
   imports: [
     DatabaseModule,
+    AuditModule,
     UsersModule,
     AuthModule,
     SyncModule,

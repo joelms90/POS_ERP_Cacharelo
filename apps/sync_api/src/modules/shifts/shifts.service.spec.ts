@@ -3,7 +3,7 @@ import { ShiftsService } from './shifts.service';
 import { ShiftsRepository } from './repositories/shifts.repository';
 import { TransactionsRepository } from './repositories/transactions.repository';
 import { DRIZZLE_CONNECTION } from '../../database/database.module';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
 describe('ShiftsService', () => {
   let service: ShiftsService;
@@ -21,7 +21,10 @@ describe('ShiftsService', () => {
 
   const mockTransactionsRepository = {
     findByShiftId: jest.fn(),
+    findByClientUuid: jest.fn().mockResolvedValue(null),
+    findById: jest.fn(),
     create: jest.fn(),
+    updateWorkflow: jest.fn(),
   };
 
   const mockDb = {
@@ -318,6 +321,8 @@ describe('ShiftsService', () => {
             summary: expect.objectContaining({ cardSales: 300 }),
           }),
         }),
+
+        expect.anything(),
       );
     });
 
@@ -385,7 +390,191 @@ describe('ShiftsService', () => {
             closeNotes: 'Todo correcto',
           }),
         }),
+
+        expect.anything(),
       );
+    });
+  });
+
+  describe('spec 019 — approval chain and cash ledger', () => {
+    const baseShift = {
+      id: 'shift-1',
+      cashierId: 'cashier-1',
+      branchId: 'branch-1',
+      initialFloat: '1000.00',
+      cashDrawerAmount: '1000.00',
+      status: 'open',
+      openedAt: new Date(Date.now() - 3600000),
+      reviewStatus: 'no_aplica',
+      version: 1,
+      recountCount: 0,
+    };
+    const originalFlag = process.env.CASH_APPROVALS_ENFORCE_OPEN_BLOCK;
+    afterEach(() => {
+      process.env.CASH_APPROVALS_ENFORCE_OPEN_BLOCK = originalFlag;
+    });
+
+    it('closes a cashier corte into pendiente_n1 resolved by the OIS', async () => {
+      mockShiftsRepository.findById.mockResolvedValue(baseShift);
+      mockTransactionsRepository.findByShiftId.mockResolvedValue([]);
+      mockShiftsRepository.update.mockImplementation(async (_id, data) => ({ ...baseShift, ...data }));
+      await service.closeShift('shift-1', { actualAmount: '1150.00', clientUuid: 'close-1' }, { id: 'cashier-1', roles: ['cashier'] });
+      expect(mockShiftsRepository.update).toHaveBeenCalledWith(
+        'shift-1',
+        expect.objectContaining({ reviewStatus: 'pendiente_n1', closedBy: 'cashier-1', n1ResolverRole: 'branch_operator', clientUuid: 'close-1' }),
+        expect.anything(),
+      );
+    });
+
+    it('S-3: a corte closed by the OIS is resolved at N1 by the supervisor', async () => {
+      mockShiftsRepository.findById.mockResolvedValue({ ...baseShift, cashierId: 'ois-1' });
+      mockTransactionsRepository.findByShiftId.mockResolvedValue([]);
+      mockShiftsRepository.update.mockImplementation(async (_id, data) => ({ ...baseShift, ...data }));
+      await service.closeShift('shift-1', { actualAmount: '1150.00' }, { id: 'ois-1', roles: ['encargado'] });
+      expect(mockShiftsRepository.update).toHaveBeenCalledWith(
+        'shift-1',
+        expect.objectContaining({ n1ResolverRole: 'branch_supervisor', closedBy: 'ois-1' }),
+        expect.anything(),
+      );
+    });
+
+    it('treats a retried close with the same clientUuid as idempotent', async () => {
+      mockShiftsRepository.findById.mockResolvedValue({
+        ...baseShift,
+        status: 'closed',
+        clientUuid: 'close-1',
+        closedAt: new Date(),
+        cashDrawerAmount: '1150.00',
+      });
+      mockTransactionsRepository.findByShiftId.mockResolvedValue([]);
+      const result: any = await service.closeShift('shift-1', { actualAmount: '1150.00', clientUuid: 'close-1' });
+      expect(result.duplicate).toBe(true);
+      expect(mockShiftsRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('records movements as pending ledger entries with author and category', async () => {
+      mockShiftsRepository.findById.mockResolvedValue(baseShift);
+      mockTransactionsRepository.findByShiftId.mockResolvedValue([]);
+      mockTransactionsRepository.create.mockImplementation(async (data) => ({ id: 'tx-1', ...data }));
+      mockShiftsRepository.update.mockResolvedValue({ ...baseShift, cashDrawerAmount: '900.00' });
+      const result = await service.createTransaction(
+        'shift-1',
+        { type: 'cash-out', amount: '100.00', reason: 'Compra de hielo', category: 'gasto_operativo', clientUuid: 'mv-1' },
+        { id: 'cashier-1', roles: ['cashier'] },
+      );
+      expect(mockTransactionsRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entryKind: 'movimiento',
+          approvalStatus: 'pendiente_n1',
+          createdBy: 'cashier-1',
+          category: 'gasto_operativo',
+          clientUuid: 'mv-1',
+        }),
+        expect.anything(),
+      );
+      expect(result.transaction).toBeDefined();
+    });
+
+    it('returns the existing entry when a movement is retried with the same clientUuid', async () => {
+      mockTransactionsRepository.findByClientUuid.mockResolvedValueOnce({ id: 'tx-1', shiftId: 'shift-1' });
+      mockShiftsRepository.findById.mockResolvedValue(baseShift);
+      const result: any = await service.createTransaction('shift-1', { type: 'cash-in', amount: '10.00', reason: 'Cambio', clientUuid: 'mv-1' });
+      expect(result.duplicate).toBe(true);
+      expect(mockTransactionsRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('MV-05: rejects a new cash-out that would leave expected cash negative', async () => {
+      mockShiftsRepository.findById.mockResolvedValue({ ...baseShift, initialFloat: '0.00' });
+      mockTransactionsRepository.findByShiftId.mockResolvedValue([]);
+      // expected = 0 + 150 cash sales
+      await expect(
+        service.createTransaction('shift-1', { type: 'cash-out', amount: '200.00', reason: 'Retiro grande' }),
+      ).rejects.toThrow('negativo');
+      expect(mockTransactionsRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('expected cash nets reversal entries out of the ledger', async () => {
+      mockShiftsRepository.findById.mockResolvedValue(baseShift);
+      mockTransactionsRepository.findByShiftId.mockResolvedValue([
+        { id: 'g', type: 'cash-out', amount: '800.00', entryKind: 'movimiento', approvalStatus: 'rechazado' },
+        { id: 'g-rev', type: 'cash-out', amount: '800.00', entryKind: 'reverso', approvalStatus: 'no_aplica', reversesTransactionId: 'g' },
+        { id: 'p', type: 'cash-in', amount: '50.00', entryKind: 'movimiento', approvalStatus: 'pendiente_n1' },
+      ]);
+      const report: any = await service.getCorteReport('shift-1', 'x');
+      // 1000 + 150 cash sales + 50 pending cash-in; the rejected expense is reversed
+      expect(report.summary.expectedCash).toBe(1200);
+      expect(report.summary.manualCashOut).toBe(0);
+      expect(report.summary.pendingMovementsAmount).toBe(50);
+      expect(report.movementTotals.reversals).toBe(800);
+    });
+
+    it('D-4: blocks opening while the last corte awaits N1 (flag on)', async () => {
+      process.env.CASH_APPROVALS_ENFORCE_OPEN_BLOCK = 'true';
+      mockShiftsRepository.findActiveShift.mockResolvedValue(null);
+      mockShiftsRepository.findLastClosedShift.mockResolvedValueOnce({
+        ...baseShift,
+        id: 'prev',
+        status: 'closed',
+        reviewStatus: 'pendiente_n1',
+        n1ResolverRole: 'branch_operator',
+      });
+      await expect(service.openShift({ cashierId: 'cashier-1', branchId: 'branch-1', initialFloat: '500.00' })).rejects.toThrow(
+        ConflictException,
+      );
+      expect(mockShiftsRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('D-4: does not block once N1 approved, or when the owner unblocked (P-2)', async () => {
+      process.env.CASH_APPROVALS_ENFORCE_OPEN_BLOCK = 'true';
+      mockShiftsRepository.findActiveShift.mockResolvedValue(null);
+      mockShiftsRepository.create.mockResolvedValue({ id: 'new' });
+      mockShiftsRepository.findLastClosedShift.mockResolvedValueOnce({ ...baseShift, status: 'closed', reviewStatus: 'pendiente_n2' });
+      await expect(service.openShift({ cashierId: 'c', branchId: 'branch-1', initialFloat: '1' })).resolves.toEqual({ id: 'new' });
+      mockShiftsRepository.findLastClosedShift.mockResolvedValueOnce({
+        ...baseShift,
+        status: 'closed',
+        reviewStatus: 'pendiente_n1',
+        openBlockOverriddenAt: new Date(),
+      });
+      await expect(service.openShift({ cashierId: 'c', branchId: 'branch-1', initialFloat: '1' })).resolves.toEqual({ id: 'new' });
+    });
+
+    it('D-4: the block is off unless the env flag is set', async () => {
+      delete process.env.CASH_APPROVALS_ENFORCE_OPEN_BLOCK;
+      mockShiftsRepository.findActiveShift.mockResolvedValue(null);
+      mockShiftsRepository.create.mockResolvedValue({ id: 'new' });
+      mockShiftsRepository.findLastClosedShift.mockResolvedValueOnce({ ...baseShift, status: 'closed', reviewStatus: 'pendiente_n1' });
+      await expect(service.openShift({ cashierId: 'c', branchId: 'branch-1', initialFloat: '1' })).resolves.toEqual({ id: 'new' });
+    });
+
+    describe('recount', () => {
+      it('rechazado_n1 → pendiente_n1, only by the corte author', async () => {
+        const rejected = { ...baseShift, status: 'closed', reviewStatus: 'rechazado_n1', closedBy: 'cashier-1' };
+        mockShiftsRepository.findById.mockResolvedValue(rejected);
+        mockShiftsRepository.update.mockImplementation(async (_id, data) => ({ ...rejected, ...data }));
+        await expect(
+          service.recountShift('shift-1', { actualAmount: '1100.00' }, { id: 'ois-1', roles: ['branch_operator'], branchId: 'branch-1' }),
+        ).rejects.toThrow(ForbiddenException);
+        const updated: any = await service.recountShift('shift-1', { actualAmount: '1100.00' }, { id: 'cashier-1', roles: ['cashier'], branchId: 'branch-1' });
+        expect(updated.reviewStatus).toBe('pendiente_n1');
+        expect(updated.recountCount).toBe(1);
+        expect(updated.cashDrawerAmount).toBe('1100.00');
+      });
+
+      it('S-5: rechazado_n2 → pendiente_n2 (straight back to N2), by the cashier or an OIS of the branch', async () => {
+        const rejected = { ...baseShift, status: 'closed', reviewStatus: 'rechazado_n2', closedBy: 'cashier-1' };
+        mockShiftsRepository.findById.mockResolvedValue(rejected);
+        mockShiftsRepository.update.mockImplementation(async (_id, data) => ({ ...rejected, ...data }));
+        const updated: any = await service.recountShift('shift-1', { actualAmount: '1100.00' }, { id: 'ois-1', roles: ['branch_operator'], branchId: 'branch-1' });
+        expect(updated.reviewStatus).toBe('pendiente_n2');
+      });
+
+      it('rejects a recount when the corte is not rejected (409)', async () => {
+        mockShiftsRepository.findById.mockResolvedValue({ ...baseShift, status: 'closed', reviewStatus: 'pendiente_n2', closedBy: 'cashier-1' });
+        await expect(
+          service.recountShift('shift-1', { actualAmount: '1.00' }, { id: 'cashier-1', roles: ['cashier'], branchId: 'branch-1' }),
+        ).rejects.toThrow(ConflictException);
+      });
     });
   });
 });

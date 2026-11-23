@@ -30,16 +30,16 @@ Leyenda: `[ ]` pendiente · `[x]` hecho · `[~]` parcial / diferido (con nota)
 - [x] T112 Tests jest de cada regla de T111 (50 tests).
 
 ### 1.3 Servicios transversales
-- [ ] T120 `AuditModule`: `AuditLogService` (insert dentro de la transacción del llamador) y `NotificationsService` (fan-out por destinatario, marcar leídas).
-- [ ] T121 `SupervisorScopeService`: sucursales asignadas, `canActN1` / `canActN2` / `canCancelOrAdjust`, destinatarios de notificaciones.
+- [x] T120 `AuditModule`: `AuditLogService` (insert dentro de la transacción del llamador) y `NotificationsService` (fan-out por destinatario, marcar leídas).
+- [x] T121 `SupervisorScopeService`: sucursales asignadas, `canActN1` / `canActN2` / `canCancelOrAdjust`, destinatarios de notificaciones.
 
 ### 1.4 Turnos (`modules/shifts`)
-- [ ] T130 `closeShift`: `closed_by`, `n1_resolver_role`, `review_status = pendiente_n1`, idempotencia por `clientUuid`, bitácora y notificación.
-- [ ] T131 `openShift`: bloqueo de apertura (D-4/C-2) con desbloqueo del owner (P-2), detrás de `CASH_APPROVALS_ENFORCE_OPEN_BLOCK`.
-- [ ] T132 `createTransaction`: asiento de ledger (`created_by`, `category`, `clientUuid` idempotente, `pendiente_n1`), egreso nuevo no puede dejar el esperado < 0 (MV-05).
-- [ ] T133 `buildShiftReport`: esperado con `cashEffect` (incluye reversos) y grupos de movimientos.
-- [ ] T134 `POST /cash-shifts/:id/recount` (S-5: tras `rechazado_n1` → `pendiente_n1`; tras `rechazado_n2` → `pendiente_n2`).
-- [ ] T135 Tests: los existentes siguen en verde + nuevos (bloqueo, idempotencia, MV-05, recount).
+- [x] T130 `closeShift`: `closed_by`, `n1_resolver_role`, `review_status = pendiente_n1`, idempotencia por `clientUuid`, bitácora y notificación.
+- [x] T131 `openShift`: bloqueo de apertura (D-4/C-2) con desbloqueo del owner (P-2), detrás de `CASH_APPROVALS_ENFORCE_OPEN_BLOCK`.
+- [x] T132 `createTransaction`: asiento de ledger (`created_by`, `category`, `clientUuid` idempotente, `pendiente_n1`), egreso nuevo no puede dejar el esperado < 0 (MV-05).
+- [x] T133 `buildShiftReport`: esperado con `cashEffect` (incluye reversos) y grupos de movimientos.
+- [x] T134 `POST /cash-shifts/:id/recount` (S-5: tras `rechazado_n1` → `pendiente_n1`; tras `rechazado_n2` → `pendiente_n2`).
+- [x] T135 Tests: los existentes siguen en verde + nuevos (bloqueo, idempotencia, MV-05, recount).
 
 ### 1.5 Supervisión (`modules/supervision`)
 - [ ] T140 Aprobar / rechazar / ajustar Corte Z (N1/N2) con `version` (409), no auto-aprobación (403), CZ-06 (422 si hay movimientos pendientes), `approval_snapshot` al aprobar en N2.

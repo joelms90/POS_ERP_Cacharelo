@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsObject,
   IsString,
   IsNotEmpty,
@@ -33,4 +34,19 @@ export class CloseShiftDto {
   @IsOptional()
   @MaxLength(100)
   receivedBy?: string;
+
+  /** Client-generated id of the close (idempotent retries / offline sync, D-5). */
+  @IsString()
+  @IsOptional()
+  @MaxLength(120)
+  clientUuid?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  closedOffline?: boolean;
+
+  /** Expected cash the POS computed locally when it closed offline. */
+  @IsNumberString()
+  @IsOptional()
+  localExpectedCash?: string;
 }
