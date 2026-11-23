@@ -15,8 +15,8 @@
 ### Session: prod-logging
 - **Scope**: Production diagnostics. Adds the `app_logs` table and `/api/logs` intake, an API 5xx interceptor, Flutter `RemoteLogger` plus the logged HTTP wrapper, the admin web `remoteLogger` plus error boundary, `make logs-*`, MCP log tools, and `docs/prod-log-triage.md`.
 - **Branch**: `feat/prod-logging`
-- **Migration Status**: `app_logs` is added to `idempotent-deploy-migrations.ts` and is also auto-created at runtime. Not yet run in prod.
-- **Status**: ✅ Completed (not deployed)
+- **Migration Status**: Running idempotent production migration for `app_logs` on 2026-11-22; deployment follows after the migration lock wait.
+- **Status**: 🔄 Production rollout in progress
 
 ### Session: 017-sucursal-version
 - **Scope**: Plan and implement the POS display of the configured sucursal next to the application version; POS client only.
