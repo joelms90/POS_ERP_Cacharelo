@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../common/colors.dart';
 import '../common/app_state.dart';
+import '../common/uom.dart';
 import '../login_screen.dart';
 
 class WarehouseDashboardScreen extends StatefulWidget {
@@ -288,7 +289,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                 runSpacing: 6,
                 children: rawItems.map((item) {
                   final name = item['productName']?.toString() ?? 'Producto';
-                  final unit = item['unit']?.toString() ?? '';
+                  final unit = uomLabel(item['unit'] ?? item['uom']);
                   final pending = (_asDouble(item['quantityOrdered']) -
                           _asDouble(item['quantityReceived']))
                       .clamp(0.0, double.infinity);
@@ -452,7 +453,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
         'productName': item['productName']?.toString() ??
             item['product']?['name']?.toString() ??
             'Producto',
-        'unit': item['unit']?.toString() ?? 'pza',
+        'unit': uomLabel(item['unit'] ?? item['uom']),
         'ordered': ordered,
         'pending': pending,
         'estimated': estimatedCost,
@@ -994,7 +995,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                 runSpacing: 6,
                 children: rawItems.map((item) {
                   final name = item['productName']?.toString() ?? 'Insumo';
-                  final unit = item['unit']?.toString() ?? '';
+                  final unit = uomLabel(item['unit'] ?? item['uom']);
                   final qty = shipped
                       ? _asDouble(item['quantityDispatched'], 0)
                       : _approvedQty(item);
@@ -1148,7 +1149,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
       final name = item['productName']?.toString() ??
           item['product']?['name']?.toString() ??
           'Insumo';
-      final unit = item['unit']?.toString() ?? item['uom']?.toString() ?? 'pza';
+      final unit = uomLabel(item['unit'] ?? item['uom']);
       final qtyApproved = _approvedQty(item);
 
       rows.add({
@@ -1582,7 +1583,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
         item['productId']?.toString() ?? item['id']?.toString() ?? '';
     final name = item['productName'] ?? item['name'] ?? 'Insumo';
     final sku = item['sku'] ?? 'S/SKU';
-    final unit = item['unit'] ?? item['uom'] ?? 'pza';
+    final unit = uomLabel(item['unit'] ?? item['uom']);
     final currentStock =
         _asDouble(item['currentStock'] ?? item['quantity'], 0.0);
     final currentStockFormatted = currentStock % 1 == 0
@@ -1851,7 +1852,7 @@ class _WarehouseDashboardScreenState extends State<WarehouseDashboardScreen> {
                     final sku = item['sku'] ?? 'S/SKU';
                     final barcode = item['barcode'] ?? item['internalCode'] ?? 'S/Código';
                     final stockNum = _asDouble(item['currentStock'] ?? item['quantity'], 0.0);
-                    final unit = item['unit'] ?? item['uom'] ?? 'pza';
+                    final unit = uomLabel(item['unit'] ?? item['uom']);
                     final stockFormatted = stockNum % 1 == 0
                         ? stockNum.toInt().toString()
                         : stockNum.toString();

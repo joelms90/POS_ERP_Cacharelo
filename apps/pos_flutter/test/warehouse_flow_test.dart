@@ -23,6 +23,14 @@ class _OutboundAppState extends AppState {
   final List<String> purchased = [];
 
   @override
+  Future<List<Map<String, dynamic>>> fetchWarehouseStock(
+          {String? warehouseId}) async =>
+      [
+        {'productId': 'p-1', 'productName': 'Harina', 'uom': 'piece', 'quantity': '100.000'},
+        {'productId': 'p-2', 'productName': 'Aceite', 'uom': 'l', 'quantity': '2.500'},
+      ];
+
+  @override
   Future<List<Map<String, dynamic>>> fetchWarehousePurchaseOrders() async => [
         _po('po-1', 'authorized', 'OC-001'),
         _po('po-2', 'purchased', 'OC-002'),
@@ -224,6 +232,21 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(appState.purchased, ['po-1:TK-9']);
+    });
+
+    testWidgets('Inventario de Bodega shows the unit label, not the raw value',
+        (tester) async {
+      final appState = _OutboundAppState();
+      await tester.pumpWidget(
+        MaterialApp(home: WarehouseDashboardScreen(state: appState)),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Inventario de Bodega'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('100 pza'), findsOneWidget);
+      expect(find.text('2.5 l (Bajo)'), findsOneWidget);
+      expect(find.textContaining('piece'), findsNothing);
     });
 
     testWidgets('confirms costs and monetary values are never exposed to warehouse operators',
