@@ -44,12 +44,10 @@ C-1 and C-2 are constants in `apps/sync_api/src/modules/supervision/cash-approva
 
 ## 5. Not done / known gaps
 
-1. **T306, offline (D-5):** the backend is idempotent (`clientUuid` on movements and close, `closedOffline`, `localExpectedCash`), but the POS has no local queue for movements or Corte Z yet. Cash operations still require a connection, as before.
-2. **Admin UI manual smoke test** against a local backend was not run.
-3. **Lint:** the new backend files are Prettier-formatted, but still raise about 30 `no-unsafe-*` warnings, mostly from jsonb snapshots typed as `any`. Lint is not part of `make check-all`, and the repo already carries 900+ errors.
-4. **Pre-commit hook:** it bumped `apps/pos_flutter/pubspec.yaml` to `1.0.1+42`; expect a trivial conflict if `main` bumped too.
-5. **Legacy admin token:** sessions using `X-Admin-Token` lose access to the 5 newly guarded report endpoints (same as `sales-dashboard` before).
-6. **Data-reset scripts:** they now opt in with `set_config('app.allow_cash_ledger_purge','on',…)` before deleting `cash_transactions`.
+1. **Done since the first handoff:** POS offline queue (T306) and legacy `X-Admin-Token` access to the guarded reports. The `pubspec.yaml` version (now `1.0.1+43`, bumped by the repo pre-commit hook) does not conflict: `main` is still on `+41`.
+2. **Still pending:** an Admin E2E browser test against the local stack. `playwright.config.ts` already starts the API on :3000 and vite on :1420, and Chromium is installed. What is missing: seeding an owner and a supervisor with an email and password, plus `e2e/supervision-approvals.spec.ts`.
+3. **Lint:** about 30 `no-unsafe-*` warnings in the new backend files (lint is not part of `make check-all`).
+4. **Data-reset scripts:** they opt in with `set_config('app.allow_cash_ledger_purge','on',…)`. This is intended, not a defect.
 
 ## 6. Next steps (owner)
 

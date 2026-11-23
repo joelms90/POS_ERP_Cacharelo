@@ -74,7 +74,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecho · `[~]` parcial / diferido (con nota)
 - [x] T303 Estados visibles para el cajero (chips en movimientos y en el resumen del Corte Z; aviso de corte rechazado con "Recontar").
 - [x] T304 Manejo del 409 de apertura bloqueada (mensaje y acceso a "Por aprobar").
 - [x] T305 `flutter test` + `flutter analyze` de los archivos tocados (sin fallos nuevos respecto a los 15 preexistentes).
-- [~] T306 Cola offline de movimientos y Corte Z offline (D-5): **pendiente**. El backend ya es idempotente (`clientUuid` en movimientos y cierre, `closedOffline`, `localExpectedCash`); falta la cola local ordenada (ventas → movimientos → Corte Z) y el ticket provisional en el POS. Hoy el POS sigue en línea para caja, como antes.
+- [x] T306 Cola offline de movimientos y Corte Z (D-5): `CashOfflineQueue` FIFO por usuario, ticket provisional, sincronización después de ventas, `occurredAt` en backend; tests en `test/cash_offline_queue_test.dart`.
 
 ## 4. Cierre
 - [x] T401 Handoff en `docs/handoffs/019-supervisor-sucursal.md`, `.claude/workspaces.md` y marcas finales en este archivo.
