@@ -334,5 +334,6 @@
   "332": "Size",
   "333": "BranchCatalogService",
   "334": "LoginScreen",
-  "335": "QrScannerDialog"
+  "335": "QrScannerDialog",
+  "336": "Injectable"
 }

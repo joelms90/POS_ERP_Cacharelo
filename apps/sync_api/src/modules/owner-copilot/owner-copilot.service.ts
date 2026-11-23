@@ -38,6 +38,7 @@ export class OwnerCopilotService {
       return {
         conversationId,
         correlationId,
+        provider: this.provider.name,
         answer,
         proposal: { actionType: plan.actionType, summary: proposalSummary },
         confirmation,

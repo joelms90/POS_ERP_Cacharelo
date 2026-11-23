@@ -1,17 +1,17 @@
 # Graph Report - owner-business-copilot  (2026-11-23)
 
 ## Corpus Check
-- 586 files · ~682,887 words
+- 586 files · ~682,889 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 104 file(s) not represented in the graph (top: (none) 28, .xcconfig 8, .xml 7)
 
 ## Summary
-- 5779 nodes · 10221 edges · 336 communities (244 shown, 92 thin omitted)
+- 5780 nodes · 10221 edges · 337 communities (244 shown, 93 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 429 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a8ad7d74`
+- Built from commit: `b9bb2db1`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -330,8 +330,8 @@
 1. `@nestjs/common` - 127 edges
 2. `Heading()` - 55 edges
 3. `Roles()` - 52 edges
-4. `class-validator` - 48 edges
-5. `drizzle-orm` - 48 edges
+4. `drizzle-orm` - 48 edges
+5. `class-validator` - 48 edges
 6. `Button()` - 43 edges
 7. `DRIZZLE_CONNECTION` - 43 edges
 8. `PosApiClient` - 36 edges
@@ -353,7 +353,7 @@
 ## Import Cycles
 - 2-file cycle: `apps/sync_api/src/modules/sync/sync.gateway.ts -> apps/sync_api/src/modules/sync/sync.service.ts -> apps/sync_api/src/modules/sync/sync.gateway.ts`
 
-## Communities (336 total, 92 thin omitted)
+## Communities (337 total, 93 thin omitted)
 
 ### Community 0 - "app_state.dart"
 Cohesion: 0.01
@@ -1333,23 +1333,23 @@ Nodes (3): Size, height, width
 
 ## Knowledge Gaps
 - **1292 isolated node(s):** `_activeCloudOrderIdForTable`, `_activeOrderIdsByTableRemoteId`, `activePaymentType`, `activeShiftId`, `addCashDrop` (+1287 more)
-  These have ≤1 connection - possible missing edges. (Counts symbols only; 3053 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **92 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges. (Counts symbols only; 3054 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **93 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `@nestjs/common` connect `@nestjs/common` to `SyncGateway`, `BranchesRepository`, `printing.service.ts`, `orders.repository.ts`, `log-entry.ts`, `app.module.ts`, `roles.ts`, `CategoriesRepository`, `catalog.module.ts`, `shifts.service.ts`, `CreateWarehouseDto`, `auth.service.ts`, `app.service.ts`, `CreatePaymentDto`, `KitchenRepository`, `recipes.service.ts`, `ReportsService`, `sync_api/package.json`, `ProductsRepository`, `ProvidersRepository`, `admin-users.controller.ts`, `dependencies`, `ticket-settings.service.ts`, `connection.ts`, `products.service.ts`, `assertBusinessAccess`, `InquiriesService`?**
-  _High betweenness centrality (0.067) - this node is a cross-community bridge._
+  _High betweenness centrality (0.059) - this node is a cross-community bridge._
 - **What connects `_activeCloudOrderIdForTable`, `_activeOrderIdsByTableRemoteId`, `activePaymentType` to the rest of the system?**
   _1292 weakly-connected nodes found - possible missing edges._
 - **Should `app_state.dart` be split into smaller, more focused modules?**
   _Cohesion score 0.005970149253731343 - nodes in this community are weakly interconnected._
 - **Why does `drizzle-orm` connect `@nestjs/common` to `sync_api/package.json`, `SyncGateway`, `app.service.ts`, `CreatePaymentDto`, `orders.repository.ts`, `printing.service.ts`, `import-excel-inventories.ts`, `import-menu-products.ts`, `import-finance-data.ts`, `assertBusinessAccess`, `recipes.service.ts`, `dependencies`, `shifts.service.ts`, `ticket-settings.service.ts`, `schema.ts`, `connection.ts`, `products.service.ts`?**
-  _High betweenness centrality (0.043) - this node is a cross-community bridge._
+  _High betweenness centrality (0.025) - this node is a cross-community bridge._
 - **Should `SyncGateway` be split into smaller, more focused modules?**
   _Cohesion score 0.10077519379844961 - nodes in this community are weakly interconnected._
 - **Why does `CACHARELO_MENU_PRESET` connect `menu_generator/src/App.tsx` to `import-menu-products.ts`?**
-  _High betweenness centrality (0.027) - this node is a cross-community bridge._
+  _High betweenness centrality (0.019) - this node is a cross-community bridge._
 - **Should `secure_storage_service.dart` be split into smaller, more focused modules?**
   _Cohesion score 0.024390243902439025 - nodes in this community are weakly interconnected._

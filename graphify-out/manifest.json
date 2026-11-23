@@ -6681,9 +6681,9 @@
     "semantic_hash": ""
   },
   "apps/sync_api/src/modules/owner-copilot/owner-copilot.service.ts": {
-    "mtime": 1795413541.9075408,
-    "seen": 1795413625.453823,
-    "ast_hash": "2e4ea120e8cd605d8c38890c996ee6c4",
+    "mtime": 1795413646.1955676,
+    "seen": 1795413666.259795,
+    "ast_hash": "a00241eb626483c2a4d2bb5c553a93a1",
     "semantic_hash": ""
   },
   "apps/sync_api/src/modules/owner-copilot/owner-copilot.types.ts": {
