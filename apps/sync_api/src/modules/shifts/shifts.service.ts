@@ -598,6 +598,7 @@ export class ShiftsService {
         reversesTransactionId: t.reversesTransactionId ?? null,
         replacesTransactionId: t.replacesTransactionId ?? null,
         createdBy: t.createdBy ?? null,
+        version: t.version ?? 1,
         cashEffect: cashEffect(t),
       })),
       movementTotals: movementGroups.totals,
