@@ -15,8 +15,9 @@
 ### Session: prod-logging
 - **Scope**: Production diagnostics. Adds the `app_logs` table and `/api/logs` intake, an API 5xx interceptor, Flutter `RemoteLogger` plus the logged HTTP wrapper, the admin web `remoteLogger` plus error boundary, `make logs-*`, MCP log tools, and `docs/prod-log-triage.md`.
 - **Branch**: `feat/prod-logging`
-- **Migration Status**: Running idempotent production migration for `app_logs` on 2026-11-22; deployment follows after the migration lock wait.
-- **Status**: 🔄 Production rollout in progress
+- **Migration Status**: ✅ Completed 2026-11-22; `app_logs` ensured successfully.
+- **Security/Backend**: ✅ Secret Manager enabled; `pos-jwt-secret` and `pos-admin-password` are attached to Cloud Run revision `pos-sync-api-00132-hxh`. Health and protected log-summary checks passed.
+- **Status**: 🔄 Frontend logging rollout pending (`admin-deploy` and Flutter release were intentionally not deployed).
 
 ### Session: 017-sucursal-version
 - **Scope**: Plan and implement the POS display of the configured sucursal next to the application version; POS client only.
