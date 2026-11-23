@@ -112,6 +112,13 @@ test.describe('Supervisión de caja (Admin web)', () => {
     await loginAs(page, seed.supervisorEmail, seed.supervisorPassword);
     await openApprovals(page);
 
+    const nav = page.locator('aside nav');
+    await expect(nav.getByText('Operaciones y Local')).toHaveCount(0);
+    await expect(nav.getByText('Catálogo e Inventario')).toHaveCount(0);
+    await expect(nav.getByRole('button', { name: 'Reportes de Venta' })).toHaveCount(0);
+    await expect(nav.getByRole('button', { name: 'Adeudos' })).toBeVisible();
+    await expect(nav.getByRole('button', { name: 'Bitácora de caja' })).toBeVisible();
+
     await page.getByRole('button', { name: /Ingresos \/ egresos/ }).click();
     const movementCard = page
       .locator('div.rounded-lg')

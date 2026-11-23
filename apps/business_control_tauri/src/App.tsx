@@ -42,8 +42,8 @@ export const roleTabs: Record<string, AdminTab[]> = {
   warehouse_purchasing_operator: ['inventory-dashboard', 'warehouse-inventory', 'receipts', 'warehouses', 'providers', 'transfers', 'purchase-orders', 'requisitions', 'help'],
   branch_operator: ['requisitions', 'help'],
   web_inquiries_viewer: ['inquiries'],
-  // Spec 019: approves Corte Z (N2) and supervises cash of assigned branches; sees their sales.
-  branch_supervisor: ['approvals', 'notifications', 'reports', 'debts', 'audit-log', 'help'],
+  // Spec 019: reviews cash and cortes of assigned branches only.
+  branch_supervisor: ['approvals', 'notifications', 'debts', 'audit-log', 'help'],
 };
 
 /** Tabs for every role the user holds (spec 019 R-4), in first-seen order. */

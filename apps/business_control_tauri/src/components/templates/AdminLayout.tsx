@@ -93,6 +93,34 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
   ];
 
   const canSee = (tab: AdminTab) => allowedTabs.includes(tab);
+  const operationsTabs: AdminTab[] = [
+    'administrators',
+    'personal',
+    'branches',
+    'ticket-settings',
+    'pos-simulator',
+    'inquiries',
+    'logs',
+    'tickets',
+    'mesas',
+  ];
+  const catalogTabs: AdminTab[] = [
+    'inventory',
+    'inventory-dashboard',
+    'branch-catalog',
+    'warehouse-inventory',
+    'categories',
+    'assembly',
+    'receipts',
+    'warehouses',
+    'providers',
+    'transfers',
+    'purchase-orders',
+    'requisitions',
+    'reports',
+  ];
+  const showOperations = operationsTabs.some(canSee);
+  const showCatalog = catalogTabs.some(canSee);
   const businessOptions = [
     { value: 'd3b07384-d113-4a0e-a555-e5b12824bf01', label: 'Cafetería' },
     { value: 'e00079b3-16f2-4ac7-9cd3-0bb10335cb4d', label: 'Cafetería Jáltipan' },
@@ -168,11 +196,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
             )}
 
             {/* Group: Operaciones */}
+            {showOperations && (
             <div className="px-3 py-1.5 mt-1 select-none">
               <span className="text-[10px] font-bold text-aged-bronze uppercase tracking-widest">
                 Operaciones y Local
               </span>
             </div>
+            )}
 
             {canSee('administrators') && (
             <button
@@ -321,11 +351,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, o
             )}
 
             {/* Group: Catálogo & Inventario */}
+            {showCatalog && (
             <div className="px-3 py-1.5 mt-3 select-none">
               <span className="text-[10px] font-bold text-aged-bronze uppercase tracking-widest">
                 Catálogo e Inventario
               </span>
             </div>
+            )}
 
             {canSee('inventory') && (
             <button
