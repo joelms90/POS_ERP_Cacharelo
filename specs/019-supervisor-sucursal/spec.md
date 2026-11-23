@@ -33,7 +33,7 @@ Hoy el sistema **registra** el dinero de caja pero nadie lo **valida**:
 4. **Corte Z sin conexión** en el POS Flutter (D-5).
 5. **Adeudo formal del cajero** por faltante aprobado (D-8).
 6. **Bandejas de aprobación**: Admin web (supervisor y owner, D-10) y POS (OIS), más **notificaciones guardadas y consultables por REST**, con una sección **"Notificaciones"** en el Admin web (https://cacharelo-central.web.app/) que ve el supervisor (D-6).
-7. **Visibilidad del supervisor** en sus sucursales asignadas: ve lo que hicieron el cajero y el OIS en caja (cortes, movimientos, bitácora) y **también ve las ventas**, mediante los reportes existentes limitados a sus sucursales (D-9, P-3). Lo que **revisa y aprueba** en Fase 1 es solo caja.
+7. **Visibilidad del supervisor** en sus sucursales asignadas: ve lo que hicieron el cajero y el OIS en caja (cortes, movimientos, bitácora). **No ve reportes de ventas ni de inventario**; su alcance es solo supervisión de caja (D-9, P-3 actualizadas 2026-11-23).
 8. **Desbloqueo de emergencia (owner)**: si el OIS no está, el owner puede permitir la apertura del siguiente turno, con motivo y registro en la bitácora (P-2).
 9. **Bitácora de auditoría** inmutable: usuario, rol, fecha, motivo, valores antes/después.
 
@@ -243,19 +243,19 @@ Acciones: `corte_z_cerrado`, `corte_z_aprobado`, `corte_z_rechazado`, `corte_z_r
 | Reabrir un Corte Z aprobado | ❌ | ❌ | ❌ | ✅ con motivo |
 | Desbloquear apertura de turno en emergencia (P-2) | ❌ | ❌ | ❌ | ✅ con motivo |
 | Ver cortes, movimientos y bitácora de caja de cajeros y OIS | 🔸 (los suyos) | 🔸 | 🔹 | ✅ |
-| Ver ventas (reportes) | — | (como hoy) | 🔹 (D-9, P-3) | ✅ |
+| Ver ventas (reportes) | — | (como hoy) | ❌ (D-9, P-3 actualizadas) | ✅ |
 | Ver notificaciones | 🔸 (las suyas) | 🔸 (las suyas) | 🔹 (sección en el Admin web) | ✅ |
 | Ver adeudos | 🔸 (los suyos) | ❌ | 🔹 | ✅ |
 | Asignar supervisores a sucursales | ❌ | ❌ | ❌ | ✅ |
 | Crear sucursales / modificar permisos de administradores | ❌ | ❌ | ❌ | ✅ |
 | Eliminar registros financieros | ❌ | ❌ | ❌ | ❌ |
 
-Lo que el supervisor **aprueba** en Fase 1 es **solo caja**; las ventas solo las **consulta** (D-9, P-3).
+Lo que el supervisor **revisa** en Fase 1 es **solo caja**; no consulta reportes de ventas (D-9, P-3 actualizadas).
 
 Para fases siguientes (tabla del brief):
 - Autorizar descuentos, cancelaciones/devoluciones y ajustes de inventario: ✅🔹 (Fase 3).
 - Primer visto bueno de requisiciones: ✅🔹 (Fase 3).
-- Ventas de sus sucursales: ✅🔹 (consulta desde Fase 1; dashboard con ventas en Fase 2).
+- Ventas de sus sucursales: ❌ (sin acceso a reportes de ventas).
 - Crear sucursales, modificar permisos de administradores y eliminar registros financieros: ❌.
 
 ## 8. Notificaciones (D-6: persistentes, consultables por REST)
@@ -308,7 +308,7 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 - **FR-007** El POS MUST permitir el Corte Z sin conexión y sincronizarlo después, con recálculo en el servidor.
 - **FR-008** El sistema MUST generar un adeudo al cajero cuando N2 apruebe un corte con faltante.
 - **FR-009** El sistema MUST generar notificaciones persistentes, consultables por REST, para quien deba aprobar y para quien sea afectado por la decisión, y el Admin web MUST mostrarlas en una sección "Notificaciones" para el supervisor y el owner.
-- **FR-010** El supervisor MUST ver cortes, movimientos y bitácora de caja de cajeros y OIS de sus sucursales, y las ventas de esas sucursales; MUST NOT ver otras sucursales.
+- **FR-010** El supervisor MUST ver cortes, movimientos y bitácora de caja de cajeros y OIS de sus sucursales; MUST NOT ver reportes de ventas, reportes de inventario ni datos de otras sucursales.
 - **FR-014** El owner MUST poder desbloquear la apertura de turno de una sucursal con motivo, sin aprobar el corte pendiente.
 - **FR-011** El sistema MUST impedir la auto-aprobación y que el supervisor u owner actúen en N1, también vía peticiones directas.
 - **FR-012** Toda transición MUST escribir en `audit_log` en la misma transacción, con nivel, antes y después.
@@ -333,7 +333,7 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 - **SC-005** Un Corte Z hecho offline se sincroniza sin duplicarse y con el esperado recalculado.
 - **SC-006** Cada transición tiene exactamente un evento en `audit_log`.
 - **SC-007** Un corte aprobado con faltante genera exactamente un adeudo.
-- **SC-008** El supervisor solo ve datos (caja, ventas, notificaciones) de sus sucursales asignadas.
+- **SC-008** El supervisor solo ve datos de caja y notificaciones de sus sucursales asignadas; no accede a reportes de ventas ni de inventario.
 - **SC-009** Toda notificación generada se puede consultar por `GET /notifications` y aparece en la sección del Admin web.
 - **SC-011** La suma de `cash_effect` de un turno con movimientos rechazados o cancelados es igual a la de un turno sin esos movimientos; ningún `DELETE` ni `UPDATE` de columnas financieras tiene éxito en `cash_transactions`.
 - **SC-010** Un desbloqueo de emergencia permite abrir el turno sin cambiar el estado del corte pendiente y deja un evento en la bitácora.
@@ -342,7 +342,7 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 
 | # | Riesgo | Evidencia | Mitigación |
 |---|---|---|---|
-| R-1 | **Endpoints de reportes sin guard** | `reports.controller.ts`: `cash-shifts`, `sales/payment-methods`, `sales/products`, `inventory/existence` e `inventory/kardex` no tienen `@UseGuards` (no hay guard global). | Corregir antes de Fase 1. Al proteger los endpoints, el alcance del supervisor se limita a sus sucursales asignadas (también en ventas, P-3). |
+| R-1 | **Endpoints de reportes sin guard** | `reports.controller.ts`: `cash-shifts`, `sales/payment-methods`, `sales/products`, `inventory/existence` e `inventory/kardex` no tienen `@UseGuards` (no hay guard global). | Corregir antes de Fase 1. Los reportes de ventas quedan solo para administradores; el supervisor usa la bandeja de supervisión. |
 | R-2 | Agregar el supervisor a `ADMIN_ROLES` le daría todas las sucursales | `reports.service.ts:613`, `users.service.ts` | Nuevo grupo `SUPERVISION_ROLES` + `supervisor_branch_assignments`. |
 | R-3 | `RolesGuard` deja pasar siempre a `owner` | `roles.guard.ts` | Las reglas de nivel (S-6: owner no actúa en N1) van en el servicio, no en el guard. |
 | R-4 | Admin web decide pestañas por `user.role` | `App.tsx` | Usar la unión de `user.roles`. |
@@ -382,7 +382,7 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 | **D-6** | ¿Canal de aviso fuera de la bandeja? | ✅ RESUELTA (actualizada) | **Notificaciones persistentes consultables por REST**, visibles para el supervisor y en una sección "Notificaciones" del Admin web. **Sin push** en Fase 1 (§8). |
 | **D-7** | ¿PIN del supervisor en la terminal? | Pospuesta | Fase futura (§5). |
 | **D-8** | ¿Faltante como adeudo del cajero? | ✅ RESUELTA | **Sí**, adeudo formal (§4.3). |
-| **D-9** | ¿Supervisor ve ventas? | ✅ RESUELTA (actualizada por P-3) | **Sí**, ve las ventas de sus sucursales (reportes en Fase 1, dashboard en Fase 2). También ve lo que hicieron el cajero y el OIS en caja. Lo que revisa y aprueba es **solo caja**. |
+| **D-9** | ¿Supervisor ve ventas? | ✅ RESUELTA (actualizada 2026-11-23) | **No.** Ve solo caja (cortes, movimientos, bitácora) de sus sucursales asignadas. Sin reportes de ventas ni de inventario. |
 | **D-10** | ¿Admins aprueban desde el Admin web? | ✅ RESUELTA | Sí; la bandeja del Admin web está en Fase 1 (admin = owner, S-2). |
 | **D-11** | ¿Auto-cierre >24 h en Fase 1? | ✅ RESUELTA | No por ahora (R-7). |
 
@@ -412,6 +412,6 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 |---|---|---|---|
 | **P-1** | ¿Cómo se liquida un adeudo? | ✅ RESUELTA | **Solo se audita.** El adeudo se registra y queda en la bitácora; el sistema no gestiona su cobro (AD-05). |
 | **P-2** | ¿El owner puede desbloquear la apertura en emergencia? | ✅ RESUELTA | **Sí**, con motivo obligatorio y sin aprobar el corte (CZ-10b). |
-| **P-3** | ¿El supervisor ve ventas? | ✅ RESUELTA | **Sí**, las de sus sucursales asignadas (D-9 actualizada). |
+| **P-3** | ¿El supervisor ve ventas? | ✅ RESUELTA (actualizada 2026-11-23) | **No.** Solo caja de sus sucursales asignadas (D-9 actualizada). |
 
 No quedan decisiones abiertas para Fase 1.

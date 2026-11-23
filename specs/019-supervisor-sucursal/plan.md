@@ -13,7 +13,7 @@
 - **Adeudo del cajero** por faltante aprobado.
 - **Notificaciones persistentes consultables por REST**, con una sección en el Admin web (sin push), y bitácora append-only.
 - **Desbloqueo de emergencia de la apertura** por el owner.
-- El supervisor ve caja y ventas de sus sucursales; aprueba solo caja.
+- El supervisor ve solo caja de sus sucursales; no ve reportes de ventas ni de inventario.
 - El adeudo solo se registra y audita.
 
 ## Technical Context
@@ -35,7 +35,7 @@
 
 ## 0. Pre-requisito independiente (antes de Fase 1)
 
-Proteger los endpoints de `ReportsController` que no tienen guard (`cash-shifts`, `sales/payment-methods`, `sales/products`, `inventory/existence`, `inventory/kardex`) con `JwtAuthGuard + RolesGuard + assertScope` (R-1). Al agregar el supervisor, los endpoints de ventas (`sales-dashboard`, `sales/*`) lo aceptan **limitado a sus sucursales asignadas** (D-9/P-3). PR separado.
+Proteger los endpoints de `ReportsController` que no tienen guard (`cash-shifts`, `sales/payment-methods`, `sales/products`, `inventory/existence`, `inventory/kardex`) con `JwtAuthGuard + RolesGuard + assertScope` (R-1). Los endpoints de ventas (`sales-dashboard`, `sales/*`) quedan solo para administradores; el supervisor no los consume (D-9/P-3 actualizadas).
 
 ## 1. Backend (`apps/sync_api`)
 
@@ -116,7 +116,7 @@ Al pasar a `aprobado*` con diferencia final < 0, `debts.service` crea el adeudo 
 | `GET /notifications?unread=&branchId=&type=&from=&to=&page=` | cualquier usuario autenticado (solo las suyas) | Notificaciones persistentes (D-6). |
 | `GET /notifications/unread-count` | ídem | Para la campana y el contador. |
 | `POST /notifications/:id/read` · `POST /notifications/read-all` | ídem | |
-| `GET /reports/sales-dashboard`, `/reports/sales/*` (con alcance) | supervisor (asignadas), owner | Ventas del supervisor (D-9/P-3). |
+| `GET /reports/sales-dashboard`, `/reports/sales/*` | owner, inventory_admin, support_tech | Sin acceso para supervisor (D-9/P-3 actualizadas). |
 | `GET /reports/cash-shifts` (extendido) | con guard | `reviewStatus`, `approvedDifference`, filtro por estado. |
 
 ### 1.5 Notificaciones
@@ -202,7 +202,7 @@ La migración es aditiva y compatible hacia atrás. **Ojo con D-4**: en cuanto e
 ## 2. Admin web (`apps/business_control_tauri`)
 
 - `App.tsx` `roleTabs`:
-  - `branch_supervisor: ['notifications', 'approvals', 'cash-activity', 'reports', 'debts', 'audit-log', 'help']`. `reports` muestra ventas y cortes solo de sus sucursales asignadas (D-9/P-3).
+  - `branch_supervisor: ['notifications', 'approvals', 'debts', 'audit-log', 'help']`. Sin `reports`: el supervisor no ve ventas ni inventario (D-9/P-3 actualizadas).
   - owner suma `notifications`, `approvals`, `cash-activity`, `debts`, `audit-log`, `supervision-assignments`.
   - Calcular pestañas con la unión de `user.roles` (R-4).
 - `pages/ApprovalsPage.tsx` (patrón `RequisitionsApprovalPage.tsx`):
@@ -217,7 +217,7 @@ La migración es aditiva y compatible hacia atrás. **Ojo con D-4**: en cuanto e
 - **`pages/NotificationsPage.tsx`** (nueva sección "Notificaciones", D-6): lista con filtros (no leídas, sucursal, tipo, fecha), resaltado de las que requieren acción, enlace al detalle y "marcar como leída" / "marcar todas". Campana con contador en `AdminLayout.tsx` (polling cada 60 s a `/notifications/unread-count`).
 - `pages/AuditLogPage.tsx`; asignaciones de supervisores (owner).
 - `services/api.ts`: tipos y métodos de §1.4.
-- Tests: render por rol (el supervisor no ve ventas), aprobar con 409, cancelar/ajustar.
+- Tests: render por rol (el supervisor solo ve supervisión de caja), aprobar con 409, cancelar/ajustar.
 
 ## 3. POS Flutter (`apps/pos_flutter`)
 
@@ -246,7 +246,7 @@ La migración es aditiva y compatible hacia atrás. **Ojo con D-4**: en cuanto e
 
 ## 4. Documentación al implementar
 
-- `knowledge/business-rules/roles-permissions-rules.md`: `branch_supervisor`, BR-ROLE-005 (cadena de caja), BR-ROLE-006 (alcance por asignación, también en ventas), BR-ROLE-007 (desbloqueo de emergencia del owner).
+- `knowledge/business-rules/roles-permissions-rules.md`: `branch_supervisor`, BR-ROLE-005 (cadena de caja), BR-ROLE-006 (alcance por asignación, solo caja), BR-ROLE-007 (desbloqueo de emergencia del owner).
 - `docs/pre-deployment-checklist.md`: migración 0022 y orden de despliegue con la bandera.
 - `HANDOFF.md`, `.claude/workspaces.md`.
 

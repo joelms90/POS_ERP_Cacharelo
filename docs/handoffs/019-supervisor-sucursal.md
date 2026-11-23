@@ -22,7 +22,7 @@ Add the `branch_supervisor` role and, first, the approval of cash: Corte Z (two 
 | Opening block (D-4, C-2) | No new shift while the last corte of the branch is `pendiente_n1`/`rechazado_n1`. Owner emergency unblock (P-2). Behind `CASH_APPROVALS_ENFORCE_OPEN_BLOCK=true` (off by default). |
 | Debts (D-8, P-1) | An approved shortage creates a `cashier_debts` row (audited only; voided on reopen). |
 | Notifications (D-6) | Persistent, read over REST (`/notifications`). No push. |
-| Supervisor scope (D-1, D-9, P-3) | Several assigned branches; sees cash and sales reports of those branches only; no inventory reports. |
+| Supervisor scope (D-1, D-9, P-3) | Several assigned branches; sees only cash supervision (cortes, movements, audit log) of those branches. No sales reports and no inventory reports. |
 
 C-1 and C-2 are constants in `apps/sync_api/src/modules/supervision/cash-approval.config.ts`. C-1 is confirmed (same supervisor may resolve N2; owner audits later); C-2 is still **to be confirmed by the owner**.
 
