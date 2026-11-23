@@ -134,19 +134,17 @@ describe('Report endpoints authorization (spec 019 R-1, D-9/P-3)', () => {
     await request(app.getHttpServer()).get(path).auth(token({ role: 'cashier', branchId: 'branch-1' }), { type: 'bearer' }).expect(403);
   });
 
-  it('a supervisor must pick an assigned branch for sales reports', async () => {
+  it('sales reports stay closed to supervisors', async () => {
     const sup = token({ role: 'branch_supervisor', businessAccess: [{ businessId: 'business-1', role: 'branch_supervisor' }] });
     await request(app.getHttpServer()).get('/reports/sales/products?businessId=business-1').auth(sup, { type: 'bearer' }).expect(403);
     await request(app.getHttpServer()).get('/reports/sales/products?businessId=business-1&branchId=branch-9').auth(sup, { type: 'bearer' }).expect(403);
-    await request(app.getHttpServer()).get('/reports/sales/products?businessId=business-1&branchId=branch-1').auth(sup, { type: 'bearer' }).expect(200);
-    expect(reports.getProductSalesReport).toHaveBeenCalledWith(expect.objectContaining({ branchId: 'branch-1' }));
+    await request(app.getHttpServer()).get('/reports/sales/products?businessId=business-1&branchId=branch-1').auth(sup, { type: 'bearer' }).expect(403);
   });
 
-  it('the cash-shift list of a supervisor is limited to assigned branches', async () => {
+  it('the cash-shift list stays closed to supervisors', async () => {
     const sup = token({ role: 'branch_supervisor' });
-    await request(app.getHttpServer()).get('/reports/cash-shifts?businessId=business-1').auth(sup, { type: 'bearer' }).expect(200);
-    expect(reports.getCashShiftsList).toHaveBeenCalledWith(expect.objectContaining({ branchIds: ['branch-1'] }));
-    await request(app.getHttpServer()).get('/reports/cash-shifts?businessId=business-1&branchId=branch-9').auth(sup, { type: 'bearer' }).expect(403);
+    await request(app.getHttpServer()).get('/reports/cash-shifts?businessId=business-1').auth(sup, { type: 'bearer' }).expect(403);
+    await request(app.getHttpServer()).get('/reports/cash-shifts?businessId=business-1&branchId=branch-1').auth(sup, { type: 'bearer' }).expect(403);
   });
 
   it.each([...salesPaths, ...inventoryPaths])('keeps accepting the legacy X-Admin-Token on %s', async (path) => {
