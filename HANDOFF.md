@@ -1,14 +1,16 @@
 # Session Handoff
 
 ## Latest Session — Purchase order (OC) flow (2026-11-23, Claude Code)
-- **Branch:** `020-purchase-orders-flow` (worktree `.worktrees/purchase-orders`, based on the deployed `019-supervisor-sucursal` at `fe7dc8f`). Committed locally, **not pushed, not deployed**.
+- **Branch:** `020-purchase-orders-flow` (worktree `.worktrees/purchase-orders`), merged into local `main` (**not pushed**). **Deployed to production 2026-11-23**: migration step 23, backend `pos-sync-api-00145-6pk` (env vars and secrets kept), admin, and POS web + APK `1.0.1+51`, which also includes the warehouse sync menu (`7651c78`).
 - **Flow:** Owner / Admin. Inventario create (by hand or from alerts), edit drafts and authorize → Almacén y Compras sees "Por comprar" in POS → "Compras y Entradas", marks it purchased ("en camino a bodega", optional ticket) → registers the entrada (single count + price paid). Stock and average cost update only when the entrada is confirmed. Differences (short, merma, over-delivery, price) are allowed with a note. Cancel (reason) before anything is received; close short (reason) after a partial entrada. Owner / Admin. Inv. can mark purchased or register entradas on behalf with a reason.
 - **Audit:** append-only `purchase_order_receipt_ledger` (one row per line per entrada, so partial entradas no longer overwrite cost) + `audit_log`; `GET /purchase-orders/:id/history`, with entradas and timeline in the admin detail.
 - **Also fixed:** send/edit/delete without status checks; PATCH ignoring lines and `orderNumber`; totals never calculated; every role could do everything; no business check on OC detail; the Flutter entrada always sent a default note, which bypassed the "differences need a note" rule; the alerts auto-engine only skipped products on drafts.
 - **Docs:** `knowledge/workflows/procurement-to-stock.md`; migration step 23 in `docs/pre-deployment-checklist.md`.
 - **Verified:** backend `tsc` + unit suite (277 pass; the 3 real-DB suites skipped); admin `tsc` + `vite build`; Flutter `warehouse_flow_test` 6/6 (new OC sections test); Playwright OC specs updated and compile (not run).
-- **⚠️ NOT yet verified:** `purchase-orders.integration.spec.ts` (real DB) and migration step 23 locally. The Mac's disk filled up (≈4 GB free) and Docker's disk went read-only. Restart Docker Desktop, run `docker builder prune -af` (≈17.8 GB), then run the migration and `PURCHASE_ORDERS_IT_DATABASE_URL=… npx jest src/modules/purchase-orders/purchase-orders.integration.spec.ts`.
-- **To ship (after the DB tests pass):** merge into `019-supervisor-sucursal`/`main`, then `make backend-migrate` (step 23) and deploy backend (`gcloud run deploy pos-sync-api --source .` — not `make backend-deploy-fast`, which wipes env vars), admin and POS together. The live POS also has another session's uncommitted sync menu (see the previous entry); it is not on this branch.
+- **Real-DB verification:** with Docker's disk read-only, the full backend suite (304/304, including all 3 integration suites) ran against a throwaway Homebrew Postgres 14 cluster built from the repo migrations. Steps 1–23 ran twice (idempotent). A production dry run of step 23 (rolled back) matched: 3 `sent` → `authorized`, totals backfilled.
+- **Production data:** the 3 OCs that were `sent` are now "Por comprar". Almacén y Compras must mark them comprada before registering the entrada.
+- **⚠️ Local machine:** the disk is ~100% full and Docker's disk is read-only (`pos_postgres_local` cannot read its files). Restart Docker Desktop, then `docker builder prune -af` (≈17.8 GB).
+- **Terminals:** install APK `1.0.1+51` from the portal. Older builds cannot register entradas (`/send` is gone and the entrada payload changed).
 
 ---
 ## Latest Session — Requisition dispatch flow (2026-11-23, Claude Code)
