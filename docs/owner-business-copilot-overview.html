@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Copiloto del Negocio — cómo funciona</title>
+  <style>
+    :root { --ink:#111827; --muted:#64748b; --card:#fff; --line:#dbe4ef; --gold:#c28a22; --blue:#2563eb; --green:#15803d; --amber:#b45309; --red:#b91c1c; --bg:#f6f8fc; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--ink); font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { max-width:1440px; margin:auto; padding:42px clamp(18px,4vw,62px); min-height:100vh; }
+    .eyebrow { color:var(--gold); font-weight:800; font-size:.78rem; letter-spacing:.12em; text-transform:uppercase; } h1 { font-size:clamp(2rem,4.5vw,4.4rem); letter-spacing:-.055em; margin:.3rem 0 .65rem; } .lead { max-width:900px; color:var(--muted); font-size:clamp(1rem,1.8vw,1.3rem); line-height:1.55; }
+    .pill { display:inline-block; margin:14px 7px 0 0; padding:7px 11px; border:1px solid var(--line); border-radius:999px; background:#fff; font-size:.84rem; font-weight:650; }
+    .grid { display:grid; grid-template-columns:1.3fr .7fr; gap:24px; margin-top:34px; } .card { background:var(--card); border:1px solid var(--line); border-radius:20px; box-shadow:0 16px 45px rgba(15,23,42,.06); padding:clamp(18px,2.5vw,31px); }
+    h2 { font-size:1.25rem; margin:0 0 18px; } .flow { display:grid; grid-template-columns:repeat(5,1fr); align-items:start; gap:10px; } .node { min-height:144px; padding:14px; border-radius:14px; border:1px solid var(--line); background:#fbfdff; font-size:.84rem; line-height:1.35; } .node strong { display:block; margin-bottom:7px; } .node.user { border-color:#bfdbfe; background:#eff6ff; } .node.ai { border-color:#fde68a; background:#fffbeb; } .node.api { border-color:#bbf7d0; background:#f0fdf4; } .node.data { border-color:#ddd6fe; background:#f5f3ff; } .arrow { color:#94a3b8; font-size:1.55rem; text-align:center; padding-top:57px; }
+    .cap { display:grid; grid-template-columns:32px 1fr; gap:11px; padding:14px 0; border-bottom:1px solid var(--line); } .cap:last-child { border:0; } .icon { width:29px; height:29px; border-radius:9px; display:grid; place-items:center; background:#f1f5f9; font-weight:900; } .cap b { display:block; font-size:.92rem; } .cap span { color:var(--muted); font-size:.84rem; line-height:1.4; }
+    .paths { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:24px; } .path { border-radius:18px; padding:24px; border:1px solid var(--line); background:#fff; } .path.read { border-top:5px solid var(--green); } .path.write { border-top:5px solid var(--amber); } .step { display:flex; align-items:center; gap:11px; margin:12px 0; font-size:.91rem; } .num { flex:0 0 26px; height:26px; border-radius:50%; color:#fff; display:grid; place-items:center; font-size:.75rem; font-weight:800; background:var(--green); } .write .num { background:var(--amber); }
+    .rule { margin-top:24px; border-radius:16px; padding:19px 22px; background:#172033; color:#edf4ff; display:flex; gap:14px; align-items:start; } .rule b { color:#fcd34d; } .tiny { color:var(--muted); font-size:.78rem; margin-top:22px; }
+    @media(max-width:900px) { .grid,.paths { grid-template-columns:1fr; } .flow { grid-template-columns:1fr; } .arrow { transform:rotate(90deg); padding:0; height:22px; } .node { min-height:0; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Cacharelo · Owner Business Copilot</div>
+    <h1>Un asistente con límites de negocio,<br>no un usuario con acceso total.</h1>
+    <p class="lead">El Copiloto ayuda al propietario a consultar datos y entenderlos en español. Gemini interpreta y redacta; el backend conserva el control de identidad, datos, permisos y cualquier cambio.</p>
+    <div><span class="pill">Solo propietario autenticado</span><span class="pill">Gemini solo en el servidor</span><span class="pill">Lecturas permitidas</span><span class="pill">Cambios requieren confirmación</span></div>
+
+    <section class="grid">
+      <div class="card">
+        <h2>Ruta de una consulta segura</h2>
+        <div class="flow">
+          <div class="node user"><strong>1. Propietario</strong>Pregunta: “¿Cómo van las ventas hoy?”</div><div class="arrow">→</div>
+          <div class="node ai"><strong>2. Gemini</strong>Clasifica la intención permitida.</div><div class="arrow">→</div>
+          <div class="node api"><strong>3. API segura</strong>Valida JWT/rol y ejecuta solo la herramienta autorizada.</div><div class="arrow">→</div>
+          <div class="node data"><strong>4. Datos + resumen</strong>Obtiene el reporte, lo redacta y Gemini lo resume en español.</div>
+        </div>
+        <p class="tiny">Gemini no recibe la llave del navegador, no llama a MCP y no decide permisos. Si Gemini no responde, el sistema usa una respuesta local segura.</p>
+      </div>
+      <aside class="card">
+        <h2>Qué puede hacer hoy</h2>
+        <div class="cap"><div class="icon">✓</div><div><b>Ventas</b><span>Consulta un resumen de ventas y lleva al reporte correspondiente.</span></div></div>
+        <div class="cap"><div class="icon">✓</div><div><b>Alertas de inventario</b><span>Consulta alertas activas y lleva al panel de inventario.</span></div></div>
+        <div class="cap"><div class="icon">✓</div><div><b>Proponer</b><span>Puede proponer orden de compra o cambio de precio.</span></div></div>
+        <div class="cap"><div class="icon">✕</div><div><b>No modifica en automático</b><span>Aún no existe un ejecutor de escrituras; una confirmación sola no cambia nada.</span></div></div>
+      </aside>
+    </section>
+
+    <section class="paths">
+      <div class="path read"><h2>🟢 Ejemplo: lectura</h2><div class="step"><div class="num">1</div>“¿Qué alertas de inventario tengo?”</div><div class="step"><div class="num">2</div>Gemini selecciona <code>inventory_alerts</code>.</div><div class="step"><div class="num">3</div>La API consulta la fuente permitida.</div><div class="step"><div class="num">4</div>Gemini resume los datos y muestra la fuente enlazada.</div></div>
+      <div class="path write"><h2>🟠 Ejemplo: cambio de precio</h2><div class="step"><div class="num">1</div>“¿Puedes cambiar el precio de los pastes?”</div><div class="step"><div class="num">2</div>Se crea propuesta <code>update_product_price</code>.</div><div class="step"><div class="num">3</div>El propietario revisa producto y monto, luego confirma.</div><div class="step"><div class="num">4</div>Hoy: se detiene de forma segura. Futuro: ejecutor tipado + token de un uso.</div></div>
+    </section>
+
+    <section class="rule"><div>🔐</div><div><b>Regla clave:</b> una frase en el chat nunca es una orden de escritura. Para modificar datos se necesita una propuesta tipada, revisión humana, token de confirmación con vencimiento y un ejecutor explícito.</div></section>
+    <p class="tiny">Auditoría: conversación, mensajes, herramientas y confirmaciones se guardan redactados cuando la migración de auditoría esté aplicada. La clave Gemini vive únicamente en Secret Manager/Cloud Run, nunca en el navegador.</p>
+  </main>
+</body>
+</html>
