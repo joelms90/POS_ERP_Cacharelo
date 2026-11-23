@@ -3,6 +3,7 @@ import { SupervisorScopeService } from '../audit/supervisor-scope.service';
 import { ReportsService } from './reports.service';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtOrAdminTokenGuard } from '../auth/guards/jwt-or-admin-token.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { assertBusinessAccess } from '../auth/business-access';
@@ -19,7 +20,7 @@ import {
   normalizeOperationalRole,
 } from '../auth/roles';
 
-type ReportRequest = { user?: { sub?: string; branchId?: string; businessId?: string; businessAccess?: Array<{ businessId?: string; role?: string }>; role?: string; roles?: string[] } };
+type ReportRequest = { user?: { sub?: string; branchId?: string; businessId?: string; businessAccess?: Array<{ businessId?: string; role?: string }>; role?: string; roles?: string[]; legacyAdmin?: boolean } };
 const REPORT_ADMIN_ROLES = [OWNER_ROLE, INVENTORY_ADMIN_ROLE, SUPPORT_TECH_ROLE];
 // Spec 019 D-9/P-3: supervisors see sales and cash reports of their assigned branches.
 const SALES_REPORT_ROLES = [...REPORT_ADMIN_ROLES, BRANCH_SUPERVISOR_ROLE];
@@ -33,7 +34,7 @@ export class ReportsController {
   ) {}
 
   @Get('sales-dashboard')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtOrAdminTokenGuard, RolesGuard)
   @Roles(...SALES_REPORT_ROLES)
   async getSalesDashboard(
     @Req() req: ReportRequest,
@@ -51,7 +52,7 @@ export class ReportsController {
   }
 
   @Get('sales/products')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtOrAdminTokenGuard, RolesGuard)
   @Roles(...SALES_REPORT_ROLES)
   async getProductSalesReport(
     @Req() req: ReportRequest,
@@ -76,7 +77,7 @@ export class ReportsController {
   }
 
   @Get('inventory/existence')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtOrAdminTokenGuard, RolesGuard)
   @Roles(...INVENTORY_REPORT_ROLES)
   async getInventoryExistence(
     @Req() req: ReportRequest,
@@ -106,7 +107,7 @@ export class ReportsController {
   }
 
   @Get('inventory/kardex')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtOrAdminTokenGuard, RolesGuard)
   @Roles(...INVENTORY_REPORT_ROLES)
   async getInventoryKardex(
     @Req() req: ReportRequest,
@@ -135,7 +136,7 @@ export class ReportsController {
   }
 
   @Get('sales/payment-methods')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtOrAdminTokenGuard, RolesGuard)
   @Roles(...SALES_REPORT_ROLES)
   async getPaymentMethodsSalesReport(
     @Req() req: ReportRequest,
@@ -158,7 +159,7 @@ export class ReportsController {
   }
 
   @Get('cash-shifts')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtOrAdminTokenGuard, RolesGuard)
   @Roles(...SALES_REPORT_ROLES)
   async getCashShiftsList(
     @Req() req: ReportRequest,
@@ -225,6 +226,8 @@ export class ReportsController {
 
   private assertScope(req: ReportRequest, businessId: string, branchId?: string) {
     const actor = req.user;
+    // Legacy admin-password sessions act as a global owner (same as AdminGuard).
+    if (actor?.legacyAdmin) return;
     assertBusinessAccess(actor, businessId);
     if (!actor?.businessId && !actor?.businessAccess?.length) {
       throw new ForbiddenException('Se requiere un negocio asociado.');

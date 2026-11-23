@@ -149,6 +149,14 @@ describe('Report endpoints authorization (spec 019 R-1, D-9/P-3)', () => {
     await request(app.getHttpServer()).get('/reports/cash-shifts?businessId=business-1&branchId=branch-9').auth(sup, { type: 'bearer' }).expect(403);
   });
 
+  it.each([...salesPaths, ...inventoryPaths])('keeps accepting the legacy X-Admin-Token on %s', async (path) => {
+    await request(app.getHttpServer()).get(path).set('X-Admin-Token', process.env.ADMIN_PASSWORD || 'admin123').expect(200);
+  });
+
+  it('rejects a wrong legacy admin token', async () => {
+    await request(app.getHttpServer()).get(salesPaths[0]).set('X-Admin-Token', 'wrong').expect(401);
+  });
+
   it('inventory reports stay closed to supervisors in phase 1', async () => {
     await request(app.getHttpServer())
       .get('/reports/inventory/existence?businessId=business-1')
