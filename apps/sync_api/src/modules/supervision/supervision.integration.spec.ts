@@ -621,24 +621,35 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
   });
 
   it('D-5: an offline queue syncs movements with their real time and an idempotent offline close', async () => {
-    const opened = await http().post('/cash-shifts').auth(as.ois2(), { type: 'bearer' }).send({ initialFloat: '300.00' }).expect(201);
+    // Fresh cashier in branch B: branch A still has an open shift from the P-2 test.
+    const cashierB = randomUUID();
+    await query(
+      `INSERT INTO users (id, business_id, branch_id, name, pin, role, roles) VALUES ($1, $2, $3, 'IT Cajero B', 'x', 'cashier', '["cashier"]'::jsonb)`,
+      [cashierB, businessId, branchB],
+    );
+    const asCashierB = () => token(cashierB, 'cashier', branchB);
+    const pause = () => new Promise((resolve) => setTimeout(resolve, 30));
+    const opened = await http().post('/cash-shifts').auth(asCashierB(), { type: 'bearer' }).send({ initialFloat: '300.00' }).expect(201);
     const shiftId = opened.body.id;
-    const occurredAt = new Date(Date.now() - 60 * 1000).toISOString();
-    const closedAt = new Date(Date.now() - 30 * 1000).toISOString();
+    await pause();
+    const occurredAt = new Date().toISOString();
+    await pause();
+    const closedAt = new Date().toISOString();
+    await pause();
     const movementUuid = `it-offline-${randomUUID()}`;
     const send = () =>
       http()
         .post(`/cash-shifts/${shiftId}/transactions`)
-        .auth(as.ois2(), { type: 'bearer' })
+        .auth(asCashierB(), { type: 'bearer' })
         .send({ type: 'cash-out', amount: '50.00', reason: 'Gasto offline', category: 'gasto_operativo', clientUuid: movementUuid, occurredAt });
     await send().expect(201);
     const dup = await send().expect(201);
     expect(dup.body.duplicate).toBe(true);
     const closeBody = { actualAmount: '250.00', clientUuid: `close-${movementUuid}`, closedAt, closedOffline: true, localExpectedCash: '250.00' };
-    await http().post(`/cash-shifts/${shiftId}/close`).auth(as.ois2(), { type: 'bearer' }).send(closeBody).expect(200);
-    const retry = await http().post(`/cash-shifts/${shiftId}/close`).auth(as.ois2(), { type: 'bearer' }).send(closeBody).expect(200);
+    await http().post(`/cash-shifts/${shiftId}/close`).auth(asCashierB(), { type: 'bearer' }).send(closeBody).expect(200);
+    const retry = await http().post(`/cash-shifts/${shiftId}/close`).auth(asCashierB(), { type: 'bearer' }).send(closeBody).expect(200);
     expect(retry.body.duplicate).toBe(true);
-    const detail = await http().get(`/supervision/cash-shifts/${shiftId}`).auth(as.supervisor(), { type: 'bearer' }).expect(200);
+    const detail = await http().get(`/supervision/cash-shifts/${shiftId}`).auth(as.owner(), { type: 'bearer' }).expect(200);
     expect(detail.body.shift).toMatchObject({ closedOffline: true, localExpectedCash: 250 });
     expect(detail.body.figures).toMatchObject({ expectedAtClose: 250, postCloseAdjustment: 0, adjustedDifference: 0 });
     const rows = await query('SELECT created_at FROM cash_transactions WHERE client_uuid = $1', [movementUuid]);
