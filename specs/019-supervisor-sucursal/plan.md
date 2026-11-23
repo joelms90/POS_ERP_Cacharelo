@@ -198,7 +198,7 @@ La migración es aditiva y compatible hacia atrás. **Ojo con D-4**: en cuanto e
 ## 2. Admin web (`apps/business_control_tauri`)
 
 - `App.tsx` `roleTabs`:
-  - `branch_supervisor: ['notifications', 'approvals', 'debts', 'audit-log', 'help']`. Sin `reports`: el supervisor no ve ventas ni inventario (D-9/P-3 actualizadas).
+  - `branch_supervisor: ['notifications', 'approvals', 'debts', 'audit-log']`. Sin `reports` ni `help`: el supervisor solo ve supervisión de caja.
   - owner suma `notifications`, `approvals`, `cash-activity`, `debts`, `audit-log`, `supervision-assignments`.
   - Calcular pestañas con la unión de `user.roles` (R-4).
 - `pages/ApprovalsPage.tsx` (patrón `RequisitionsApprovalPage.tsx`):

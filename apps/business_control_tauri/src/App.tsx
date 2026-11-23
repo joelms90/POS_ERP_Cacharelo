@@ -43,7 +43,7 @@ export const roleTabs: Record<string, AdminTab[]> = {
   branch_operator: ['requisitions', 'help'],
   web_inquiries_viewer: ['inquiries'],
   // Spec 019: reviews cash and cortes of assigned branches only.
-  branch_supervisor: ['approvals', 'notifications', 'debts', 'audit-log', 'help'],
+  branch_supervisor: ['approvals', 'notifications', 'debts', 'audit-log'],
 };
 
 /** Tabs for every role the user holds (spec 019 R-4), in first-seen order. */

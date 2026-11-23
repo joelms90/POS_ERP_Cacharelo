@@ -116,6 +116,8 @@ test.describe('Supervisión de caja (Admin web)', () => {
     await expect(nav.getByText('Operaciones y Local')).toHaveCount(0);
     await expect(nav.getByText('Catálogo e Inventario')).toHaveCount(0);
     await expect(nav.getByRole('button', { name: 'Reportes de Venta' })).toHaveCount(0);
+    await expect(nav.getByRole('button', { name: 'Guía y Manual (FAQ)' })).toHaveCount(0);
+    await expect(page.getByTitle('Guía y Manual (FAQ)')).toHaveCount(0);
     await expect(nav.getByRole('button', { name: 'Adeudos' })).toBeVisible();
     await expect(nav.getByRole('button', { name: 'Bitácora de caja' })).toBeVisible();
 
