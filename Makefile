@@ -650,7 +650,7 @@ backend-deploy:
 			--max-instances 10 \
 			--allow-unauthenticated \
 			--add-cloudsql-instances fresh-sensor-497515-d3:us-central1:pos-db-instance \
-			--set-env-vars "NODE_ENV=production,ENABLE_GCP_INTEGRATIONS=true,DATABASE_URL=postgresql://pos_user:pos-secure-db-pass-2026!@/pos_db?host=/cloudsql/fresh-sensor-497515-d3:us-central1:pos-db-instance,PG_POOL_MAX=5,PG_IDLE_TIMEOUT_MS=30000,PG_CONNECTION_TIMEOUT_MS=5000,TAKEAWAY_SELF_HEAL_INTERVAL_MS=60000"
+			--update-env-vars "NODE_ENV=production,ENABLE_GCP_INTEGRATIONS=true,DATABASE_URL=postgresql://pos_user:pos-secure-db-pass-2026!@/pos_db?host=/cloudsql/fresh-sensor-497515-d3:us-central1:pos-db-instance,PG_POOL_MAX=5,PG_IDLE_TIMEOUT_MS=30000,PG_CONNECTION_TIMEOUT_MS=5000,TAKEAWAY_SELF_HEAL_INTERVAL_MS=60000"
 	@echo ""
 	@echo "✅ Deployment complete!"
 	@echo ""
@@ -676,7 +676,7 @@ backend-deploy-fast:
 			--max-instances 10 \
 			--allow-unauthenticated \
 			--add-cloudsql-instances fresh-sensor-497515-d3:us-central1:pos-db-instance \
-			--set-env-vars "NODE_ENV=production,ENABLE_GCP_INTEGRATIONS=true,DATABASE_URL=postgresql://pos_user:pos-secure-db-pass-2026!@/pos_db?host=/cloudsql/fresh-sensor-497515-d3:us-central1:pos-db-instance,PG_POOL_MAX=5,PG_IDLE_TIMEOUT_MS=30000,PG_CONNECTION_TIMEOUT_MS=5000,TAKEAWAY_SELF_HEAL_INTERVAL_MS=60000"
+			--update-env-vars "NODE_ENV=production,ENABLE_GCP_INTEGRATIONS=true,DATABASE_URL=postgresql://pos_user:pos-secure-db-pass-2026!@/pos_db?host=/cloudsql/fresh-sensor-497515-d3:us-central1:pos-db-instance,PG_POOL_MAX=5,PG_IDLE_TIMEOUT_MS=30000,PG_CONNECTION_TIMEOUT_MS=5000,TAKEAWAY_SELF_HEAL_INTERVAL_MS=60000"
 	@echo ""
 	@echo "✅ Deployment complete!"
 	@echo ""
