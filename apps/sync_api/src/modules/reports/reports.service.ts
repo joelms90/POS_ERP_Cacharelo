@@ -2,7 +2,8 @@ import { Injectable, Inject, ForbiddenException } from '@nestjs/common';
 import { DRIZZLE_CONNECTION } from '../../database/database.module';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../database/schema';
-import { eq, and, isNull, gte, lte, lt, gt, inArray, desc } from 'drizzle-orm';
+import { eq, and, isNull, gte, lte, lt, gt, inArray, desc, asc, sql } from 'drizzle-orm';
+import { cashEffect, reconciliationStatus } from '../supervision/cash-approval.rules';
 import { assertBusinessAccess, getUserRoles, isGlobalOwner } from '../auth/business-access';
 import { ADMIN_ROLES, BRANCH_OPERATOR_ROLE, normalizeOperationalRole } from '../auth/roles';
 
@@ -536,22 +537,38 @@ export class ReportsService {
     startDate?: string;
     endDate?: string;
     branchId?: string;
+    /** Spec 019: restricts a supervisor to assigned branches. */
+    branchIds?: string[];
   }) {
-    const { businessId, startDate, endDate, branchId } = query;
+    const { businessId, startDate, endDate, branchId, branchIds } = query;
+    if (branchIds && branchIds.length === 0) return [];
 
     const start = startDate ? new Date(startDate + 'T00:00:00') : null;
     const end = endDate ? new Date(endDate + 'T23:59:59') : null;
 
-    return await this.db
+    const rows = await this.db
       .select({
         id: schema.cashShifts.id,
         cashierName: schema.users.name,
+        branchId: schema.cashShifts.branchId,
         branchName: schema.branches.name,
         initialFloat: schema.cashShifts.initialFloat,
         cashDrawerAmount: schema.cashShifts.cashDrawerAmount,
         status: schema.cashShifts.status,
         openedAt: schema.cashShifts.openedAt,
         closedAt: schema.cashShifts.closedAt,
+        closeSnapshot: schema.cashShifts.closeSnapshot,
+        reviewStatus: schema.cashShifts.reviewStatus,
+        approvedAmount: schema.cashShifts.approvedAmount,
+        approvedDifference: schema.cashShifts.approvedDifference,
+        approvalSnapshot: schema.cashShifts.approvalSnapshot,
+        // Spec 019 §4.4.3: reversals inserted after the close, shown apart from the snapshot.
+        postCloseAdjustment: sql<string>`coalesce((
+          SELECT sum(ct.cash_effect) FROM cash_transactions ct
+          WHERE ct.shift_id = ${schema.cashShifts.id}
+            AND ${schema.cashShifts.closedAt} IS NOT NULL
+            AND ct.created_at > ${schema.cashShifts.closedAt}
+        ), 0)`,
       })
       .from(schema.cashShifts)
       .innerJoin(schema.users, eq(schema.cashShifts.cashierId, schema.users.id))
@@ -562,9 +579,51 @@ export class ReportsService {
           start ? gte(schema.cashShifts.openedAt, start) : undefined,
           end ? lte(schema.cashShifts.openedAt, end) : undefined,
           branchId ? eq(schema.cashShifts.branchId, branchId) : undefined,
+          branchIds ? inArray(schema.cashShifts.branchId, branchIds) : undefined,
         ),
       )
       .orderBy(desc(schema.cashShifts.openedAt));
+    return rows.map((row) => ({ ...row, ...this.cashShiftReconciliation(row) }));
+  }
+
+  /**
+   * Official vs provisional figures of a closed shift, computed on the server so
+   * Admin, POS and CSV agree (spec 019 §4.4.5): approved cortes use the frozen
+   * approval snapshot; others use the close snapshot plus post-close reversals.
+   */
+  private cashShiftReconciliation(row: {
+    status: string;
+    cashDrawerAmount: string | null;
+    closeSnapshot: unknown;
+    reviewStatus?: string | null;
+    approvedAmount?: string | null;
+    approvedDifference?: string | null;
+    approvalSnapshot?: unknown;
+    postCloseAdjustment?: string | number | null;
+  }) {
+    if (row.status !== 'closed') {
+      return { expectedAtClose: null, postCloseAdjustment: 0, adjustedExpected: null, adjustedDifference: null, isOfficial: false, reconciliationStatus: null };
+    }
+    const snap = (row.closeSnapshot ?? null) as any;
+    const approval = (row.approvalSnapshot ?? null) as any;
+    const postClose = this.roundMoney(this.parseMoney(row.postCloseAdjustment));
+    const expectedAtClose = snap?.summary?.expectedCash ?? snap?.expectedCash ?? null;
+    const isOfficial = row.reviewStatus === 'aprobado' || row.reviewStatus === 'aprobado_con_ajuste';
+    const counted = isOfficial && row.approvedAmount != null ? this.parseMoney(row.approvedAmount) : this.parseMoney(row.cashDrawerAmount);
+    const adjustedExpected = isOfficial && approval?.adjustedExpected != null
+      ? this.roundMoney(Number(approval.adjustedExpected))
+      : expectedAtClose === null ? null : this.roundMoney(Number(expectedAtClose) + postClose);
+    const adjustedDifference = isOfficial && row.approvedDifference != null
+      ? this.parseMoney(row.approvedDifference)
+      : adjustedExpected === null ? null : this.roundMoney(counted - adjustedExpected);
+    return {
+      expectedAtClose: expectedAtClose === null ? null : Number(expectedAtClose),
+      postCloseAdjustment: postClose,
+      adjustedExpected,
+      adjustedDifference,
+      isOfficial,
+      reconciliationStatus: adjustedExpected === null ? null : reconciliationStatus(adjustedExpected, counted),
+    };
   }
 
   async getCashShiftAuditReport(
@@ -577,6 +636,8 @@ export class ReportsService {
       roles?: string[];
       businessAccess?: Array<{ businessId?: string; role?: string }>;
     },
+    /** Spec 019: set for supervisors; they may audit only assigned branches. */
+    supervisorBranchIds?: string[],
   ) {
     const shiftList = await this.db
       .select({
@@ -617,6 +678,10 @@ export class ReportsService {
 
       if (isAdmin) {
         // Admins and owners can audit any shift within their business
+      } else if (supervisorBranchIds) {
+        if (!supervisorBranchIds.includes(shift.branchId)) {
+          throw new ForbiddenException('Esta sucursal no está asignada a tu supervisión.');
+        }
       } else if (isBranchSupervisor) {
         // Branch operators can audit shifts in their assigned branch
         if (!actor.branchId || actor.branchId !== shift.branchId) {
@@ -635,6 +700,7 @@ export class ReportsService {
       }
     }
 
+    const review = await this.cashShiftReview(shiftId);
     if (shift.status === 'closed' && shift.closeSnapshot) {
       const snap = shift.closeSnapshot as any;
       const initialFloat =
@@ -716,6 +782,7 @@ export class ReportsService {
           snap.denominationCounts ?? shift.denominationCounts ?? null,
         closeNotes: snap.closeNotes ?? shift.closeNotes ?? null,
         generatedAt: snap.generatedAt ?? new Date(),
+        review,
       };
     }
 
@@ -729,19 +796,23 @@ export class ReportsService {
         amount: schema.cashTransactions.amount,
         reason: schema.cashTransactions.reason,
         createdAt: schema.cashTransactions.createdAt,
+        category: schema.cashTransactions.category,
+        entryKind: schema.cashTransactions.entryKind,
+        approvalStatus: schema.cashTransactions.approvalStatus,
       })
       .from(schema.cashTransactions)
       .where(eq(schema.cashTransactions.shiftId, shiftId))
       .orderBy(schema.cashTransactions.createdAt);
 
+    // Spec 019 S-4: reversal entries net out rejected/cancelled movements.
     let totalCashIn = 0;
     let totalCashOut = 0;
     transactionsList.forEach((t) => {
-      const amt = this.parseMoney(t.amount);
+      const effect = cashEffect(t);
       if (t.type === 'cash-in') {
-        totalCashIn += amt;
+        totalCashIn += effect;
       } else if (t.type === 'cash-out') {
-        totalCashOut += amt;
+        totalCashOut -= effect;
       }
     });
 
@@ -829,6 +900,9 @@ export class ReportsService {
         amount: this.parseMoney(t.amount),
         reason: t.reason,
         createdAt: t.createdAt,
+        category: t.category,
+        entryKind: t.entryKind,
+        approvalStatus: t.approvalStatus,
       })),
       cashMovements: transactionsList.map((t) => ({
         id: t.id,
@@ -836,8 +910,12 @@ export class ReportsService {
         amount: this.parseMoney(t.amount),
         reason: t.reason,
         createdAt: t.createdAt,
+        category: t.category,
+        entryKind: t.entryKind,
+        approvalStatus: t.approvalStatus,
       })),
       expectedCash: this.roundMoney(expectedCash),
+      review,
       discrepancy: shift.status === 'closed' ? this.roundMoney(discrepancy) : 0,
       denominationCounts: shift.denominationCounts ?? null,
       closeNotes: shift.closeNotes ?? null,
@@ -920,6 +998,63 @@ export class ReportsService {
       itemsGrossTotal: this.roundMoney(itemsGrossTotal),
       subtotal: this.roundMoney(order.subtotal),
       difference: this.roundMoney(difference),
+    };
+  }
+
+  /**
+   * Spec 019: review state and post-close ledger adjustments of a shift.
+   * Enrichment only: a failure here must not break the audit report itself.
+   */
+  private async cashShiftReview(shiftId: string) {
+    try {
+      return await this.loadCashShiftReview(shiftId);
+    } catch {
+      return null;
+    }
+  }
+
+  private async loadCashShiftReview(shiftId: string) {
+    const [row] = await this.db
+      .select({
+        status: schema.cashShifts.status,
+        closedAt: schema.cashShifts.closedAt,
+        cashDrawerAmount: schema.cashShifts.cashDrawerAmount,
+        closeSnapshot: schema.cashShifts.closeSnapshot,
+        reviewStatus: schema.cashShifts.reviewStatus,
+        approvedAmount: schema.cashShifts.approvedAmount,
+        approvedDifference: schema.cashShifts.approvedDifference,
+        approvalSnapshot: schema.cashShifts.approvalSnapshot,
+        n1ResolverRole: schema.cashShifts.n1ResolverRole,
+        recountCount: schema.cashShifts.recountCount,
+        version: schema.cashShifts.version,
+      })
+      .from(schema.cashShifts)
+      .where(eq(schema.cashShifts.id, shiftId))
+      .limit(1);
+    if (!row) return null;
+    const postCloseEntries = row.closedAt
+      ? await this.db
+          .select({
+            id: schema.cashTransactions.id,
+            type: schema.cashTransactions.type,
+            amount: schema.cashTransactions.amount,
+            entryKind: schema.cashTransactions.entryKind,
+            reason: schema.cashTransactions.reason,
+            createdAt: schema.cashTransactions.createdAt,
+          })
+          .from(schema.cashTransactions)
+          .where(and(eq(schema.cashTransactions.shiftId, shiftId), gt(schema.cashTransactions.createdAt, row.closedAt)))
+          .orderBy(asc(schema.cashTransactions.createdAt))
+      : [];
+    const postCloseAdjustment = this.roundMoney(postCloseEntries.reduce((sum, e) => sum + cashEffect(e), 0));
+    return {
+      reviewStatus: row.reviewStatus,
+      n1ResolverRole: row.n1ResolverRole,
+      recountCount: row.recountCount,
+      version: row.version,
+      approvedAmount: row.approvedAmount != null ? this.parseMoney(row.approvedAmount) : null,
+      postCloseEntries: postCloseEntries.map((e) => ({ ...e, amount: this.parseMoney(e.amount), cashEffect: cashEffect(e) })),
+      ...this.cashShiftReconciliation({ ...row, postCloseAdjustment }),
     };
   }
 

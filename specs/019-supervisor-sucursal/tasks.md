@@ -51,9 +51,9 @@ Leyenda: `[ ]` pendiente · `[x]` hecho · `[~]` parcial / diferido (con nota)
 - [x] T146 Tests de autorización HTTP (401/403/409/422) y de servicio para cada regla.
 
 ### 1.6 Reportes
-- [ ] T150 Guards en endpoints de reportes sin protección (R-1) y alcance del supervisor a sus sucursales (D-9/P-3).
-- [ ] T151 `getCashShiftAuditReport` / `getCashShiftsList`: `reviewStatus`, `approvedDifference`, `postCloseEntries`, `adjustedExpected`, `reconciliationStatus` del backend.
-- [ ] T152 Tests.
+- [x] T150 Guards en endpoints de reportes sin protección (R-1) y alcance del supervisor a sus sucursales (D-9/P-3).
+- [x] T151 `getCashShiftAuditReport` / `getCashShiftsList`: `reviewStatus`, `approvedDifference`, `postCloseEntries`, `adjustedExpected`, `reconciliationStatus` del backend.
+- [x] T152 Tests.
 
 ### 1.7 Cierre del backend
 - [ ] T160 `npx tsc --noEmit`, `npx jest`, `npm run build`; resumen.

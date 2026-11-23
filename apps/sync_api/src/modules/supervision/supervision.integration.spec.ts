@@ -61,6 +61,7 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     const { AuditModule } = require('../audit/audit.module');
     const { SupervisionModule } = require('./supervision.module');
     const { ShiftsModule } = require('../shifts/shifts.module');
+    const { ReportsModule } = require('../reports/reports.module');
     ({ pool } = require('../../database/connection'));
     /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -90,7 +91,7 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     );
 
     const moduleRef = await Test.createTestingModule({
-      imports: [DatabaseModule, AuditModule, ShiftsModule, SupervisionModule],
+      imports: [DatabaseModule, AuditModule, ShiftsModule, SupervisionModule, ReportsModule],
     }).compile();
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
@@ -247,6 +248,23 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     // The close snapshot is never rewritten.
     const row = await shiftRow(state.shiftA);
     expect(row.close_snapshot.summary.expectedCash).toBe(200);
+  });
+
+  it('reports expose the close snapshot intact plus post-close adjustments and a server reconciliation status', async () => {
+    const audit = await http().get(`/reports/cash-shifts/${state.shiftA}/audit`).auth(as.owner(), { type: 'bearer' }).expect(200);
+    expect(audit.body.summary.expectedCash).toBe(200);
+    expect(audit.body.review).toMatchObject({
+      reviewStatus: 'pendiente_n2',
+      expectedAtClose: 200,
+      postCloseAdjustment: 800,
+      adjustedExpected: 1000,
+      adjustedDifference: -800,
+      reconciliationStatus: 'SHORTAGE',
+      isOfficial: false,
+    });
+    const list = await http().get(`/reports/cash-shifts?businessId=${businessId}`).auth(as.supervisor(), { type: 'bearer' }).expect(200);
+    expect(list.body.find((r: any) => r.id === state.shiftA)).toMatchObject({ adjustedDifference: -800, reconciliationStatus: 'SHORTAGE' });
+    await http().get(`/reports/cash-shifts/${state.shiftA}/audit`).auth(as.foreignSupervisor(), { type: 'bearer' }).expect(403);
   });
 
   it('the ledger rejects in-place edits of financial columns', async () => {
