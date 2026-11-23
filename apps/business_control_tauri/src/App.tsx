@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { ProvidersPage } from './pages/ProvidersPage';
 import { InquiriesPage } from './pages/InquiriesPage';
+import { LogsPage } from './pages/LogsPage';
 import { WarehousesPage } from './pages/WarehousesPage';
 import { ReceiptsPage } from './pages/ReceiptsPage';
 import { BranchesPage } from './pages/BranchesPage';
@@ -27,12 +28,12 @@ import { WarehouseInventoryPage } from './pages/WarehouseInventoryPage';
 import { api } from './services/api';
 import { remoteLogger } from './services/remoteLogger';
 
-export type AdminTab = 'administrators' | 'personal' | 'inventory-dashboard' | 'branch-catalog' | 'warehouse-inventory' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers' | 'purchase-orders' | 'requisitions' | 'help' | 'reports' | 'tickets' | 'mesas' | 'ticket-settings' | 'pos-simulator';
+export type AdminTab = 'administrators' | 'personal' | 'inventory-dashboard' | 'branch-catalog' | 'warehouse-inventory' | 'inventory' | 'providers' | 'inquiries' | 'warehouses' | 'receipts' | 'branches' | 'categories' | 'assembly' | 'transfers' | 'purchase-orders' | 'requisitions' | 'help' | 'reports' | 'tickets' | 'mesas' | 'ticket-settings' | 'pos-simulator' | 'logs';
 
 export const roleTabs: Record<string, AdminTab[]> = {
-  owner: ['administrators', 'personal', 'branches', 'ticket-settings', 'pos-simulator', 'inventory-dashboard', 'branch-catalog', 'warehouse-inventory', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'transfers', 'purchase-orders', 'requisitions', 'reports', 'tickets', 'mesas', 'inquiries', 'help'],
+  owner: ['administrators', 'personal', 'branches', 'ticket-settings', 'pos-simulator', 'inventory-dashboard', 'branch-catalog', 'warehouse-inventory', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'transfers', 'purchase-orders', 'requisitions', 'reports', 'tickets', 'mesas', 'inquiries', 'logs', 'help'],
   inventory_admin: ['inventory-dashboard', 'branch-catalog', 'warehouse-inventory', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'purchase-orders', 'requisitions', 'help'],
-  support_tech: ['tickets', 'mesas', 'personal', 'inventory-dashboard', 'branch-catalog', 'warehouse-inventory', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'purchase-orders', 'requisitions', 'help'],
+  support_tech: ['tickets', 'mesas', 'logs', 'personal', 'inventory-dashboard', 'branch-catalog', 'warehouse-inventory', 'inventory', 'categories', 'receipts', 'warehouses', 'providers', 'assembly', 'purchase-orders', 'requisitions', 'help'],
   warehouse_purchasing_operator: ['inventory-dashboard', 'warehouse-inventory', 'receipts', 'warehouses', 'providers', 'transfers', 'purchase-orders', 'requisitions', 'help'],
   branch_operator: ['requisitions', 'help'],
   web_inquiries_viewer: ['inquiries'],
@@ -141,6 +142,7 @@ function App() {
         {activeTab === 'inventory' && <InventoryPage businessId={activeBusinessId} />}
         {activeTab === 'providers' && <ProvidersPage businessId={activeBusinessId} />}
         {activeTab === 'inquiries' && <InquiriesPage />}
+        {activeTab === 'logs' && <LogsPage />}
         {activeTab === 'warehouses' && <WarehousesPage businessId={activeBusinessId} />}
         {activeTab === 'receipts' && <ReceiptsPage businessId={activeBusinessId} />}
         {activeTab === 'branches' && <BranchesPage businessId={activeBusinessId} />}
