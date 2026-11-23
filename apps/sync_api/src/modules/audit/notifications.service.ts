@@ -32,7 +32,9 @@ export class NotificationsService {
   constructor(@Inject(DRIZZLE_CONNECTION) private readonly db: AppDatabase) {}
 
   async notify(exec: DbExecutor, input: NotificationInput) {
-    const recipients = Array.from(new Set(input.recipients.filter((id): id is string => Boolean(id))));
+    const recipients = Array.from(
+      new Set(input.recipients.filter((id): id is string => Boolean(id))),
+    );
     if (recipients.length === 0) return;
     await exec.insert(schema.notifications).values(
       recipients.map((recipientUserId) => ({
@@ -50,7 +52,11 @@ export class NotificationsService {
   }
 
   /** Action notifications are marked read automatically once the entity leaves the pending state. */
-  async resolveActionFor(exec: DbExecutor, entityType: string, entityId: string) {
+  async resolveActionFor(
+    exec: DbExecutor,
+    entityType: string,
+    entityId: string,
+  ) {
     await exec
       .update(schema.notifications)
       .set({ readAt: new Date() })
@@ -66,14 +72,28 @@ export class NotificationsService {
 
   async list(
     userId: string,
-    filters: { unread?: boolean; branchId?: string; type?: string; from?: Date; to?: Date; limit?: number; offset?: number },
+    filters: {
+      unread?: boolean;
+      branchId?: string;
+      type?: string;
+      from?: Date;
+      to?: Date;
+      limit?: number;
+      offset?: number;
+    },
   ) {
-    const conditions: SQL[] = [eq(schema.notifications.recipientUserId, userId)];
+    const conditions: SQL[] = [
+      eq(schema.notifications.recipientUserId, userId),
+    ];
     if (filters.unread) conditions.push(isNull(schema.notifications.readAt));
-    if (filters.branchId) conditions.push(eq(schema.notifications.branchId, filters.branchId));
-    if (filters.type) conditions.push(eq(schema.notifications.type, filters.type));
-    if (filters.from) conditions.push(gte(schema.notifications.createdAt, filters.from));
-    if (filters.to) conditions.push(lte(schema.notifications.createdAt, filters.to));
+    if (filters.branchId)
+      conditions.push(eq(schema.notifications.branchId, filters.branchId));
+    if (filters.type)
+      conditions.push(eq(schema.notifications.type, filters.type));
+    if (filters.from)
+      conditions.push(gte(schema.notifications.createdAt, filters.from));
+    if (filters.to)
+      conditions.push(lte(schema.notifications.createdAt, filters.to));
     return this.db
       .select({
         id: schema.notifications.id,
@@ -90,7 +110,10 @@ export class NotificationsService {
         readAt: schema.notifications.readAt,
       })
       .from(schema.notifications)
-      .leftJoin(schema.branches, eq(schema.notifications.branchId, schema.branches.id))
+      .leftJoin(
+        schema.branches,
+        eq(schema.notifications.branchId, schema.branches.id),
+      )
       .where(and(...conditions))
       .orderBy(desc(schema.notifications.createdAt))
       .limit(Math.min(Math.max(filters.limit ?? 50, 1), 200))
@@ -101,7 +124,12 @@ export class NotificationsService {
     const [row] = await this.db
       .select({ total: count() })
       .from(schema.notifications)
-      .where(and(eq(schema.notifications.recipientUserId, userId), isNull(schema.notifications.readAt)));
+      .where(
+        and(
+          eq(schema.notifications.recipientUserId, userId),
+          isNull(schema.notifications.readAt),
+        ),
+      );
     const [action] = await this.db
       .select({ total: count() })
       .from(schema.notifications)
@@ -112,16 +140,25 @@ export class NotificationsService {
           eq(schema.notifications.requiresAction, true),
         ),
       );
-    return { unread: Number(row?.total ?? 0), requiresAction: Number(action?.total ?? 0) };
+    return {
+      unread: Number(row?.total ?? 0),
+      requiresAction: Number(action?.total ?? 0),
+    };
   }
 
   async markRead(userId: string, id: string) {
     const rows = await this.db
       .update(schema.notifications)
       .set({ readAt: new Date() })
-      .where(and(eq(schema.notifications.id, id), eq(schema.notifications.recipientUserId, userId)))
+      .where(
+        and(
+          eq(schema.notifications.id, id),
+          eq(schema.notifications.recipientUserId, userId),
+        ),
+      )
       .returning({ id: schema.notifications.id });
-    if (rows.length === 0) throw new NotFoundException('Notificación no encontrada.');
+    if (rows.length === 0)
+      throw new NotFoundException('Notificación no encontrada.');
     return { id, read: true };
   }
 
@@ -129,7 +166,12 @@ export class NotificationsService {
     const rows = await this.db
       .update(schema.notifications)
       .set({ readAt: new Date() })
-      .where(and(eq(schema.notifications.recipientUserId, userId), isNull(schema.notifications.readAt)))
+      .where(
+        and(
+          eq(schema.notifications.recipientUserId, userId),
+          isNull(schema.notifications.readAt),
+        ),
+      )
       .returning({ id: schema.notifications.id });
     return { updated: rows.length };
   }

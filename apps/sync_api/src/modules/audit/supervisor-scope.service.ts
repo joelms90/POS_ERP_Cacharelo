@@ -1,10 +1,21 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { DRIZZLE_CONNECTION } from '../../database/database.module';
 import * as schema from '../../database/schema';
-import { assertBusinessAccess, getUserBusinessIds } from '../auth/business-access';
+import {
+  assertBusinessAccess,
+  getUserBusinessIds,
+} from '../auth/business-access';
 import { BRANCH_SUPERVISOR_ROLE, OWNER_ROLE } from '../auth/roles';
-import { ApprovalActor, normalizeRoles } from '../supervision/cash-approval.rules';
+import {
+  ApprovalActor,
+  normalizeRoles,
+} from '../supervision/cash-approval.rules';
 import type { AppDatabase } from './db-executor';
 
 export type JwtUser = {
@@ -14,7 +25,10 @@ export type JwtUser = {
   roles?: string[];
   branchId?: string | null;
   businessId?: string | null;
-  businessAccess?: Array<{ businessId?: string | null; role?: string | null }> | null;
+  businessAccess?: Array<{
+    businessId?: string | null;
+    role?: string | null;
+  }> | null;
 };
 
 /** Resolves who may act on which branch (spec 019: supervisors via assignments, owner business-wide). */
@@ -24,9 +38,12 @@ export class SupervisorScopeService {
 
   async buildActor(user: JwtUser | undefined): Promise<ApprovalActor> {
     const id = user?.sub ?? user?.id;
-    if (!id) throw new ForbiddenException('Se requiere un usuario autenticado.');
+    if (!id)
+      throw new ForbiddenException('Se requiere un usuario autenticado.');
     const roles = normalizeRoles(user?.roles, user?.role);
-    const assignedBranchIds = roles.includes(BRANCH_SUPERVISOR_ROLE) ? await this.assignedBranchIds(id) : [];
+    const assignedBranchIds = roles.includes(BRANCH_SUPERVISOR_ROLE)
+      ? await this.assignedBranchIds(id)
+      : [];
     return {
       id,
       roles,
@@ -37,7 +54,11 @@ export class SupervisorScopeService {
   }
 
   /** Owner must also have access to the business the item belongs to. */
-  actorForBusiness(actor: ApprovalActor, user: JwtUser | undefined, businessId: string): ApprovalActor {
+  actorForBusiness(
+    actor: ApprovalActor,
+    user: JwtUser | undefined,
+    businessId: string,
+  ): ApprovalActor {
     if (!actor.isOwner) return actor;
     try {
       assertBusinessAccess(user, businessId);
@@ -65,7 +86,10 @@ export class SupervisorScopeService {
    * supervisor, every branch of the accessible businesses for the owner, and the
    * bound branch for an OIS.
    */
-  async visibleBranchIds(actor: ApprovalActor, user: JwtUser | undefined): Promise<string[]> {
+  async visibleBranchIds(
+    actor: ApprovalActor,
+    user: JwtUser | undefined,
+  ): Promise<string[]> {
     const ids = new Set<string>(actor.assignedBranchIds);
     if (actor.branchId) ids.add(actor.branchId);
     if (actor.isOwner) {
@@ -74,8 +98,16 @@ export class SupervisorScopeService {
         ? await this.db
             .select({ id: schema.branches.id })
             .from(schema.branches)
-            .where(and(inArray(schema.branches.businessId, businessIds), isNull(schema.branches.deletedAt)))
-        : await this.db.select({ id: schema.branches.id }).from(schema.branches).where(isNull(schema.branches.deletedAt));
+            .where(
+              and(
+                inArray(schema.branches.businessId, businessIds),
+                isNull(schema.branches.deletedAt),
+              ),
+            )
+        : await this.db
+            .select({ id: schema.branches.id })
+            .from(schema.branches)
+            .where(isNull(schema.branches.deletedAt));
       rows.forEach((row) => ids.add(row.id));
     }
     return Array.from(ids);
@@ -83,7 +115,11 @@ export class SupervisorScopeService {
 
   async getBranch(branchId: string) {
     const [branch] = await this.db
-      .select({ id: schema.branches.id, businessId: schema.branches.businessId, name: schema.branches.name })
+      .select({
+        id: schema.branches.id,
+        businessId: schema.branches.businessId,
+        name: schema.branches.name,
+      })
       .from(schema.branches)
       .where(eq(schema.branches.id, branchId))
       .limit(1);
@@ -95,7 +131,10 @@ export class SupervisorScopeService {
     const rows = await this.db
       .select({ userId: schema.supervisorBranchAssignments.userId })
       .from(schema.supervisorBranchAssignments)
-      .innerJoin(schema.users, eq(schema.supervisorBranchAssignments.userId, schema.users.id))
+      .innerJoin(
+        schema.users,
+        eq(schema.supervisorBranchAssignments.userId, schema.users.id),
+      )
       .where(
         and(
           eq(schema.supervisorBranchAssignments.branchId, branchId),
@@ -114,7 +153,10 @@ export class SupervisorScopeService {
         and(
           eq(schema.users.businessId, businessId),
           isNull(schema.users.deletedAt),
-          or(eq(schema.users.role, OWNER_ROLE), sql`${schema.users.roles} ? 'owner'`),
+          or(
+            eq(schema.users.role, OWNER_ROLE),
+            sql`${schema.users.roles} ? 'owner'`,
+          ),
         ),
       );
     const access = await this.db
@@ -138,10 +180,20 @@ export class SupervisorScopeService {
       .where(
         and(
           isNull(schema.users.deletedAt),
-          or(eq(schema.users.branchId, branchId), and(isNull(schema.users.branchId), eq(schema.users.businessId, businessId))),
+          or(
+            eq(schema.users.branchId, branchId),
+            and(
+              isNull(schema.users.branchId),
+              eq(schema.users.businessId, businessId),
+            ),
+          ),
           or(
             sql`${schema.users.roles} ?| array['branch_operator','encargado','responsable']`,
-            inArray(schema.users.role, ['branch_operator', 'encargado', 'responsable']),
+            inArray(schema.users.role, [
+              'branch_operator',
+              'encargado',
+              'responsable',
+            ]),
           ),
         ),
       );

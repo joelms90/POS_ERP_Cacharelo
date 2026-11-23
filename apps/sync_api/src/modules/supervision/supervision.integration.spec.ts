@@ -37,7 +37,14 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
 
   const token = (userId: string, role: string, branchId: string | null) =>
     jwt.sign(
-      { sub: userId, role, roles: [role], branchId, businessId, businessAccess: [{ businessId, role }] },
+      {
+        sub: userId,
+        role,
+        roles: [role],
+        branchId,
+        businessId,
+        businessAccess: [{ businessId, role }],
+      },
       { secret: process.env.JWT_SECRET || 'dev_jwt_secret_key' },
     );
   const as = {
@@ -46,12 +53,15 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     ois2: () => token(ids.ois2, 'branch_operator', branchA),
     supervisor: () => token(ids.supervisor, 'branch_supervisor', null),
     supervisor2: () => token(ids.supervisor2, 'branch_supervisor', null),
-    foreignSupervisor: () => token(ids.foreignSupervisor, 'branch_supervisor', null),
+    foreignSupervisor: () =>
+      token(ids.foreignSupervisor, 'branch_supervisor', null),
     owner: () => token(ids.owner, 'owner', null),
   };
   const http = () => request(app.getHttpServer());
-  const query = async (text: string, params: unknown[] = []) => (await pool.query(text, params)).rows;
-  const shiftRow = async (id: string) => (await query('SELECT * FROM cash_shifts WHERE id = $1', [id]))[0];
+  const query = async (text: string, params: unknown[] = []) =>
+    (await pool.query(text, params)).rows;
+  const shiftRow = async (id: string) =>
+    (await query('SELECT * FROM cash_shifts WHERE id = $1', [id]))[0];
 
   beforeAll(async () => {
     process.env.DATABASE_URL = DATABASE_URL;
@@ -65,10 +75,14 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     ({ pool } = require('../../database/connection'));
     /* eslint-enable @typescript-eslint/no-require-imports */
 
-    await query('INSERT INTO businesses (id, name) VALUES ($1, $2)', [businessId, `IT-019 ${businessId.slice(0, 8)}`]);
-    await query('INSERT INTO branches (id, business_id, name) VALUES ($1, $3, $4), ($2, $3, $5)', [
-      branchA, branchB, businessId, 'IT Sucursal A', 'IT Sucursal B',
+    await query('INSERT INTO businesses (id, name) VALUES ($1, $2)', [
+      businessId,
+      `IT-019 ${businessId.slice(0, 8)}`,
     ]);
+    await query(
+      'INSERT INTO branches (id, business_id, name) VALUES ($1, $3, $4), ($2, $3, $5)',
+      [branchA, branchB, businessId, 'IT Sucursal A', 'IT Sucursal B'],
+    );
     const users: Array<[string, string, string | null, string]> = [
       [ids.cashier, 'cashier', branchA, 'IT Cajero'],
       [ids.ois, 'branch_operator', branchA, 'IT OIS'],
@@ -87,14 +101,34 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     await query(
       `INSERT INTO supervisor_branch_assignments (business_id, user_id, branch_id, assigned_by)
        VALUES ($1, $2, $4, $5), ($1, $3, $4, $5), ($1, $6, $7, $5)`,
-      [businessId, ids.supervisor, ids.supervisor2, branchA, ids.owner, ids.foreignSupervisor, branchB],
+      [
+        businessId,
+        ids.supervisor,
+        ids.supervisor2,
+        branchA,
+        ids.owner,
+        ids.foreignSupervisor,
+        branchB,
+      ],
     );
 
     const moduleRef = await Test.createTestingModule({
-      imports: [DatabaseModule, AuditModule, ShiftsModule, SupervisionModule, ReportsModule],
+      imports: [
+        DatabaseModule,
+        AuditModule,
+        ShiftsModule,
+        SupervisionModule,
+        ReportsModule,
+      ],
     }).compile();
     app = moduleRef.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
     await app.init();
     jwt = moduleRef.get(JwtService);
   });
@@ -107,18 +141,36 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
         await client.query('BEGIN');
         await client.query('SET LOCAL session_replication_role = replica');
         const branches = [branchA, branchB];
-        await client.query('DELETE FROM notifications WHERE business_id = $1', [businessId]);
-        await client.query('DELETE FROM audit_log WHERE business_id = $1', [businessId]);
-        await client.query('DELETE FROM cashier_debts WHERE business_id = $1', [businessId]);
+        await client.query('DELETE FROM notifications WHERE business_id = $1', [
+          businessId,
+        ]);
+        await client.query('DELETE FROM audit_log WHERE business_id = $1', [
+          businessId,
+        ]);
+        await client.query('DELETE FROM cashier_debts WHERE business_id = $1', [
+          businessId,
+        ]);
         await client.query(
           'DELETE FROM cash_transactions WHERE shift_id IN (SELECT id FROM cash_shifts WHERE branch_id = ANY($1::uuid[]))',
           [branches],
         );
-        await client.query('DELETE FROM cash_shifts WHERE branch_id = ANY($1::uuid[])', [branches]);
-        await client.query('DELETE FROM supervisor_branch_assignments WHERE business_id = $1', [businessId]);
-        await client.query('DELETE FROM users WHERE business_id = $1', [businessId]);
-        await client.query('DELETE FROM branches WHERE business_id = $1', [businessId]);
-        await client.query('DELETE FROM businesses WHERE id = $1', [businessId]);
+        await client.query(
+          'DELETE FROM cash_shifts WHERE branch_id = ANY($1::uuid[])',
+          [branches],
+        );
+        await client.query(
+          'DELETE FROM supervisor_branch_assignments WHERE business_id = $1',
+          [businessId],
+        );
+        await client.query('DELETE FROM users WHERE business_id = $1', [
+          businessId,
+        ]);
+        await client.query('DELETE FROM branches WHERE business_id = $1', [
+          businessId,
+        ]);
+        await client.query('DELETE FROM businesses WHERE id = $1', [
+          businessId,
+        ]);
         await client.query('COMMIT');
       } finally {
         client.release();
@@ -131,16 +183,30 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
   // --- Cashier corte with a pending movement -------------------------------------------------
 
   it('cashier opens a shift, records a pending movement and closes the Corte Z into N1', async () => {
-    const opened = await http().post('/cash-shifts').auth(as.cashier(), { type: 'bearer' }).send({ initialFloat: '1000.00' }).expect(201);
+    const opened = await http()
+      .post('/cash-shifts')
+      .auth(as.cashier(), { type: 'bearer' })
+      .send({ initialFloat: '1000.00' })
+      .expect(201);
     state.shiftA = opened.body.id;
 
     const movement = await http()
       .post(`/cash-shifts/${state.shiftA}/transactions`)
       .auth(as.cashier(), { type: 'bearer' })
-      .send({ type: 'cash-out', amount: '800.00', reason: 'Gasto operativo: proveedor', category: 'gasto_operativo', clientUuid: `it-${randomUUID()}` })
+      .send({
+        type: 'cash-out',
+        amount: '800.00',
+        reason: 'Gasto operativo: proveedor',
+        category: 'gasto_operativo',
+        clientUuid: `it-${randomUUID()}`,
+      })
       .expect(201);
     state.expense = movement.body.transaction;
-    expect(state.expense).toMatchObject({ approvalStatus: 'pendiente_n1', entryKind: 'movimiento', createdBy: ids.cashier });
+    expect(state.expense).toMatchObject({
+      approvalStatus: 'pendiente_n1',
+      entryKind: 'movimiento',
+      createdBy: ids.cashier,
+    });
 
     // MV-05: a cash-out that would leave expected cash negative is rejected.
     await http()
@@ -158,7 +224,11 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     expect(closed.body.report.summary.cashDifference).toBe(0);
 
     const row = await shiftRow(state.shiftA);
-    expect(row).toMatchObject({ review_status: 'pendiente_n1', n1_resolver_role: 'branch_operator', closed_by: ids.cashier });
+    expect(row).toMatchObject({
+      review_status: 'pendiente_n1',
+      n1_resolver_role: 'branch_operator',
+      closed_by: ids.cashier,
+    });
 
     // Retrying the same close is idempotent.
     const retry = await http()
@@ -170,17 +240,28 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
   });
 
   it('notifies the OIS that the corte and the movement await N1', async () => {
-    const res = await http().get('/notifications').auth(as.ois(), { type: 'bearer' }).expect(200);
+    const res = await http()
+      .get('/notifications')
+      .auth(as.ois(), { type: 'bearer' })
+      .expect(200);
     const entityIds = res.body.map((n: any) => n.entityId);
-    expect(entityIds).toEqual(expect.arrayContaining([state.shiftA, state.expense.id]));
-    const count = await http().get('/notifications/unread-count').auth(as.ois(), { type: 'bearer' }).expect(200);
+    expect(entityIds).toEqual(
+      expect.arrayContaining([state.shiftA, state.expense.id]),
+    );
+    const count = await http()
+      .get('/notifications/unread-count')
+      .auth(as.ois(), { type: 'bearer' })
+      .expect(200);
     expect(count.body.requiresAction).toBeGreaterThanOrEqual(2);
   });
 
   it('N1 rules: no self-approval, no supervisor/owner substitution (S-6), stale version → 409, pending movements → 422', async () => {
     const shift = await shiftRow(state.shiftA);
     const approve = (tok: string, version = shift.version) =>
-      http().post(`/supervision/cash-shifts/${state.shiftA}/approve`).auth(tok, { type: 'bearer' }).send({ version });
+      http()
+        .post(`/supervision/cash-shifts/${state.shiftA}/approve`)
+        .auth(tok, { type: 'bearer' })
+        .send({ version });
     await approve(as.cashier()).expect(403);
     await approve(as.supervisor()).expect(403);
     await approve(as.owner()).expect(403);
@@ -211,31 +292,57 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
   });
 
   it('inbox: the assigned supervisor sees the corte as actionable; a foreign supervisor sees nothing and cannot open it', async () => {
-    const mine = await http().get('/supervision/approvals?type=corte_z').auth(as.supervisor(), { type: 'bearer' }).expect(200);
+    const mine = await http()
+      .get('/supervision/approvals?type=corte_z')
+      .auth(as.supervisor(), { type: 'bearer' })
+      .expect(200);
     const item = mine.body.cortes.find((c: any) => c.id === state.shiftA);
-    expect(item).toMatchObject({ reviewStatus: 'pendiente_n2', canAct: true, level: 'n2' });
-    const foreign = await http().get('/supervision/approvals').auth(as.foreignSupervisor(), { type: 'bearer' }).expect(200);
-    expect(foreign.body.cortes.find((c: any) => c.id === state.shiftA)).toBeUndefined();
-    await http().get(`/supervision/cash-shifts/${state.shiftA}`).auth(as.foreignSupervisor(), { type: 'bearer' }).expect(403);
+    expect(item).toMatchObject({
+      reviewStatus: 'pendiente_n2',
+      canAct: true,
+      level: 'n2',
+    });
+    const foreign = await http()
+      .get('/supervision/approvals')
+      .auth(as.foreignSupervisor(), { type: 'bearer' })
+      .expect(200);
+    expect(
+      foreign.body.cortes.find((c: any) => c.id === state.shiftA),
+    ).toBeUndefined();
+    await http()
+      .get(`/supervision/cash-shifts/${state.shiftA}`)
+      .auth(as.foreignSupervisor(), { type: 'bearer' })
+      .expect(403);
   });
 
   it('S-4: impact preview, then the supervisor cancels the approved expense with a ledger reversal → $800 shortage', async () => {
     const impact = await http()
-      .get(`/supervision/cash-movements/${state.expense.id}/impact?action=cancel`)
+      .get(
+        `/supervision/cash-movements/${state.expense.id}/impact?action=cancel`,
+      )
       .auth(as.supervisor(), { type: 'bearer' })
       .expect(200);
-    expect(impact.body).toMatchObject({ currentDifference: 0, resultingDifference: -800 });
+    expect(impact.body).toMatchObject({
+      currentDifference: 0,
+      resultingDifference: -800,
+    });
 
     await http()
       .post(`/supervision/cash-movements/${state.expense.id}/cancel`)
       .auth(as.supervisor(), { type: 'bearer' })
       .send({ version: 2, reason: 'Sin comprobante' })
       .expect(200);
-    const reversals = await query('SELECT * FROM cash_transactions WHERE reverses_transaction_id = $1', [state.expense.id]);
+    const reversals = await query(
+      'SELECT * FROM cash_transactions WHERE reverses_transaction_id = $1',
+      [state.expense.id],
+    );
     expect(reversals).toHaveLength(1);
     expect(Number(reversals[0].cash_effect)).toBe(800);
 
-    const detail = await http().get(`/supervision/cash-shifts/${state.shiftA}`).auth(as.supervisor(), { type: 'bearer' }).expect(200);
+    const detail = await http()
+      .get(`/supervision/cash-shifts/${state.shiftA}`)
+      .auth(as.supervisor(), { type: 'bearer' })
+      .expect(200);
     expect(detail.body.figures).toMatchObject({
       expectedAtClose: 200,
       postCloseAdjustment: 800,
@@ -251,7 +358,10 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
   });
 
   it('reports expose the close snapshot intact plus post-close adjustments and a server reconciliation status', async () => {
-    const audit = await http().get(`/reports/cash-shifts/${state.shiftA}/audit`).auth(as.owner(), { type: 'bearer' }).expect(200);
+    const audit = await http()
+      .get(`/reports/cash-shifts/${state.shiftA}/audit`)
+      .auth(as.owner(), { type: 'bearer' })
+      .expect(200);
     expect(audit.body.summary.expectedCash).toBe(200);
     expect(audit.body.review).toMatchObject({
       reviewStatus: 'pendiente_n2',
@@ -262,14 +372,29 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       reconciliationStatus: 'SHORTAGE',
       isOfficial: false,
     });
-    const list = await http().get(`/reports/cash-shifts?businessId=${businessId}`).auth(as.supervisor(), { type: 'bearer' }).expect(200);
-    expect(list.body.find((r: any) => r.id === state.shiftA)).toMatchObject({ adjustedDifference: -800, reconciliationStatus: 'SHORTAGE' });
-    await http().get(`/reports/cash-shifts/${state.shiftA}/audit`).auth(as.foreignSupervisor(), { type: 'bearer' }).expect(403);
+    const list = await http()
+      .get(`/reports/cash-shifts?businessId=${businessId}`)
+      .auth(as.supervisor(), { type: 'bearer' })
+      .expect(200);
+    expect(list.body.find((r: any) => r.id === state.shiftA)).toMatchObject({
+      adjustedDifference: -800,
+      reconciliationStatus: 'SHORTAGE',
+    });
+    await http()
+      .get(`/reports/cash-shifts/${state.shiftA}/audit`)
+      .auth(as.foreignSupervisor(), { type: 'bearer' })
+      .expect(403);
   });
 
   it('the ledger rejects in-place edits of financial columns', async () => {
-    await expect(query('UPDATE cash_transactions SET amount = 1 WHERE id = $1', [state.expense.id])).rejects.toThrow(/immutable/);
-    await expect(query('DELETE FROM cash_transactions WHERE id = $1', [state.expense.id])).rejects.toThrow(/append-only/);
+    await expect(
+      query('UPDATE cash_transactions SET amount = 1 WHERE id = $1', [
+        state.expense.id,
+      ]),
+    ).rejects.toThrow(/immutable/);
+    await expect(
+      query('DELETE FROM cash_transactions WHERE id = $1', [state.expense.id]),
+    ).rejects.toThrow(/append-only/);
   });
 
   it('N2 rejection → recount by the OIS goes straight back to N2 (S-5)', async () => {
@@ -289,7 +414,10 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       .auth(as.ois(), { type: 'bearer' })
       .send({ actualAmount: '250.00', notes: 'Se encontraron $50 en el sobre' })
       .expect(200);
-    expect(recount.body).toMatchObject({ reviewStatus: 'pendiente_n2', recountCount: 1 });
+    expect(recount.body).toMatchObject({
+      reviewStatus: 'pendiente_n2',
+      recountCount: 1,
+    });
     row = await shiftRow(state.shiftA);
     expect(Number(row.cash_drawer_amount)).toBe(250);
   });
@@ -304,11 +432,20 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     expect(res.body.reviewStatus).toBe('aprobado');
     expect(Number(res.body.approvedDifference)).toBe(-750);
     expect(res.body.approvalSnapshot.adjustedExpected).toBe(1000);
-    const debts = await query('SELECT * FROM cashier_debts WHERE shift_id = $1', [state.shiftA]);
+    const debts = await query(
+      'SELECT * FROM cashier_debts WHERE shift_id = $1',
+      [state.shiftA],
+    );
     expect(debts).toHaveLength(1);
-    expect(debts[0]).toMatchObject({ cashier_id: ids.cashier, status: 'vigente' });
+    expect(debts[0]).toMatchObject({
+      cashier_id: ids.cashier,
+      status: 'vigente',
+    });
     expect(Number(debts[0].amount)).toBe(750);
-    const mine = await http().get('/supervision/debts?mine=true').auth(as.cashier(), { type: 'bearer' }).expect(200);
+    const mine = await http()
+      .get('/supervision/debts?mine=true')
+      .auth(as.cashier(), { type: 'bearer' })
+      .expect(200);
     expect(mine.body.map((d: any) => d.shiftId)).toContain(state.shiftA);
   });
 
@@ -320,7 +457,11 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
     await http()
       .post(`/supervision/cash-movements/${adjust[0].id}/adjust`)
       .auth(as.owner(), { type: 'bearer' })
-      .send({ version: adjust[0].version, amount: '100.00', reason: 'Corrección tardía' })
+      .send({
+        version: adjust[0].version,
+        amount: '100.00',
+        reason: 'Corrección tardía',
+      })
       .expect(409);
   });
 
@@ -336,13 +477,18 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       .send({ reason: 'Apareció el comprobante del gasto' })
       .expect(200);
     expect(res.body.reviewStatus).toBe('pendiente_n2');
-    const debts = await query('SELECT status FROM cashier_debts WHERE shift_id = $1', [state.shiftA]);
+    const debts = await query(
+      'SELECT status FROM cashier_debts WHERE shift_id = $1',
+      [state.shiftA],
+    );
     expect(debts.map((d: any) => d.status)).toEqual(['anulado']);
   });
 
   it('audit log records every step with level, actor and before/after', async () => {
     const res = await http()
-      .get(`/supervision/audit-log?entityType=cash_shift&entityId=${state.shiftA}`)
+      .get(
+        `/supervision/audit-log?entityType=cash_shift&entityId=${state.shiftA}`,
+      )
       .auth(as.owner(), { type: 'bearer' })
       .expect(200);
     const actions = res.body.map((e: any) => e.action).reverse();
@@ -354,38 +500,69 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       'corte_z_aprobado',
       'corte_z_reabierto',
     ]);
-    expect(res.body.find((e: any) => e.action === 'corte_z_rechazado')).toMatchObject({
+    expect(
+      res.body.find((e: any) => e.action === 'corte_z_rechazado'),
+    ).toMatchObject({
       approvalLevel: 'n2',
       actorId: ids.supervisor,
       reason: 'Recontar el sobre de gastos',
     });
-    await expect(query('DELETE FROM audit_log WHERE business_id = $1', [businessId])).rejects.toThrow(/append-only/);
+    await expect(
+      query('DELETE FROM audit_log WHERE business_id = $1', [businessId]),
+    ).rejects.toThrow(/append-only/);
   });
 
   // --- OIS-authored corte: S-3, C-1 and the opening block (D-4, C-2, P-2) ----------------------
 
   it('S-3: a corte closed by the OIS is resolved at N1 by the supervisor; C-1: the same supervisor cannot do N2', async () => {
     process.env.CASH_APPROVALS_ENFORCE_OPEN_BLOCK = 'true';
-    const opened = await http().post('/cash-shifts').auth(as.ois(), { type: 'bearer' }).send({ initialFloat: '500.00' }).expect(201);
+    const opened = await http()
+      .post('/cash-shifts')
+      .auth(as.ois(), { type: 'bearer' })
+      .send({ initialFloat: '500.00' })
+      .expect(201);
     state.shiftB = opened.body.id;
-    await http().post(`/cash-shifts/${state.shiftB}/close`).auth(as.ois(), { type: 'bearer' }).send({ actualAmount: '500.00' }).expect(200);
+    await http()
+      .post(`/cash-shifts/${state.shiftB}/close`)
+      .auth(as.ois(), { type: 'bearer' })
+      .send({ actualAmount: '500.00' })
+      .expect(200);
     let row = await shiftRow(state.shiftB);
-    expect(row).toMatchObject({ review_status: 'pendiente_n1', n1_resolver_role: 'branch_supervisor' });
+    expect(row).toMatchObject({
+      review_status: 'pendiente_n1',
+      n1_resolver_role: 'branch_supervisor',
+    });
 
     // D-4 + C-2: the branch cannot open a new shift until N1.
-    const blocked = await http().post('/cash-shifts').auth(as.cashier(), { type: 'bearer' }).send({ initialFloat: '100.00' }).expect(409);
+    const blocked = await http()
+      .post('/cash-shifts')
+      .auth(as.cashier(), { type: 'bearer' })
+      .send({ initialFloat: '100.00' })
+      .expect(409);
     expect(blocked.body.code).toBe('OPENING_BLOCKED_PENDING_CORTE');
 
     // Another OIS cannot resolve N1 of an OIS corte; the owner cannot either (S-6).
-    await http().post(`/supervision/cash-shifts/${state.shiftB}/approve`).auth(as.ois2(), { type: 'bearer' }).send({ version: row.version }).expect(403);
-    await http().post(`/supervision/cash-shifts/${state.shiftB}/approve`).auth(as.owner(), { type: 'bearer' }).send({ version: row.version }).expect(403);
+    await http()
+      .post(`/supervision/cash-shifts/${state.shiftB}/approve`)
+      .auth(as.ois2(), { type: 'bearer' })
+      .send({ version: row.version })
+      .expect(403);
+    await http()
+      .post(`/supervision/cash-shifts/${state.shiftB}/approve`)
+      .auth(as.owner(), { type: 'bearer' })
+      .send({ version: row.version })
+      .expect(403);
     const n1 = await http()
       .post(`/supervision/cash-shifts/${state.shiftB}/approve`)
       .auth(as.supervisor(), { type: 'bearer' })
       .send({ version: row.version })
       .expect(200);
     expect(n1.body.reviewStatus).toBe('pendiente_n2');
-    await http().post(`/supervision/cash-shifts/${state.shiftB}/approve`).auth(as.supervisor(), { type: 'bearer' }).send({ version: n1.body.version }).expect(403);
+    await http()
+      .post(`/supervision/cash-shifts/${state.shiftB}/approve`)
+      .auth(as.supervisor(), { type: 'bearer' })
+      .send({ version: n1.body.version })
+      .expect(403);
     const n2 = await http()
       .post(`/supervision/cash-shifts/${state.shiftB}/approve`)
       .auth(as.supervisor2(), { type: 'bearer' })
@@ -398,10 +575,22 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
   });
 
   it('P-2: the owner unblocks the opening without approving the pending corte', async () => {
-    const opened = await http().post('/cash-shifts').auth(as.cashier(), { type: 'bearer' }).send({ initialFloat: '100.00' }).expect(201);
+    const opened = await http()
+      .post('/cash-shifts')
+      .auth(as.cashier(), { type: 'bearer' })
+      .send({ initialFloat: '100.00' })
+      .expect(201);
     state.shiftC = opened.body.id;
-    await http().post(`/cash-shifts/${state.shiftC}/close`).auth(as.cashier(), { type: 'bearer' }).send({ actualAmount: '100.00' }).expect(200);
-    await http().post('/cash-shifts').auth(as.ois(), { type: 'bearer' }).send({ initialFloat: '100.00' }).expect(409);
+    await http()
+      .post(`/cash-shifts/${state.shiftC}/close`)
+      .auth(as.cashier(), { type: 'bearer' })
+      .send({ actualAmount: '100.00' })
+      .expect(200);
+    await http()
+      .post('/cash-shifts')
+      .auth(as.ois(), { type: 'bearer' })
+      .send({ initialFloat: '100.00' })
+      .expect(409);
     await http()
       .post(`/supervision/cash-shifts/${state.shiftC}/override-open-block`)
       .auth(as.supervisor(), { type: 'bearer' })
@@ -414,7 +603,11 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       .expect(200);
     const row = await shiftRow(state.shiftC);
     expect(row.review_status).toBe('pendiente_n1');
-    await http().post('/cash-shifts').auth(as.ois(), { type: 'bearer' }).send({ initialFloat: '100.00' }).expect(201);
+    await http()
+      .post('/cash-shifts')
+      .auth(as.ois(), { type: 'bearer' })
+      .send({ initialFloat: '100.00' })
+      .expect(201);
   });
 
   it('assignments are owner-only and audited', async () => {
@@ -429,17 +622,34 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       .send({ businessId, branchIds: [branchA, branchB] })
       .expect(200);
     expect(res.body.added).toEqual([branchA]);
-    const list = await http().get(`/supervision/assignments?businessId=${businessId}`).auth(as.owner(), { type: 'bearer' }).expect(200);
+    const list = await http()
+      .get(`/supervision/assignments?businessId=${businessId}`)
+      .auth(as.owner(), { type: 'bearer' })
+      .expect(200);
     const foreign = list.body.find((s: any) => s.id === ids.foreignSupervisor);
-    expect(foreign.branches.map((b: any) => b.branchId).sort()).toEqual([branchA, branchB].sort());
+    expect(foreign.branches.map((b: any) => b.branchId).sort()).toEqual(
+      [branchA, branchB].sort(),
+    );
   });
 
   it('notifications can be marked read', async () => {
-    const list = await http().get('/notifications?unread=true').auth(as.cashier(), { type: 'bearer' }).expect(200);
+    const list = await http()
+      .get('/notifications?unread=true')
+      .auth(as.cashier(), { type: 'bearer' })
+      .expect(200);
     expect(list.body.length).toBeGreaterThan(0);
-    await http().post(`/notifications/${list.body[0].id}/read`).auth(as.cashier(), { type: 'bearer' }).expect(200);
-    await http().post(`/notifications/${list.body[0].id}/read`).auth(as.ois(), { type: 'bearer' }).expect(404);
-    const all = await http().post('/notifications/read-all').auth(as.cashier(), { type: 'bearer' }).expect(200);
+    await http()
+      .post(`/notifications/${list.body[0].id}/read`)
+      .auth(as.cashier(), { type: 'bearer' })
+      .expect(200);
+    await http()
+      .post(`/notifications/${list.body[0].id}/read`)
+      .auth(as.ois(), { type: 'bearer' })
+      .expect(404);
+    const all = await http()
+      .post('/notifications/read-all')
+      .auth(as.cashier(), { type: 'bearer' })
+      .expect(200);
     expect(all.body.updated).toBe(list.body.length - 1);
   });
 

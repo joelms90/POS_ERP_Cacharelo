@@ -1,4 +1,15 @@
-import { Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { NotificationsService } from '../audit/notifications.service';
 
@@ -45,7 +56,10 @@ export class NotificationsController {
 
   @Post(':id/read')
   @HttpCode(HttpStatus.OK)
-  read(@Param('id', ParseUUIDPipe) id: string, @Req() req: NotificationsRequest) {
+  read(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: NotificationsRequest,
+  ) {
     return this.notifications.markRead(this.userId(req), id);
   }
 

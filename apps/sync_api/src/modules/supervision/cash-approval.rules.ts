@@ -6,7 +6,12 @@
  * append-only ledger where rejections, cancellations and adjustments insert
  * reversal entries (S-4).
  */
-import { BRANCH_OPERATOR_ROLE, BRANCH_SUPERVISOR_ROLE, OWNER_ROLE, normalizeOperationalRole } from '../auth/roles';
+import {
+  BRANCH_OPERATOR_ROLE,
+  BRANCH_SUPERVISOR_ROLE,
+  OWNER_ROLE,
+  normalizeOperationalRole,
+} from '../auth/roles';
 import { CASH_APPROVAL_CONFIG } from './cash-approval.config';
 
 export type ShiftReviewStatus =
@@ -28,7 +33,9 @@ export type MovementStatus =
   | 'no_aplica';
 
 export type EntryKind = 'movimiento' | 'reverso' | 'ajuste';
-export type N1ResolverRole = typeof BRANCH_OPERATOR_ROLE | typeof BRANCH_SUPERVISOR_ROLE;
+export type N1ResolverRole =
+  | typeof BRANCH_OPERATOR_ROLE
+  | typeof BRANCH_SUPERVISOR_ROLE;
 
 export type ShiftAction =
   | 'approve_n1'
@@ -60,11 +67,25 @@ export interface ApprovalActor {
   isOwner: boolean;
 }
 
-export const FINAL_SHIFT_STATUSES: ShiftReviewStatus[] = ['aprobado', 'aprobado_con_ajuste'];
-export const OPEN_BLOCKING_STATUSES: ShiftReviewStatus[] = ['pendiente_n1', 'rechazado_n1'];
+export const FINAL_SHIFT_STATUSES: ShiftReviewStatus[] = [
+  'aprobado',
+  'aprobado_con_ajuste',
+];
+export const OPEN_BLOCKING_STATUSES: ShiftReviewStatus[] = [
+  'pendiente_n1',
+  'rechazado_n1',
+];
 
-export function normalizeRoles(roles: unknown, fallback?: string | null): string[] {
-  const source = Array.isArray(roles) && roles.length > 0 ? roles : fallback ? [fallback] : [];
+export function normalizeRoles(
+  roles: unknown,
+  fallback?: string | null,
+): string[] {
+  const source =
+    Array.isArray(roles) && roles.length > 0
+      ? roles
+      : fallback
+        ? [fallback]
+        : [];
   return Array.from(
     new Set(
       source
@@ -79,11 +100,19 @@ export const isOwnerRole = (roles: string[]) => hasRole(roles, OWNER_ROLE);
 
 /** S-3: whatever the OIS closes or records is resolved at N1 by the supervisor. */
 export function n1ResolverRoleFor(authorRoles: string[]): N1ResolverRole {
-  return hasRole(authorRoles, BRANCH_OPERATOR_ROLE) ? BRANCH_SUPERVISOR_ROLE : BRANCH_OPERATOR_ROLE;
+  return hasRole(authorRoles, BRANCH_OPERATOR_ROLE)
+    ? BRANCH_SUPERVISOR_ROLE
+    : BRANCH_OPERATOR_ROLE;
 }
 
-export function isSupervisorOf(actor: ApprovalActor, branchId: string): boolean {
-  return hasRole(actor.roles, BRANCH_SUPERVISOR_ROLE) && actor.assignedBranchIds.includes(branchId);
+export function isSupervisorOf(
+  actor: ApprovalActor,
+  branchId: string,
+): boolean {
+  return (
+    hasRole(actor.roles, BRANCH_SUPERVISOR_ROLE) &&
+    actor.assignedBranchIds.includes(branchId)
+  );
 }
 
 /**
@@ -94,12 +123,20 @@ export function isSupervisorOf(actor: ApprovalActor, branchId: string): boolean 
  */
 export function assertCanResolveN1(
   actor: ApprovalActor,
-  item: { branchId: string; authorId: string | null; n1ResolverRole: string | null },
+  item: {
+    branchId: string;
+    authorId: string | null;
+    n1ResolverRole: string | null;
+  },
 ): void {
   if (item.authorId && item.authorId === actor.id) {
-    throw new ApprovalRuleError('forbidden', 'No puedes aprobar ni rechazar lo que tú registraste.');
+    throw new ApprovalRuleError(
+      'forbidden',
+      'No puedes aprobar ni rechazar lo que tú registraste.',
+    );
   }
-  const resolver = (item.n1ResolverRole ?? BRANCH_OPERATOR_ROLE) as N1ResolverRole;
+  const resolver = (item.n1ResolverRole ??
+    BRANCH_OPERATOR_ROLE) as N1ResolverRole;
   if (resolver === BRANCH_SUPERVISOR_ROLE) {
     if (!isSupervisorOf(actor, item.branchId)) {
       throw new ApprovalRuleError(
@@ -109,7 +146,10 @@ export function assertCanResolveN1(
     }
     return;
   }
-  if (!hasRole(actor.roles, BRANCH_OPERATOR_ROLE) || actor.branchId !== item.branchId) {
+  if (
+    !hasRole(actor.roles, BRANCH_OPERATOR_ROLE) ||
+    actor.branchId !== item.branchId
+  ) {
     throw new ApprovalRuleError(
       'forbidden',
       'El nivel 1 lo resuelve el operador de esa sucursal; el supervisor y el owner no lo sustituyen.',
@@ -120,70 +160,130 @@ export function assertCanResolveN1(
 /** N2 of a Corte Z: assigned supervisor or owner, never the author, and (C-1) not the N1 approver. */
 export function assertCanResolveN2(
   actor: ApprovalActor,
-  shift: { branchId: string; closedBy: string | null; operatorReviewedBy: string | null },
+  shift: {
+    branchId: string;
+    closedBy: string | null;
+    operatorReviewedBy: string | null;
+  },
   config = CASH_APPROVAL_CONFIG,
 ): void {
   if (!actor.isOwner && !isSupervisorOf(actor, shift.branchId)) {
-    throw new ApprovalRuleError('forbidden', 'Solo el supervisor asignado a la sucursal o el owner resuelven el nivel 2.');
+    throw new ApprovalRuleError(
+      'forbidden',
+      'Solo el supervisor asignado a la sucursal o el owner resuelven el nivel 2.',
+    );
   }
   if (shift.closedBy && shift.closedBy === actor.id) {
-    throw new ApprovalRuleError('forbidden', 'No puedes aprobar tu propio Corte Z.');
+    throw new ApprovalRuleError(
+      'forbidden',
+      'No puedes aprobar tu propio Corte Z.',
+    );
   }
-  if (config.n2MustDifferFromN1 && shift.operatorReviewedBy && shift.operatorReviewedBy === actor.id) {
-    throw new ApprovalRuleError('forbidden', 'El nivel 2 debe resolverlo una persona distinta de quien aprobó el nivel 1.');
+  if (
+    config.n2MustDifferFromN1 &&
+    shift.operatorReviewedBy &&
+    shift.operatorReviewedBy === actor.id
+  ) {
+    throw new ApprovalRuleError(
+      'forbidden',
+      'El nivel 2 debe resolverlo una persona distinta de quien aprobó el nivel 1.',
+    );
   }
 }
 
 /** Cancel/adjust a movement: assigned supervisor or owner (MV-04). */
-export function assertCanCancelOrAdjust(actor: ApprovalActor, branchId: string): void {
+export function assertCanCancelOrAdjust(
+  actor: ApprovalActor,
+  branchId: string,
+): void {
   if (!actor.isOwner && !isSupervisorOf(actor, branchId)) {
-    throw new ApprovalRuleError('forbidden', 'Solo el supervisor asignado o el owner pueden cancelar o ajustar movimientos.');
+    throw new ApprovalRuleError(
+      'forbidden',
+      'Solo el supervisor asignado o el owner pueden cancelar o ajustar movimientos.',
+    );
   }
 }
 
-const SHIFT_TRANSITIONS: Record<ShiftAction, Partial<Record<ShiftReviewStatus, ShiftReviewStatus>>> = {
+const SHIFT_TRANSITIONS: Record<
+  ShiftAction,
+  Partial<Record<ShiftReviewStatus, ShiftReviewStatus>>
+> = {
   approve_n1: { pendiente_n1: 'pendiente_n2' },
   reject_n1: { pendiente_n1: 'rechazado_n1' },
   // S-5: a recount after an N2 rejection goes straight back to N2.
   recount: { rechazado_n1: 'pendiente_n1', rechazado_n2: 'pendiente_n2' },
   approve_n2: { pendiente_n2: 'aprobado' },
-  adjust_n2: { pendiente_n2: 'aprobado_con_ajuste', rechazado_n2: 'aprobado_con_ajuste' },
+  adjust_n2: {
+    pendiente_n2: 'aprobado_con_ajuste',
+    rechazado_n2: 'aprobado_con_ajuste',
+  },
   reject_n2: { pendiente_n2: 'rechazado_n2' },
   reopen: { aprobado: 'pendiente_n2', aprobado_con_ajuste: 'pendiente_n2' },
 };
 
-export function nextShiftStatus(current: string, action: ShiftAction): ShiftReviewStatus {
+export function nextShiftStatus(
+  current: string,
+  action: ShiftAction,
+): ShiftReviewStatus {
   const next = SHIFT_TRANSITIONS[action][current as ShiftReviewStatus];
   if (!next) {
-    throw new ApprovalRuleError('conflict', `La acción "${action}" no aplica a un Corte Z en estado "${current}".`);
+    throw new ApprovalRuleError(
+      'conflict',
+      `La acción "${action}" no aplica a un Corte Z en estado "${current}".`,
+    );
   }
   return next;
 }
 
-export function shiftActionLevel(action: ShiftAction): 'n1' | 'n2' | 'owner' | null {
+export function shiftActionLevel(
+  action: ShiftAction,
+): 'n1' | 'n2' | 'owner' | null {
   if (action === 'approve_n1' || action === 'reject_n1') return 'n1';
-  if (action === 'approve_n2' || action === 'adjust_n2' || action === 'reject_n2') return 'n2';
+  if (
+    action === 'approve_n2' ||
+    action === 'adjust_n2' ||
+    action === 'reject_n2'
+  )
+    return 'n2';
   if (action === 'reopen') return 'owner';
   return null;
 }
 
-const MOVEMENT_TRANSITIONS: Record<MovementAction, Partial<Record<MovementStatus, MovementStatus>>> = {
+const MOVEMENT_TRANSITIONS: Record<
+  MovementAction,
+  Partial<Record<MovementStatus, MovementStatus>>
+> = {
   approve: { pendiente_n1: 'aprobado' },
   reject: { pendiente_n1: 'rechazado' },
-  cancel: { pendiente_n1: 'cancelado', aprobado: 'cancelado', aprobado_historico: 'cancelado' },
-  adjust: { pendiente_n1: 'ajustado', aprobado: 'ajustado', aprobado_historico: 'ajustado' },
+  cancel: {
+    pendiente_n1: 'cancelado',
+    aprobado: 'cancelado',
+    aprobado_historico: 'cancelado',
+  },
+  adjust: {
+    pendiente_n1: 'ajustado',
+    aprobado: 'ajustado',
+    aprobado_historico: 'ajustado',
+  },
 };
 
-export function nextMovementStatus(current: string, action: MovementAction): MovementStatus {
+export function nextMovementStatus(
+  current: string,
+  action: MovementAction,
+): MovementStatus {
   const next = MOVEMENT_TRANSITIONS[action][current as MovementStatus];
   if (!next) {
-    throw new ApprovalRuleError('conflict', `La acción "${action}" no aplica a un movimiento en estado "${current}".`);
+    throw new ApprovalRuleError(
+      'conflict',
+      `La acción "${action}" no aplica a un movimiento en estado "${current}".`,
+    );
   }
   return next;
 }
 
 /** Whether the action inserts a reversal entry in the ledger (S-4). */
-export const movementActionReverses = (action: MovementAction) => action !== 'approve';
+export const movementActionReverses = (action: MovementAction) =>
+  action !== 'approve';
 
 /** MV-04: once the Corte Z of the shift has its final approval, its ledger is closed. */
 export function assertShiftLedgerOpen(shiftReviewStatus: string): void {
@@ -196,9 +296,13 @@ export function assertShiftLedgerOpen(shiftReviewStatus: string): void {
 }
 
 /** CZ-06: a level cannot approve a corte while movements of the shift await N1. */
-export function assertNoPendingMovements(entries: Array<{ entryKind?: string | null; approvalStatus?: string | null }>): void {
+export function assertNoPendingMovements(
+  entries: Array<{ entryKind?: string | null; approvalStatus?: string | null }>,
+): void {
   const pending = entries.filter(
-    (e) => (e.entryKind ?? 'movimiento') === 'movimiento' && e.approvalStatus === 'pendiente_n1',
+    (e) =>
+      (e.entryKind ?? 'movimiento') === 'movimiento' &&
+      e.approvalStatus === 'pendiente_n1',
   ).length;
   if (pending > 0) {
     throw new ApprovalRuleError(
@@ -220,17 +324,25 @@ export interface LedgerEntry {
   [key: string]: unknown;
 }
 
-const money = (value: unknown) => Number.parseFloat(value?.toString() ?? '0') || 0;
-export const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+const money = (value: unknown) =>
+  Number.parseFloat(value?.toString() ?? '0') || 0;
+export const roundMoney = (value: number) =>
+  Math.round((value + Number.EPSILON) * 100) / 100;
 
 /** Signed effect of a ledger entry on expected cash (mirror of the cash_effect generated column). */
-export function cashEffect(entry: Pick<LedgerEntry, 'type' | 'amount' | 'entryKind'>): number {
+export function cashEffect(
+  entry: Pick<LedgerEntry, 'type' | 'amount' | 'entryKind'>,
+): number {
   const sign = entry.type === 'cash-in' ? 1 : -1;
   const reversal = entry.entryKind === 'reverso' ? -1 : 1;
   return roundMoney(money(entry.amount) * sign * reversal);
 }
 
-export type MovementGroup = 'aprobados' | 'pendientes' | 'revertidos' | 'ajustados';
+export type MovementGroup =
+  | 'aprobados'
+  | 'pendientes'
+  | 'revertidos'
+  | 'ajustados';
 
 export interface GroupedMovements {
   aprobados: LedgerEntry[];
@@ -295,10 +407,17 @@ export function groupMovements(entries: LedgerEntry[]): GroupedMovements {
   return result;
 }
 
-export type ReconciliationStatus = 'BALANCED' | 'SURPLUS' | 'SHORTAGE' | 'REQUIRES_RECONCILIATION';
+export type ReconciliationStatus =
+  | 'BALANCED'
+  | 'SURPLUS'
+  | 'SHORTAGE'
+  | 'REQUIRES_RECONCILIATION';
 
 /** Server-side mirror of ReportsPage.reconcileCash, computed on adjusted/approved expected cash. */
-export function reconciliationStatus(expected: number, counted: number): ReconciliationStatus {
+export function reconciliationStatus(
+  expected: number,
+  counted: number,
+): ReconciliationStatus {
   if (Math.round(expected * 100) < 0) return 'REQUIRES_RECONCILIATION';
   const diffCents = Math.round((counted - expected) * 100);
   if (diffCents === 0) return 'BALANCED';
@@ -317,9 +436,18 @@ export function isOpeningBlockedBy(
   config = CASH_APPROVAL_CONFIG,
 ): boolean {
   if (!lastShift) return false;
-  if (!OPEN_BLOCKING_STATUSES.includes((lastShift.reviewStatus ?? 'no_aplica') as ShiftReviewStatus)) return false;
+  if (
+    !OPEN_BLOCKING_STATUSES.includes(
+      (lastShift.reviewStatus ?? 'no_aplica') as ShiftReviewStatus,
+    )
+  )
+    return false;
   if (lastShift.openBlockOverriddenAt) return false;
-  if (lastShift.n1ResolverRole === BRANCH_SUPERVISOR_ROLE && !config.oisCloseBlocksOpeningUntilN1) return false;
+  if (
+    lastShift.n1ResolverRole === BRANCH_SUPERVISOR_ROLE &&
+    !config.oisCloseBlocksOpeningUntilN1
+  )
+    return false;
   return true;
 }
 
@@ -329,10 +457,16 @@ export function debtAmountFor(approvedDifference: number): number {
 }
 
 /** Reasons are mandatory for every rejection, adjustment, cancellation, reopen and unblock (AU-03). */
-export function requireReason(reason: string | undefined | null, what: string): string {
+export function requireReason(
+  reason: string | undefined | null,
+  what: string,
+): string {
   const trimmed = reason?.trim() ?? '';
   if (trimmed.length < 3) {
-    throw new ApprovalRuleError('unprocessable', `Se requiere un motivo para ${what}.`);
+    throw new ApprovalRuleError(
+      'unprocessable',
+      `Se requiere un motivo para ${what}.`,
+    );
   }
   return trimmed;
 }

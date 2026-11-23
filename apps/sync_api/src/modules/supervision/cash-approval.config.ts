@@ -25,6 +25,8 @@ export const CASH_APPROVAL_CONFIG = {
  * so that branches can keep opening shifts until every POS terminal runs the
  * version that includes the N1 inbox (plan.md §1.6).
  */
-export function isOpenBlockEnforced(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isOpenBlockEnforced(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
   return env.CASH_APPROVALS_ENFORCE_OPEN_BLOCK === 'true';
 }

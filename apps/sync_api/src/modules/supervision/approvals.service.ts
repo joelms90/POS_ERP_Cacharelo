@@ -7,13 +7,26 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { and, desc, eq, gte, inArray, isNull, lte, SQL, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  SQL,
+  sql,
+} from 'drizzle-orm';
 import { DRIZZLE_CONNECTION } from '../../database/database.module';
 import * as schema from '../../database/schema';
 import type { AppDatabase, DbExecutor } from '../audit/db-executor';
 import { AuditLogService } from '../audit/audit-log.service';
 import { NotificationsService } from '../audit/notifications.service';
-import { JwtUser, SupervisorScopeService } from '../audit/supervisor-scope.service';
+import {
+  JwtUser,
+  SupervisorScopeService,
+} from '../audit/supervisor-scope.service';
 import { ShiftsService } from '../shifts/shifts.service';
 import { TransactionsRepository } from '../shifts/repositories/transactions.repository';
 import { BRANCH_OPERATOR_ROLE, BRANCH_SUPERVISOR_ROLE } from '../auth/roles';
@@ -37,13 +50,24 @@ import {
   roundMoney,
   ShiftAction,
 } from './cash-approval.rules';
-import { AdjustMovementDto, AdjustShiftDto, ApproveDto, RejectDto } from './dto/approval.dto';
+import {
+  AdjustMovementDto,
+  AdjustShiftDto,
+  ApproveDto,
+  RejectDto,
+} from './dto/approval.dto';
 
 type Shift = typeof schema.cashShifts.$inferSelect;
 type Movement = typeof schema.cashTransactions.$inferSelect;
 
-const PENDING_SHIFT_STATUSES = ['pendiente_n1', 'rechazado_n1', 'pendiente_n2', 'rechazado_n2'];
-const money = (value: unknown) => Number.parseFloat(value?.toString() ?? '0') || 0;
+const PENDING_SHIFT_STATUSES = [
+  'pendiente_n1',
+  'rechazado_n1',
+  'pendiente_n2',
+  'rechazado_n2',
+];
+const money = (value: unknown) =>
+  Number.parseFloat(value?.toString() ?? '0') || 0;
 
 function toHttp(error: unknown): never {
   if (error instanceof ApprovalRuleError) {
@@ -81,8 +105,16 @@ export class ApprovalsService {
   // Corte Z
   // ---------------------------------------------------------------------------
 
-  async approveShift(shiftId: string, user: JwtUser, dto: ApproveDto, source: 'admin_web' | 'pos') {
-    const { shift, actor, branch } = await this.loadShiftForAction(shiftId, user);
+  async approveShift(
+    shiftId: string,
+    user: JwtUser,
+    dto: ApproveDto,
+    source: 'admin_web' | 'pos',
+  ) {
+    const { shift, actor, branch } = await this.loadShiftForAction(
+      shiftId,
+      user,
+    );
     const level = this.levelFor(shift.reviewStatus);
     const action: ShiftAction = level === 'n1' ? 'approve_n1' : 'approve_n2';
     this.authorizeShiftLevel(actor, shift, level);
@@ -99,15 +131,28 @@ export class ApprovalsService {
           operatorReviewedAt: new Date(),
           operatorNotes: dto.reason?.trim() || null,
         });
-        await this.recordShift(tx, shift, branch.businessId, actor, user, 'corte_z_aprobado', 'n1', dto.reason, source, {
-          before: { reviewStatus: shift.reviewStatus },
-          after: { reviewStatus: next },
-        });
+        await this.recordShift(
+          tx,
+          shift,
+          branch.businessId,
+          actor,
+          user,
+          'corte_z_aprobado',
+          'n1',
+          dto.reason,
+          source,
+          {
+            before: { reviewStatus: shift.reviewStatus },
+            after: { reviewStatus: next },
+          },
+        );
         await this.notifications.resolveActionFor(tx, 'cash_shift', shift.id);
         await this.notifications.notify(tx, {
           businessId: branch.businessId,
           branchId: shift.branchId,
-          recipients: (await this.n2Recipients(shift.branchId, branch.businessId)).filter((id) => id !== actor.id),
+          recipients: (
+            await this.n2Recipients(shift.branchId, branch.businessId)
+          ).filter((id) => id !== actor.id),
           type: 'aprobacion_pendiente',
           requiresAction: true,
           entityType: 'cash_shift',
@@ -127,41 +172,111 @@ export class ApprovalsService {
         reviewNotes: dto.reason?.trim() || null,
         approvedAmount: figures.counted.toFixed(2),
         approvedDifference: approvedDifference.toFixed(2),
-        approvalSnapshot: { ...figures, approvedAt: new Date(), approvedBy: actor.id },
+        approvalSnapshot: {
+          ...figures,
+          approvedAt: new Date(),
+          approvedBy: actor.id,
+        },
       });
-      await this.recordShift(tx, shift, branch.businessId, actor, user, 'corte_z_aprobado', 'n2', dto.reason, source, {
-        before: { reviewStatus: shift.reviewStatus },
-        after: { reviewStatus: next, approvedAmount: figures.counted, approvedDifference },
-      });
-      await this.afterFinalApproval(tx, shift, branch, actor, approvedDifference, user, source);
+      await this.recordShift(
+        tx,
+        shift,
+        branch.businessId,
+        actor,
+        user,
+        'corte_z_aprobado',
+        'n2',
+        dto.reason,
+        source,
+        {
+          before: { reviewStatus: shift.reviewStatus },
+          after: {
+            reviewStatus: next,
+            approvedAmount: figures.counted,
+            approvedDifference,
+          },
+        },
+      );
+      await this.afterFinalApproval(
+        tx,
+        shift,
+        branch,
+        actor,
+        approvedDifference,
+        user,
+        source,
+      );
       return updated;
     });
   }
 
-  async rejectShift(shiftId: string, user: JwtUser, dto: RejectDto, source: 'admin_web' | 'pos') {
-    const reason = guard(() => requireReason(dto.reason, 'rechazar el Corte Z'));
-    const { shift, actor, branch } = await this.loadShiftForAction(shiftId, user);
+  async rejectShift(
+    shiftId: string,
+    user: JwtUser,
+    dto: RejectDto,
+    source: 'admin_web' | 'pos',
+  ) {
+    const reason = guard(() =>
+      requireReason(dto.reason, 'rechazar el Corte Z'),
+    );
+    const { shift, actor, branch } = await this.loadShiftForAction(
+      shiftId,
+      user,
+    );
     const level = this.levelFor(shift.reviewStatus);
     this.authorizeShiftLevel(actor, shift, level);
-    const next = guard(() => nextShiftStatus(shift.reviewStatus, level === 'n1' ? 'reject_n1' : 'reject_n2'));
+    const next = guard(() =>
+      nextShiftStatus(
+        shift.reviewStatus,
+        level === 'n1' ? 'reject_n1' : 'reject_n2',
+      ),
+    );
     this.assertVersion(shift.version, dto.version);
 
     return this.db.transaction(async (tx) => {
       const updates: Partial<Shift> =
         level === 'n1'
-          ? { reviewStatus: next, operatorReviewedBy: actor.id, operatorReviewedAt: new Date(), operatorNotes: reason }
-          : { reviewStatus: next, reviewedBy: actor.id, reviewedAt: new Date(), reviewNotes: reason };
+          ? {
+              reviewStatus: next,
+              operatorReviewedBy: actor.id,
+              operatorReviewedAt: new Date(),
+              operatorNotes: reason,
+            }
+          : {
+              reviewStatus: next,
+              reviewedBy: actor.id,
+              reviewedAt: new Date(),
+              reviewNotes: reason,
+            };
       const updated = await this.casShift(tx, shift, updates);
-      await this.recordShift(tx, shift, branch.businessId, actor, user, 'corte_z_rechazado', level, reason, source, {
-        before: { reviewStatus: shift.reviewStatus },
-        after: { reviewStatus: next },
-      });
+      await this.recordShift(
+        tx,
+        shift,
+        branch.businessId,
+        actor,
+        user,
+        'corte_z_rechazado',
+        level,
+        reason,
+        source,
+        {
+          before: { reviewStatus: shift.reviewStatus },
+          after: { reviewStatus: next },
+        },
+      );
       await this.notifications.resolveActionFor(tx, 'cash_shift', shift.id);
       const author = shift.closedBy ?? shift.cashierId;
       const recipients =
         level === 'n1'
           ? [author]
-          : [shift.cashierId, author, ...(await this.scope.operatorsOf(shift.branchId, branch.businessId))];
+          : [
+              shift.cashierId,
+              author,
+              ...(await this.scope.operatorsOf(
+                shift.branchId,
+                branch.businessId,
+              )),
+            ];
       await this.notifications.notify(tx, {
         businessId: branch.businessId,
         branchId: shift.branchId,
@@ -177,11 +292,21 @@ export class ApprovalsService {
     });
   }
 
-  async adjustShift(shiftId: string, user: JwtUser, dto: AdjustShiftDto, source: 'admin_web' | 'pos') {
+  async adjustShift(
+    shiftId: string,
+    user: JwtUser,
+    dto: AdjustShiftDto,
+    source: 'admin_web' | 'pos',
+  ) {
     const reason = guard(() => requireReason(dto.reason, 'ajustar el Corte Z'));
-    const { shift, actor, branch } = await this.loadShiftForAction(shiftId, user);
+    const { shift, actor, branch } = await this.loadShiftForAction(
+      shiftId,
+      user,
+    );
     if (!['pendiente_n2', 'rechazado_n2'].includes(shift.reviewStatus)) {
-      throw new ConflictException('Solo se puede aprobar con ajuste un Corte Z en nivel 2.');
+      throw new ConflictException(
+        'Solo se puede aprobar con ajuste un Corte Z en nivel 2.',
+      );
     }
     guard(() => assertCanResolveN2(actor, this.n2Context(shift)));
     const next = guard(() => nextShiftStatus(shift.reviewStatus, 'adjust_n2'));
@@ -208,19 +333,49 @@ export class ApprovalsService {
           approvedBy: actor.id,
         },
       });
-      await this.recordShift(tx, shift, branch.businessId, actor, user, 'corte_z_ajustado', 'n2', reason, source, {
-        before: { reviewStatus: shift.reviewStatus, counted: money(shift.cashDrawerAmount) },
-        after: { reviewStatus: next, approvedAmount, approvedDifference },
-      });
-      await this.afterFinalApproval(tx, shift, branch, actor, approvedDifference, user, source);
+      await this.recordShift(
+        tx,
+        shift,
+        branch.businessId,
+        actor,
+        user,
+        'corte_z_ajustado',
+        'n2',
+        reason,
+        source,
+        {
+          before: {
+            reviewStatus: shift.reviewStatus,
+            counted: money(shift.cashDrawerAmount),
+          },
+          after: { reviewStatus: next, approvedAmount, approvedDifference },
+        },
+      );
+      await this.afterFinalApproval(
+        tx,
+        shift,
+        branch,
+        actor,
+        approvedDifference,
+        user,
+        source,
+      );
       return updated;
     });
   }
 
   async reopenShift(shiftId: string, user: JwtUser, reasonInput: string) {
-    const reason = guard(() => requireReason(reasonInput, 'reabrir el Corte Z'));
-    const { shift, actor, branch } = await this.loadShiftForAction(shiftId, user);
-    if (!actor.isOwner) throw new ForbiddenException('Solo el owner puede reabrir un Corte Z aprobado.');
+    const reason = guard(() =>
+      requireReason(reasonInput, 'reabrir el Corte Z'),
+    );
+    const { shift, actor, branch } = await this.loadShiftForAction(
+      shiftId,
+      user,
+    );
+    if (!actor.isOwner)
+      throw new ForbiddenException(
+        'Solo el owner puede reabrir un Corte Z aprobado.',
+      );
     const next = guard(() => nextShiftStatus(shift.reviewStatus, 'reopen'));
 
     return this.db.transaction(async (tx) => {
@@ -235,12 +390,31 @@ export class ApprovalsService {
       const voided = await tx
         .update(schema.cashierDebts)
         .set({ status: 'anulado', voidedBy: actor.id, voidedAt: new Date() })
-        .where(and(eq(schema.cashierDebts.shiftId, shift.id), eq(schema.cashierDebts.status, 'vigente')))
+        .where(
+          and(
+            eq(schema.cashierDebts.shiftId, shift.id),
+            eq(schema.cashierDebts.status, 'vigente'),
+          ),
+        )
         .returning();
-      await this.recordShift(tx, shift, branch.businessId, actor, user, 'corte_z_reabierto', 'owner', reason, 'admin_web', {
-        before: { reviewStatus: shift.reviewStatus, approvedDifference: shift.approvedDifference },
-        after: { reviewStatus: next },
-      });
+      await this.recordShift(
+        tx,
+        shift,
+        branch.businessId,
+        actor,
+        user,
+        'corte_z_reabierto',
+        'owner',
+        reason,
+        'admin_web',
+        {
+          before: {
+            reviewStatus: shift.reviewStatus,
+            approvedDifference: shift.approvedDifference,
+          },
+          after: { reviewStatus: next },
+        },
+      );
       for (const debt of voided) {
         await this.audit.record(tx, {
           businessId: branch.businessId,
@@ -270,7 +444,9 @@ export class ApprovalsService {
       await this.notifications.notify(tx, {
         businessId: branch.businessId,
         branchId: shift.branchId,
-        recipients: (await this.scope.supervisorsOf(shift.branchId)).filter((id) => id !== actor.id),
+        recipients: (await this.scope.supervisorsOf(shift.branchId)).filter(
+          (id) => id !== actor.id,
+        ),
         type: 'aprobacion_pendiente',
         requiresAction: true,
         entityType: 'cash_shift',
@@ -284,11 +460,25 @@ export class ApprovalsService {
 
   /** P-2: owner lets the branch open a new shift; the corte stays pending at N1. */
   async overrideOpenBlock(shiftId: string, user: JwtUser, reasonInput: string) {
-    const reason = guard(() => requireReason(reasonInput, 'desbloquear la apertura'));
-    const { shift, actor, branch } = await this.loadShiftForAction(shiftId, user);
-    if (!actor.isOwner) throw new ForbiddenException('Solo el owner puede desbloquear la apertura de turno.');
-    if (shift.openBlockOverriddenAt) throw new ConflictException('La apertura ya fue desbloqueada para este corte.');
-    if (!isOpeningBlockedBy(shift)) throw new ConflictException('Este Corte Z no está bloqueando la apertura de turno.');
+    const reason = guard(() =>
+      requireReason(reasonInput, 'desbloquear la apertura'),
+    );
+    const { shift, actor, branch } = await this.loadShiftForAction(
+      shiftId,
+      user,
+    );
+    if (!actor.isOwner)
+      throw new ForbiddenException(
+        'Solo el owner puede desbloquear la apertura de turno.',
+      );
+    if (shift.openBlockOverriddenAt)
+      throw new ConflictException(
+        'La apertura ya fue desbloqueada para este corte.',
+      );
+    if (!isOpeningBlockedBy(shift))
+      throw new ConflictException(
+        'Este Corte Z no está bloqueando la apertura de turno.',
+      );
 
     return this.db.transaction(async (tx) => {
       const updated = await this.casShift(tx, shift, {
@@ -296,10 +486,24 @@ export class ApprovalsService {
         openBlockOverriddenAt: new Date(),
         openBlockOverrideReason: reason,
       });
-      await this.recordShift(tx, shift, branch.businessId, actor, user, 'apertura_desbloqueada', 'owner', reason, 'admin_web', {
-        before: { reviewStatus: shift.reviewStatus },
-        after: { reviewStatus: shift.reviewStatus, openBlockOverridden: true },
-      });
+      await this.recordShift(
+        tx,
+        shift,
+        branch.businessId,
+        actor,
+        user,
+        'apertura_desbloqueada',
+        'owner',
+        reason,
+        'admin_web',
+        {
+          before: { reviewStatus: shift.reviewStatus },
+          after: {
+            reviewStatus: shift.reviewStatus,
+            openBlockOverridden: true,
+          },
+        },
+      );
       await this.notifications.notify(tx, {
         businessId: branch.businessId,
         branchId: shift.branchId,
@@ -321,36 +525,88 @@ export class ApprovalsService {
   // Cash movements (S-1: N1 only; S-4: ledger reversals)
   // ---------------------------------------------------------------------------
 
-  async approveMovement(id: string, user: JwtUser, dto: ApproveDto, source: 'admin_web' | 'pos') {
-    return this.resolveMovement(id, user, 'approve', dto.version, dto.reason, source);
+  async approveMovement(
+    id: string,
+    user: JwtUser,
+    dto: ApproveDto,
+    source: 'admin_web' | 'pos',
+  ) {
+    return this.resolveMovement(
+      id,
+      user,
+      'approve',
+      dto.version,
+      dto.reason,
+      source,
+    );
   }
 
-  async rejectMovement(id: string, user: JwtUser, dto: RejectDto, source: 'admin_web' | 'pos') {
-    const reason = guard(() => requireReason(dto.reason, 'rechazar el movimiento'));
-    return this.resolveMovement(id, user, 'reject', dto.version, reason, source);
+  async rejectMovement(
+    id: string,
+    user: JwtUser,
+    dto: RejectDto,
+    source: 'admin_web' | 'pos',
+  ) {
+    const reason = guard(() =>
+      requireReason(dto.reason, 'rechazar el movimiento'),
+    );
+    return this.resolveMovement(
+      id,
+      user,
+      'reject',
+      dto.version,
+      reason,
+      source,
+    );
   }
 
   async cancelMovement(id: string, user: JwtUser, dto: RejectDto) {
-    const reason = guard(() => requireReason(dto.reason, 'cancelar el movimiento'));
+    const reason = guard(() =>
+      requireReason(dto.reason, 'cancelar el movimiento'),
+    );
     return this.correctMovement(id, user, 'cancel', dto.version, reason);
   }
 
   async adjustMovement(id: string, user: JwtUser, dto: AdjustMovementDto) {
-    const reason = guard(() => requireReason(dto.reason, 'ajustar el movimiento'));
+    const reason = guard(() =>
+      requireReason(dto.reason, 'ajustar el movimiento'),
+    );
     const amount = money(dto.amount);
-    if (amount <= 0) throw new BadRequestException('El monto ajustado debe ser mayor a cero.');
-    return this.correctMovement(id, user, 'adjust', dto.version, reason, amount);
+    if (amount <= 0)
+      throw new BadRequestException('El monto ajustado debe ser mayor a cero.');
+    return this.correctMovement(
+      id,
+      user,
+      'adjust',
+      dto.version,
+      reason,
+      amount,
+    );
   }
 
   /** R-16: what a reject/cancel/adjust would do to the corte difference, shown before confirming. */
-  async movementImpact(id: string, user: JwtUser, action: 'reject' | 'cancel' | 'adjust', newAmount?: number) {
-    const { movement, shift } = await this.loadMovement(id, user, { forView: true });
+  async movementImpact(
+    id: string,
+    user: JwtUser,
+    action: 'reject' | 'cancel' | 'adjust',
+    newAmount?: number,
+  ) {
+    const { movement, shift } = await this.loadMovement(id, user, {
+      forView: true,
+    });
     const figures = await this.adjustedFigures(shift);
     const removed = -cashEffect(movement as any);
-    const added = action === 'adjust' && newAmount !== undefined
-      ? cashEffect({ type: movement.type, amount: newAmount, entryKind: 'ajuste' })
-      : 0;
-    const resultingExpected = roundMoney(figures.adjustedExpected + removed + added);
+    const added =
+      action === 'adjust' && newAmount !== undefined
+        ? cashEffect({
+            type: movement.type,
+            amount: newAmount,
+            entryKind: 'ajuste',
+          })
+        : 0;
+    const resultingExpected = roundMoney(
+      figures.adjustedExpected + removed + added,
+    );
     const counted = shift.status === 'closed' ? figures.counted : null;
     return {
       movementId: movement.id,
@@ -358,7 +614,8 @@ export class ApprovalsService {
       currentExpected: figures.adjustedExpected,
       resultingExpected,
       currentDifference: counted === null ? null : figures.adjustedDifference,
-      resultingDifference: counted === null ? null : roundMoney(counted - resultingExpected),
+      resultingDifference:
+        counted === null ? null : roundMoney(counted - resultingExpected),
       shiftClosed: shift.status === 'closed',
       message:
         counted === null
@@ -375,12 +632,28 @@ export class ApprovalsService {
     reason: string | undefined,
     source: 'admin_web' | 'pos',
   ) {
-    const { movement, shift, actor, branch } = await this.loadMovement(id, user);
-    const authorRoles = movement.createdBy ? await this.scope.userRoles(movement.createdBy) : [];
-    const n1ResolverRole = movement.createdBy ? n1ResolverRoleFor(authorRoles) : BRANCH_OPERATOR_ROLE;
-    guard(() => assertCanResolveN1(actor, { branchId: shift.branchId, authorId: movement.createdBy, n1ResolverRole }));
-    const next = guard(() => nextMovementStatus(movement.approvalStatus, action));
-    if (action === 'reject') guard(() => assertShiftLedgerOpen(shift.reviewStatus));
+    const { movement, shift, actor, branch } = await this.loadMovement(
+      id,
+      user,
+    );
+    const authorRoles = movement.createdBy
+      ? await this.scope.userRoles(movement.createdBy)
+      : [];
+    const n1ResolverRole = movement.createdBy
+      ? n1ResolverRoleFor(authorRoles)
+      : BRANCH_OPERATOR_ROLE;
+    guard(() =>
+      assertCanResolveN1(actor, {
+        branchId: shift.branchId,
+        authorId: movement.createdBy,
+        n1ResolverRole,
+      }),
+    );
+    const next = guard(() =>
+      nextMovementStatus(movement.approvalStatus, action),
+    );
+    if (action === 'reject')
+      guard(() => assertShiftLedgerOpen(shift.reviewStatus));
     this.assertVersion(movement.version, version);
 
     return this.db.transaction(async (tx) => {
@@ -393,14 +666,21 @@ export class ApprovalsService {
       });
       let reversal: Movement | null = null;
       if (action === 'reject') {
-        reversal = await this.insertReversal(tx, movement, shift, actor.id, reason!);
+        reversal = await this.insertReversal(
+          tx,
+          movement,
+          shift,
+          actor.id,
+          reason!,
+        );
       }
       await this.audit.record(tx, {
         businessId: branch.businessId,
         branchId: shift.branchId,
         entityType: 'cash_transaction',
         entityId: movement.id,
-        action: action === 'approve' ? 'movimiento_aprobado' : 'movimiento_rechazado',
+        action:
+          action === 'approve' ? 'movimiento_aprobado' : 'movimiento_rechazado',
         approvalLevel: 'n1',
         actorId: actor.id,
         actorRole: actor.roles[0] ?? null,
@@ -410,7 +690,11 @@ export class ApprovalsService {
         source,
         deviceId: this.deviceId(user),
       });
-      await this.notifications.resolveActionFor(tx, 'cash_transaction', movement.id);
+      await this.notifications.resolveActionFor(
+        tx,
+        'cash_transaction',
+        movement.id,
+      );
       await this.notifications.notify(tx, {
         businessId: branch.businessId,
         branchId: shift.branchId,
@@ -433,10 +717,15 @@ export class ApprovalsService {
     reason: string,
     newAmount?: number,
   ) {
-    const { movement, shift, actor, branch } = await this.loadMovement(id, user);
+    const { movement, shift, actor, branch } = await this.loadMovement(
+      id,
+      user,
+    );
     guard(() => assertCanCancelOrAdjust(actor, shift.branchId));
     guard(() => assertShiftLedgerOpen(shift.reviewStatus));
-    const next = guard(() => nextMovementStatus(movement.approvalStatus, action));
+    const next = guard(() =>
+      nextMovementStatus(movement.approvalStatus, action),
+    );
     this.assertVersion(movement.version, version);
 
     return this.db.transaction(async (tx) => {
@@ -447,7 +736,13 @@ export class ApprovalsService {
         reviewReason: reason,
         reviewLevel: 'n2',
       });
-      const reversal = await this.insertReversal(tx, movement, shift, actor.id, reason);
+      const reversal = await this.insertReversal(
+        tx,
+        movement,
+        shift,
+        actor.id,
+        reason,
+      );
       let replacement: Movement | null = null;
       if (action === 'adjust') {
         replacement = await this.transactions.create(
@@ -466,7 +761,15 @@ export class ApprovalsService {
           tx,
         );
         if (shift.status === 'open') {
-          await this.bumpDrawerCache(tx, shift.id, cashEffect({ type: movement.type, amount: newAmount!, entryKind: 'ajuste' }));
+          await this.bumpDrawerCache(
+            tx,
+            shift.id,
+            cashEffect({
+              type: movement.type,
+              amount: newAmount!,
+              entryKind: 'ajuste',
+            }),
+          );
         }
       }
       await this.audit.record(tx, {
@@ -474,12 +777,16 @@ export class ApprovalsService {
         branchId: shift.branchId,
         entityType: 'cash_transaction',
         entityId: movement.id,
-        action: action === 'cancel' ? 'movimiento_cancelado' : 'movimiento_ajustado',
+        action:
+          action === 'cancel' ? 'movimiento_cancelado' : 'movimiento_ajustado',
         approvalLevel: actor.isOwner ? 'owner' : 'n2',
         actorId: actor.id,
         actorRole: actor.isOwner ? 'owner' : BRANCH_SUPERVISOR_ROLE,
         reason,
-        before: { approvalStatus: movement.approvalStatus, amount: money(movement.amount) },
+        before: {
+          approvalStatus: movement.approvalStatus,
+          amount: money(movement.amount),
+        },
         after: {
           approvalStatus: next,
           amount: action === 'adjust' ? newAmount : 0,
@@ -488,12 +795,19 @@ export class ApprovalsService {
         },
         source: 'admin_web',
       });
-      await this.notifications.resolveActionFor(tx, 'cash_transaction', movement.id);
+      await this.notifications.resolveActionFor(
+        tx,
+        'cash_transaction',
+        movement.id,
+      );
       await this.notifications.notify(tx, {
         businessId: branch.businessId,
         branchId: shift.branchId,
-        recipients: [movement.createdBy, shift.cashierId].filter((uid) => uid !== actor.id),
-        type: action === 'cancel' ? 'movimiento_cancelado' : 'movimiento_ajustado',
+        recipients: [movement.createdBy, shift.cashierId].filter(
+          (uid) => uid !== actor.id,
+        ),
+        type:
+          action === 'cancel' ? 'movimiento_cancelado' : 'movimiento_ajustado',
         entityType: 'cash_transaction',
         entityId: movement.id,
         title:
@@ -512,11 +826,19 @@ export class ApprovalsService {
 
   async listApprovals(
     user: JwtUser,
-    filters: { type?: 'corte_z' | 'cash_movement'; status?: string; branchId?: string; from?: string; to?: string; actionable?: boolean },
+    filters: {
+      type?: 'corte_z' | 'cash_movement';
+      status?: string;
+      branchId?: string;
+      from?: string;
+      to?: string;
+      actionable?: boolean;
+    },
   ) {
     const actor = await this.scope.buildActor(user);
     let branchIds = await this.scope.visibleBranchIds(actor, user);
-    if (filters.branchId) branchIds = branchIds.filter((id) => id === filters.branchId);
+    if (filters.branchId)
+      branchIds = branchIds.filter((id) => id === filters.branchId);
     if (branchIds.length === 0) return { cortes: [], movements: [] };
     const from = filters.from ? new Date(`${filters.from}T00:00:00`) : null;
     const to = filters.to ? new Date(`${filters.to}T23:59:59`) : null;
@@ -524,20 +846,40 @@ export class ApprovalsService {
     const cortes =
       filters.type === 'cash_movement'
         ? []
-        : await this.listShiftItems(actor, user, branchIds, filters.status ? filters.status.split(',') : PENDING_SHIFT_STATUSES, from, to);
+        : await this.listShiftItems(
+            actor,
+            user,
+            branchIds,
+            filters.status ? filters.status.split(',') : PENDING_SHIFT_STATUSES,
+            from,
+            to,
+          );
     const movements =
       filters.type === 'corte_z'
         ? []
-        : await this.listMovementItems(actor, user, branchIds, filters.status ? filters.status.split(',') : ['pendiente_n1'], from, to);
+        : await this.listMovementItems(
+            actor,
+            user,
+            branchIds,
+            filters.status ? filters.status.split(',') : ['pendiente_n1'],
+            from,
+            to,
+          );
     return {
       cortes: filters.actionable ? cortes.filter((c) => c.canAct) : cortes,
-      movements: filters.actionable ? movements.filter((m) => m.canAct) : movements,
+      movements: filters.actionable
+        ? movements.filter((m) => m.canAct)
+        : movements,
     };
   }
 
   async countActionable(user: JwtUser) {
     const result = await this.listApprovals(user, { actionable: true });
-    return { cortes: result.cortes.length, movements: result.movements.length, total: result.cortes.length + result.movements.length };
+    return {
+      cortes: result.cortes.length,
+      movements: result.movements.length,
+      total: result.cortes.length + result.movements.length,
+    };
   }
 
   async getShiftDetail(shiftId: string, user: JwtUser) {
@@ -545,17 +887,32 @@ export class ApprovalsService {
     const actor = await this.scope.buildActor(user);
     await this.assertCanView(actor, user, shift.branchId);
     const branch = await this.scope.getBranch(shift.branchId);
-    const scopedActor = this.scope.actorForBusiness(actor, user, branch.businessId);
+    const scopedActor = this.scope.actorForBusiness(
+      actor,
+      user,
+      branch.businessId,
+    );
     const figures = await this.adjustedFigures(shift);
     const report = await this.shifts.buildShiftReport(shift, {
       closedAt: shift.closedAt ? new Date(shift.closedAt) : new Date(),
       actualCash: shift.status === 'closed' ? figures.counted : undefined,
-      denominationCounts: (shift.denominationCounts ?? undefined) as Record<string, number> | undefined,
+      denominationCounts: (shift.denominationCounts ?? undefined) as
+        | Record<string, number>
+        | undefined,
       closeNotes: shift.closeNotes ?? undefined,
       status: shift.status as 'open' | 'closed',
     });
-    const history = await this.audit.query({ entityType: 'cash_shift', entityId: shift.id, limit: 200 });
-    const names = await this.userNames([shift.cashierId, shift.closedBy, shift.operatorReviewedBy, shift.reviewedBy]);
+    const history = await this.audit.query({
+      entityType: 'cash_shift',
+      entityId: shift.id,
+      limit: 200,
+    });
+    const names = await this.userNames([
+      shift.cashierId,
+      shift.closedBy,
+      shift.operatorReviewedBy,
+      shift.reviewedBy,
+    ]);
     return {
       shift: {
         id: shift.id,
@@ -570,22 +927,33 @@ export class ApprovalsService {
         reviewStatus: shift.reviewStatus,
         n1ResolverRole: shift.n1ResolverRole,
         closedBy: shift.closedBy,
-        closedByName: shift.closedBy ? names[shift.closedBy] ?? null : null,
+        closedByName: shift.closedBy ? (names[shift.closedBy] ?? null) : null,
         operatorReviewedBy: shift.operatorReviewedBy,
-        operatorReviewedByName: shift.operatorReviewedBy ? names[shift.operatorReviewedBy] ?? null : null,
+        operatorReviewedByName: shift.operatorReviewedBy
+          ? (names[shift.operatorReviewedBy] ?? null)
+          : null,
         operatorReviewedAt: shift.operatorReviewedAt,
         operatorNotes: shift.operatorNotes,
         reviewedBy: shift.reviewedBy,
-        reviewedByName: shift.reviewedBy ? names[shift.reviewedBy] ?? null : null,
+        reviewedByName: shift.reviewedBy
+          ? (names[shift.reviewedBy] ?? null)
+          : null,
         reviewedAt: shift.reviewedAt,
         reviewNotes: shift.reviewNotes,
         recountCount: shift.recountCount,
         closedOffline: shift.closedOffline,
-        localExpectedCash: shift.localExpectedCash != null ? money(shift.localExpectedCash) : null,
+        localExpectedCash:
+          shift.localExpectedCash != null
+            ? money(shift.localExpectedCash)
+            : null,
         openBlockOverriddenAt: shift.openBlockOverriddenAt,
         openBlockOverrideReason: shift.openBlockOverrideReason,
-        approvedAmount: shift.approvedAmount != null ? money(shift.approvedAmount) : null,
-        approvedDifference: shift.approvedDifference != null ? money(shift.approvedDifference) : null,
+        approvedAmount:
+          shift.approvedAmount != null ? money(shift.approvedAmount) : null,
+        approvedDifference:
+          shift.approvedDifference != null
+            ? money(shift.approvedDifference)
+            : null,
         version: shift.version,
       },
       figures,
@@ -596,22 +964,35 @@ export class ApprovalsService {
     };
   }
 
-  async listDebts(user: JwtUser, filters: { branchId?: string; cashierId?: string; status?: string; mine?: boolean }) {
+  async listDebts(
+    user: JwtUser,
+    filters: {
+      branchId?: string;
+      cashierId?: string;
+      status?: string;
+      mine?: boolean;
+    },
+  ) {
     const actor = await this.scope.buildActor(user);
     const conditions: SQL[] = [];
     if (filters.mine) {
       conditions.push(eq(schema.cashierDebts.cashierId, actor.id));
     } else {
       if (!actor.isOwner && !actor.roles.includes(BRANCH_SUPERVISOR_ROLE)) {
-        throw new ForbiddenException('Solo el supervisor o el owner consultan los adeudos de la sucursal.');
+        throw new ForbiddenException(
+          'Solo el supervisor o el owner consultan los adeudos de la sucursal.',
+        );
       }
       let branchIds = await this.scope.visibleBranchIds(actor, user);
-      if (filters.branchId) branchIds = branchIds.filter((id) => id === filters.branchId);
+      if (filters.branchId)
+        branchIds = branchIds.filter((id) => id === filters.branchId);
       if (branchIds.length === 0) return [];
       conditions.push(inArray(schema.cashierDebts.branchId, branchIds));
-      if (filters.cashierId) conditions.push(eq(schema.cashierDebts.cashierId, filters.cashierId));
+      if (filters.cashierId)
+        conditions.push(eq(schema.cashierDebts.cashierId, filters.cashierId));
     }
-    if (filters.status) conditions.push(eq(schema.cashierDebts.status, filters.status));
+    if (filters.status)
+      conditions.push(eq(schema.cashierDebts.status, filters.status));
     return this.db
       .select({
         id: schema.cashierDebts.id,
@@ -627,19 +1008,39 @@ export class ApprovalsService {
         voidedAt: schema.cashierDebts.voidedAt,
       })
       .from(schema.cashierDebts)
-      .innerJoin(schema.branches, eq(schema.cashierDebts.branchId, schema.branches.id))
-      .innerJoin(schema.users, eq(schema.cashierDebts.cashierId, schema.users.id))
+      .innerJoin(
+        schema.branches,
+        eq(schema.cashierDebts.branchId, schema.branches.id),
+      )
+      .innerJoin(
+        schema.users,
+        eq(schema.cashierDebts.cashierId, schema.users.id),
+      )
       .where(and(...conditions))
       .orderBy(desc(schema.cashierDebts.generatedAt));
   }
 
-  async auditLog(user: JwtUser, filters: { branchId?: string; entityType?: string; entityId?: string; actorId?: string; action?: string; from?: string; to?: string }) {
+  async auditLog(
+    user: JwtUser,
+    filters: {
+      branchId?: string;
+      entityType?: string;
+      entityId?: string;
+      actorId?: string;
+      action?: string;
+      from?: string;
+      to?: string;
+    },
+  ) {
     const actor = await this.scope.buildActor(user);
     if (!actor.isOwner && !actor.roles.includes(BRANCH_SUPERVISOR_ROLE)) {
-      throw new ForbiddenException('Solo el supervisor o el owner consultan la bitácora.');
+      throw new ForbiddenException(
+        'Solo el supervisor o el owner consultan la bitácora.',
+      );
     }
     let branchIds = await this.scope.visibleBranchIds(actor, user);
-    if (filters.branchId) branchIds = branchIds.filter((id) => id === filters.branchId);
+    if (filters.branchId)
+      branchIds = branchIds.filter((id) => id === filters.branchId);
     return this.audit.query({
       branchIds,
       entityType: filters.entityType,
@@ -655,7 +1056,11 @@ export class ApprovalsService {
   async listAssignments(user: JwtUser, businessId: string) {
     this.assertOwnerOf(user, businessId);
     const supervisors = await this.db
-      .select({ id: schema.users.id, name: schema.users.name, email: schema.users.email })
+      .select({
+        id: schema.users.id,
+        name: schema.users.name,
+        email: schema.users.email,
+      })
       .from(schema.users)
       .where(
         and(
@@ -673,33 +1078,61 @@ export class ApprovalsService {
             createdAt: schema.supervisorBranchAssignments.createdAt,
           })
           .from(schema.supervisorBranchAssignments)
-          .innerJoin(schema.branches, eq(schema.supervisorBranchAssignments.branchId, schema.branches.id))
+          .innerJoin(
+            schema.branches,
+            eq(schema.supervisorBranchAssignments.branchId, schema.branches.id),
+          )
           .where(
             and(
               eq(schema.supervisorBranchAssignments.businessId, businessId),
               isNull(schema.supervisorBranchAssignments.revokedAt),
-              inArray(schema.supervisorBranchAssignments.userId, supervisors.map((s) => s.id)),
+              inArray(
+                schema.supervisorBranchAssignments.userId,
+                supervisors.map((s) => s.id),
+              ),
             ),
           )
       : [];
     return supervisors.map((supervisor) => ({
       ...supervisor,
-      branches: rows.filter((row) => row.userId === supervisor.id).map(({ branchId, branchName, createdAt }) => ({ branchId, branchName, createdAt })),
+      branches: rows
+        .filter((row) => row.userId === supervisor.id)
+        .map(({ branchId, branchName, createdAt }) => ({
+          branchId,
+          branchName,
+          createdAt,
+        })),
     }));
   }
 
-  async replaceAssignments(user: JwtUser, userId: string, businessId: string, branchIds: string[]) {
+  async replaceAssignments(
+    user: JwtUser,
+    userId: string,
+    businessId: string,
+    branchIds: string[],
+  ) {
     this.assertOwnerOf(user, businessId);
     const roles = await this.scope.userRoles(userId);
     if (!roles.includes(BRANCH_SUPERVISOR_ROLE)) {
-      throw new BadRequestException('El usuario no tiene el rol de supervisor de sucursal.');
+      throw new BadRequestException(
+        'El usuario no tiene el rol de supervisor de sucursal.',
+      );
     }
     if (branchIds.length) {
       const valid = await this.db
         .select({ id: schema.branches.id })
         .from(schema.branches)
-        .where(and(inArray(schema.branches.id, branchIds), eq(schema.branches.businessId, businessId), isNull(schema.branches.deletedAt)));
-      if (valid.length !== branchIds.length) throw new BadRequestException('Alguna sucursal no pertenece al negocio.');
+        .where(
+          and(
+            inArray(schema.branches.id, branchIds),
+            eq(schema.branches.businessId, businessId),
+            isNull(schema.branches.deletedAt),
+          ),
+        );
+      if (valid.length !== branchIds.length)
+        throw new BadRequestException(
+          'Alguna sucursal no pertenece al negocio.',
+        );
     }
     const actorId = (user.sub ?? user.id)!;
     return this.db.transaction(async (tx) => {
@@ -714,18 +1147,32 @@ export class ApprovalsService {
           ),
         );
       const currentIds = current.map((row) => row.branchId);
-      const toRevoke = current.filter((row) => !branchIds.includes(row.branchId));
+      const toRevoke = current.filter(
+        (row) => !branchIds.includes(row.branchId),
+      );
       const toAdd = branchIds.filter((id) => !currentIds.includes(id));
       if (toRevoke.length) {
         await tx
           .update(schema.supervisorBranchAssignments)
           .set({ revokedAt: new Date() })
-          .where(inArray(schema.supervisorBranchAssignments.id, toRevoke.map((row) => row.id)));
+          .where(
+            inArray(
+              schema.supervisorBranchAssignments.id,
+              toRevoke.map((row) => row.id),
+            ),
+          );
       }
       if (toAdd.length) {
-        await tx.insert(schema.supervisorBranchAssignments).values(
-          toAdd.map((branchId) => ({ businessId, userId, branchId, assignedBy: actorId })),
-        );
+        await tx
+          .insert(schema.supervisorBranchAssignments)
+          .values(
+            toAdd.map((branchId) => ({
+              businessId,
+              userId,
+              branchId,
+              assignedBy: actorId,
+            })),
+          );
       }
       if (toRevoke.length || toAdd.length) {
         await this.audit.record(tx, {
@@ -741,7 +1188,13 @@ export class ApprovalsService {
           source: 'admin_web',
         });
       }
-      return { userId, businessId, branchIds, added: toAdd, revoked: toRevoke.map((row) => row.branchId) };
+      return {
+        userId,
+        businessId,
+        branchIds,
+        added: toAdd,
+        revoked: toRevoke.map((row) => row.branchId),
+      };
     });
   }
 
@@ -762,7 +1215,8 @@ export class ApprovalsService {
       status: shift.status as 'open' | 'closed',
     });
     const adjustedExpected = live.summary.expectedCash;
-    const expectedAtClose = snapshot?.summary?.expectedCash ?? snapshot?.expectedCash ?? null;
+    const expectedAtClose =
+      snapshot?.summary?.expectedCash ?? snapshot?.expectedCash ?? null;
     const postCloseEntries = closedAt
       ? movements
           .filter((m) => m.createdAt && new Date(m.createdAt) > closedAt)
@@ -780,16 +1234,22 @@ export class ApprovalsService {
       : [];
     const counted = countedOverride ?? money(shift.cashDrawerAmount);
     const isClosed = shift.status === 'closed';
-    const adjustedDifference = isClosed ? roundMoney(counted - adjustedExpected) : null;
+    const adjustedDifference = isClosed
+      ? roundMoney(counted - adjustedExpected)
+      : null;
     return {
       expectedAtClose: expectedAtClose === null ? null : money(expectedAtClose),
-      postCloseAdjustment: roundMoney(postCloseEntries.reduce((sum, entry) => sum + entry.cashEffect, 0)),
+      postCloseAdjustment: roundMoney(
+        postCloseEntries.reduce((sum, entry) => sum + entry.cashEffect, 0),
+      ),
       postCloseEntries,
       adjustedExpected,
       counted,
       originalDifference: snapshot?.summary?.cashDifference ?? null,
       adjustedDifference,
-      reconciliationStatus: isClosed ? reconciliationStatus(adjustedExpected, counted) : null,
+      reconciliationStatus: isClosed
+        ? reconciliationStatus(adjustedExpected, counted)
+        : null,
       movementTotals: live.movementTotals,
       pendingMovementsCount: live.summary.pendingMovementsCount,
       pendingMovementsAmount: live.summary.pendingMovementsAmount,
@@ -828,16 +1288,22 @@ export class ApprovalsService {
         approvalLevel: 'n2',
         actorId: actor.id,
         actorRole: actor.isOwner ? 'owner' : BRANCH_SUPERVISOR_ROLE,
-        after: { amount: debtAmount, shiftId: shift.id, cashierId: shift.cashierId },
+        after: {
+          amount: debtAmount,
+          shiftId: shift.id,
+          cashierId: shift.cashierId,
+        },
         source,
         deviceId: this.deviceId(user),
       });
       await this.notifications.notify(tx, {
         businessId: branch.businessId,
         branchId: shift.branchId,
-        recipients: [shift.cashierId, ...(await this.scope.supervisorsOf(shift.branchId)), ...(await this.scope.ownersOf(branch.businessId))].filter(
-          (id) => id !== actor.id,
-        ),
+        recipients: [
+          shift.cashierId,
+          ...(await this.scope.supervisorsOf(shift.branchId)),
+          ...(await this.scope.ownersOf(branch.businessId)),
+        ].filter((id) => id !== actor.id),
         type: 'adeudo_generado',
         entityType: 'cashier_debt',
         entityId: debt.id,
@@ -847,7 +1313,9 @@ export class ApprovalsService {
     await this.notifications.notify(tx, {
       businessId: branch.businessId,
       branchId: shift.branchId,
-      recipients: [shift.cashierId, shift.closedBy].filter((id) => id && id !== actor.id),
+      recipients: [shift.cashierId, shift.closedBy].filter(
+        (id) => id && id !== actor.id,
+      ),
       type: 'aprobacion_resuelta',
       entityType: 'cash_shift',
       entityId: shift.id,
@@ -856,7 +1324,14 @@ export class ApprovalsService {
     });
   }
 
-  private async listShiftItems(actor: ApprovalActor, user: JwtUser, branchIds: string[], statuses: string[], from: Date | null, to: Date | null) {
+  private async listShiftItems(
+    actor: ApprovalActor,
+    user: JwtUser,
+    branchIds: string[],
+    statuses: string[],
+    from: Date | null,
+    to: Date | null,
+  ) {
     const rows = await this.db
       .select({
         shift: schema.cashShifts,
@@ -865,7 +1340,10 @@ export class ApprovalsService {
         cashierName: schema.users.name,
       })
       .from(schema.cashShifts)
-      .innerJoin(schema.branches, eq(schema.cashShifts.branchId, schema.branches.id))
+      .innerJoin(
+        schema.branches,
+        eq(schema.cashShifts.branchId, schema.branches.id),
+      )
       .leftJoin(schema.users, eq(schema.cashShifts.cashierId, schema.users.id))
       .where(
         and(
@@ -905,7 +1383,14 @@ export class ApprovalsService {
     });
   }
 
-  private async listMovementItems(actor: ApprovalActor, user: JwtUser, branchIds: string[], statuses: string[], from: Date | null, to: Date | null) {
+  private async listMovementItems(
+    actor: ApprovalActor,
+    user: JwtUser,
+    branchIds: string[],
+    statuses: string[],
+    from: Date | null,
+    to: Date | null,
+  ) {
     const rows = await this.db
       .select({
         movement: schema.cashTransactions,
@@ -919,9 +1404,18 @@ export class ApprovalsService {
         authorRoles: schema.users.roles,
       })
       .from(schema.cashTransactions)
-      .innerJoin(schema.cashShifts, eq(schema.cashTransactions.shiftId, schema.cashShifts.id))
-      .innerJoin(schema.branches, eq(schema.cashShifts.branchId, schema.branches.id))
-      .leftJoin(schema.users, eq(schema.cashTransactions.createdBy, schema.users.id))
+      .innerJoin(
+        schema.cashShifts,
+        eq(schema.cashTransactions.shiftId, schema.cashShifts.id),
+      )
+      .innerJoin(
+        schema.branches,
+        eq(schema.cashShifts.branchId, schema.branches.id),
+      )
+      .leftJoin(
+        schema.users,
+        eq(schema.cashTransactions.createdBy, schema.users.id),
+      )
       .where(
         and(
           inArray(schema.cashShifts.branchId, branchIds),
@@ -936,11 +1430,17 @@ export class ApprovalsService {
     return rows.map((row) => {
       const scoped = this.scope.actorForBusiness(actor, user, row.businessId);
       const n1ResolverRole = row.movement.createdBy
-        ? n1ResolverRoleFor(normalizeAuthorRoles(row.authorRoles, row.authorRole))
+        ? n1ResolverRoleFor(
+            normalizeAuthorRoles(row.authorRoles, row.authorRole),
+          )
         : BRANCH_OPERATOR_ROLE;
       let canAct = false;
       try {
-        assertCanResolveN1(scoped, { branchId: row.branchId, authorId: row.movement.createdBy, n1ResolverRole });
+        assertCanResolveN1(scoped, {
+          branchId: row.branchId,
+          authorId: row.movement.createdBy,
+          n1ResolverRole,
+        });
         nextMovementStatus(row.movement.approvalStatus, 'approve');
         canAct = true;
       } catch {
@@ -995,20 +1495,31 @@ export class ApprovalsService {
           : false;
     return {
       level,
-      canApprove: canLevel && ['pendiente_n1', 'pendiente_n2'].includes(shift.reviewStatus),
-      canReject: canLevel && ['pendiente_n1', 'pendiente_n2'].includes(shift.reviewStatus),
-      canAdjust: level === 'n2' && can(() => assertCanResolveN2(actor, this.n2Context(shift))),
-      canReopen: actor.isOwner && ['aprobado', 'aprobado_con_ajuste'].includes(shift.reviewStatus),
+      canApprove:
+        canLevel &&
+        ['pendiente_n1', 'pendiente_n2'].includes(shift.reviewStatus),
+      canReject:
+        canLevel &&
+        ['pendiente_n1', 'pendiente_n2'].includes(shift.reviewStatus),
+      canAdjust:
+        level === 'n2' &&
+        can(() => assertCanResolveN2(actor, this.n2Context(shift))),
+      canReopen:
+        actor.isOwner &&
+        ['aprobado', 'aprobado_con_ajuste'].includes(shift.reviewStatus),
       canUnblockOpening: actor.isOwner && isOpeningBlockedBy(shift),
       canCorrectMovements:
-        can(() => assertCanCancelOrAdjust(actor, shift.branchId)) && can(() => assertShiftLedgerOpen(shift.reviewStatus)),
+        can(() => assertCanCancelOrAdjust(actor, shift.branchId)) &&
+        can(() => assertShiftLedgerOpen(shift.reviewStatus)),
     };
   }
 
   private levelFor(status: string): 'n1' | 'n2' {
     const level = this.levelForSafe(status);
     if (level !== 'n1' && level !== 'n2') {
-      throw new ConflictException(`El Corte Z en estado "${status}" no está pendiente de aprobación.`);
+      throw new ConflictException(
+        `El Corte Z en estado "${status}" no está pendiente de aprobación.`,
+      );
     }
     return level;
   }
@@ -1019,8 +1530,13 @@ export class ApprovalsService {
     return null;
   }
 
-  private authorizeShiftLevel(actor: ApprovalActor, shift: Shift, level: 'n1' | 'n2') {
-    if (level === 'n1') guard(() => assertCanResolveN1(actor, this.n1Context(shift)));
+  private authorizeShiftLevel(
+    actor: ApprovalActor,
+    shift: Shift,
+    level: 'n1' | 'n2',
+  ) {
+    if (level === 'n1')
+      guard(() => assertCanResolveN1(actor, this.n1Context(shift)));
     else guard(() => assertCanResolveN2(actor, this.n2Context(shift)));
   }
 
@@ -1042,76 +1558,135 @@ export class ApprovalsService {
 
   private async loadShiftForAction(shiftId: string, user: JwtUser) {
     const shift = await this.getShift(shiftId);
-    if (shift.status !== 'closed') throw new ConflictException('El turno sigue abierto; no tiene Corte Z.');
+    if (shift.status !== 'closed')
+      throw new ConflictException('El turno sigue abierto; no tiene Corte Z.');
     const branch = await this.scope.getBranch(shift.branchId);
-    const actor = this.scope.actorForBusiness(await this.scope.buildActor(user), user, branch.businessId);
+    const actor = this.scope.actorForBusiness(
+      await this.scope.buildActor(user),
+      user,
+      branch.businessId,
+    );
     return { shift, actor, branch };
   }
 
-  private async loadMovement(id: string, user: JwtUser, opts: { forView?: boolean } = {}) {
+  private async loadMovement(
+    id: string,
+    user: JwtUser,
+    opts: { forView?: boolean } = {},
+  ) {
     const movement = await this.transactions.findById(id);
     if (!movement) throw new NotFoundException('Movimiento no encontrado.');
     if ((movement.entryKind ?? 'movimiento') !== 'movimiento') {
-      throw new ConflictException('Solo se aprueban o corrigen movimientos originales, no reversos ni ajustes.');
+      throw new ConflictException(
+        'Solo se aprueban o corrigen movimientos originales, no reversos ni ajustes.',
+      );
     }
     const shift = await this.getShift(movement.shiftId);
     const branch = await this.scope.getBranch(shift.branchId);
-    const actor = this.scope.actorForBusiness(await this.scope.buildActor(user), user, branch.businessId);
+    const actor = this.scope.actorForBusiness(
+      await this.scope.buildActor(user),
+      user,
+      branch.businessId,
+    );
     if (opts.forView) await this.assertCanView(actor, user, shift.branchId);
     return { movement, shift, actor, branch };
   }
 
   private async getShift(id: string) {
-    const [shift] = await this.db.select().from(schema.cashShifts).where(eq(schema.cashShifts.id, id)).limit(1);
+    const [shift] = await this.db
+      .select()
+      .from(schema.cashShifts)
+      .where(eq(schema.cashShifts.id, id))
+      .limit(1);
     if (!shift) throw new NotFoundException('Turno no encontrado.');
     return shift;
   }
 
-  private async assertCanView(actor: ApprovalActor, user: JwtUser, branchId: string) {
+  private async assertCanView(
+    actor: ApprovalActor,
+    user: JwtUser,
+    branchId: string,
+  ) {
     const visible = await this.scope.visibleBranchIds(actor, user);
-    if (!visible.includes(branchId)) throw new ForbiddenException('No tienes acceso a esta sucursal.');
+    if (!visible.includes(branchId))
+      throw new ForbiddenException('No tienes acceso a esta sucursal.');
   }
 
   private assertOwnerOf(user: JwtUser, businessId: string) {
     const roles = (user.roles ?? [user.role]).filter(Boolean) as string[];
-    if (!roles.includes('owner')) throw new ForbiddenException('Solo el owner administra supervisores.');
-    const ids = [user.businessId, ...(user.businessAccess ?? []).map((a) => a.businessId)].filter(Boolean);
-    if (ids.length && !ids.includes(businessId)) throw new ForbiddenException('No tienes acceso a este negocio.');
+    if (!roles.includes('owner'))
+      throw new ForbiddenException('Solo el owner administra supervisores.');
+    const ids = [
+      user.businessId,
+      ...(user.businessAccess ?? []).map((a) => a.businessId),
+    ].filter(Boolean);
+    if (ids.length && !ids.includes(businessId))
+      throw new ForbiddenException('No tienes acceso a este negocio.');
   }
 
   private assertVersion(current: number | null | undefined, expected: number) {
     if ((current ?? 1) !== expected) {
-      throw new ConflictException('Otra persona modificó este registro; recarga para ver su estado actual.');
+      throw new ConflictException(
+        'Otra persona modificó este registro; recarga para ver su estado actual.',
+      );
     }
   }
 
   /** Compare-and-set on version so two approvers cannot both win (CZ-09). */
-  private async casShift(tx: DbExecutor, shift: Shift, updates: Partial<Shift>) {
+  private async casShift(
+    tx: DbExecutor,
+    shift: Shift,
+    updates: Partial<Shift>,
+  ) {
     const rows = await tx
       .update(schema.cashShifts)
       .set({ ...updates, version: (shift.version ?? 1) + 1 })
-      .where(and(eq(schema.cashShifts.id, shift.id), eq(schema.cashShifts.version, shift.version ?? 1)))
+      .where(
+        and(
+          eq(schema.cashShifts.id, shift.id),
+          eq(schema.cashShifts.version, shift.version ?? 1),
+        ),
+      )
       .returning();
     if (rows.length === 0) {
-      throw new ConflictException('Otra persona modificó este Corte Z; recarga para ver su estado actual.');
+      throw new ConflictException(
+        'Otra persona modificó este Corte Z; recarga para ver su estado actual.',
+      );
     }
     return rows[0];
   }
 
-  private async casMovement(tx: DbExecutor, movement: Movement, updates: Partial<Movement>) {
+  private async casMovement(
+    tx: DbExecutor,
+    movement: Movement,
+    updates: Partial<Movement>,
+  ) {
     const rows = await tx
       .update(schema.cashTransactions)
       .set({ ...updates, version: (movement.version ?? 1) + 1 })
-      .where(and(eq(schema.cashTransactions.id, movement.id), eq(schema.cashTransactions.version, movement.version ?? 1)))
+      .where(
+        and(
+          eq(schema.cashTransactions.id, movement.id),
+          eq(schema.cashTransactions.version, movement.version ?? 1),
+        ),
+      )
       .returning();
     if (rows.length === 0) {
-      throw new ConflictException('Otra persona modificó este movimiento; recarga para ver su estado actual.');
+      throw new ConflictException(
+        'Otra persona modificó este movimiento; recarga para ver su estado actual.',
+      );
     }
     return rows[0];
   }
 
   /** S-4: compensating entry dated now, attributed to the original's shift (§4.4.2). */
-  private async insertReversal(tx: DbExecutor, movement: Movement, shift: Shift, actorId: string, reason: string) {
+  private async insertReversal(
+    tx: DbExecutor,
+    movement: Movement,
+    shift: Shift,
+    actorId: string,
+    reason: string,
+  ) {
     const reversal = await this.transactions.create(
       {
         shiftId: movement.shiftId,
@@ -1128,17 +1703,36 @@ export class ApprovalsService {
       tx,
     );
     if (shift.status === 'open') {
-      await this.bumpDrawerCache(tx, shift.id, cashEffect({ type: movement.type, amount: movement.amount, entryKind: 'reverso' }));
+      await this.bumpDrawerCache(
+        tx,
+        shift.id,
+        cashEffect({
+          type: movement.type,
+          amount: movement.amount,
+          entryKind: 'reverso',
+        }),
+      );
     }
     return reversal;
   }
 
   /** Keeps the legacy running cache of an open shift in step with the ledger (R-15). */
-  private async bumpDrawerCache(tx: DbExecutor, shiftId: string, delta: number) {
+  private async bumpDrawerCache(
+    tx: DbExecutor,
+    shiftId: string,
+    delta: number,
+  ) {
     await tx
       .update(schema.cashShifts)
-      .set({ cashDrawerAmount: sql`${schema.cashShifts.cashDrawerAmount} + ${delta.toFixed(2)}` })
-      .where(and(eq(schema.cashShifts.id, shiftId), eq(schema.cashShifts.status, 'open')));
+      .set({
+        cashDrawerAmount: sql`${schema.cashShifts.cashDrawerAmount} + ${delta.toFixed(2)}`,
+      })
+      .where(
+        and(
+          eq(schema.cashShifts.id, shiftId),
+          eq(schema.cashShifts.status, 'open'),
+        ),
+      );
   }
 
   private async recordShift(
@@ -1161,7 +1755,12 @@ export class ApprovalsService {
       action,
       approvalLevel: level,
       actorId: actor.id,
-      actorRole: level === 'owner' || (level === 'n2' && actor.isOwner) ? 'owner' : level === 'n2' ? BRANCH_SUPERVISOR_ROLE : shift.n1ResolverRole ?? BRANCH_OPERATOR_ROLE,
+      actorRole:
+        level === 'owner' || (level === 'n2' && actor.isOwner)
+          ? 'owner'
+          : level === 'n2'
+            ? BRANCH_SUPERVISOR_ROLE
+            : (shift.n1ResolverRole ?? BRANCH_OPERATOR_ROLE),
       reason: reason?.trim() || null,
       before: values.before,
       after: values.after,
@@ -1171,14 +1770,25 @@ export class ApprovalsService {
   }
 
   private async n2Recipients(branchId: string, businessId: string) {
-    return [...(await this.scope.supervisorsOf(branchId)), ...(await this.scope.ownersOf(businessId))];
+    return [
+      ...(await this.scope.supervisorsOf(branchId)),
+      ...(await this.scope.ownersOf(businessId)),
+    ];
   }
 
   private async userNames(ids: Array<string | null | undefined>) {
-    const unique = Array.from(new Set(ids.filter((id): id is string => Boolean(id))));
+    const unique = Array.from(
+      new Set(ids.filter((id): id is string => Boolean(id))),
+    );
     if (!unique.length) return {} as Record<string, string>;
-    const rows = await this.db.select({ id: schema.users.id, name: schema.users.name }).from(schema.users).where(inArray(schema.users.id, unique));
-    return Object.fromEntries(rows.map((row) => [row.id, row.name])) as Record<string, string>;
+    const rows = await this.db
+      .select({ id: schema.users.id, name: schema.users.name })
+      .from(schema.users)
+      .where(inArray(schema.users.id, unique));
+    return Object.fromEntries(rows.map((row) => [row.id, row.name])) as Record<
+      string,
+      string
+    >;
   }
 
   private deviceId(user: JwtUser & { deviceId?: string }) {
@@ -1187,7 +1797,9 @@ export class ApprovalsService {
 }
 
 function normalizeAuthorRoles(roles: unknown, role: string | null) {
-  const source = Array.isArray(roles) && roles.length ? roles : role ? [role] : [];
-  return source.map((r: string) => (r === 'encargado' || r === 'responsable' ? BRANCH_OPERATOR_ROLE : r));
+  const source =
+    Array.isArray(roles) && roles.length ? roles : role ? [role] : [];
+  return source.map((r: string) =>
+    r === 'encargado' || r === 'responsable' ? BRANCH_OPERATOR_ROLE : r,
+  );
 }
-

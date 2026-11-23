@@ -56,7 +56,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecho · `[~]` parcial / diferido (con nota)
 - [x] T152 Tests.
 
 ### 1.7 Cierre del backend
-- [ ] T160 `npx tsc --noEmit`, `npx jest`, `npm run build`; resumen.
+- [x] T160 `npx tsc --noEmit`, `npx jest`, `npm run build`; resumen.
 
 ## 2. Admin web (`apps/business_control_tauri`)
 - [ ] T201 `services/api.ts`: tipos y métodos de supervisión y notificaciones.

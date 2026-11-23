@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsNumberString, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumberString,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 /** New physical count after a Corte Z rejection (spec 019 CZ-02 / CZ-04). */
 export class RecountShiftDto {

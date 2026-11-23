@@ -7,7 +7,11 @@ import type { AppDatabase, DbExecutor } from './db-executor';
 export interface AuditEntry {
   businessId: string;
   branchId?: string | null;
-  entityType: 'cash_shift' | 'cash_transaction' | 'cashier_debt' | 'supervisor_assignment';
+  entityType:
+    | 'cash_shift'
+    | 'cash_transaction'
+    | 'cashier_debt'
+    | 'supervisor_assignment';
   entityId: string;
   action: string;
   approvalLevel?: 'n1' | 'n2' | 'owner' | null;
@@ -55,13 +59,34 @@ export class AuditLogService {
     limit?: number;
   }) {
     const conditions: SQL[] = [];
-    if (filters.branchIds) conditions.push(inArray(schema.auditLog.branchId, filters.branchIds.length ? filters.branchIds : ['00000000-0000-0000-0000-000000000000']));
-    if (filters.businessIds) conditions.push(inArray(schema.auditLog.businessId, filters.businessIds.length ? filters.businessIds : ['00000000-0000-0000-0000-000000000000']));
-    if (filters.entityType) conditions.push(eq(schema.auditLog.entityType, filters.entityType));
-    if (filters.entityId) conditions.push(eq(schema.auditLog.entityId, filters.entityId));
-    if (filters.actorId) conditions.push(eq(schema.auditLog.actorId, filters.actorId));
-    if (filters.action) conditions.push(eq(schema.auditLog.action, filters.action));
-    if (filters.from) conditions.push(gte(schema.auditLog.createdAt, filters.from));
+    if (filters.branchIds)
+      conditions.push(
+        inArray(
+          schema.auditLog.branchId,
+          filters.branchIds.length
+            ? filters.branchIds
+            : ['00000000-0000-0000-0000-000000000000'],
+        ),
+      );
+    if (filters.businessIds)
+      conditions.push(
+        inArray(
+          schema.auditLog.businessId,
+          filters.businessIds.length
+            ? filters.businessIds
+            : ['00000000-0000-0000-0000-000000000000'],
+        ),
+      );
+    if (filters.entityType)
+      conditions.push(eq(schema.auditLog.entityType, filters.entityType));
+    if (filters.entityId)
+      conditions.push(eq(schema.auditLog.entityId, filters.entityId));
+    if (filters.actorId)
+      conditions.push(eq(schema.auditLog.actorId, filters.actorId));
+    if (filters.action)
+      conditions.push(eq(schema.auditLog.action, filters.action));
+    if (filters.from)
+      conditions.push(gte(schema.auditLog.createdAt, filters.from));
     if (filters.to) conditions.push(lte(schema.auditLog.createdAt, filters.to));
     return this.db
       .select({
