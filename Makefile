@@ -770,6 +770,17 @@ admin-dev-local:
 	@echo "======================================================================="
 	cd apps/business_control_tauri && PORT=$(ADMIN_PORT) VITE_API_URL=http://localhost:$(BACKEND_PORT)/api pnpm vite --port $(ADMIN_PORT)
 
+# Owner Business Copilot MVP (run these in separate terminals)
+.PHONY: owner-copilot-backend owner-copilot-admin owner-copilot-test
+owner-copilot-backend: dev-backend-local
+
+owner-copilot-admin: admin-dev-local
+
+owner-copilot-test:
+	@echo "Running focused Owner Business Copilot checks..."
+	cd apps/sync_api && npm test -- --runInBand owner-copilot
+	cd apps/business_control_tauri && pnpm test -- --run OwnerCopilot
+
 admin-test-e2e:
 	@echo "Running Playwright E2E tests for Admin Dashboard..."
 	cd apps/business_control_tauri && pnpm test:e2e

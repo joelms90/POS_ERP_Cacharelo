@@ -78,11 +78,12 @@ El servidor organiza sus herramientas en **7 dominios operativos**:
 | `get_product_recipe_bom` | `productId` | Receta (BOM) de un platillo con gramos/piezas de cada ingrediente. | *"¿Cuál es la receta del Omelette con Panela?"* |
 | `simulate_recipe_depletion` | `productId`, `quantity` | Calcula el consumo teórico de insumos para N unidades producidas. | *"Si producimos 50 Baguettes, ¿cuánto queso y pollo requerimos?"* |
 
-### 7. Sistema & Extensibilidad Dinámica (`system.tools.ts`)
+### 7. Sistema (`system.tools.ts`)
 | Herramienta | Parámetros | Descripción |
 | :--- | :--- | :--- |
 | `system_health_and_capabilities` | *(ninguno)* | Diagnóstico de conexión al backend, latencia y lista de herramientas activas. |
-| `call_backend_api` | `endpoint`, `method?`, `query?`, `body?` | **Comodín de extensión dinámico**: permite llamar a cualquier endpoint nuevo o existente de la API sin esperar una nueva versión de MCP. |
+
+> El Copiloto de Propietario del panel administrativo no usa esta conexión MCP, sus credenciales ni una identidad global. Sus consultas se resuelven en la API con la identidad real del propietario, un catálogo tipado de lecturas y auditoría propia.
 
 ---
 
@@ -126,7 +127,6 @@ Crea o edita `.cursor/mcp.json` en la raíz del proyecto:
 Para apuntar el MCP a la API en producción en lugar del backend local:
 ```env
 POS_API_URL=https://pos-sync-api-232144991863.us-central1.run.app/api
-POS_ADMIN_TOKEN=pos-secure-db-pass-2026!
 POS_DEFAULT_BUSINESS_ID=d3b07384-d113-4a0e-a555-e5b12824bf01
 ```
 
@@ -147,18 +147,7 @@ Este script:
 - Compara las rutas contra las herramientas registradas en el MCP.
 - Reporta la cobertura exacta y genera una lista de candidatos agrupados por módulo listos para convertirse en nuevas herramientas dedicadas.
 
-### 2. Comodín Dinámico `call_backend_api` (Cero Espera)
-Si hoy agregas un nuevo módulo en el backend (por ejemplo `/api/loyalty/points`), la IA **no tiene que esperar a que alguien cree la herramienta en MCP**. Puede invocar inmediatamente:
-```json
-call_backend_api({
-  "endpoint": "/loyalty/points",
-  "method": "GET",
-  "query": { "customerId": "..." }
-})
-```
-Esto garantiza compatibilidad del 100% el mismo día que se despliega cualquier cambio en el backend.
-
-### 3. Arquitectura Modular por Dominios
+### 2. Arquitectura Modular por Dominios
 Agregar una nueva herramienta especializada toma menos de 2 minutos:
 1. Abre el archivo de su dominio (ej. `src/tools/inventory.tools.ts`).
 2. Agrega `server.tool(...)` con su esquema `zod`.
