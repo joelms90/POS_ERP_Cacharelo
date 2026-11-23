@@ -1,7 +1,7 @@
 # Data Model: Supervisor de Sucursal — Fase 1
 
 **Estado**: Propuesta. Ninguna migración se ha ejecutado. Ver [plan.md](plan.md) §1.6.
-**Actualizado**: 2026-11-22. Decisiones del dueño aplicadas (D-1 a D-11, S-1 a S-6): Corte Z en dos niveles (OIS → supervisor/owner), movimientos en un nivel (OIS) con cancelación y ajuste del supervisor, bloqueo de apertura con desbloqueo de emergencia del owner, Corte Z offline, adeudos (solo auditados) y notificaciones persistentes por REST (sin push).
+**Actualizado**: 2026-11-22 (decisión final). Decisiones del dueño aplicadas (D-1 a D-11, S-1 a S-6, P-1 a P-3): ledger de caja con reversos (S-4), N1 del OIS hecho por el supervisor (S-3), reconteo tras rechazo de N2 directo a N2 (S-5); Corte Z en dos niveles (OIS → supervisor/owner), movimientos en un nivel (OIS) con cancelación y ajuste del supervisor, bloqueo de apertura con desbloqueo de emergencia del owner, Corte Z offline, adeudos (solo auditados) y notificaciones persistentes por REST (sin push).
 
 Convenciones del repo: PK `uuid` con `defaultRandom()`, `timestamptz`, `version` para concurrencia optimista, estados en `varchar` (como `branch_requisitions.status`) y montos `decimal(10,2)`.
 
@@ -34,15 +34,14 @@ Nota: `pendiente_n1` y `rechazado_n1` dejan de bloquear si `open_block_overridde
 
 Reabrir (owner): `aprobado*` → `pendiente_n2`, con evento `corte_z_reabierto` en la bitácora.
 
-### 2.2 `cash_transactions.approval_status` (solo asientos `entry_kind = movimiento`)
+### 2.2 `cash_transactions.approval_status` (solo asientos `entry_kind = movimiento`; un solo nivel, S-1)
 
 | Estado | Efecto neto en caja | Significado |
 |---|---|---|
 | `aprobado_historico` | Cuenta | Previo al despliegue (default de la migración) |
 | `pendiente_n1` | Cuenta (S-4) | Esperando N1: OIS, o el supervisor si el autor es el OIS (S-3) |
-| `pendiente_n2` | Cuenta | Solo si S-1 = alternativa (N2 también en movimientos) |
 | `aprobado` | Cuenta | Final |
-| `rechazado` | 0 (original + reverso) | Rechazado por N1/N2; reverso insertado |
+| `rechazado` | 0 (original + reverso) | Rechazado por N1; reverso insertado |
 | `cancelado` | 0 (original + reverso) | Cancelado por el supervisor/owner; reverso insertado |
 | `ajustado` | Cuenta el monto del asiento de ajuste | Reverso + asiento `ajuste` con el monto correcto |
 
@@ -164,7 +163,7 @@ Patrón tomado de `stock_ledger`: delta con signo, tipo de asiento, referencia a
 | `cash_effect` | decimal(10,2) GENERATED ALWAYS AS (…) STORED | `+amount` si `cash-in`, `−amount` si `cash-out`; negado si `reverso`. Se suma directamente en los reportes. |
 | `approval_status` | varchar(30) NOT NULL default `'aprobado_historico'` | §2.2 (`no_aplica` en reversos y ajustes). |
 | `reviewed_by` / `reviewed_at` / `review_reason` | uuid / timestamptz / text | Quien aprobó o rechazó. |
-| `review_level` | varchar(10) NULL | `n1` o `n2`. |
+| `review_level` | varchar(10) NULL | Siempre `n1` en Fase 1 (S-1); se conserva por si se agrega N2 a movimientos en el futuro. |
 | `device_id` | varchar(255) NULL | |
 | `version` | integer NOT NULL default 1 | Concurrencia optimista de las columnas de flujo. |
 

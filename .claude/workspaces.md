@@ -11,7 +11,7 @@
 - **Scope**: Propuesta (solo documentación) del rol `branch_supervisor`: Fase 1 = aprobación de Cortes Z e ingresos/egresos de caja, umbrales, bitácora, permisos, offline. Archivos: `specs/019-supervisor-sucursal/{spec,plan,data-model}.md`. Sin código, sin migraciones, sin deploy.
 - **Branch**: `019-supervisor-sucursal` (worktree `.worktrees/supervisor-sucursal`)
 - **Migration Status**: Ninguna ejecutada; `0022_supervisor_cash_approvals` solo propuesta.
-- **Status**: ✅ 4.ª ronda 2026-11-22: S-2/S-3/S-4/S-6 resueltos (S-3: N1 del OIS lo hace el supervisor; S-4: ledger de caja con reversos + análisis de reportes §4.4); estados renombrados por nivel (pendiente_n1/n2, rechazado_n1/n2).
+- **Status**: ✅ Decisión final 2026-11-22: S-1 = N2 solo para Corte Z (movimientos solo N1; supervisor cancela/ajusta en el corte con reverso); S-5 = reconteo tras rechazo N2 directo a N2. S-2/S-3/S-4/S-6 resueltos (ledger de caja §4.4). Pendientes menores: C-1, C-2 (consecuencias de S-3).
 ### Session: feature-delivery-workflow
 - **Scope**: Add the reusable feature-delivery skill, safe feature lifecycle Make targets, and team-status portability fix. Shared tooling only; no app deployment.
 - **Branch**: `chore/feature-delivery-workflow`

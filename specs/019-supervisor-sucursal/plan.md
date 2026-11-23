@@ -2,13 +2,13 @@
 
 **Branch**: `019-supervisor-sucursal` | **Date**: 2026-11-22 (segunda ronda de decisiones del dueño) | **Spec**: [spec.md](spec.md) | **Data model**: [data-model.md](data-model.md)
 
-> Propuesta. No se ha implementado ni migrado nada. Las decisiones D-1 a D-11 y los supuestos S-1 a S-6 están resueltos. P-1 a P-3 también están resueltos. No quedan decisiones abiertas.
+> Propuesta. No se ha implementado ni migrado nada. D-1 a D-11, S-1 a S-6 y P-1 a P-3 están resueltos. Quedan C-1 y C-2 (consecuencias de S-3, con propuesta por defecto en spec §15.2), que no bloquean el inicio.
 
 ## Summary
 
-- **Corte Z**: dos niveles obligatorios. N1 es el OIS de la sucursal, en el POS. N2 es el supervisor asignado o el owner, en el Admin web. Si el corte lo cerró el OIS, va directo a N2.
-- **Ingresos/egresos**: cuentan al registrarse y los aprueba el OIS. Si el autor es el OIS, los aprueba el supervisor. El supervisor u owner puede cancelarlos o ajustarlos hasta que se apruebe el corte.
-- **Bloqueo de apertura**: no se abre turno mientras el OIS no apruebe el Corte Z anterior.
+- **Corte Z**: dos niveles obligatorios. N1 = OIS en el POS (o el supervisor asignado si el corte lo cerró el OIS, S-3). N2 = supervisor asignado u owner en el Admin web, persona distinta de N1 (C-1). Tras un rechazo de N2, el reconteo va directo a N2 (S-5).
+- **Ingresos/egresos**: ledger append-only. Cuentan desde que se registran y solo los aprueba N1 (OIS, o el supervisor si el autor es el OIS; S-1). Rechazos, cancelaciones y ajustes generan asientos de reverso (S-4). El supervisor u owner los revisa dentro del Corte Z y puede cancelarlos o ajustarlos hasta la aprobación final.
+- **Bloqueo de apertura**: no se abre turno mientras el Corte Z anterior no tenga aprobado su N1.
 - **Corte Z offline**, con recálculo en el servidor.
 - **Adeudo del cajero** por faltante aprobado.
 - **Notificaciones persistentes consultables por REST**, con una sección en el Admin web (sin push), y bitácora append-only.
@@ -71,15 +71,14 @@ Tabla de transiciones en `approvals.service.ts` (fuente única):
 | Corte | `pendiente_n1` | N1 | aprobar / rechazar | `pendiente_n2` / `rechazado_n1` |
 | Corte | `rechazado_n1` | autor del corte | reconteo | `pendiente_n1` |
 | Corte | `pendiente_n2` | N2 (≠ quien hizo N1, C-1) | aprobar / ajustar / rechazar | `aprobado` / `aprobado_con_ajuste` / `rechazado_n2` (guarda `approval_snapshot` al aprobar) |
-| Corte | `rechazado_n2` | cajero u OIS | reconteo | `pendiente_n2` (regla actual) · `pendiente_n1` (alternativa S-5, **pendiente**) |
+| Corte | `rechazado_n2` | cajero u OIS | reconteo | `pendiente_n2` (directo a N2, S-5) |
 | Corte | `rechazado_n2` | N2 | ajustar | `aprobado_con_ajuste` |
 | Corte | `aprobado*` | owner | reabrir | `pendiente_n2` (anula el adeudo) |
 | Movimiento | (alta) cualquier autor | — | registrar asiento | `pendiente_n1` (N1 = OIS o supervisor según el autor, S-3) |
-| Movimiento | `pendiente_n1` | N1 | aprobar / rechazar | `aprobado` (o `pendiente_n2` si S-1 = alternativa) / `rechazado` + **asiento de reverso** |
-| Movimiento | `pendiente_n2` (solo S-1 alternativa) | N2 | aprobar / rechazar | `aprobado` / `rechazado` + reverso |
+| Movimiento | `pendiente_n1` | N1 | aprobar / rechazar | `aprobado` (final, S-1) / `rechazado` + **asiento de reverso** |
 | Movimiento | cualquiera salvo `rechazado`/`cancelado`/`ajustado`, con el corte sin aprobación final | supervisor/owner | cancelar / ajustar | `cancelado` + reverso / `ajustado` + reverso + asiento `ajuste` |
 
-La máquina de estados está parametrizada por dos banderas de configuración, `REQUIRE_N2_FOR_CASH_MOVEMENTS` (S-1) y `N2_RECOUNT_GOES_TO_N1` (S-5), para no reescribirla cuando el dueño confirme.
+Los movimientos tienen un solo nivel (S-1). El supervisor actúa sobre ellos dentro del detalle del Corte Z (cancelar/ajustar), y el corte no puede aprobarse en N2 mientras haya movimientos en `pendiente_n1` (CZ-06).
 
 Al pasar a `aprobado*` con diferencia final < 0, `debts.service` crea el adeudo en la misma transacción.
 
