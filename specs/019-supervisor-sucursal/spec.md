@@ -84,7 +84,7 @@ Reglas:
 - **CZ-05** Ningún rechazo reabre el turno (el efectivo ya salió y puede haber otro turno abierto). El `close_snapshot` original **nunca se sobrescribe**; los reconteos y ajustes quedan como versiones en la bitácora.
 - **CZ-06** Un nivel no puede aprobar un corte mientras haya movimientos del mismo turno pendientes de N1 o N2.
 - **CZ-07** Nadie aprueba su propio corte (`closed_by == actor` → 403). Esto extiende BR-ROLE-003. C-1 (confirmada 2026-11-23): **el mismo supervisor que hizo N1 puede resolver N2** (aprobar o ajustar) sin esperar al owner; cada acción queda en la bitácora para que el owner audite después. La única prohibición es aprobar el corte propio.
-- **CZ-08** **Sin sustitución (S-6)**: ni el supervisor ni el owner aprueban N1 en lugar del OIS cuando el autor es un cajero; solo actúan después, en N2. **Única excepción (S-3)**: si el autor es el OIS, el N1 lo hace el supervisor asignado (el owner no). Desbloquear la apertura (CZ-10b) **no** es aprobar.
+- **CZ-08** **Sin sustitución (S-6)**: ni el supervisor ni el owner aprueban N1 en lugar del OIS cuando el autor es un cajero; solo actúan después, en N2. **Única excepción (S-3)**: si el autor es el OIS, el N1 lo hace el supervisor asignado; el owner también puede hacerlo actuando como supervisor. Desbloquear la apertura (CZ-10b) **no** es aprobar.
 - **CZ-09** Concurrencia: cada acción exige la `version` vigente; si otra persona actuó antes, el servidor responde 409.
 - **CZ-10** **Bloqueo de apertura (D-4)**: no se puede abrir un turno nuevo en la sucursal mientras su último Corte Z esté en `pendiente_n1` o `rechazado_n1`. Cuando N1 lo aprueba, la sucursal puede abrir aunque N2 no esté resuelto. Consecuencia de S-3 (C-2, por confirmar): un corte cerrado por el OIS bloquea hasta que **el supervisor** apruebe su N1; si el supervisor no está disponible, aplica el desbloqueo del owner (CZ-10b).
 - **CZ-10b** **Desbloqueo de emergencia (P-2)**: si la sucursal está bloqueada y quien debe resolver N1 no está disponible, el **owner** puede desbloquear la apertura con un motivo obligatorio. El corte anterior **sigue** en `pendiente_n1` (N1 lo resolverá después); solo se permite abrir el turno nuevo. Queda en la bitácora (`apertura_desbloqueada`) y genera una notificación al supervisor de la sucursal.
@@ -237,7 +237,7 @@ Acciones: `corte_z_cerrado`, `corte_z_aprobado`, `corte_z_rechazado`, `corte_z_r
 | Registrar reconteo tras rechazo de N2 (va directo a N2, S-5) | 🔸 (su turno) | 🔸 (su sucursal) | ❌ | ❌ |
 | N1: aprobar/rechazar Corte Z **de un cajero** | ❌ | 🔸 | ❌ (S-6) | ❌ (S-6) |
 | N1: aprobar/rechazar movimiento **de un cajero** | ❌ | 🔸 | ❌ (S-6) | ❌ (S-6) |
-| N1: aprobar/rechazar Corte Z o movimiento **del OIS** (S-3) | ❌ | ❌ (propio) | 🔹 | ❌ |
+| N1: aprobar/rechazar Corte Z o movimiento **del OIS** (S-3) | ❌ | ❌ (propio) | 🔹 | ✅ (actúa como supervisor) |
 | N2: aprobar/rechazar/ajustar Corte Z | ❌ | ❌ | 🔹 (también si hizo N1; el owner audita) | ✅ (S-2: único admin) |
 | Cancelar o ajustar un movimiento con asiento de reverso (antes de aprobar el corte) | ❌ | ❌ | 🔹 | ✅ |
 | Reabrir un Corte Z aprobado | ❌ | ❌ | ❌ | ✅ con motivo |

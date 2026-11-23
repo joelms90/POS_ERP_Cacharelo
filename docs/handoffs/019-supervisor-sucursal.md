@@ -14,7 +14,7 @@ Add the `branch_supervisor` role and, first, the approval of cash: Corte Z (two 
 
 | Item | Rule |
 |---|---|
-| Corte Z | N1 = OIS (`branch_operator`) of the branch; if the OIS closed it, N1 = assigned supervisor (S-3). N2 = assigned supervisor or owner (S-2). C-1 confirmed (2026-11-23): the same supervisor may resolve N2 (approve or adjust) and the owner audits the log afterwards; approving one's own corte is still forbidden. |
+| Corte Z | N1 = OIS (`branch_operator`) of the branch; if the OIS closed it, N1 = assigned supervisor (S-3), and the owner may also take that N1 acting as supervisor. N2 = assigned supervisor or owner (S-2). C-1 confirmed (2026-11-23): the same supervisor may resolve N2 (approve or adjust) and the owner audits the log afterwards; approving one's own corte is still forbidden. |
 | Rejection | N1 rejection → the corte author recounts → back to N1. N2 rejection → cashier/OIS recounts → straight back to N2 (S-5), or the supervisor approves with an adjustment. |
 | Cash-in / cash-out | Counts in cash from the moment it is recorded; approved only at N1 (S-1). Supervisor/owner can cancel or adjust until the corte has final approval. |
 | Ledger (S-4) | `cash_transactions` is append-only. Reject/cancel insert a reversal entry dated now and attributed to the original shift; adjust = reversal + `ajuste` entry. `close_snapshot` is never rewritten; post-close entries are shown apart, and figures are frozen in `approval_snapshot` at N2. |

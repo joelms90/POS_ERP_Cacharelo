@@ -120,10 +120,10 @@ describe('cash approval rules', () => {
       );
     });
 
-    it('S-3: the assigned supervisor resolves N1 of OIS items; another OIS and the owner cannot', () => {
+    it('S-3: the assigned supervisor or the owner resolves N1 of OIS items; another OIS cannot', () => {
       expect(() => assertCanResolveN1(supervisor, oisItem)).not.toThrow();
+      expect(() => assertCanResolveN1(owner, oisItem)).not.toThrow();
       expectRule(() => assertCanResolveN1(otherOis, oisItem), 'forbidden');
-      expectRule(() => assertCanResolveN1(owner, oisItem), 'forbidden');
       expectRule(
         () => assertCanResolveN1(unassignedSupervisor, oisItem),
         'forbidden',

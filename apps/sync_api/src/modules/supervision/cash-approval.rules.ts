@@ -119,7 +119,8 @@ export function isSupervisorOf(
  * N1 for a Corte Z or a cash movement.
  * - Nobody resolves their own item.
  * - S-6: neither the supervisor nor the owner replaces the OIS…
- * - …except S-3: when the OIS is the author, the assigned supervisor resolves N1.
+ * - …except S-3: when the OIS is the author, the assigned supervisor (or the
+ *   owner acting as supervisor) resolves N1.
  */
 export function assertCanResolveN1(
   actor: ApprovalActor,
@@ -138,10 +139,10 @@ export function assertCanResolveN1(
   const resolver = (item.n1ResolverRole ??
     BRANCH_OPERATOR_ROLE) as N1ResolverRole;
   if (resolver === BRANCH_SUPERVISOR_ROLE) {
-    if (!isSupervisorOf(actor, item.branchId)) {
+    if (!isSupervisorOf(actor, item.branchId) && !actor.isOwner) {
       throw new ApprovalRuleError(
         'forbidden',
-        'El nivel 1 de lo registrado por el operador de sucursal lo resuelve el supervisor asignado.',
+        'El nivel 1 de lo registrado por el operador de sucursal lo resuelve el supervisor asignado o el owner.',
       );
     }
     return;

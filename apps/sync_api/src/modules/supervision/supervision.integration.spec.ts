@@ -549,11 +549,15 @@ describeIt('Spec 019 supervision chain (integration, real DB)', () => {
       .auth(as.ois2(), { type: 'bearer' })
       .send({ version: row.version })
       .expect(403);
-    await http()
-      .post(`/supervision/cash-shifts/${state.shiftB}/approve`)
+    const ownerView = await http()
+      .get(`/supervision/cash-shifts/${state.shiftB}`)
       .auth(as.owner(), { type: 'bearer' })
-      .send({ version: row.version })
-      .expect(403);
+      .expect(200);
+    expect(ownerView.body.permissions).toMatchObject({
+      level: 'n1',
+      canApprove: true,
+      canReject: true,
+    });
     const n1 = await http()
       .post(`/supervision/cash-shifts/${state.shiftB}/approve`)
       .auth(as.supervisor(), { type: 'bearer' })

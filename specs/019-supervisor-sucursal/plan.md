@@ -6,7 +6,7 @@
 
 ## Summary
 
-- **Corte Z**: dos niveles obligatorios. N1 = OIS en el POS (o el supervisor asignado si el corte lo cerró el OIS, S-3). N2 = supervisor asignado u owner en el Admin web; C-1 confirmada: puede ser la misma persona que hizo N1, y el owner audita después. Tras un rechazo de N2, el reconteo va directo a N2 (S-5).
+- **Corte Z**: dos niveles obligatorios. N1 = OIS en el POS (o el supervisor asignado, u owner actuando como supervisor, si el corte lo cerró el OIS, S-3). N2 = supervisor asignado u owner en el Admin web; C-1 confirmada: puede ser la misma persona que hizo N1, y el owner audita después. Tras un rechazo de N2, el reconteo va directo a N2 (S-5).
 - **Ingresos/egresos**: ledger append-only. Cuentan desde que se registran y solo los aprueba N1 (OIS, o el supervisor si el autor es el OIS; S-1). Rechazos, cancelaciones y ajustes generan asientos de reverso (S-4). El supervisor u owner los revisa dentro del Corte Z y puede cancelarlos o ajustarlos hasta la aprobación final.
 - **Bloqueo de apertura**: no se abre turno mientras el Corte Z anterior no tenga aprobado su N1.
 - **Corte Z offline**, con recálculo en el servidor.
