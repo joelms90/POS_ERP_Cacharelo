@@ -32,6 +32,7 @@ This idempotently creates/alters everything below (safe to run multiple times):
 | `production_runs` | `destination_warehouse_id`, `status`, `actual_quantity_produced`, `started_at` (OP lifecycle) |
 | `users.role` | widened to `varchar(50)` for canonical operational roles such as `warehouse_purchasing_operator` |
 | `app_logs` | production diagnostics from POS Flutter, Admin Web and API 5xx (also auto-created lazily by `LogsService`; see `docs/prod-log-triage.md`) |
+| Spec 019 supervisor (step 21, **not yet run in production**) | `cash_shifts` review columns, `cash_transactions` append-only ledger (`entry_kind`, reversals, generated `cash_effect`, immutability trigger), `supervisor_branch_assignments`, `cashier_debts`, `notifications`, `audit_log` (append-only trigger). Deploy order: migration → backend with `CASH_APPROVALS_ENFORCE_OPEN_BLOCK` unset → admin → POS on every terminal → then set the flag to `true`. See `docs/handoffs/019-supervisor-sucursal.md`. |
 
 > ⚠️ Note: the full Drizzle journal runner (`npm run migrate` / app-boot `runMigrations`) can
 > fail on pre-existing manually-created objects (e.g. `admin_business_access`). Prefer

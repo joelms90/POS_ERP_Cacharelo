@@ -77,4 +77,4 @@ Leyenda: `[ ]` pendiente · `[x]` hecho · `[~]` parcial / diferido (con nota)
 - [~] T306 Cola offline de movimientos y Corte Z offline (D-5): **pendiente**. El backend ya es idempotente (`clientUuid` en movimientos y cierre, `closedOffline`, `localExpectedCash`); falta la cola local ordenada (ventas → movimientos → Corte Z) y el ticket provisional en el POS. Hoy el POS sigue en línea para caja, como antes.
 
 ## 4. Cierre
-- [ ] T401 Handoff en `docs/handoffs/019-supervisor-sucursal.md`, `.claude/workspaces.md` y marcas finales en este archivo.
+- [x] T401 Handoff en `docs/handoffs/019-supervisor-sucursal.md`, `.claude/workspaces.md` y marcas finales en este archivo.

@@ -399,6 +399,8 @@ Estado actual verificado: abrir turno, ingresos/egresos y Corte Z son **solo en 
 
 **Consecuencias de S-3 por confirmar** (propuestas, no reglas del dueño):
 
+> Implementación (2026-11-22): C-1 y C-2 están implementadas con las propuestas por defecto como constantes en `apps/sync_api/src/modules/supervision/cash-approval.config.ts` (`n2MustDifferFromN1`, `oisCloseBlocksOpeningUntilN1`). Siguen **por confirmar** por el dueño; cambiarlas no requiere migración.
+
 | # | Punto | Propuesta |
 |---|---|---|
 | **C-1** | En un corte del OIS, el supervisor hace N1. ¿Puede la misma persona hacer también N2? | **No**: N1 y N2 deben ser personas distintas. El N2 lo hace el owner u otro supervisor asignado a la sucursal. |
