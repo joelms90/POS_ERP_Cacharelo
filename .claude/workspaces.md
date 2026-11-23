@@ -2,11 +2,16 @@
 
 **Purpose**: Track which development sessions (terminals/developers/assistants) are working on which parts of the monorepo to prevent conflicts.
 
-**Last Updated**: 2026-11-20
+**Last Updated**: 2026-11-22
 
 ---
 
 ## Currently Active Sessions
+### Session: 019-supervisor-sucursal
+- **Scope**: Propuesta (solo documentación) del rol `branch_supervisor`: Fase 1 = aprobación de Cortes Z e ingresos/egresos de caja, umbrales, bitácora, permisos, offline. Archivos: `specs/019-supervisor-sucursal/{spec,plan,data-model}.md`. Sin código, sin migraciones, sin deploy.
+- **Branch**: `019-supervisor-sucursal` (worktree `.worktrees/supervisor-sucursal`)
+- **Migration Status**: Ninguna ejecutada; `0022_supervisor_cash_approvals` solo propuesta.
+- **Status**: ✅ Propuesta completada — pendiente de decisiones del dueño (spec.md §15).
 ### Session: feature-delivery-workflow
 - **Scope**: Add the reusable feature-delivery skill, safe feature lifecycle Make targets, and team-status portability fix. Shared tooling only; no app deployment.
 - **Branch**: `chore/feature-delivery-workflow`
