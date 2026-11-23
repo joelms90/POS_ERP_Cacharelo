@@ -12,7 +12,7 @@
 - **Branch**: `feat/owner-business-copilot`
 - **Apps**: `apps/sync_api/`, `apps/business_control_tauri/`, `apps/mcp_server/`
 - **Migration Status**: None yet; any required audit-table migration will be declared separately before execution.
-- **Status**: 🔄 In progress
+- **Status**: ✅ Completed (2026-11-22; no migration or production deployment run)
 
 ### Session: graphify-knowledge-graph
 - **Scope**: Add the Graphify code knowledge graph (local CLI, project-scoped skills for Claude/Codex/OpenCode/generic agents), `graphify-out/` artifacts, `.graphifyrc`, Make targets, git hooks, and AGENTS.md/CLAUDE.md query-first rules. Shared tooling only; no app deployment, no migrations.
