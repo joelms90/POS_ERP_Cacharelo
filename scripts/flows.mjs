@@ -153,21 +153,25 @@ function loadEndpoints() {
   return set;
 }
 
-function updateTimestamp() {
-  if (!existsSync(GRAPH)) return false;
-  try {
-    return statSync(join(ROOT, 'graphify-out', 'needs_update')).isFile();
-  } catch {
-    return false;
+function staleSources() {
+  const newer = [];
+  if (existsSync(join(ROOT, 'graphify-out', 'needs_update'))) newer.push('graphify-out/needs_update');
+  if (!existsSync(GRAPH)) return newer;
+  let gm;
+  try { gm = statSync(GRAPH).mtimeMs; } catch { return newer; }
+  let files = [];
+  try { files = execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean); } catch { return newer; }
+  const codeExt = /\.(ts|tsx|js|jsx|mjs|cjs|dart|sql|sh|bash|tf|hcl|py|json|yaml|yml)$/;
+  for (const f of files) {
+    if (!codeExt.test(f) || f.startsWith('graphify-out/')) continue;
+    try {
+      if (statSync(join(ROOT, f)).mtimeMs > gm) {
+        newer.push(f);
+        if (newer.length >= 3) break;
+      }
+    } catch { /* ignore */ }
   }
-}
-
-function gitHead() {
-  try {
-    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
-  } catch {
-    return '';
-  }
+  return newer;
 }
 
 function chainFor(seeds) {
@@ -248,15 +252,12 @@ function cmdCheck(flows, json) {
   const tables = loadTables();
   const rules = loadRules();
   const endpoints = loadEndpoints();
-  const head = gitHead();
   const warnings = [];
   const results = [];
 
   if (!labels) warnings.push('graphify-out/graph.json missing — run `make graphify-build` (seed symbols not validated)');
-  else if (labels.builtAt && head && !head.startsWith(labels.builtAt) && !labels.builtAt.startsWith(head)) {
-    warnings.push(`graph built at ${labels.builtAt}, HEAD is ${head} — run \`make graphify-update\``);
-  }
-  if (updateTimestamp()) warnings.push('graphify-out/needs_update exists — run `graphify update .`');
+  const stale = staleSources();
+  if (stale.length) warnings.push(`graph is older than source files (${stale.slice(0, 3).join(', ')}${stale.length > 3 ? ', …' : ''}) — run \`make graphify-update\``);
 
   for (const f of flows) {
     const missing = [];
