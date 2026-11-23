@@ -85,7 +85,7 @@ test.describe('Admin Console E2E Navigation', () => {
             id: 'assistant-e2e', role: 'assistant', createdAt: new Date().toISOString(),
             content: 'Las ventas se mantienen estables.',
             toolRuns: [{ tool: 'sales_summary', status: 'completed', summary: 'Resumen del día consultado.' }],
-            sources: [{ label: 'Reporte de ventas', href: '/reports' }],
+            sources: [{ label: 'Reporte de ventas', href: '/reports/sales-dashboard' }],
             actionProposal: { title: 'Crear borrador', summary: 'No se ejecutará sin confirmación.', confirmationToken: 'confirmation-e2e', expiresAt: new Date(Date.now() + 60000).toISOString() },
           },
         }),
@@ -98,6 +98,8 @@ test.describe('Admin Console E2E Navigation', () => {
     await expect(page.getByText('sales_summary')).toBeVisible();
     await expect(page.getByText('Fuente: Reporte de ventas')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Confirmar acción' })).toBeVisible();
+    await page.getByRole('button', { name: 'Fuente: Reporte de ventas' }).click();
+    await expect(page.getByText('Reportes de Venta')).toBeVisible();
   });
 
   test('should switch businesses and retain navigation functionality', async ({ page }) => {

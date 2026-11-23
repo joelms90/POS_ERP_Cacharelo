@@ -136,7 +136,7 @@ function App() {
         allowedBusinessIds={allowedBusinessIds}
       >
         {activeTab === 'administrators' && <AdministratorsPage businessId={activeBusinessId} />}
-        {activeTab === 'copilot' && <OwnerCopilotPage businessId={activeBusinessId} />}
+        {activeTab === 'copilot' && <OwnerCopilotPage businessId={activeBusinessId} onNavigate={setActiveTab} />}
         {activeTab === 'personal' && <DashboardPage businessId={activeBusinessId} />}
         {activeTab === 'inventory-dashboard' && <InventoryDashboardPage businessId={activeBusinessId} />}
         {activeTab === 'branch-catalog' && <BranchCatalogPage businessId={activeBusinessId} />}

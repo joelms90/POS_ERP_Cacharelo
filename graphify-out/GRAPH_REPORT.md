@@ -1,17 +1,17 @@
 # Graph Report - owner-business-copilot  (2026-11-22)
 
 ## Corpus Check
-- 584 files · ~681,860 words
+- 584 files · ~681,955 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 103 file(s) not represented in the graph (top: (none) 28, .xcconfig 8, .xml 7)
 
 ## Summary
-- 5762 nodes · 10178 edges · 324 communities (238 shown, 86 thin omitted)
+- 5763 nodes · 10181 edges · 316 communities (233 shown, 83 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 428 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `92100998`
+- Built from commit: `e1f0f1c9`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -45,7 +45,7 @@
 - CategoriesRepository
 - catalog.module.ts
 - business_control_tauri/src/App.tsx
-- ProvidersRepository
+- CreateProviderDto
 - CreateWarehouseDto
 - GeneratedPluginRegistrant.swift
 - encargado_caja_tab.dart
@@ -57,7 +57,7 @@
 - BranchCatalogService
 - frontend/package.json
 - waiter_ordering_screen.dart
-- KitchenController
+- KitchenRepository
 - remote_logger.dart
 - api.ts
 - desktop_printer_settings_dialog.dart
@@ -67,7 +67,7 @@
 - with
 - version_service.dart
 - waiter_screen_test.dart
-- InventoryRepository
+- auth.service.ts
 - steps
 - sync_api/infra/main.tf
 - my_application.cc
@@ -86,7 +86,7 @@
 - requisitions_flow_test.dart
 - cart_sidebar.dart
 - SyncGateway
-- CreateAdminUserDto
+- ProvidersRepository
 - users.service.ts
 - ProductsController
 - table_node.dart
@@ -102,8 +102,7 @@
 - steps
 - update_dialog.dart
 - scripts
-- BranchesController
-- InventoryService
+- AuthController
 - waiter_billing_flow_test.dart
 - logged_http.dart
 - pg
@@ -121,7 +120,7 @@
 - local_requisition.dart
 - colors.dart
 - "public"."businesses"
-- auth.service.ts
+- AuthService
 - ReceiveTransferDto
 - assertBusinessAccess
 - InquiriesService
@@ -129,32 +128,31 @@
 - server.ts
 - AdminUsersController
 - backend/package.json
-- CreatePurchaseOrderDto
+- SyncController
 - "public"."products"
 - UsersController
 - agent-team.sh
 - git/scripts/bash/create-new-feature.sh
 - CreateReceiptDto
 - Win32Window
-- RequisitionsController
+- main.dart
 - create-new-feature.ps1
 - verify-synthetic-workflow.cjs
 - extension
 - compilerOptions
-- win32_window.cpp
+- WindowClassRegistrar
 - theme
 - OrdersController
 - AlertsService
 - OrdersRepository
 - prod-logs.mjs
-- AdminLayout.tsx
+- ref_react
 - WarehouseInventoryPage.tsx
 - compilerOptions
 - cover
-- MenuPageRenderer.tsx
-- ProductsRepository
+- CompleteProductionRunDto
 - BulkGeneratePoByProductsDto
-- CreateProductDto
+- ProvidersController
 - CreateOrderDto
 - scripts
 - dependencies
@@ -163,22 +161,21 @@
 - config
 - manifest.json
 - CreateTransferDto
-- KitchenRepository
+- Size
 - products.service.ts
 - dev-all.sh
 - dishes
-- .MessageHandler
+- win32_window.cpp
 - google_storage_bucket.tfstate
 - owner_copilot_conversations
 - ref_path
-- LogsPage.tsx
+- .applyMovement
 - OwnerCopilotPage.tsx
 - windows/flutter/generated_plugin_registrant.cc
 - jest
 - CreateProductionRunDto
 - flows.mjs
 - hooks
-- YamlModal.tsx
 - TransfersPage.tsx
 - compilerOptions
 - categories
@@ -186,7 +183,6 @@
 - "order_items"
 - 0017_print_stations_and_jobs.sql
 - import-excel-inventories.ts
-- scripts
 - after_analyze
 - after_checklist
 - after_clarify
@@ -211,7 +207,6 @@
 - bump-version.js
 - shared_contracts/package.json
 - default.json
-- AddOrderItemsDto
 - eslint.config.js
 - scripts
 - .oxlintrc.json
@@ -221,7 +216,7 @@
 - query-tickets-hoy.ts
 - UpsertThresholdDto
 - get-active-orders.ts
-- .Create
+- Point
 - pin-crypto.ts
 - hooks
 - auto_commit
@@ -246,8 +241,6 @@
 - .terraform.lock.hcl
 - analysis_options.yaml
 - ChatDto
-- UpdateRequisitionStatusDto
-- dependencies
 - import-menu-products.ts
 - prettier@^3.4.2
 - MapTabber.tsx
@@ -303,8 +296,6 @@
 - owner-copilot-tools.ts
 - dependencies
 - typescript@^5.7.3
-- CreateRequisitionDto
-- CancelOrderDto
 - requisition-transfer-lifecycle.spec.ts
 - LandingTemplate.tsx
 - branch-out-of-stock-requisition.spec.ts
@@ -320,8 +311,8 @@
 1. `@nestjs/common` - 126 edges
 2. `Heading()` - 55 edges
 3. `Roles()` - 52 edges
-4. `class-validator` - 48 edges
-5. `drizzle-orm` - 48 edges
+4. `drizzle-orm` - 48 edges
+5. `class-validator` - 48 edges
 6. `Button()` - 43 edges
 7. `DRIZZLE_CONNECTION` - 43 edges
 8. `PosApiClient` - 36 edges
@@ -333,25 +324,25 @@
   apps/menu_generator/src/components/editor/SectionEditor.tsx → apps/menu_generator/src/types/menu.ts
 - `ThemeEditorProps` --references--> `MenuTheme`  [EXTRACTED]
   apps/menu_generator/src/components/editor/ThemeEditor.tsx → apps/menu_generator/src/types/menu.ts
-- `YamlModalProps` --references--> `MenuCatalog`  [EXTRACTED]
-  apps/menu_generator/src/components/editor/YamlModal.tsx → apps/menu_generator/src/types/menu.ts
 - `FlutterWindow::OnCreate()` --calls--> `RegisterPlugins()`  [INFERRED]
   apps/pos_flutter/windows/runner/flutter_window.cpp → apps/pos_flutter/windows/flutter/generated_plugin_registrant.cc
 - `wWinMain()` --calls--> `CreateAndAttachConsole()`  [INFERRED]
   apps/pos_flutter/windows/runner/main.cpp → apps/pos_flutter/windows/runner/utils.cpp
+- `OwnerCopilotPageProps` --references--> `AdminTab`  [EXTRACTED]
+  apps/business_control_tauri/src/pages/OwnerCopilotPage.tsx → apps/business_control_tauri/src/App.tsx
 
 ## Import Cycles
 - 2-file cycle: `apps/sync_api/src/modules/sync/sync.gateway.ts -> apps/sync_api/src/modules/sync/sync.service.ts -> apps/sync_api/src/modules/sync/sync.gateway.ts`
 
-## Communities (324 total, 86 thin omitted)
+## Communities (316 total, 83 thin omitted)
 
 ### Community 0 - "app_state.dart"
 Cohesion: 0.01
 Nodes (326): _activeCloudOrderIdForTable, _activeOrderIdsByTableRemoteId, activePaymentType, activeShiftId, addCashDrop, _addReadyPickupOrder, _addRecentClosedSale, adjustWarehouseStock (+318 more)
 
 ### Community 1 - "SyncGateway"
-Cohesion: 0.06
-Nodes (12): LedgerMovementInput, LedgerService, OrdersRepository, AckSyncDto, PullSyncDto, PushSyncDto, actor, SyncAccessService (+4 more)
+Cohesion: 0.09
+Nodes (8): AckSyncDto, PullSyncDto, PushSyncDto, actor, SyncAccessService, SyncActor, actor, SyncService
 
 ### Community 2 - "secure_storage_service.dart"
 Cohesion: 0.02
@@ -363,11 +354,11 @@ Nodes (63): Terraform module: apps/sync_api/infra/envs/staging, module.sync_api,
 
 ### Community 4 - "encargado_dashboard_screen.dart"
 Cohesion: 0.03
-Nodes (53): build, _buildActiveTablesGrid, _buildFilterBar, _buildHeader, _buildLockedOverlay, CashierDashboardScreen, _CashierDashboardScreenState, createState (+45 more)
+Nodes (51): build, _buildActiveTablesGrid, _buildFilterBar, _buildHeader, _buildLockedOverlay, createState, initState, isPrinterQueueOpen (+43 more)
 
 ### Community 5 - "BranchesRepository"
-Cohesion: 0.08
-Nodes (4): BranchesService, CreateBranchDto, UpdateBranchDto, BranchesRepository
+Cohesion: 0.06
+Nodes (5): BranchesController, BranchesService, CreateBranchDto, UpdateBranchDto, BranchesRepository
 
 ### Community 6 - "printing.service.ts"
 Cohesion: 0.06
@@ -375,51 +366,55 @@ Nodes (7): CreatePrintJobDto, PrintStationHeartbeatDto, UpdatePrintJobStatusDto,
 
 ### Community 7 - "guest_split_payment_screen.dart"
 Cohesion: 0.03
-Nodes (61): amount, _assignItemToGuest, build, _buildAssignmentList, _buildCollectionSummary, _buildGuestCounter, _buildGuestTotals, _buildHeader (+53 more)
+Nodes (59): amount, _assignItemToGuest, build, _buildAssignmentList, _buildCollectionSummary, _buildGuestCounter, _buildGuestTotals, _buildHeader (+51 more)
 
 ### Community 8 - "encargado_pos_tab.dart"
 Cohesion: 0.03
-Nodes (62): _addCashReceived, _addToCart, build, _buildCardInput, _buildCartFooter, _buildCartHeader, _buildCartItemList, _buildCartPanel (+54 more)
+Nodes (58): _addCashReceived, _addToCart, build, _buildCardInput, _buildCartFooter, _buildCartHeader, _buildCartItemList, _buildCartPanel (+50 more)
 
 ### Community 9 - "PosApiClient"
 Cohesion: 0.06
 Nodes (46): dependencies, dotenv@^16.4.7, jsonwebtoken@^9.0.3, @modelcontextprotocol/sdk@^1.6.1, zod@^3.24.2, description, devDependencies, tsx@^4.19.3 (+38 more)
 
+### Community 10 - "RequisitionsRepository"
+Cohesion: 0.05
+Nodes (6): CreateRequisitionDto, RequisitionItemDto, UpdateRequisitionStatusDto, RequisitionsRepository, RequisitionsController, RequisitionsService
+
 ### Community 11 - "log-entry.ts"
 Cohesion: 0.07
-Nodes (22): APP_LOGS_TABLE_SQL, AppLogEntry, fingerprintOf(), LIMITS, LOG_LEVELS, LOG_SOURCES, LogLevel, LogSource (+14 more)
+Nodes (23): APP_LOGS_TABLE_SQL, AppLogEntry, fingerprintOf(), LIMITS, LOG_LEVELS, LOG_SOURCES, LogLevel, LogSource (+15 more)
 
 ### Community 12 - "package:flutter/material.dart"
-Cohesion: 0.04
-Nodes (39): appState, build, main, MyApp, state, _DenomButton, _PaymentTypeButton, MenuItem (+31 more)
+Cohesion: 0.05
+Nodes (39): _DenomButton, _PaymentTypeButton, MenuItem, EmpireTheme, UpdateDialog, _DenomButton, _SalesCard, build (+31 more)
 
 ### Community 13 - "split_checkout_view.dart"
 Cohesion: 0.04
-Nodes (52): _addCashReceived, build, _buildCashPaymentInputs, _buildCashQuickButton, _buildCheckoutHeader, _buildDiscountSelector, _buildEqualSplitControls, _buildGuestBadge (+44 more)
+Nodes (50): _addCashReceived, build, _buildCashPaymentInputs, _buildCashQuickButton, _buildCheckoutHeader, _buildDiscountSelector, _buildEqualSplitControls, _buildGuestBadge (+42 more)
 
 ### Community 14 - "ShiftsService"
-Cohesion: 0.06
-Nodes (6): CloseShiftDto, CreateTransactionDto, OpenShiftDto, ShiftsRepository, ShiftsController, ShiftsService
+Cohesion: 0.07
+Nodes (5): CloseShiftDto, CreateTransactionDto, OpenShiftDto, ShiftsController, ShiftsService
 
 ### Community 15 - "login_screen.dart"
 Cohesion: 0.04
 Nodes (45): _activationError, _apiUrlController, _branchIdController, _branchNameController, build, _buildActivationView, _buildBrandingPanel, _buildButtonContent (+37 more)
 
 ### Community 16 - "app.module.ts"
-Cohesion: 0.07
-Nodes (19): DatabaseModule, AuthModule, AdminGuard, BranchesModule, CatalogModule, InquiriesModule, InventoryModule, LogsModule (+11 more)
+Cohesion: 0.09
+Nodes (15): DatabaseModule, AdminGuard, BranchesModule, CatalogModule, InquiriesModule, InventoryModule, OrdersModule, OwnerCopilotModule (+7 more)
 
 ### Community 17 - "@nestjs/common"
-Cohesion: 0.12
-Nodes (12): DRIZZLE_CONNECTION, UpsertBranchProductInput, ThresholdsService, UpsertThresholdInput, UpsertWarehouseThresholdInput, TransactionsRepository, ShiftsModule, drizzle-orm (+4 more)
+Cohesion: 0.08
+Nodes (18): AppModule, DRIZZLE_CONNECTION, UpsertBranchProductInput, CategoriesRepository, ProductsRepository, LedgerMovementInput, LedgerService, UpsertThresholdInput (+10 more)
 
 ### Community 18 - "roles.ts"
-Cohesion: 0.10
-Nodes (23): ROLES_KEY, JwtAuthGuard, RolesGuard, BRANCH_OPERATOR_ROLE, CASHIER_ROLE, ENCARGADO_ROLE, INVENTORY_ADMIN_ROLE, normalizeOperationalRole() (+15 more)
+Cohesion: 0.08
+Nodes (26): Roles(), ROLES_KEY, JwtAuthGuard, RolesGuard, BRANCH_OPERATOR_ROLE, CASHIER_ROLE, ENCARGADO_ROLE, INVENTORY_ADMIN_ROLE (+18 more)
 
 ### Community 20 - "LandingPage.tsx"
-Cohesion: 0.16
-Nodes (13): App(), Button(), ButtonProps, Typography(), TypographyProps, BrandCard(), BrandCardProps, BrandGrid() (+5 more)
+Cohesion: 0.17
+Nodes (13): Button(), ButtonProps, Typography(), TypographyProps, BrandCard(), BrandCardProps, BrandGrid(), ContactForm() (+5 more)
 
 ### Community 21 - "devDependencies"
 Cohesion: 0.07
@@ -430,8 +425,8 @@ Cohesion: 0.04
 Nodes (46): adminBusinessAccess, branches, branchProducts, branchRequisitionItems, branchRequisitions, branchStockThresholds, branchTables, bulkImports (+38 more)
 
 ### Community 23 - "PurchaseOrdersService"
-Cohesion: 0.08
-Nodes (3): PurchaseOrdersController, PurchaseOrdersService, PurchaseOrdersRepository
+Cohesion: 0.06
+Nodes (7): InventoryService, CreatePurchaseOrderDto, PurchaseOrderItemDto, UpdatePurchaseOrderDto, PurchaseOrdersController, PurchaseOrdersService, PurchaseOrdersRepository
 
 ### Community 24 - "@playwright/test"
 Cohesion: 0.10
@@ -443,7 +438,7 @@ Nodes (42): build, _clearCloseInputs, _closeNotesController, _countedCashFromDen
 
 ### Community 26 - "CategoriesRepository"
 Cohesion: 0.07
-Nodes (5): CategoriesController, CategoriesService, CreateCategoryDto, UpdateCategoryDto, CategoriesRepository
+Nodes (4): CategoriesController, CategoriesService, CreateCategoryDto, UpdateCategoryDto
 
 ### Community 27 - "catalog.module.ts"
 Cohesion: 0.07
@@ -451,11 +446,7 @@ Nodes (5): CreateSupplierProductDto, UpdateSupplierProductDto, SupplierProductsR
 
 ### Community 28 - "business_control_tauri/src/App.tsx"
 Cohesion: 0.21
-Nodes (35): App(), roleTabs, Badge(), Button(), Heading(), Input, Autocomplete(), FormField() (+27 more)
-
-### Community 29 - "ProvidersRepository"
-Cohesion: 0.08
-Nodes (5): CreateProviderDto, UpdateProviderDto, ProvidersController, ProvidersService, ProvidersRepository
+Nodes (34): App(), roleTabs, Badge(), Button(), Heading(), Input, Autocomplete(), FormField() (+26 more)
 
 ### Community 30 - "CreateWarehouseDto"
 Cohesion: 0.07
@@ -467,47 +458,51 @@ Nodes (20): AppDelegate, SceneDelegate, RunnerTests, RegisterGeneratedPlugins(),
 
 ### Community 32 - "encargado_caja_tab.dart"
 Cohesion: 0.05
-Nodes (44): _activeSubView, build, _buildControlDeCajaView, _buildFilterChip, _buildMetricCard, _buildOrdenesCobradasView, _buildSegmentButton, _buildTicketCard (+36 more)
+Nodes (42): _activeSubView, build, _buildControlDeCajaView, _buildFilterChip, _buildMetricCard, _buildOrdenesCobradasView, _buildSegmentButton, _buildTicketCard (+34 more)
 
 ### Community 33 - "ref_react"
-Cohesion: 0.07
-Nodes (38): ButtonProps, HeadingProps, InputProps, FormFieldProps, ToastContainerProps, ToastNotification(), ToastNotificationProps, AdministratorsPageProps (+30 more)
+Cohesion: 0.08
+Nodes (28): ButtonProps, HeadingProps, ToastContainerProps, ToastNotification(), ToastNotificationProps, BranchCatalogPageProps, ITEM_TYPE_LABELS, InventoryDashboardPageProps (+20 more)
 
 ### Community 34 - "by_items_payment_screen.dart"
 Cohesion: 0.05
 Nodes (40): _allItemsPaid, build, _buildActionButtons, _buildCardInput, _buildCashInput, _buildHeader, _buildLeftPanel, _buildPaymentInputs (+32 more)
 
 ### Community 35 - "equal_split_payment_screen.dart"
-Cohesion: 0.04
-Nodes (45): build, _buildCardInput, _buildCashInput, _buildHeader, _buildLeftPanel, _buildNavigationButtons, _buildPaymentInputs, _buildPaymentMethodSelector (+37 more)
+Cohesion: 0.05
+Nodes (43): build, _buildCardInput, _buildCashInput, _buildHeader, _buildLeftPanel, _buildNavigationButtons, _buildPaymentInputs, _buildPaymentMethodSelector (+35 more)
 
 ### Community 36 - "operator_operations_tabs.dart"
-Cohesion: 0.05
-Nodes (40): ByItemsPaymentScreen, _ByItemsPaymentScreenState, amount, build, controller, createState, DailySalesTab, _DailySalesTabState (+32 more)
+Cohesion: 0.04
+Nodes (58): ByItemsPaymentScreen, _ByItemsPaymentScreenState, CashierDashboardScreen, _CashierDashboardScreenState, EqualSplitPaymentScreen, _EqualSplitPaymentScreenState, GuestSplitPaymentScreen, _GuestSplitPaymentScreenState (+50 more)
 
 ### Community 37 - "menu_generator/package.json"
-Cohesion: 0.07
-Nodes (41): dependencies, js-yaml@^5.4.1, jspdf@^4.2.1, lucide-react@^1.41.0, react@^19.2.8, react-dom@^19.2.8, devDependencies, oxlint@^1.79.0 (+33 more)
+Cohesion: 0.06
+Nodes (43): dependencies, html-to-image@^1.11.13, js-yaml@^5.4.1, jspdf@^4.2.1, lucide-react@^1.41.0, react@^19.2.8, react-dom@^19.2.8, devDependencies (+35 more)
 
 ### Community 39 - "frontend/package.json"
 Cohesion: 0.07
-Nodes (39): devDependencies, eslint@^10.3.0, @eslint/js@^10.0.1, globals@^17.6.0, jsdom@^29.1.1, @testing-library/dom@^10.4.1, @testing-library/jest-dom@^6.9.1, @testing-library/react@^16.3.2 (+31 more)
+Nodes (37): devDependencies, eslint@^10.3.0, @eslint/js@^10.0.1, eslint-plugin-react-hooks@^7.1.1, globals@^17.6.0, jsdom@^29.1.1, @testing-library/dom@^10.4.1, @types/leaflet@^1.9.21 (+29 more)
 
 ### Community 40 - "waiter_ordering_screen.dart"
 Cohesion: 0.05
 Nodes (33): activeGenders, activeOrderingTable, build, _buildFloorMap, _buildGuestSelectorBar, _buildHeader, _buildInfoSidebar, _buildInfoStatCard (+25 more)
+
+### Community 41 - "KitchenRepository"
+Cohesion: 0.08
+Nodes (5): UpdateTicketStatusDto, KitchenController, KitchenModule, KitchenService, KitchenRepository
 
 ### Community 42 - "remote_logger.dart"
 Cohesion: 0.05
 Nodes (28): breadcrumb, _breadcrumbs, _capturing, clientOverride, _debounce, _dedupeWindow, didChangeAppLifecycleState, error (+20 more)
 
 ### Community 43 - "api.ts"
-Cohesion: 0.08
-Nodes (37): AuthContext, AuthProvider(), DateRangeType, ReportsPageProps, GUEST_LABELS, guestLabel(), TicketsPageProps, apiRequest() (+29 more)
+Cohesion: 0.06
+Nodes (51): AuthContext, AuthContextType, AuthProvider(), formatTime(), LEVEL_VARIANT, LogsPage(), SOURCE_LABEL, todayInMexico() (+43 more)
 
 ### Community 44 - "desktop_printer_settings_dialog.dart"
-Cohesion: 0.03
-Nodes (50): AppState, BluetoothSettingsDialog, _BluetoothSettingsDialogState, build, _buildPaperWidthSelector, _buildPrintStationSection, _buildReceiveRemoteJobsSwitch, _checkStatusAndScan (+42 more)
+Cohesion: 0.04
+Nodes (48): AppState, build, _buildPaperWidthSelector, _buildPrintStationSection, _buildReceiveRemoteJobsSwitch, _checkStatusAndScan, createState, _devices (+40 more)
 
 ### Community 45 - "recipes.service.ts"
 Cohesion: 0.08
@@ -515,7 +510,7 @@ Nodes (6): RecipeItemDto, SetRecipeDto, RecipesController, RecipesModule, Recipe
 
 ### Community 46 - "create_requisition.dart"
 Cohesion: 0.06
-Nodes (32): _buildPaymentTypeSelector, build, _cancelCreation, charCodes, _confirmDiscard, CreateRequisitionScreen, _CreateRequisitionScreenState, createState (+24 more)
+Nodes (30): _buildPaymentTypeSelector, build, _cancelCreation, charCodes, _confirmDiscard, createState, fromCharCodes, _fromRemoteRequisition (+22 more)
 
 ### Community 47 - "dependencies"
 Cohesion: 0.05
@@ -533,6 +528,10 @@ Nodes (30): branch, buildDate, _cachedMetadata, cacheDuration, checkForUpdates, 
 Cohesion: 0.08
 Nodes (13): main, buildBadge, main, main, main, main, delete, main (+5 more)
 
+### Community 51 - "auth.service.ts"
+Cohesion: 0.13
+Nodes (5): AuthModule, LoginDto, RefreshTokenDto, TabletLoginDto, UsersModule
+
 ### Community 52 - "steps"
 Cohesion: 0.06
 Nodes (34): args, inputs, integration, scope, spec, default, prompt, type (+26 more)
@@ -547,7 +546,7 @@ Nodes (14): fl_register_plugins(), main(), first_frame_cb(), my_application_acti
 
 ### Community 55 - "ReportsService"
 Cohesion: 0.06
-Nodes (12): LocalDemoOwnerCopilotProvider, OwnerCopilotController, FIXTURES, OwnerCopilotService, OWNER_COPILOT_READ_TOOLS, OwnerCopilotActor, OwnerCopilotPlan, OwnerCopilotProvider (+4 more)
+Nodes (12): LocalDemoOwnerCopilotProvider, FIXTURES, Db, OwnerCopilotService, OWNER_COPILOT_READ_TOOLS, OwnerCopilotActor, OwnerCopilotPlan, OwnerCopilotProvider (+4 more)
 
 ### Community 57 - "common.sh"
 Cohesion: 0.14
@@ -582,12 +581,12 @@ Cohesion: 0.11
 Nodes (25): BULK_UOMS, InventoryPageProps, isSupplyItem(), ITEM_TYPE_LABELS, productDecimals(), PRODUCTION_STRATEGY_LABELS, UOM_LABELS, buildCorteSimulation() (+17 more)
 
 ### Community 65 - "menu_generator/src/App.tsx"
-Cohesion: 0.11
-Nodes (23): html-to-image@^1.11.13, App(), getCatalogHash(), EditorHeader(), EditorHeaderProps, MenuInfoEditor(), COLOR_PRESETS, ThemeEditor() (+15 more)
+Cohesion: 0.10
+Nodes (25): App(), getCatalogHash(), EditorHeader(), EditorHeaderProps, MenuInfoEditor(), SectionEditor(), COLOR_PRESETS, ThemeEditor() (+17 more)
 
 ### Community 66 - "MenuTheme"
-Cohesion: 0.20
-Nodes (21): ColumnarTableLayoutProps, DenseListLayoutProps, DiagonalTwoLayoutProps, DishImageRenderer(), DishImageRendererProps, EditorialFourLayoutProps, EditorialThreeLayoutProps, HeroOneLayoutProps (+13 more)
+Cohesion: 0.15
+Nodes (30): ColumnarTableLayout(), ColumnarTableLayoutProps, SectionPhotoCard(), SectionPhotoCardProps, DenseListLayout(), DenseListLayoutProps, DiagonalTwoLayout(), DiagonalTwoLayoutProps (+22 more)
 
 ### Community 67 - "requisitions_flow_test.dart"
 Cohesion: 0.08
@@ -597,17 +596,9 @@ Nodes (19): delete, FakeSecureStorage, main, read, _storage, write, delete, Fake
 Cohesion: 0.07
 Nodes (26): ComandaPrintSelection, activeGenders, build, _buildGuestBadge, _buildItemsPane, _buildSummaryPane, _cartItems, CartSidebar (+18 more)
 
-### Community 69 - "SyncGateway"
-Cohesion: 0.10
-Nodes (3): KitchenModule, KitchenService, SyncGateway
-
-### Community 70 - "CreateAdminUserDto"
-Cohesion: 0.11
-Nodes (4): AdminRole, AdminBusinessAccessDto, CreateAdminUserDto, UpdateAdminUserDto
-
 ### Community 71 - "users.service.ts"
-Cohesion: 0.10
-Nodes (5): UserRole, CreateUserDto, USER_ROLES, UpdateUserDto, bcrypt
+Cohesion: 0.06
+Nodes (7): AdminRole, AdminBusinessAccessDto, CreateAdminUserDto, CreateUserDto, USER_ROLES, UpdateAdminUserDto, UpdateUserDto
 
 ### Community 73 - "table_node.dart"
 Cohesion: 0.08
@@ -622,15 +613,15 @@ Cohesion: 0.08
 Nodes (24): compilerOptions, allowSyntheticDefaultImports, baseUrl, declaration, emitDecoratorMetadata, esModuleInterop, experimentalDecorators, forceConsistentCasingInFileNames (+16 more)
 
 ### Community 77 - "RemoteLogger"
-Cohesion: 0.12
+Cohesion: 0.11
 Nodes (10): AppErrorBoundary, Props, State, Entry, Level, LoggerConfig, normalize(), RemoteLogger (+2 more)
 
 ### Community 78 - "modifier_dialog.dart"
-Cohesion: 0.09
-Nodes (19): build, createState, dispose, existingOrderItem, guestGenders, initialSelectedGuestIndex, initState, item (+11 more)
+Cohesion: 0.12
+Nodes (14): build, createState, dispose, existingOrderItem, guestGenders, initialSelectedGuestIndex, initState, item (+6 more)
 
 ### Community 79 - "utils.cpp"
-Cohesion: 0.19
+Cohesion: 0.12
 Nodes (4): wWinMain(), CreateAndAttachConsole(), GetCommandLineArguments(), Utf8FromUtf16()
 
 ### Community 80 - "dependencies"
@@ -642,8 +633,8 @@ Cohesion: 0.14
 Nodes (4): UpsertTicketSettingsDto, TicketSettingsController, TicketSettingsModule, TicketSettingsService
 
 ### Community 82 - "DashboardPage.tsx"
-Cohesion: 0.17
-Nodes (17): getPosRoles(), PosEmployeeRole, roleOptions, UserForm(), UserFormProps, UsersGrid(), UsersGridProps, BranchCatalogPageProps (+9 more)
+Cohesion: 0.25
+Nodes (13): getPosRoles(), PosEmployeeRole, roleOptions, UserForm(), UserFormProps, UsersGrid(), UsersGridProps, DashboardPage() (+5 more)
 
 ### Community 83 - "steps"
 Cohesion: 0.09
@@ -657,10 +648,6 @@ Nodes (20): UpdateCheckResult, build, _buildErrorContent, _buildFallbackDownload
 Cohesion: 0.09
 Nodes (23): scripts, build, catalog:to-insumos, db:clean, db:clean-all-sales, db:clean-old-history, db:clean-today, db:import-excel (+15 more)
 
-### Community 87 - "InventoryService"
-Cohesion: 0.18
-Nodes (3): InventoryService, deductDirectStock(), deductIngredients()
-
 ### Community 88 - "waiter_billing_flow_test.dart"
 Cohesion: 0.09
 Nodes (20): SecureStorageService, createDialogUnderTest, FakeSecureStorageService, getPendingOrderSyncJobs, getPendingSaleSyncJobs, getReadyPickupOrders, getSavedPrinter, getTerminalConfig (+12 more)
@@ -671,7 +658,7 @@ Nodes (14): delete, _expectedStatuses, head, logger, patch, path, post, put (+6 
 
 ### Community 92 - "connection.ts"
 Cohesion: 0.13
-Nodes (12): APPLY, FORCE, groupKey(), main(), APPLY, EXPECTED, main(), AppModule (+4 more)
+Nodes (12): APPLY, FORCE, groupKey(), main(), APPLY, EXPECTED, main(), db (+4 more)
 
 ### Community 93 - "compilerOptions"
 Cohesion: 0.10
@@ -682,8 +669,8 @@ Cohesion: 0.11
 Nodes (6): FlutterWindow::OnDestroy(), FlutterWindow, flutter_controller_, FlutterWindow::FlutterWindow(), project_, Win32Window::OnDestroy()
 
 ### Community 95 - "ProductsService"
-Cohesion: 0.19
-Nodes (6): normalizeItemType(), normalizeProductionStrategy(), normalizeUom(), ProductsService, resolveItemFlags(), resolveSaleType()
+Cohesion: 0.18
+Nodes (7): normalizeItemType(), normalizeProductionStrategy(), normalizeUom(), ProductsService, recalculateSheetRange(), resolveItemFlags(), resolveSaleType()
 
 ### Community 96 - "compilerOptions"
 Cohesion: 0.11
@@ -706,8 +693,8 @@ Cohesion: 0.11
 Nodes (17): compilerOptions, allowImportingTsExtensions, erasableSyntaxOnly, lib, module, moduleDetection, moduleResolution, noEmit (+9 more)
 
 ### Community 101 - "DishEditor.tsx"
-Cohesion: 0.15
-Nodes (19): BackgroundRemovalModal(), BackgroundRemovalModalProps, DishEditor(), DishEditorProps, SAMPLE_DISH_IMAGES, QuickTextImportModal(), QuickTextImportModalProps, SectionEditor() (+11 more)
+Cohesion: 0.14
+Nodes (19): BackgroundRemovalModal(), BackgroundRemovalModalProps, DishEditor(), DishEditorProps, SAMPLE_DISH_IMAGES, QuickTextImportModal(), QuickTextImportModalProps, SectionEditorProps (+11 more)
 
 ### Community 102 - "local_requisition.dart"
 Cohesion: 0.11
@@ -721,16 +708,12 @@ Nodes (16): agedBronze, agedBronzeDark, champagneGold, champagneGoldLight, charc
 Cohesion: 0.16
 Nodes (9): "cash_transactions", "categories", "devices", "products", "users", "providers", "bulk_imports", "admin_business_access" (+1 more)
 
-### Community 105 - "auth.service.ts"
-Cohesion: 0.08
-Nodes (6): AuthController, AuthService, LoginDto, RefreshTokenDto, TabletLoginDto, AuthRepository
-
 ### Community 107 - "assertBusinessAccess"
-Cohesion: 0.17
-Nodes (11): assertBusinessAccess(), AuthenticatedBusinessUser, getUserBusinessIds(), getUserRoles(), isGlobalOwner(), ADMIN_ROLES, OrdersAccessGuard, probe() (+3 more)
+Cohesion: 0.18
+Nodes (11): assertBusinessAccess(), AuthenticatedBusinessUser, getUserBusinessIds(), getUserRoles(), isGlobalOwner(), ADMIN_ROLES, normalizeOperationalRole(), OrdersAccessGuard (+3 more)
 
 ### Community 108 - "InquiriesService"
-Cohesion: 0.13
+Cohesion: 0.14
 Nodes (3): InquiriesController, InquiriesService, Inquiry
 
 ### Community 109 - "compilerOptions"
@@ -742,12 +725,8 @@ Cohesion: 0.16
 Nodes (13): express@^5.2.1, addUser(), app, DATA_DIR, defaultUsers, deleteUser(), findUserByPin(), getUsers() (+5 more)
 
 ### Community 112 - "backend/package.json"
-Cohesion: 0.13
-Nodes (18): author, description, devDependencies, tsx@^4.22.3, @types/node@^25.9.1, typescript@^6.0.3, vitest@^4.1.7, tsx (+10 more)
-
-### Community 113 - "CreatePurchaseOrderDto"
-Cohesion: 0.19
-Nodes (3): CreatePurchaseOrderDto, PurchaseOrderItemDto, UpdatePurchaseOrderDto
+Cohesion: 0.08
+Nodes (30): author, dependencies, @google-cloud/firestore@^8.6.0, @google-cloud/functions-framework@^5.0.2, description, devDependencies, tsx@^4.22.3, @types/node@^25.9.1 (+22 more)
 
 ### Community 114 - ""public"."products""
 Cohesion: 0.13
@@ -762,8 +741,12 @@ Cohesion: 0.24
 Nodes (14): _byte_length(), check_existing_branches(), clean_branch_name(), _extract_highest_number(), _find_project_root(), generate_branch_name(), get_highest_from_branches(), get_highest_from_remote_refs() (+6 more)
 
 ### Community 119 - "Win32Window"
-Cohesion: 0.18
-Nodes (7): FlutterWindow::OnCreate(), Win32Window::GetClientArea(), Win32Window::OnCreate(), Win32Window, child_content_, quit_on_close_, window_handle_
+Cohesion: 0.17
+Nodes (7): FlutterWindow::OnCreate(), Win32Window::Destroy(), Win32Window::OnCreate(), Win32Window, child_content_, quit_on_close_, window_handle_
+
+### Community 120 - "main.dart"
+Cohesion: 0.20
+Nodes (5): appState, build, main, MyApp, state
 
 ### Community 121 - "create-new-feature.ps1"
 Cohesion: 0.20
@@ -781,9 +764,9 @@ Nodes (14): config, defaults, branch_numbering, init_commit_message, extension, 
 Cohesion: 0.14
 Nodes (13): compilerOptions, esModuleInterop, forceConsistentCasingInFileNames, module, moduleResolution, outDir, resolveJsonModule, rootDir (+5 more)
 
-### Community 125 - "win32_window.cpp"
-Cohesion: 0.13
-Nodes (7): Win32Window::Destroy(), Win32Window::GetHandle(), Win32Window::Show(), EnableNonClientDpiScaling, WindowClassRegistrar, class_registered_, instance_
+### Community 125 - "WindowClassRegistrar"
+Cohesion: 0.25
+Nodes (3): WindowClassRegistrar, class_registered_, instance_
 
 ### Community 126 - "theme"
 Cohesion: 0.15
@@ -793,9 +776,9 @@ Nodes (13): theme, accentColor, bodyFont, borderColor, cardStyle, dishBackdrop, 
 Cohesion: 0.26
 Nodes (12): API, call(), [command = 'summary', ...rest], commands, common(), flags, fmtTime(), indent() (+4 more)
 
-### Community 131 - "AdminLayout.tsx"
-Cohesion: 0.16
-Nodes (14): AdminTab, StatusIndicator(), StatusIndicatorProps, LoginForm(), LoginFormProps, AdminLayoutProps, AuthContextType, useAuthContext() (+6 more)
+### Community 131 - "ref_react"
+Cohesion: 0.09
+Nodes (23): InputProps, FormFieldProps, StatusIndicator(), StatusIndicatorProps, LoginForm(), LoginFormProps, AdminLayout(), useAuthContext() (+15 more)
 
 ### Community 132 - "WarehouseInventoryPage.tsx"
 Cohesion: 0.17
@@ -809,13 +792,13 @@ Nodes (11): compilerOptions, declaration, esModuleInterop, module, moduleResolut
 Cohesion: 0.17
 Nodes (12): backgroundBlur, backgroundImage, backgroundOverlayOpacity, cardMode, enabled, footer, slogan, style (+4 more)
 
-### Community 135 - "MenuPageRenderer.tsx"
-Cohesion: 0.27
-Nodes (10): ColumnarTableLayout(), SectionPhotoCard(), SectionPhotoCardProps, DenseListLayout(), DiagonalTwoLayout(), EditorialFourLayout(), EditorialThreeLayout(), HeroOneLayout() (+2 more)
-
 ### Community 137 - "BulkGeneratePoByProductsDto"
 Cohesion: 0.17
 Nodes (4): BulkGeneratePoByProductsDto, BulkGeneratePoDto, PoProductItemDto, RefreshDto
+
+### Community 139 - "CreateOrderDto"
+Cohesion: 0.15
+Nodes (3): AddOrderItemsDto, CreateOrderDto, OrderItemDto
 
 ### Community 140 - "scripts"
 Cohesion: 0.18
@@ -830,8 +813,8 @@ Cohesion: 0.22
 Nodes (9): __dirname, EndpointInfo, __filename, main(), MAPPED_TOOL_PREFIXES, scanControllers(), parseController(), walk() (+1 more)
 
 ### Community 143 - "menu.ts"
-Cohesion: 0.35
-Nodes (8): BRAND_LOGOS, CURATED_BACKGROUNDS, MenuInfoEditorProps, CoverPageProps, HorizontalCoverPageProps, Cover, ImageTransform, Restaurant
+Cohesion: 0.28
+Nodes (11): BRAND_LOGOS, CURATED_BACKGROUNDS, MenuInfoEditorProps, CoverPage(), CoverPageProps, HorizontalCoverPage(), HorizontalCoverPageProps, PagePreviewContainer() (+3 more)
 
 ### Community 144 - "config"
 Cohesion: 0.18
@@ -841,9 +824,13 @@ Nodes (10): description, file, name, description, name, required, template, prov
 Cohesion: 0.18
 Nodes (10): background_color, description, display, icons, name, orientation, prefer_related_applications, short_name (+2 more)
 
+### Community 147 - "Size"
+Cohesion: 0.50
+Nodes (3): Size, height, width
+
 ### Community 148 - "products.service.ts"
-Cohesion: 0.21
-Nodes (3): UpdateProductDto, ITEM_TYPE_FLAGS, recalculateSheetRange()
+Cohesion: 0.12
+Nodes (3): CreateProductDto, UpdateProductDto, ITEM_TYPE_FLAGS
 
 ### Community 149 - "dev-all.sh"
 Cohesion: 0.33
@@ -852,6 +839,10 @@ Nodes (9): cmd_start(), cmd_status(), cmd_stop(), is_http_ok(), is_port_our_back
 ### Community 150 - "dishes"
 Cohesion: 0.20
 Nodes (10): dishes, description, id, image, name, price, prices, review_required (+2 more)
+
+### Community 151 - "win32_window.cpp"
+Cohesion: 0.14
+Nodes (7): Win32Window::GetClientArea(), Win32Window::GetHandle(), Win32Window::Show(), EnableFullDpiSupportIfAvailable(), EnableNonClientDpiScaling, Scale(), Win32Window::Win32Window()
 
 ### Community 152 - "google_storage_bucket.tfstate"
 Cohesion: 0.33
@@ -865,13 +856,9 @@ Nodes (10): "branches", "businesses", idx_owner_copilot_conversation_correlation
 Cohesion: 0.27
 Nodes (5): classifyProduct(), generate(), classifyProduct(), CsvRow, main()
 
-### Community 155 - "LogsPage.tsx"
-Cohesion: 0.15
-Nodes (11): formatTime(), LEVEL_VARIANT, LogsPage(), SOURCE_LABEL, todayInMexico(), LogEntryDetail, LogIssue, LogLevel (+3 more)
-
 ### Community 156 - "OwnerCopilotPage.tsx"
-Cohesion: 0.24
-Nodes (9): ActionProposal(), OwnerCopilotPage(), OwnerCopilotPageProps, SUGGESTIONS, ToolActivityCard(), toolStatus, OwnerCopilotActionProposal, OwnerCopilotMessage (+1 more)
+Cohesion: 0.19
+Nodes (12): AdminTab, AdminLayoutProps, ActionProposal(), OwnerCopilotPage(), OwnerCopilotPageProps, SOURCE_TABS, SUGGESTIONS, ToolActivityCard() (+4 more)
 
 ### Community 158 - "jest"
 Cohesion: 0.22
@@ -885,13 +872,9 @@ Nodes (40): firstHeading(), firstParagraph(), frontmatter(), main(), prepare(), 
 Cohesion: 0.22
 Nodes (9): command, description, optional, command, description, optional, hooks, before_constitution (+1 more)
 
-### Community 162 - "YamlModal.tsx"
-Cohesion: 0.43
-Nodes (6): YamlModal(), YamlModalProps, exportMenuToYaml(), parseMenuYaml(), RawYamlMenu, resolveDishImage()
-
 ### Community 163 - "TransfersPage.tsx"
 Cohesion: 0.11
-Nodes (17): BadgeProps, AutocompleteOption, AutocompleteProps, MesasActivasPage(), MesasActivasPageProps, ROOM_ICONS, stateColor(), statusLabel() (+9 more)
+Nodes (18): BadgeProps, AutocompleteOption, AutocompleteProps, MesasActivasPage(), MesasActivasPageProps, ROOM_ICONS, stateColor(), statusLabel() (+10 more)
 
 ### Community 164 - "compilerOptions"
 Cohesion: 0.25
@@ -912,10 +895,6 @@ Nodes (10): "branch_tables", "cash_shifts", "refresh_tokens", "print_jobs", prin
 ### Community 170 - "import-excel-inventories.ts"
 Cohesion: 0.43
 Nodes (7): determineItemClassification(), formatDept(), main(), getOrCreateCategory(), normName(), parseNum(), parseUom()
-
-### Community 171 - "scripts"
-Cohesion: 0.29
-Nodes (7): scripts, build, dev, gcp-build, predev, start, test
 
 ### Community 172 - "after_analyze"
 Cohesion: 0.25
@@ -990,8 +969,8 @@ Cohesion: 0.25
 Nodes (8): command, condition, description, enabled, extension, optional, prompt, before_taskstoissues
 
 ### Community 190 - "backend/src/index.ts"
-Cohesion: 0.33
-Nodes (3): db, submitInquiry(), { mockCollection, mockDoc, mockSet }
+Cohesion: 0.15
+Nodes (8): db, submitInquiry(), { mockCollection, mockDoc, mockSet }, @testing-library/jest-dom@^6.9.1, @testing-library/react@^16.3.2, App(), @testing-library/jest-dom, @testing-library/react
 
 ### Community 192 - "menu"
 Cohesion: 0.29
@@ -1008,10 +987,6 @@ Nodes (6): name, private, scripts, test, type, version
 ### Community 195 - "default.json"
 Cohesion: 0.33
 Nodes (5): description, identifier, permissions, $schema, windows
-
-### Community 198 - "eslint.config.js"
-Cohesion: 0.24
-Nodes (4): eslint-plugin-react-hooks@^7.1.1, eslint-plugin-react-refresh@^0.5.2, eslint-plugin-react-hooks, eslint-plugin-react-refresh
 
 ### Community 199 - "scripts"
 Cohesion: 0.33
@@ -1037,12 +1012,12 @@ Nodes (5): determineItemClassification(), main(), mapUomAndSaleType(), normName(
 Cohesion: 0.53
 Nodes (5): DEFAULT_OUTPUT_DIR, padLeft(), padRight(), queryTicketsHoy(), slug()
 
-### Community 208 - ".Create"
-Cohesion: 0.15
-Nodes (8): Scale(), Point, x, y, Size, height, width, Win32Window::Win32Window()
+### Community 208 - "Point"
+Cohesion: 0.50
+Nodes (3): Point, x, y
 
 ### Community 209 - "pin-crypto.ts"
-Cohesion: 0.80
+Cohesion: 0.60
 Nodes (3): decryptPin(), encryptPin(), getEncryptionKey()
 
 ### Community 210 - "hooks"
@@ -1133,17 +1108,13 @@ Nodes (3): provider.registry.terraform.io/hashicorp/archive, provider.registry.t
 Cohesion: 0.50
 Nodes (3): include, linter, rules
 
-### Community 234 - "dependencies"
-Cohesion: 0.40
-Nodes (5): dependencies, @google-cloud/firestore@^8.6.0, @google-cloud/functions-framework@^5.0.2, @google-cloud/firestore, @google-cloud/functions-framework
-
 ### Community 235 - "import-menu-products.ts"
 Cohesion: 0.83
 Nodes (3): main(), norm(), resolveCategoryName()
 
 ### Community 237 - "MapTabber.tsx"
-Cohesion: 0.28
-Nodes (9): TabItem(), TabItemProps, MapTabber(), goldIcon, MapController(), MapView(), MapViewProps, Location (+1 more)
+Cohesion: 0.29
+Nodes (8): TabItem(), TabItemProps, goldIcon, MapController(), MapView(), MapViewProps, Location, locationsData
 
 ### Community 238 - "tsconfig.build.json"
 Cohesion: 0.50
@@ -1298,24 +1269,24 @@ Cohesion: 0.10
 Nodes (20): author, description, @eslint/eslintrc@^3.2.0, @nestjs/schematics@^11.0.0, source-map-support@^0.5.21, ts-loader@^9.5.2, tsconfig-paths@^4.2.0, @types/jest@^30.0.0 (+12 more)
 
 ## Knowledge Gaps
-- **1292 isolated node(s):** `business_control_tauri`, `appState`, `state`, `main`, `build` (+1287 more)
+- **1292 isolated node(s):** `_activeCloudOrderIdForTable`, `_activeOrderIdsByTableRemoteId`, `activePaymentType`, `activeShiftId`, `addCashDrop` (+1287 more)
   These have ≤1 connection - possible missing edges. (Counts symbols only; 3047 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **86 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **83 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `@nestjs/common` connect `@nestjs/common` to `SyncGateway`, `BranchesRepository`, `printing.service.ts`, `RequisitionsRepository`, `log-entry.ts`, `app.module.ts`, `roles.ts`, `products.service.ts`, `PurchaseOrdersService`, `CategoriesRepository`, `catalog.module.ts`, `ProvidersRepository`, `CreateWarehouseDto`, `recipes.service.ts`, `ReportsService`, `sync_api/package.json`, `SyncGateway`, `users.service.ts`, `dependencies`, `ticket-settings.service.ts`, `app.service.ts`, `connection.ts`, `auth.service.ts`, `assertBusinessAccess`, `InquiriesService`, `CreatePurchaseOrderDto`?**
-  _High betweenness centrality (0.049) - this node is a cross-community bridge._
-- **What connects `business_control_tauri`, `appState`, `state` to the rest of the system?**
+- **Why does `@nestjs/common` connect `@nestjs/common` to `SyncGateway`, `BranchesRepository`, `printing.service.ts`, `log-entry.ts`, `app.module.ts`, `roles.ts`, `products.service.ts`, `PurchaseOrdersService`, `CategoriesRepository`, `catalog.module.ts`, `CreateProviderDto`, `CreateWarehouseDto`, `KitchenRepository`, `recipes.service.ts`, `auth.service.ts`, `ReportsService`, `sync_api/package.json`, `users.service.ts`, `dependencies`, `ticket-settings.service.ts`, `app.service.ts`, `connection.ts`, `assertBusinessAccess`, `InquiriesService`?**
+  _High betweenness centrality (0.056) - this node is a cross-community bridge._
+- **What connects `_activeCloudOrderIdForTable`, `_activeOrderIdsByTableRemoteId`, `activePaymentType` to the rest of the system?**
   _1292 weakly-connected nodes found - possible missing edges._
 - **Should `app_state.dart` be split into smaller, more focused modules?**
   _Cohesion score 0.005970149253731343 - nodes in this community are weakly interconnected._
-- **Why does `drizzle-orm` connect `@nestjs/common` to `sync_api/package.json`, `SyncGateway`, `BranchesRepository`, `SyncGateway`, `import-excel-inventories.ts`, `import-menu-products.ts`, `import-finance-data.ts`, `assertBusinessAccess`, `recipes.service.ts`, `RequisitionsRepository`, `dependencies`, `ticket-settings.service.ts`, `roles.ts`, `products.service.ts`, `schema.ts`, `app.service.ts`, `connection.ts`?**
-  _High betweenness centrality (0.032) - this node is a cross-community bridge._
+- **Why does `drizzle-orm` connect `@nestjs/common` to `sync_api/package.json`, `SyncGateway`, `import-excel-inventories.ts`, `import-menu-products.ts`, `import-finance-data.ts`, `assertBusinessAccess`, `recipes.service.ts`, `dependencies`, `ticket-settings.service.ts`, `roles.ts`, `products.service.ts`, `schema.ts`, `app.service.ts`, `connection.ts`?**
+  _High betweenness centrality (0.025) - this node is a cross-community bridge._
 - **Should `SyncGateway` be split into smaller, more focused modules?**
-  _Cohesion score 0.06308610400682012 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0898989898989899 - nodes in this community are weakly interconnected._
 - **Why does `CACHARELO_MENU_PRESET` connect `menu_generator/src/App.tsx` to `import-menu-products.ts`?**
-  _High betweenness centrality (0.029) - this node is a cross-community bridge._
+  _High betweenness centrality (0.018) - this node is a cross-community bridge._
 - **Should `secure_storage_service.dart` be split into smaller, more focused modules?**
   _Cohesion score 0.024390243902439025 - nodes in this community are weakly interconnected._

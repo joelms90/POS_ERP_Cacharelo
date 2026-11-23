@@ -181,9 +181,9 @@
     "semantic_hash": "363df2139f49c59672070b516f7b607b"
   },
   "apps/business_control_tauri/e2e/navigation.spec.ts": {
-    "mtime": 1795408615.179246,
-    "seen": 1795411091.993588,
-    "ast_hash": "938f349910467fe705506d2ccee37b7d",
+    "mtime": 1795411500.523836,
+    "seen": 1795411519.852366,
+    "ast_hash": "c19314f7d6fc2518bef553f2422f4c36",
     "semantic_hash": ""
   },
   "apps/business_control_tauri/e2e/panel-inventory-bulk-oc.spec.ts": {
@@ -285,9 +285,9 @@
     "semantic_hash": "67126b9280dd6db73c40a98c422f7857"
   },
   "apps/business_control_tauri/src/App.tsx": {
-    "mtime": 1795408532.5453303,
-    "seen": 1795411091.993612,
-    "ast_hash": "95358c760809d401f76f80e108d29b91",
+    "mtime": 1795411494.6832507,
+    "seen": 1795411519.8523872,
+    "ast_hash": "41a0051be6df7f24e88d177cd8a35b33",
     "semantic_hash": ""
   },
   "apps/business_control_tauri/src/components/atoms/Badge.tsx": {
@@ -3591,9 +3591,9 @@
     "semantic_hash": ""
   },
   ".claude/workspaces.md": {
-    "mtime": 1795407058.4371748,
-    "seen": 1795411091.994273,
-    "ast_hash": "42268161a204cc77468140815cef7397",
+    "mtime": 1795411143.705317,
+    "seen": 1795411519.853149,
+    "ast_hash": "486fa4a4425a0aebb2aae4ea8d543ae0",
     "semantic_hash": ""
   },
   ".github/copilot-instructions.md": {
@@ -6627,9 +6627,9 @@
     "semantic_hash": ""
   },
   "apps/business_control_tauri/src/pages/OwnerCopilotPage.tsx": {
-    "mtime": 1795408532.5259807,
-    "seen": 1795411091.993651,
-    "ast_hash": "1500aaff98edb8e6506cab63e15a5483",
+    "mtime": 1795411494.6575458,
+    "seen": 1795411519.852438,
+    "ast_hash": "efa15e148bef7529f3c632c2c43634c0",
     "semantic_hash": ""
   },
   "apps/mcp_server/src/owner-copilot-tools.ts": {
@@ -6741,9 +6741,9 @@
     "semantic_hash": ""
   },
   "specs/018-owner-business-copilot/tasks.md": {
-    "mtime": 1795411060.3605115,
-    "seen": 1795411091.9945862,
-    "ast_hash": "bfe9c9b3185b5b49d325ee7c4cc901a2",
+    "mtime": 1795411097.7767787,
+    "seen": 1795411519.853489,
+    "ast_hash": "773473ef6a41619ee1127baf0e4b063c",
     "semantic_hash": ""
   },
   "apps/business_control_tauri/pnpm-lock.yaml": {

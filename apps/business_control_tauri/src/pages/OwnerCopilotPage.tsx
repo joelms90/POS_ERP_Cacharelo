@@ -6,10 +6,19 @@ import {
   OwnerCopilotToolRun,
 } from '../services/api';
 import { Heading } from '../components/atoms/Heading';
+import type { AdminTab } from '../App';
 
 interface OwnerCopilotPageProps {
   businessId: string;
+  onNavigate: (tab: AdminTab) => void;
 }
+
+// The dashboard is an in-app tab shell, not a URL router. Keep API source
+// paths useful by translating known internal sources to their corresponding tab.
+const SOURCE_TABS: Record<string, AdminTab> = {
+  '/inventory/alerts': 'inventory-dashboard',
+  '/reports/sales-dashboard': 'reports',
+};
 
 const SUGGESTIONS = [
   '¿Cómo van las ventas de hoy?',
@@ -59,7 +68,7 @@ function ActionProposal({ proposal, onConfirm, isConfirming }: {
   );
 }
 
-export function OwnerCopilotPage({ businessId }: OwnerCopilotPageProps) {
+export function OwnerCopilotPage({ businessId, onNavigate }: OwnerCopilotPageProps) {
   const [conversationId, setConversationId] = useState<string>();
   const [messages, setMessages] = useState<OwnerCopilotMessage[]>([]);
   const [draft, setDraft] = useState('');
@@ -127,7 +136,14 @@ export function OwnerCopilotPage({ businessId }: OwnerCopilotPageProps) {
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-text-secondary">{message.role === 'owner' ? 'Tú' : 'Copiloto'}</p>
             <p className="whitespace-pre-wrap text-sm text-text-primary">{message.content}</p>
             {message.toolRuns && <div className="mt-3 grid gap-2">{message.toolRuns.map((run, index) => <ToolActivityCard key={`${run.tool}-${index}`} run={run} />)}</div>}
-            {message.sources && message.sources.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{message.sources.map((source) => <a key={source.href} href={source.href} className="text-xs text-champagne-gold underline underline-offset-2" target="_blank" rel="noreferrer">Fuente: {source.label}</a>)}</div>}
+            {message.sources && message.sources.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{message.sources.map((source) => {
+              const tab = SOURCE_TABS[source.href];
+              return tab ? (
+                <button key={source.href} type="button" onClick={() => onNavigate(tab)} className="text-xs text-champagne-gold underline underline-offset-2">Fuente: {source.label}</button>
+              ) : (
+                <a key={source.href} href={source.href} className="text-xs text-champagne-gold underline underline-offset-2" target="_blank" rel="noreferrer">Fuente: {source.label}</a>
+              );
+            })}</div>}
             {message.actionProposal && <ActionProposal proposal={message.actionProposal} isConfirming={confirmingToken === message.actionProposal.confirmationToken} onConfirm={() => void confirm(message.actionProposal!)} />}
           </article>
         ))}
