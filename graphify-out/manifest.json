@@ -285,9 +285,9 @@
     "semantic_hash": "67126b9280dd6db73c40a98c422f7857"
   },
   "apps/business_control_tauri/src/App.tsx": {
-    "mtime": 1795411494.6832507,
-    "seen": 1795411519.8523872,
-    "ast_hash": "41a0051be6df7f24e88d177cd8a35b33",
+    "mtime": 1795666134.8264544,
+    "seen": 1795666146.5384378,
+    "ast_hash": "b4d14addaa8a594405d7998c95aa6805",
     "semantic_hash": ""
   },
   "apps/business_control_tauri/src/components/atoms/Badge.tsx": {
@@ -3591,9 +3591,9 @@
     "semantic_hash": ""
   },
   ".claude/workspaces.md": {
-    "mtime": 1795419844.7652316,
-    "seen": 1795420421.7511601,
-    "ast_hash": "09b14312cd2c3e92f039e12488a75c28",
+    "mtime": 1795666105.5565162,
+    "seen": 1795666146.5391512,
+    "ast_hash": "93d6a2cbdacc0e3249109723951d821d",
     "semantic_hash": ""
   },
   ".github/copilot-instructions.md": {
